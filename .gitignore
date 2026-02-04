@@ -1,0 +1,39 @@
+# IDE
+.idea/
+.vscode/
+*.DS_Store
+*.swp
+
+# Gradle
+.gradle/
+build/
+**/build/
+out/
+bin/
+**/bin/
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Data
+data/
+**/data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+env/
+
+# Node
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.npm/
+
+# OS
+.DS_Store
+Thumbs.db
