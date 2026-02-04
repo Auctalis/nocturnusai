@@ -1,0 +1,168 @@
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: MATCHING OTHER: Parent (pattern=Parent(John, Gibran, Eni))
+DEBUG: INDEXING OTHER: Parent -> Parent(John, Gibran, Eni)
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = [Parent]
+DEBUG: INDEXING Zeus GrandParent ?z
+DEBUG: MATCHING OTHER: Man (pattern=Man(Socrates))
+DEBUG: INDEXING OTHER: Man -> Man(Socrates)
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: INDEXING OTHER: !Mortal -> NOT Mortal(Zeus)
+DEBUG: lookup s=Batman p=Enemies o=Joker
+DEBUG: spo[s] = null
+DEBUG: INDEXING Batman Enemies Joker
+DEBUG: MATCHING OTHER: Man (pattern=Man(Socrates))
+DEBUG: INDEXING OTHER: Man -> Man(Socrates)
+DEBUG: MATCHING OTHER: Man (pattern=Man(Socrates))
+DEBUG: CANDIDATES for Man: [Man(Socrates)]
+DEBUG: INDEXING OTHER: Mortal -> Mortal(Socrates)
+DEBUG: MATCHING OTHER: NonMortal (pattern=NonMortal(Zeus))
+DEBUG: INDEXING OTHER: NonMortal -> NonMortal(Zeus)
+DEBUG: MATCHING OTHER: NonMortal (pattern=NonMortal(Zeus))
+DEBUG: CANDIDATES for NonMortal: [NonMortal(Zeus)]
+DEBUG: INDEXING OTHER: NonMan -> NonMan(Zeus)
+DEBUG: MATCHING OTHER: !Man (pattern=NOT Man(Superman))
+DEBUG: INDEXING OTHER: !Man -> NOT Man(Superman)
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: INDEXING OTHER: !Mortal -> NOT Mortal(Zeus)
+DEBUG: MATCHING OTHER: Dog (pattern=Dog(Fido))
+DEBUG: INDEXING OTHER: Dog -> Dog(Fido)
+DEBUG: MATCHING OTHER: !Man (pattern=NOT Man(Superman))
+DEBUG: INDEXING OTHER: !Man -> NOT Man(Superman)
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: INDEXING OTHER: !Mortal -> NOT Mortal(Zeus)
+DEBUG: MATCHING OTHER: Dog (pattern=Dog(Fido))
+DEBUG: INDEXING OTHER: Dog -> Dog(Fido)
+DEBUG: MATCHING OTHER: !Man (pattern=NOT Man(Superman))
+DEBUG: INDEXING OTHER: !Man -> NOT Man(Superman)
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: INDEXING OTHER: !Mortal -> NOT Mortal(Zeus)
+DEBUG: MATCHING OTHER: Dog (pattern=Dog(Fido))
+DEBUG: INDEXING OTHER: Dog -> Dog(Fido)
+DEBUG: MATCHING OTHER: !Man (pattern=NOT Man(Superman))
+DEBUG: INDEXING OTHER: !Man -> NOT Man(Superman)
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: INDEXING OTHER: !Mortal -> NOT Mortal(Zeus)
+DEBUG: MATCHING OTHER: Dog (pattern=Dog(Fido))
+DEBUG: INDEXING OTHER: Dog -> Dog(Fido)
+DEBUG: MATCHING OTHER: visited (pattern=visited(page1))
+DEBUG: INDEXING OTHER: visited -> visited(page1)
+DEBUG: MATCHING OTHER: visited (pattern=visited(page2))
+DEBUG: INDEXING OTHER: visited -> visited(page2)
+DEBUG: MATCHING OTHER: visited (pattern=visited(page1))
+DEBUG: INDEXING OTHER: visited -> visited(page1)
+DEBUG: MATCHING OTHER: visited (pattern=visited(page2))
+DEBUG: INDEXING OTHER: visited -> visited(page2)
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: MATCHING OTHER: Parent (pattern=Parent(John, Gibran, Eni))
+DEBUG: INDEXING OTHER: Parent -> Parent(John, Gibran, Eni)
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = [Parent]
+DEBUG: INDEXING Zeus GrandParent ?z
+DEBUG: MATCHING OTHER: Man (pattern=Man(Socrates))
+DEBUG: INDEXING OTHER: Man -> Man(Socrates)
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: INDEXING OTHER: !Mortal -> NOT Mortal(Zeus)
+DEBUG: lookup s=Batman p=Enemies o=Joker
+DEBUG: spo[s] = null
+DEBUG: INDEXING Batman Enemies Joker
+DEBUG: MATCHING OTHER: Man (pattern=Man(Socrates))
+DEBUG: INDEXING OTHER: Man -> Man(Socrates)
+DEBUG: MATCHING OTHER: Man (pattern=Man(Socrates))
+DEBUG: CANDIDATES for Man: [Man(Socrates)]
+DEBUG: INDEXING OTHER: Mortal -> Mortal(Socrates)
+DEBUG: MATCHING OTHER: NonMortal (pattern=NonMortal(Zeus))
+DEBUG: INDEXING OTHER: NonMortal -> NonMortal(Zeus)
+DEBUG: MATCHING OTHER: NonMortal (pattern=NonMortal(Zeus))
+DEBUG: CANDIDATES for NonMortal: [NonMortal(Zeus)]
+DEBUG: INDEXING OTHER: NonMan -> NonMan(Zeus)
+DEBUG: MATCHING OTHER: !Man (pattern=NOT Man(Superman))
+DEBUG: INDEXING OTHER: !Man -> NOT Man(Superman)
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: INDEXING OTHER: !Mortal -> NOT Mortal(Zeus)
+DEBUG: MATCHING OTHER: Dog (pattern=Dog(Fido))
+DEBUG: INDEXING OTHER: Dog -> Dog(Fido)
+DEBUG: MATCHING OTHER: !Man (pattern=NOT Man(Superman))
+DEBUG: INDEXING OTHER: !Man -> NOT Man(Superman)
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: INDEXING OTHER: !Mortal -> NOT Mortal(Zeus)
+DEBUG: MATCHING OTHER: Dog (pattern=Dog(Fido))
+DEBUG: INDEXING OTHER: Dog -> Dog(Fido)
+DEBUG: MATCHING OTHER: !Man (pattern=NOT Man(Superman))
+DEBUG: INDEXING OTHER: !Man -> NOT Man(Superman)
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: INDEXING OTHER: !Mortal -> NOT Mortal(Zeus)
+DEBUG: MATCHING OTHER: Dog (pattern=Dog(Fido))
+DEBUG: INDEXING OTHER: Dog -> Dog(Fido)
+DEBUG: MATCHING OTHER: !Man (pattern=NOT Man(Superman))
+DEBUG: INDEXING OTHER: !Man -> NOT Man(Superman)
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: INDEXING OTHER: !Mortal -> NOT Mortal(Zeus)
+DEBUG: MATCHING OTHER: Dog (pattern=Dog(Fido))
+DEBUG: INDEXING OTHER: Dog -> Dog(Fido)
+DEBUG: MATCHING OTHER: visited (pattern=visited(page1))
+DEBUG: INDEXING OTHER: visited -> visited(page1)
+DEBUG: MATCHING OTHER: visited (pattern=visited(page2))
+DEBUG: INDEXING OTHER: visited -> visited(page2)
+DEBUG: MATCHING OTHER: visited (pattern=visited(page1))
+DEBUG: INDEXING OTHER: visited -> visited(page1)
+DEBUG: MATCHING OTHER: visited (pattern=visited(page2))
+DEBUG: INDEXING OTHER: visited -> visited(page2)
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: lookup s=Zeus p=Parent o=Ares
+DEBUG: spo[s] = null
+DEBUG: INDEXING Zeus Parent Ares
+DEBUG: MATCHING OTHER: !Man (pattern=NOT Man(Superman))
+DEBUG: INDEXING OTHER: !Man -> NOT Man(Superman)
+DEBUG: MATCHING OTHER: !Man (pattern=NOT Man(Superman))
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Superman))
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Superman))
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Superman))
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Superman))
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: INDEXING OTHER: !Mortal -> NOT Mortal(Zeus)
+DEBUG: MATCHING OTHER: !Man (pattern=NOT Man(Zeus))
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: MATCHING OTHER: !Mortal (pattern=NOT Mortal(Zeus))
+DEBUG: MATCHING OTHER: Dog (pattern=Dog(Fido))
+DEBUG: INDEXING OTHER: Dog -> Dog(Fido)
+DEBUG: MATCHING OTHER: !Dog (pattern=NOT Dog(Fido))

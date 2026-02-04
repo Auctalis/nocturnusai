@@ -1,0 +1,96 @@
+#!/bin/bash
+
+# Configuration
+SERVER_IMAGE="logic-server"
+WEB_IMAGE="logic-web"
+API_PORT=9300
+WEB_PORT=9400
+
+# Function to check for command existence
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Determine Compose Command
+COMPOSE_CMD=""
+if command_exists "docker" && docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
+elif command_exists "docker-compose"; then
+    COMPOSE_CMD="docker-compose"
+elif command_exists "podman-compose"; then
+    COMPOSE_CMD="podman-compose"
+fi
+
+# Cleanup Function
+cleanup() {
+    echo "Stopping..."
+    if [ -n "$COMPOSE_CMD" ]; then
+        $COMPOSE_CMD down
+    else
+        podman stop logic-server logic-web 2>/dev/null
+        podman rm logic-server logic-web 2>/dev/null
+        podman network rm logic-net 2>/dev/null
+    fi
+    echo "Done."
+    exit
+}
+
+trap cleanup SIGINT SIGTERM
+
+echo "=== Logic Server Launcher ==="
+
+if [ -n "$COMPOSE_CMD" ]; then
+    echo "Using orchestration tool: $COMPOSE_CMD"
+    
+    echo "Building and Starting Stack..."
+    $COMPOSE_CMD up -d --build
+    
+    if [ $? -eq 0 ]; then
+        echo "=== Running ==="
+        echo "Server: http://localhost:$API_PORT"
+        echo "Web:    http://localhost:$WEB_PORT"
+        echo "Logs (Server):"
+        $COMPOSE_CMD logs -f logic-server
+    else
+        echo "Failed to start stack."
+        exit 1
+    fi
+
+else
+    echo "No docker-compose/podman-compose found. Falling back to manual podman commands."
+    
+    # Manual Fallback
+    NETWORK="logic-net"
+    SERVER_CONTAINER="logic-server"
+    WEB_CONTAINER="logic-web"
+    
+    # Cleanup
+    podman stop $SERVER_CONTAINER $WEB_CONTAINER 2>/dev/null
+    podman rm $SERVER_CONTAINER $WEB_CONTAINER 2>/dev/null
+    podman network rm $NETWORK 2>/dev/null
+    
+    podman network create $NETWORK 2>/dev/null || true
+    mkdir -p data
+    
+    echo "Building Server..."
+    podman build -t $SERVER_IMAGE -f Dockerfile .
+    
+    echo "Building Web..."
+    podman build --build-arg VITE_API_URL=http://localhost:$API_PORT -t $WEB_IMAGE -f axiombase-web/Dockerfile axiombase-web
+    
+    echo "Starting Server..."
+    podman run -d --name $SERVER_CONTAINER --network $NETWORK \
+        -p $API_PORT:9300 -v $(pwd)/data:/data \
+        -e STORAGE_DIR=/data \
+        $SERVER_IMAGE
+        
+    echo "Starting Web..."
+    podman run -d --name $WEB_CONTAINER --network $NETWORK \
+        -p $WEB_PORT:80 \
+        $WEB_IMAGE
+        
+    echo "=== Running ==="
+    echo "Server: http://localhost:$API_PORT"
+    echo "Web:    http://localhost:$WEB_PORT"
+    podman logs -f $SERVER_CONTAINER
+fi

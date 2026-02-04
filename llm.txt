@@ -1,0 +1,205 @@
+# Logic Server API Reference
+
+> **Auto-Generated**: This file is dynamically generated from the source code. Do not edit manually.
+
+## Overview
+
+This API allows interaction with the AxiomBase Logic Server for asserting facts, rules, and performing queries.
+
+
+## Data Schemas
+
+### `ExecuteRequest`
+```json
+{
+  "command": "String"
+}
+```
+
+### `FactRequest`
+```json
+{
+  "predicate": "String",
+  "args": "List<String>",
+  "truthVal": "Boolean",
+  "negated": "Boolean",
+  "though truthVal exists      scope": "String?"
+}
+```
+
+### `AtomDto`
+```json
+{
+  "predicate": "String",
+  "args": "List<String>",
+  "negated": "Boolean",
+  "scope": "String?"
+}
+```
+
+### `RuleRequest`
+```json
+{
+  "head": "AtomDto",
+  "body": "List<AtomDto>",
+  "scope": "String?"
+}
+```
+
+### `CreateDbRequest`
+```json
+{
+  "name": "String",
+  "isMultiTenant": "Boolean"
+}
+```
+
+### `CreateTenantRequest`
+```json
+{
+  "tenantId": "String"
+}
+```
+
+### `TemplateRequest`
+```json
+{
+  "type": "TemplateType",
+  "predicates": "Map<String",
+  ""Q" -> "Mortal"      args": "List<String>",
+  "// Variable names e.g. ["x"]      scope": "String?"
+}
+```
+
+
+## Endpoints
+
+### Core Logic
+
+#### `POST /admin/databases`
+Database Manager Helper to get DB context Authentication Middleware Allow health check without auth? ... (rest of routing)
+
+- **Request Body**: `CreateDbRequest`
+
+---
+
+#### `GET /admin/databases`
+No description available.
+
+
+---
+
+#### `GET /admin/databases/{name}/facts`
+No description available.
+
+
+---
+
+#### `GET /admin/databases/{name}/rules`
+Use .toList() to consume sequence safely before serializing
+
+
+---
+
+#### `POST /admin/databases/{name}/tenants`
+--- Tenant CRUD ---
+
+- **Request Body**: `CreateTenantRequest`
+
+---
+
+#### `GET /admin/databases/{name}/tenants`
+No description available.
+
+
+---
+
+#### `DELETE /admin/databases/{name}/tenants/{id}`
+No description available.
+
+
+---
+
+#### `GET /metrics`
+No description available.
+
+
+---
+
+#### `GET /health`
+Simple metrics for default DB
+
+
+---
+
+#### `POST /execute`
+Legacy/Generic Endpoint Legacy/Generic Endpoint
+
+- **Request Body**: `ExecuteRequest`
+
+---
+
+#### `POST /tx/begin`
+--- Transactions --- --- Transactions ---
+
+
+---
+
+#### `POST /tx/commit/{id}`
+If DB is MT, tenantId is required? logic server handles it via getContext check inside AxiomBase? Actually TransactionManager.begin(tenantId) is where we pass it.
+
+
+---
+
+#### `POST /tx/rollback/{id}`
+No description available.
+
+
+---
+
+#### `POST /assert/fact`
+--- Microservice API --- Endpoint 1: Add Knowledge (ASSERT) POST /assert/fact { "predicate": "Man", "args": ["Socrates"] }
+
+- **Request Body**: `FactRequest`
+
+---
+
+#### `POST /retract`
+Determine truthVal: if negated is true, truthVal is false. Prioritize 'negated' if strictly sent, otherwise fallback to 'truthVal'. Ideally they should be consistent. Direct (Auto-commit) Endpoint 4: Retract Knowledge (TMS Trigger) POST /retract
+
+- **Request Body**: `FactRequest`
+
+---
+
+#### `POST /assert/rule`
+Endpoint 2: Teach Logic (ADD RULE) POST /assert/rule
+
+- **Request Body**: `RuleRequest`
+
+---
+
+#### `POST /assert/template`
+Parse Head Parse Body Collect Variables (from Head and ALL Body atoms) e.printStackTrace() // helpful for debugging Endpoint 2.5: Apply Template
+
+- **Request Body**: `TemplateRequest`
+
+---
+
+#### `POST /infer`
+... Endpoint 3: Ask Questions (INFER) POST /infer
+
+- **Request Body**: `FactRequest`
+
+---
+
+#### `POST /admin/backups`
+Use Backward Chaining (Layer 4b) for inference queries Note: infer() in AxiomBase (LogicContext) checks Hexastore which now respects scope in match() BUT backwardChainer.solve() might need to respect scope during unification? AxiomBase.infer calls ctx.backwardChainer.solve(pattern) We haven't updated BackwardChainer to respect scope in recursion explicitly, but it calls store.match() eventually. If I query infer(scope="doc1"), the initial goal has scope="doc1". When it looks for rules, does it strictly look for rules in "doc1"? Currently getRules() returns ALL rules effectively unless we added filtering in chainer. NOTE: BackwardChainer logic was not requested to be updated in step 1, but might be implicitly shielded by Hexastore query. However, the entry point queryAtom now has the scope. --- Backup & Replication --- Backup Endpoints
+
+
+---
+
+#### `GET /replication/wal`
+Only Leader can backup? Or anyone? Ideally leader. But follower backup is also valid for read-replicas. We need to backup ALL databases? Current AxiomBase logic backs up "the" database storage dir. dbManager manages multiple DBs. This is tricky. simpler implementation: Backup Default or All? Let's iterate all DBs and backup them? Or just backup the whole data directory at OS level? Implementation Plan said: "Add createBackup... to AxiomBase" So we call it per DB. Replication Endpoints (Only on Leader)
+
+
+---

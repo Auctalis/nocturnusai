@@ -1,0 +1,45 @@
+services:
+  logic-server:
+    image: logic-server:latest
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: logic-server
+    restart: unless-stopped
+    ports:
+      - "9300:9300"
+    volumes:
+      - ./data:/data
+    environment:
+      - PORT=9300
+      - STORAGE_DIR=/data
+      - HOST=0.0.0.0
+    networks:
+      - logic-net
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9300/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  logic-web:
+    image: logic-web:latest
+    build:
+      context: ./axiombase-web
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:9300
+    container_name: logic-web
+    restart: unless-stopped
+    ports:
+      - "9400:80"
+    depends_on:
+      logic-server:
+        condition: service_healthy
+    networks:
+      - logic-net
+
+networks:
+  logic-net:
+    driver: bridge
