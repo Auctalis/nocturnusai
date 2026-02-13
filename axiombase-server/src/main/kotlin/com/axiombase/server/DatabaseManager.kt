@@ -1,6 +1,9 @@
 package com.axiombase.server
 
 import com.axiombase.AxiomBase
+import com.axiombase.extraction.FactExtractor
+import com.axiombase.extraction.RuleExtractor
+import com.axiombase.persistence.EncryptionService
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.Serializable
@@ -13,8 +16,13 @@ data class DatabaseConfig(
     val isMultiTenant: Boolean = false
 )
 
-class DatabaseManager(private val rootStorageDir: File) {
+class DatabaseManager(
+    private val rootStorageDir: File,
+    private val factExtractor: FactExtractor? = null,
+    private val ruleExtractor: RuleExtractor? = null
+) {
     private val databases = ConcurrentHashMap<String, AxiomBase>()
+    private val encryption: EncryptionService? = ServerConfig.encryptionKey?.let { EncryptionService(it) }
     
     init {
         rootStorageDir.mkdirs()
@@ -43,7 +51,7 @@ class DatabaseManager(private val rootStorageDir: File) {
             // For backward compat, we can map "default" to rootStorageDir if no subdirs found?
             // To keep it simple: "default" -> rootStorageDir/default.
             // User can migrate data manually or we init new.
-            createDatabase("default", false)
+            createDatabase("default", true)
         }
     }
     
@@ -74,28 +82,62 @@ class DatabaseManager(private val rootStorageDir: File) {
         
         // Save config
         val configFile = File(dbDir, "db.config")
-        val config = DatabaseConfig(multiTenant)
+        // Force true
+        val config = DatabaseConfig(true)
         configFile.writeText(Json.encodeToString(config))
         
-        val db = AxiomBase(dbDir, multiTenant)
+        val db = AxiomBase(dbDir, true, dbName = name, encryption = encryption, factExtractor = factExtractor, ruleExtractor = ruleExtractor)
+        if (!db.getRegisteredTenants().contains("default")) {
+            db.createTenant("default")
+        }
         databases[name] = db
         return db
     }
+
+    fun deleteDatabase(name: String) {
+        if (!databases.containsKey(name)) return
+        if (name == "default") throw IllegalArgumentException("Cannot delete default database")
+        
+        // Remove from map
+        databases.remove(name)
+        
+        // Delete directory
+        val dbDir = File(rootStorageDir, name)
+        dbDir.deleteRecursively()
+    }
     
+    fun close() {
+        databases.forEach { (name, db) ->
+            try {
+                db.shutdownGracefully()
+            } catch (e: Exception) {
+                println("Error shutting down database '$name': ${e.message}")
+            }
+        }
+    }
+
     private fun loadDatabase(name: String) {
         val dbDir = File(rootStorageDir, name)
         val configFile = File(dbDir, "db.config")
-        var isMultiTenant = false
-        if (configFile.exists()) {
+        // var isMultiTenant = false 
+        // Always force true
+        val isMultiTenant = true
+        
+        // We still read config just to migrate or ensure it's valid JSON if needed?
+        // But we ignore the value.
+         if (configFile.exists()) {
             try {
-                val config = Json.decodeFromString<DatabaseConfig>(configFile.readText())
-                isMultiTenant = config.isMultiTenant
+                // Just read to validate? Or update?
+                // val config = Json.decodeFromString<DatabaseConfig>(configFile.readText())
             } catch (e: Exception) {
                 println("Error loading config for $name: ${e.message}")
             }
         }
         
-        val db = AxiomBase(dbDir, isMultiTenant)
+        val db = AxiomBase(dbDir, isMultiTenant, dbName = name, encryption = encryption, factExtractor = factExtractor, ruleExtractor = ruleExtractor)
+        if (isMultiTenant && !db.getRegisteredTenants().contains("default")) {
+            db.createTenant("default")
+        }
         databases[name] = db
         println("Loaded database: $name (MT=$isMultiTenant)")
     }

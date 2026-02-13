@@ -8,12 +8,19 @@ services:
     restart: unless-stopped
     ports:
       - "9300:9300"
+      # - "9443:9443"  # Uncomment for TLS
     volumes:
       - ./data:/data
     environment:
       - PORT=9300
       - STORAGE_DIR=/data
       - HOST=0.0.0.0
+      # - ENCRYPTION_KEY=        # 64 hex chars for AES-256 encryption at rest
+      # - TLS_ENABLED=true       # Enable HTTPS
+      # - TLS_PORT=9443
+      # - TLS_KEYSTORE_PATH=/data/keystore.p12
+      # - TLS_KEYSTORE_PASSWORD=changeit
+      # - TLS_KEY_ALIAS=axiombase
     networks:
       - logic-net
     healthcheck:

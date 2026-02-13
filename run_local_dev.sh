@@ -47,6 +47,14 @@ fi
 kill_port $API_PORT
 kill_port $WEB_PORT
 
+# Load .env if present
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+    echo -e "${GREEN}Loaded .env config${NC}"
+fi
+
 # Start Server
 echo -e "${GREEN}Starting Gradle Server...${NC}"
 ./gradlew :axiombase-server:run --console=plain &

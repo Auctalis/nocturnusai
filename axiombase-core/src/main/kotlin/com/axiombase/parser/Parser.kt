@@ -2,6 +2,7 @@ package com.axiombase.parser
 
 import com.axiombase.core.*
 import com.axiombase.logic.Constraint
+import com.axiombase.testing.TestCase
 
 sealed class Command {
     data class AssertFact(val fact: Atom) : Command()
@@ -9,6 +10,8 @@ sealed class Command {
     data class Infer(val query: Atom, val withProof: Boolean) : Command()
     data class Restrict(val constraint: Constraint) : Command()
     data class Explain(val fact: Atom) : Command()
+    data class Test(val testCase: TestCase) : Command()
+    data class Extract(val text: String, val dryRun: Boolean) : Command()
 }
 
 class Parser(private val tokens: List<Token>) {
@@ -29,7 +32,9 @@ class Parser(private val tokens: List<Token>) {
             TokenType.INFER -> parseQuery()
             TokenType.RESTRICT -> parseConstraint()
             TokenType.EXPLAIN -> parseExplanation()
-            else -> throw error(token, "Expected command start (ASSERT, INFER, RESTRICT, EXPLAIN)")
+            TokenType.TEST -> parseTest()
+            TokenType.EXTRACT -> parseExtract()
+            else -> throw error(token, "Expected command start (ASSERT, INFER, RESTRICT, EXPLAIN, TEST, EXTRACT)")
         }
     }
 
@@ -145,6 +150,83 @@ class Parser(private val tokens: List<Token>) {
         val fact = parseAtom()
         consume(TokenType.SEMICOLON, "Expected ';'")
         return Command.Explain(fact)
+    }
+
+    // EXTRACT "text" [DRY] ;
+    private fun parseExtract(): Command {
+        val textToken = consume(TokenType.STRING, "Expected text string after EXTRACT")
+        val dryRun = match(TokenType.DRY)
+        consume(TokenType.SEMICOLON, "Expected ';' after EXTRACT")
+        return Command.Extract(textToken.text, dryRun)
+    }
+
+    // TEST "name" { GIVEN { ... } EXPECT { ... } } ;
+    private fun parseTest(): Command {
+        val nameToken = consume(TokenType.STRING, "Expected test name string")
+        val testName = nameToken.text
+
+        consume(TokenType.LBRACE, "Expected '{' after test name")
+
+        val setupActions = mutableListOf<com.axiombase.testing.SetupAction>()
+        val expectations = mutableListOf<com.axiombase.testing.Expectation>()
+
+        // Parse GIVEN block
+        if (match(TokenType.GIVEN)) {
+            consume(TokenType.LBRACE, "Expected '{' after GIVEN")
+            while (!check(TokenType.RBRACE)) {
+                setupActions.add(parseSetupAction())
+            }
+            consume(TokenType.RBRACE, "Expected '}' to close GIVEN block")
+        }
+
+        // Parse EXPECT block
+        consume(TokenType.EXPECT, "Expected EXPECT block")
+        consume(TokenType.LBRACE, "Expected '{' after EXPECT")
+        while (!check(TokenType.RBRACE)) {
+            expectations.add(parseExpectation())
+        }
+        consume(TokenType.RBRACE, "Expected '}' to close EXPECT block")
+
+        consume(TokenType.RBRACE, "Expected '}' to close TEST block")
+        consume(TokenType.SEMICOLON, "Expected ';' after TEST")
+
+        return Command.Test(TestCase(testName, setupActions, expectations))
+    }
+
+    private fun parseSetupAction(): com.axiombase.testing.SetupAction {
+        consume(TokenType.ASSERT, "Expected ASSERT in GIVEN block")
+        return if (check(TokenType.FORALL)) {
+            val rule = parseRule()
+            consume(TokenType.SEMICOLON, "Expected ';' after rule in GIVEN")
+            com.axiombase.testing.SetupAction.AssertRule(rule)
+        } else {
+            val fact = parseAtom()
+            consume(TokenType.SEMICOLON, "Expected ';' after fact in GIVEN")
+            com.axiombase.testing.SetupAction.AssertFact(fact)
+        }
+    }
+
+    private fun parseExpectation(): com.axiombase.testing.Expectation {
+        return when {
+            match(TokenType.PROVABLE) -> {
+                val goal = parseAtom()
+                consume(TokenType.SEMICOLON, "Expected ';' after PROVABLE expectation")
+                com.axiombase.testing.Expectation.Provable(goal)
+            }
+            match(TokenType.NOT_PROVABLE) -> {
+                val goal = parseAtom()
+                consume(TokenType.SEMICOLON, "Expected ';' after NOT_PROVABLE expectation")
+                com.axiombase.testing.Expectation.NotProvable(goal)
+            }
+            match(TokenType.COUNT) -> {
+                val goal = parseAtom()
+                val countToken = consume(TokenType.NUMBER, "Expected count number after goal")
+                val count = countToken.text.toDouble().toInt()
+                consume(TokenType.SEMICOLON, "Expected ';' after COUNT expectation")
+                com.axiombase.testing.Expectation.ResultCount(goal, count)
+            }
+            else -> throw error(peek(), "Expected PROVABLE, NOT_PROVABLE, or COUNT")
+        }
     }
 
     // Identifier "(" Term { "," Term } ")"

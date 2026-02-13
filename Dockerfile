@@ -17,7 +17,7 @@ RUN ./gradlew :axiombase-server:installDist --no-daemon
 
 # Run Stage
 FROM eclipse-temurin:21-jre-alpine
-EXPOSE 9300
+EXPOSE 9300 9443
 
 ENV PORT=9300
 ENV HOST=0.0.0.0

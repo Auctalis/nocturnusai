@@ -4,6 +4,8 @@ enum class TokenType {
     ASSERT, INFER, RESTRICT, EXPLAIN, FORALL,
     WITH, PROOF, CONTRADICTION,
     AND, NOT,
+    TEST, GIVEN, EXPECT, PROVABLE, NOT_PROVABLE, COUNT,
+    EXTRACT, DRY,
     ARROW_LEFT, ARROW_RIGHT, // <-, ->
     LBRACE, RBRACE, LPAREN, RPAREN, COMMA, SEMICOLON,
     IDENTIFIER, VARIABLE, STRING, NUMBER,
@@ -27,7 +29,15 @@ class Tokenizer(private val input: String) {
         "PROOF" to TokenType.PROOF,
         "CONTRADICTION" to TokenType.CONTRADICTION,
         "AND" to TokenType.AND,
-        "NOT" to TokenType.NOT
+        "NOT" to TokenType.NOT,
+        "TEST" to TokenType.TEST,
+        "GIVEN" to TokenType.GIVEN,
+        "EXPECT" to TokenType.EXPECT,
+        "PROVABLE" to TokenType.PROVABLE,
+        "NOT_PROVABLE" to TokenType.NOT_PROVABLE,
+        "COUNT" to TokenType.COUNT,
+        "EXTRACT" to TokenType.EXTRACT,
+        "DRY" to TokenType.DRY
     )
 
     fun tokenize(): List<Token> {

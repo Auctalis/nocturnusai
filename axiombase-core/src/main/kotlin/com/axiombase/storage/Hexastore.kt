@@ -3,9 +3,7 @@ package com.axiombase.storage
 import com.axiombase.core.Atom
 import com.axiombase.core.Term
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.locks.ReentrantReadWriteLock
-import kotlin.concurrent.read
-import kotlin.concurrent.write
+import java.util.concurrent.locks.StampedLock
 
 /**
  * A Reasoning Store implementation using Hexastore indexing strategy.
@@ -50,28 +48,40 @@ class Hexastore {
     // Map Predicate -> Set of Atoms
     private val otherAtoms = newMap<String, MutableSet<Atom>>()
 
-    private val lock = ReentrantReadWriteLock()
+    private val lock = StampedLock()
+
+    private val logger = org.slf4j.LoggerFactory.getLogger(Hexastore::class.java)
 
     fun add(atom: Atom) {
-        lock.write {
+        val stamp = lock.writeLock()
+        try {
             val effectivePredicate = if (atom.truthVal) atom.predicate else "!${atom.predicate}"
-            
+
             if (atom.args.size == 2) {
                 val s = atom.args[0]
                 val p = effectivePredicate
                 val o = atom.args[1]
-                java.io.File("/tmp/hexastore_debug.log").appendText("DEBUG: INDEXING $s $p $o SCOPE=${atom.scope}\n")
+                // Remove existing atom first to support metadata upsert
+                // (equals/hashCode exclude metadata, so this finds the same logical atom)
+                deleteTriple(s, p, o, atom)
+                logger.debug("INDEXING {} {} {} SCOPE={}", s, p, o, atom.scope)
                 indexTriple(s, p, o, atom)
             } else {
-                otherAtoms.getOrPut(effectivePredicate) { newSet() }.add(atom)
+                val set = otherAtoms.getOrPut(effectivePredicate) { newSet() }
+                // Remove existing atom first to support metadata upsert
+                set.remove(atom)
+                set.add(atom)
             }
+        } finally {
+            lock.unlockWrite(stamp)
         }
     }
 
     fun delete(atom: Atom) {
-        lock.write {
+        val stamp = lock.writeLock()
+        try {
             val effectivePredicate = if (atom.truthVal) atom.predicate else "!${atom.predicate}"
-            
+
             if (atom.args.size == 2) {
                  val s = atom.args[0]
                  val p = effectivePredicate
@@ -80,6 +90,8 @@ class Hexastore {
             } else {
                  otherAtoms[effectivePredicate]?.remove(atom)
             }
+        } finally {
+            lock.unlockWrite(stamp)
         }
     }
 
@@ -210,39 +222,46 @@ class Hexastore {
     // Now logic layer needs to decide if it wants to pass scope down here or filter later.
     // Ideally we pass it down.
     fun match(pattern: Atom, scope: String? = null): Sequence<Atom> {
-        return lock.read {
-             if (pattern.args.size == 2) {
-                 val s = if (pattern.args[0] is Term.Variable) null else pattern.args[0]
-                 val o = if (pattern.args[1] is Term.Variable) null else pattern.args[1]
-                 val p = if (pattern.truthVal) pattern.predicate else "!${pattern.predicate}"
-                 
-                 // If pattern has a scope defined, use it? Or use argument?
-                 // The pattern object itself might have scope=null (wildcard in pattern?) or scope="Global".
-                 // argument 'scope' overrides?
-                 // Let's use argument 'scope' if provided, else if pattern.scope is set use that?
-                 val effectiveScope = scope ?: pattern.scope
-                 
-                 query(s, p, o, effectiveScope).toList().asSequence() 
-             } else {
-                 val effectiveP = if (pattern.truthVal) pattern.predicate else "!${pattern.predicate}"
-                 val candidates = otherAtoms[effectiveP] ?: return@read emptySequence()
-                 
-                 candidates.filter { candidate ->
-                     // Check Scope
-                     if (scope != null && candidate.scope != scope) return@filter false
-                     if (pattern.scope != null && candidate.scope != pattern.scope) return@filter false
-                     
-                     if (candidate.args.size != pattern.args.size) return@filter false
-                     for (i in candidate.args.indices) {
-                         val patTerm = pattern.args[i]
-                         val candTerm = candidate.args[i]
-                         if (patTerm !is Term.Variable && patTerm != candTerm) {
-                             return@filter false
-                         }
-                     }
-                     true
-                 }.toList().asSequence()
-             }
+        // Try optimistic read first (no lock acquisition when no writes in progress)
+        val optimisticStamp = lock.tryOptimisticRead()
+        if (optimisticStamp != 0L) {
+            val result = matchInternal(pattern, scope)
+            if (lock.validate(optimisticStamp)) {
+                return result.asSequence()
+            }
+        }
+        // Optimistic read failed (concurrent write); fall back to read lock
+        val stamp = lock.readLock()
+        try {
+            return matchInternal(pattern, scope).asSequence()
+        } finally {
+            lock.unlockRead(stamp)
+        }
+    }
+
+    private fun matchInternal(pattern: Atom, scope: String?): List<Atom> {
+        return if (pattern.args.size == 2) {
+            val s = if (pattern.args[0] is Term.Variable) null else pattern.args[0]
+            val o = if (pattern.args[1] is Term.Variable) null else pattern.args[1]
+            val p = if (pattern.truthVal) pattern.predicate else "!${pattern.predicate}"
+            val effectiveScope = scope ?: pattern.scope
+            query(s, p, o, effectiveScope).toList()
+        } else {
+            val effectiveP = if (pattern.truthVal) pattern.predicate else "!${pattern.predicate}"
+            val candidates = otherAtoms[effectiveP] ?: return emptyList()
+            candidates.filter { candidate ->
+                if (scope != null && candidate.scope != scope) return@filter false
+                if (pattern.scope != null && candidate.scope != pattern.scope) return@filter false
+                if (candidate.args.size != pattern.args.size) return@filter false
+                for (i in candidate.args.indices) {
+                    val patTerm = pattern.args[i]
+                    val candTerm = candidate.args[i]
+                    if (patTerm !is Term.Variable && patTerm != candTerm) {
+                        return@filter false
+                    }
+                }
+                true
+            }.toList()
         }
     }
     
@@ -250,18 +269,20 @@ class Hexastore {
      * Retrieves all stored atoms.
      */
     fun getAllAtoms(): Sequence<Atom> {
-        lock.read {
+        val stamp = lock.readLock()
+        try {
             val all = ArrayList<Atom>()
-             spo.values.forEach { m1 ->
-                 m1.values.forEach { m2 ->
-                     m2.values.forEach { set ->
-                         all.addAll(set)
-                     }
-                 }
-             }
-
+            spo.values.forEach { m1 ->
+                m1.values.forEach { m2 ->
+                    m2.values.forEach { set ->
+                        all.addAll(set)
+                    }
+                }
+            }
             all.addAll(otherAtoms.values.flatten())
             return all.asSequence()
+        } finally {
+            lock.unlockRead(stamp)
         }
     }
 }

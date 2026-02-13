@@ -17,6 +17,9 @@ bin/
 logs/
 *.log.*
 
+# Env / Secrets
+.env
+
 # Data
 data/
 **/data/

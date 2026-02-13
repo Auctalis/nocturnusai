@@ -89,19 +89,19 @@ class ReteEngine(
              // If we get here, all conditions matched!
              // Instantiate the head
              val derivedFact = Unifier.substitute(rule.head, finalSubst)
-             
-             // Check if it already exists?
-             // Mark as INFERRED
              val inferredFact = derivedFact.copy(source = SourceType.INFERRED)
-             
-             // ACTION: Add to store
-             store.add(inferredFact)
-             
-             // RECORD PROVENANCE
-             tracker?.record(inferredFact, rule, premises)
-             
-             // Also, we need to notify the engine about this new fact!
-             onFactAsserted(inferredFact) 
+
+             // Skip if already in store — prevents infinite forward chaining loops
+             val alreadyExists = store.match(inferredFact).any {
+                 it.predicate == inferredFact.predicate &&
+                 it.args == inferredFact.args &&
+                 it.truthVal == inferredFact.truthVal
+             }
+             if (!alreadyExists) {
+                 store.add(inferredFact)
+                 tracker?.record(inferredFact, rule, premises)
+                 onFactAsserted(inferredFact)
+             }
         }
     }
 

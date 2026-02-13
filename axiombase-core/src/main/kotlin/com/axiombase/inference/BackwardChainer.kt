@@ -3,12 +3,13 @@ package com.axiombase.inference
 import com.axiombase.core.*
 import com.axiombase.storage.Hexastore
 import com.axiombase.inference.Substitution
+import com.axiombase.inference.Unifier
+import java.util.concurrent.atomic.AtomicLong
 
 class BackwardChainer(
     private val store: Hexastore,
-    private val rules: List<Rule> // Needs access to rules. 
-    // In ReteEngine, rules are local. In AxiomBase, we should share them.
-    // For now, we will pass them or make them accessible.
+    private val rules: List<Rule>,
+    private val maxDepth: Int = 100 // Hard limit to prevent stack overflow
 ) {
 
     /**
@@ -16,7 +17,9 @@ class BackwardChainer(
      * Returns a sequence of fully unified facts matching the goal.
      */
     fun solve(goal: Atom): Sequence<Atom> {
-        return solveRecursive(listOf(goal), 0, emptyMap())
+        val rulesByPredicate = rules.groupBy { it.head.predicate }
+        val memo = HashMap<Atom, List<Atom>>()
+        return solveRecursive(listOf(goal), 0, emptyMap(), 0, rulesByPredicate, memo)
              .map { subst -> Unifier.substitute(goal, subst) }
              .distinct()
     }
@@ -24,65 +27,166 @@ class BackwardChainer(
     private fun solveRecursive(
         goals: List<Atom>,
         index: Int,
-        subst: Substitution
+        subst: Substitution,
+        depth: Int,
+        rulesByPredicate: Map<String, List<Rule>>,
+        memo: HashMap<Atom, List<Atom>>
     ): Sequence<Substitution> {
+        if (depth > maxDepth) {
+            // Log warning or just return empty?
+            // Since we don't have easy logger access here without DI or global, we just return empty
+            // to stop infinite recursion.
+            return emptySequence()
+        }
+
         if (index >= goals.size) {
             return sequenceOf(subst)
         }
 
         val currentGoal = Unifier.substitute(goals[index], subst)
-        
-        // 1. Unify with Fact (Base case)
-        val factMatches = store.match(currentGoal).mapNotNull { fact ->
-            Unifier.unifyAtoms(currentGoal, fact)
+
+        // Memoization: normalize goal to use positional variable placeholders as cache key
+        val normalizedKey = normalizeForMemo(currentGoal)
+        val resolvedAtoms: List<Atom> = memo[normalizedKey] ?: run {
+            // Sentinel: mark as in-progress to prevent infinite recursion on same goal
+            memo[normalizedKey] = emptyList()
+
+            val results = mutableListOf<Atom>()
+
+            // 1. Unify with Facts (Base case)
+            store.match(currentGoal).forEach { fact -> results.add(fact) }
+
+            // 2. Unify with Rule Heads (Recursive case) — indexed by predicate
+            val candidateRules = rulesByPredicate[currentGoal.predicate] ?: emptyList()
+            for (rule in candidateRules) {
+                val uniqueRule = renameVars(rule)
+                val headMatch = Unifier.unifyAtoms(currentGoal, uniqueRule.head) ?: continue
+                // Body goals only contain renamed rule variables; outer subst is irrelevant
+                solveRecursive(uniqueRule.body, 0, headMatch, depth + 1, rulesByPredicate, memo)
+                    .forEach { bodySubst ->
+                        results.add(Unifier.substitute(uniqueRule.head, bodySubst))
+                    }
+            }
+
+            val distinct = results.distinct()
+            memo[normalizedKey] = distinct
+            distinct
         }
 
-        // 2. Unify with Rule Head (Recursive case)
-        val ruleMatches = rules.asSequence().flatMap { rule ->
-            // Rename variables in rule to avoid collision with current goal vars?
-            // "Standardizing apart" is important in logic programming.
-            // For prototype, we assume distinct variable names or rely on scope handling locally.
-            // BUT strict correctness requires renaming (e.g. ?x in rule vs ?x in goal).
-            // Let's implement simple renaming: append suffix to all variables in rule.
+        // Produce substitutions by unifying currentGoal with each resolved atom
+        return resolvedAtoms.asSequence().mapNotNull { resultAtom ->
+            Unifier.unifyAtoms(currentGoal, resultAtom)
+        }.flatMap { matchSubst ->
+            val nextSubst = subst + matchSubst
+            solveRecursive(goals, index + 1, nextSubst, depth, rulesByPredicate, memo)
+        }
+    }
+    
+    /**
+     * Proves the goal and returns proof trees showing the derivation path.
+     */
+    fun solveWithProof(goal: Atom): Sequence<ProofTree> {
+        val rulesByPredicate = rules.groupBy { it.head.predicate }
+        return solveRecursiveWithProof(listOf(goal), 0, emptyMap(), 0, rulesByPredicate)
+            .map { (subst, proofs) ->
+                val result = Unifier.substitute(goal, subst)
+                ProofTree(result, proofs.first())
+            }
+            .distinctBy { it.result }
+    }
+
+    private fun solveRecursiveWithProof(
+        goals: List<Atom>,
+        index: Int,
+        subst: Substitution,
+        depth: Int,
+        rulesByPredicate: Map<String, List<Rule>>
+    ): Sequence<Pair<Substitution, List<ProofNode>>> {
+        if (depth > maxDepth) return emptySequence()
+
+        if (index >= goals.size) {
+            return sequenceOf(Pair(subst, emptyList()))
+        }
+
+        val currentGoal = Unifier.substitute(goals[index], subst)
+
+        // 1. Unify with facts
+        val factMatches = store.match(currentGoal).mapNotNull { fact ->
+            val unification = Unifier.unifyAtoms(currentGoal, fact)
+            if (unification != null) Pair(unification, fact) else null
+        }
+
+        // 2. Unify with rule heads — indexed by predicate
+        val candidateRules = rulesByPredicate[currentGoal.predicate] ?: emptyList()
+        val ruleMatches = candidateRules.asSequence().flatMap { rule ->
+            val originalRule = rule
             val uniqueRule = renameVars(rule)
-            
+
             val headMatch = Unifier.unifyAtoms(currentGoal, uniqueRule.head)
             if (headMatch != null) {
-                // If head matches, we must prove the body
-                // We add body clauses to the goal stack
-                val newSubGoals = uniqueRule.body // These need to be solved
-                // We must solve (body... then remaining goals)
-                // But solveRecursive solves list sequentially.
-                // Actually, we should solve the rule body given the 'headMatch' substitution.
-                
-                // Solve the RULE BODY first
-                solveRecursive(uniqueRule.body, 0, subst + headMatch).flatMap { bodySubst ->
-                    // After body is solved, we continue with original goals
-                    // BUT we must propagate the substitution gained from the body
-                    // back to the original computation path?
-                    // solveRecursive logic: solve 'currentGoal', then 'nextGoal'.
-                    // If 'currentGoal' is derived via Rule, we solved RuleBody.
-                    // The result of RuleBody match gives us bindings for currentGoal.
-                    
-                    // So, we just return the substitution that satisfies currentGoal.
-                     sequenceOf(bodySubst) // This subst contains bindings for currentGoal variables
+                solveRecursiveWithProof(uniqueRule.body, 0, subst + headMatch, depth + 1, rulesByPredicate).map { (bodySubst, bodyProofs) ->
+                    val substMap = bodySubst.entries.associate { (k, v) -> k.name to v.toString() }
+                    val proofNode = ProofNode(
+                        goal = currentGoal,
+                        step = ProofStep.RuleApplication(originalRule, bodyProofs),
+                        substitution = substMap
+                    )
+                    Triple(bodySubst, proofNode, true)
                 }
             } else {
                 emptySequence()
             }
         }
-        
-        // Combine fact and rule matches
-        return (factMatches + ruleMatches).flatMap { matchSubst ->
+
+        // Combine: fact matches produce FactMatch nodes, rule matches produce RuleApplication nodes
+        val factResults = factMatches.flatMap { (matchSubst, fact) ->
             val nextSubst = subst + matchSubst
-            solveRecursive(goals, index + 1, nextSubst)
+            val substMap = nextSubst.entries.associate { (k, v) -> k.name to v.toString() }
+            val proofNode = ProofNode(
+                goal = currentGoal,
+                step = ProofStep.FactMatch(fact),
+                substitution = substMap
+            )
+            solveRecursiveWithProof(goals, index + 1, nextSubst, depth, rulesByPredicate).map { (restSubst, restProofs) ->
+                Pair(restSubst, listOf(proofNode) + restProofs)
+            }
         }
+
+        val ruleResults = ruleMatches.flatMap { (matchSubst, proofNode, _) ->
+            solveRecursiveWithProof(goals, index + 1, matchSubst, depth, rulesByPredicate).map { (restSubst, restProofs) ->
+                Pair(restSubst, listOf(proofNode) + restProofs)
+            }
+        }
+
+        return factResults + ruleResults
     }
-    
+
+    /**
+     * Normalizes a goal for memo lookup by replacing variable names with positional
+     * placeholders (?_0, ?_1, ...) so that goals differing only in variable names
+     * hash to the same key.
+     */
+    private fun normalizeForMemo(goal: Atom): Atom {
+        val varMapping = HashMap<String, Int>()
+        var counter = 0
+        val normalizedArgs = goal.args.map { term ->
+            if (term is Term.Variable) {
+                val idx = varMapping.getOrPut(term.name) { counter++ }
+                Term.Variable("_$idx")
+            } else {
+                term
+            }
+        }
+        return goal.copy(args = normalizedArgs)
+    }
+
+    companion object {
+        private val varCounter = AtomicLong(0)
+    }
+
     // Simple standardization apart
     private fun renameVars(rule: Rule): Rule {
-        val suffix = "_${System.nanoTime()}" // Simple unique suffix
-        val renameMap = mutableMapOf<String, String>()
+        val suffix = "_${varCounter.incrementAndGet()}"
         
         fun rename(term: Term): Term {
             return when(term) {

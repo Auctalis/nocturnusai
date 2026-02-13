@@ -22,7 +22,7 @@ data class SnapshotData(
     val negatives: List<Atom>? = null
 )
 
-class SnapshotManager(private val storageDir: File) {
+class SnapshotManager(private val storageDir: File, private val encryption: EncryptionService? = null) {
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
     fun saveSnapshot(tenantDataMap: Map<String, TenantSnapshotData>) {
@@ -30,10 +30,13 @@ class SnapshotManager(private val storageDir: File) {
             timestamp = System.currentTimeMillis(),
             tenants = tenantDataMap
         )
-        
+
+        val jsonText = json.encodeToString(snapshotData)
+        val outputText = if (encryption != null) encryption.encryptString(jsonText) else jsonText
+
         val tempFile = File(storageDir, "snapshot.tmp")
-        tempFile.writeText(json.encodeToString(snapshotData))
-        
+        tempFile.writeText(outputText)
+
         val finalFile = File(storageDir, "snapshot.json")
         if (finalFile.exists()) {
              val backup = File(storageDir, "snapshot.bak")
@@ -42,12 +45,16 @@ class SnapshotManager(private val storageDir: File) {
         }
         tempFile.renameTo(finalFile)
     }
-    
+
     fun loadSnapshot(): SnapshotData? {
         val file = File(storageDir, "snapshot.json")
         if (!file.exists()) return null
         return try {
-            json.decodeFromString<SnapshotData>(file.readText())
+            val rawText = file.readText()
+            val jsonText = if (encryption != null) {
+                try { encryption.decryptString(rawText) } catch (_: Exception) { rawText }
+            } else { rawText }
+            json.decodeFromString<SnapshotData>(jsonText)
         } catch (e: Exception) {
             System.err.println("Failed to load snapshot: ${e.message}")
             return null
