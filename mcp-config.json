@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "axiombase": {
+      "url": "http://localhost:9300/mcp/sse",
+      "transport": "sse",
+      "description": "AxiomBase Logic Server — deterministic reasoning, truth maintenance, and agent memory management",
+      "headers": {
+        "X-Database": "default",
+        "X-Tenant-ID": "default"
+      }
+    }
+  }
+}

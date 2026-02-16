@@ -22,7 +22,11 @@ data class FactRequest(
     val truthVal: Boolean = true,
     val negated: Boolean = false,
     val scope: String? = null,
-    val metadata: Map<String, JsonElement> = emptyMap()
+    val metadata: Map<String, JsonElement> = emptyMap(),
+    // Temporal fields for agent memory management
+    val validFrom: Long? = null,
+    val validUntil: Long? = null,
+    val ttl: Long? = null // time-to-live in milliseconds
 )
 
 @Serializable
@@ -67,7 +71,11 @@ data class AtomResponse(
     val args: List<String>,
     val negated: Boolean = false,
     val scope: String? = null,
-    val metadata: Map<String, JsonElement> = emptyMap()
+    val metadata: Map<String, JsonElement> = emptyMap(),
+    val createdAt: Long? = null,
+    val validFrom: Long? = null,
+    val validUntil: Long? = null,
+    val ttl: Long? = null
 ) {
     companion object {
         fun from(atom: Atom): AtomResponse = AtomResponse(
@@ -75,7 +83,11 @@ data class AtomResponse(
             args = atom.args.map { it.toString() },
             negated = !atom.truthVal,
             scope = atom.scope,
-            metadata = atom.metadata
+            metadata = atom.metadata,
+            createdAt = atom.createdAt,
+            validFrom = atom.validFrom,
+            validUntil = atom.validUntil,
+            ttl = atom.ttl
         )
     }
 }

@@ -27,6 +27,7 @@ import com.axiombase.extraction.ExtractedFact
 import com.axiombase.extraction.ExtractedRule
 import com.axiombase.extraction.FactExtractor
 import com.axiombase.extraction.RuleExtractor
+import com.axiombase.memory.*
 import com.axiombase.testing.TestRunner
 import com.axiombase.transaction.TransactionManager
 
@@ -193,7 +194,16 @@ class AxiomBase(
         val limitTenant = tenantId ?: "default"
 
         // If fact itself has a scope, respect it, otherwise apply the passed scope
-        val finalFact = if (fact.scope == null && scope != null) fact.copy(scope = scope) else fact
+        var finalFact = if (fact.scope == null && scope != null) fact.copy(scope = scope) else fact
+
+        // Auto-stamp createdAt if not already set
+        if (finalFact.createdAt == null) {
+            finalFact = finalFact.copy(createdAt = System.currentTimeMillis())
+        }
+        // Auto-set validFrom to now if not specified
+        if (finalFact.validFrom == null) {
+            finalFact = finalFact.copy(validFrom = finalFact.createdAt)
+        }
 
         internalAssertFact(ctx, finalFact, logging = true, tenantId = limitTenant)
     }
@@ -242,6 +252,9 @@ class AxiomBase(
         // Unified Storage: All facts (positive or negative) go to ctx.store
         ctx.store.add(fact)
         ctx.rete.onFactAsserted(fact)
+
+        // 4. Notify memory manager (salience tracking + event bus)
+        ctx.memoryManager.onFactAsserted(fact, tenantId)
     }
 
     fun retractFact(fact: Atom, tenantId: String? = null, scope: String? = null) {
@@ -264,6 +277,9 @@ class AxiomBase(
              }
         }
         ctx.store.delete(fact)
+
+        // Notify memory manager
+        ctx.memoryManager.onFactRetracted(fact, tenantId)
     }
 
     fun assertRule(rule: Rule, tenantId: String? = null, scope: String? = null) {
@@ -280,6 +296,9 @@ class AxiomBase(
         }
         ctx.rules.add(rule)
         ctx.rete.addRule(rule)
+
+        // Notify memory manager
+        ctx.memoryManager.onRuleAsserted(rule, tenantId)
     }
 
     fun query(pattern: Atom, tenantId: String? = null, scope: String? = null): Sequence<Atom> {
@@ -317,6 +336,96 @@ class AxiomBase(
         val ctx = getContext(tenantId)
         return if (scope == null) ctx.rules.toList()
         else ctx.rules.filter { it.scope == scope }
+    }
+
+    // --- Agent Memory API ---
+
+    /** Query facts that were valid at a specific point in time. */
+    fun queryAtTime(pattern: Atom, timestamp: Long, tenantId: String? = null, scope: String? = null): List<Atom> {
+        val ctx = getContext(tenantId)
+        return ctx.memoryManager.queryAtTime(ctx.store, pattern, timestamp, scope)
+    }
+
+    /** Query facts ranked by salience (most relevant first). */
+    fun queryWithSalience(
+        pattern: Atom,
+        tenantId: String? = null,
+        scope: String? = null,
+        limit: Int = 50,
+        minSalience: Double = 0.0
+    ): List<ScoredAtom> {
+        val ctx = getContext(tenantId)
+        return ctx.memoryManager.queryWithSalience(ctx.store, pattern, scope, limit, minSalience)
+    }
+
+    /** Build an optimal context window for an agent step. */
+    fun buildContextWindow(
+        tenantId: String? = null,
+        scope: String? = null,
+        maxFacts: Int = 100,
+        minSalience: Double = 0.0,
+        predicates: List<String>? = null
+    ): ContextWindow {
+        val ctx = getContext(tenantId)
+        return ctx.memoryManager.buildContextWindow(ctx.store, scope, maxFacts, minSalience, predicates)
+    }
+
+    /** Run memory consolidation (compress episodic patterns into semantic facts). */
+    fun runConsolidation(tenantId: String? = null): ConsolidationResult {
+        val ctx = getContext(tenantId)
+        val limitTenant = tenantId ?: "default"
+        return ctx.memoryManager.consolidate(
+            store = ctx.store,
+            retractConsolidated = { atom -> internalRetractFact(ctx, atom, logging = true, tenantId = limitTenant) },
+            assertConsolidated = { atom -> internalAssertFact(ctx, atom, logging = true, tenantId = limitTenant) },
+            tenantId = limitTenant
+        )
+    }
+
+    /** Run decay: expire TTL'd facts, evict low-salience facts if over capacity. */
+    fun runDecay(tenantId: String? = null, threshold: Double? = null): DecayResult {
+        val ctx = getContext(tenantId)
+        val limitTenant = tenantId ?: "default"
+        return ctx.memoryManager.runDecay(
+            store = ctx.store,
+            retractFact = { atom -> internalRetractFact(ctx, atom, logging = true, tenantId = limitTenant) },
+            tenantId = limitTenant,
+            forceThreshold = threshold
+        )
+    }
+
+    /** Set explicit salience priority for a fact (agent can boost/demote). */
+    fun setSaliencePriority(fact: Atom, priority: Double, tenantId: String? = null) {
+        val ctx = getContext(tenantId)
+        ctx.memoryManager.salienceTracker.setPriority(fact, priority)
+    }
+
+    /** Subscribe to knowledge change events. Returns subscription ID. */
+    fun subscribe(
+        predicatePattern: String? = null,
+        eventTypes: Set<String> = setOf("fact_asserted", "fact_retracted"),
+        tenantId: String? = null,
+        callback: (KnowledgeEvent) -> Unit
+    ): String {
+        val ctx = getContext(tenantId)
+        return ctx.memoryManager.eventBus.subscribe(predicatePattern, eventTypes, tenantId, callback)
+    }
+
+    /** Unsubscribe from knowledge change events. */
+    fun unsubscribe(subscriptionId: String, tenantId: String? = null) {
+        val ctx = getContext(tenantId)
+        ctx.memoryManager.eventBus.unsubscribe(subscriptionId)
+    }
+
+    /** Get recent events since a given event ID. */
+    fun getEventsSince(sinceEventId: Long, tenantId: String? = null): List<KnowledgeEvent> {
+        val ctx = getContext(tenantId)
+        return ctx.memoryManager.eventBus.getEventsSince(sinceEventId)
+    }
+
+    /** Get the memory manager for a tenant (for direct access to advanced features). */
+    fun getMemoryManager(tenantId: String? = null): MemoryManager {
+        return getContext(tenantId).memoryManager
     }
 
     // --- Tenant Management ---
@@ -738,7 +847,10 @@ class AxiomBase(
             logger.error("Failed to create final snapshot during shutdown: ${e.message}")
         }
 
-        // 6. Close WAL
+        // 6. Shutdown memory managers
+        contexts.forEach { (_, ctx) -> ctx.memoryManager.shutdown() }
+
+        // 7. Close WAL
         wal.close()
         logger.info("Database '$dbName' shutdown complete.")
     }

@@ -34,7 +34,10 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
             val terms = req.args.map { parseTerm(it) }
             val effectiveTruth = if (req.negated) false else req.truthVal
 
-            val atom = com.axiombase.core.Atom(req.predicate, terms, effectiveTruth, scope = req.scope, metadata = req.metadata)
+            val atom = com.axiombase.core.Atom(
+                req.predicate, terms, effectiveTruth, scope = req.scope, metadata = req.metadata,
+                validFrom = req.validFrom, validUntil = req.validUntil, ttl = req.ttl
+            )
 
             val txId = call.request.header("X-Transaction-ID")?.toLongOrNull()
 

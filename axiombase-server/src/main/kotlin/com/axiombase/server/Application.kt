@@ -173,7 +173,8 @@ fun Application.module() {
                 call.request.uri == "/health/ready" ||
                 call.request.uri == "/metrics" ||
                 call.request.uri == "/llm.txt" ||
-                call.request.uri == "/userguide"
+                call.request.uri == "/userguide" ||
+                call.request.uri == "/.well-known/agent.json"
 
             if (!isPublic && keyContext != apiKey) {
                 call.respondText("Unauthorized", status = HttpStatusCode.Unauthorized)
@@ -195,6 +196,8 @@ fun Application.module() {
         logicRoutes(dbManager)
         transactionRoutes(dbManager)
         testRoutes(dbManager)
+        memoryRoutes(dbManager)
+        mcpRoutes(dbManager)
         observabilityRoutes(appMicrometerRegistry, dbManager, ServerConfig.storageDir)
         replicationRoutes(dbManager)
         extractionRoutes(dbManager, factExtractor, ruleExtractor, llmProvider)
