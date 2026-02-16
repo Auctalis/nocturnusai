@@ -2,6 +2,7 @@ package com.axiombase.cli
 
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
+import java.io.File
 
 // ANSI colors
 private const val RESET  = "\u001B[0m"
@@ -15,6 +16,33 @@ private const val RED    = "\u001B[31m"
 class Repl(private val client: Client) {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+
+    /** Execute a single command and exit (for -e flag / scripting) */
+    fun execSingle(command: String) {
+        val (cmd, rest) = splitFirst(command.trim())
+        try {
+            when (cmd.lowercase()) {
+                "ask", "?"        -> doAsk(rest)
+                "tell", "+"       -> doTell(rest)
+                "teach", "++"     -> doTeach(rest)
+                "forget", "-"     -> doForget(rest)
+                "inspect", "ls"   -> doInspect(rest)
+                "context", "ctx"  -> doContext(rest)
+                "compress"        -> doCompress()
+                "cleanup"         -> doCleanup(rest)
+                "dsl", "exec"     -> doDsl(rest)
+                "import", "load"  -> doImport(rest)
+                "export", "dump"  -> doExport(rest)
+                "dbs"             -> doDbs()
+                "health"          -> doHealth()
+                else              -> System.err.println("Unknown command: $cmd")
+            }
+        } catch (e: Exception) {
+            System.err.println("Error: ${e.message}")
+        } finally {
+            client.close()
+        }
+    }
 
     fun run() {
         printBanner()
@@ -36,6 +64,8 @@ class Repl(private val client: Client) {
                     "compress"        -> doCompress()
                     "cleanup"         -> doCleanup(rest)
                     "dsl", "exec"     -> doDsl(rest)
+                    "import", "load"  -> doImport(rest)
+                    "export", "dump"  -> doExport(rest)
                     "use"             -> doUse(rest)
                     "dbs"             -> doDbs()
                     "health"          -> doHealth()
@@ -151,6 +181,76 @@ class Repl(private val client: Client) {
         println(resp)
     }
 
+    private fun doImport(path: String) = runBlocking {
+        require(path.isNotBlank()) { "Usage: import <file.ab>" }
+        val file = File(path)
+        require(file.exists()) { "File not found: $path" }
+
+        val lines = file.readLines()
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !it.startsWith("#") }
+
+        var facts = 0
+        var rules = 0
+        var errors = 0
+
+        for ((idx, line) in lines.withIndex()) {
+            try {
+                if (Parser.isRule(line)) {
+                    client.teach(Parser.ruleToJson(line))
+                    rules++
+                } else {
+                    client.tell(Parser.factToJson(line))
+                    facts++
+                }
+            } catch (e: Exception) {
+                errors++
+                println("  ${RED}line ${idx + 1}: ${e.message}$RESET  $DIM$line$RESET")
+            }
+        }
+
+        println("${GREEN}Imported$RESET — $facts facts, $rules rules" +
+            if (errors > 0) ", ${RED}$errors errors$RESET" else "")
+    }
+
+    private fun doExport(path: String) = runBlocking {
+        val factsRaw = client.listFacts()
+        val rulesRaw = client.listRules()
+        val facts = tryParseArray(factsRaw)
+        val rules = tryParseArray(rulesRaw)
+
+        val sb = StringBuilder()
+        sb.appendLine("# AxiomBase knowledge dump — ${client.database}")
+        sb.appendLine("# ${java.time.Instant.now()}")
+        sb.appendLine()
+
+        if (facts.isNotEmpty()) {
+            sb.appendLine("# Facts")
+            for (f in facts) {
+                sb.appendLine(formatAtomPlain(f))
+            }
+            sb.appendLine()
+        }
+
+        if (rules.isNotEmpty()) {
+            sb.appendLine("# Rules")
+            for (r in rules) {
+                sb.appendLine(formatRulePlain(r))
+            }
+            sb.appendLine()
+        }
+
+        val text = sb.toString()
+
+        if (path.isBlank()) {
+            // Print to stdout
+            println(text)
+        } else {
+            File(path).writeText(text)
+            println("${GREEN}Exported$RESET — ${facts.size} facts, ${rules.size} rules → $path")
+        }
+    }
+
     private fun doUse(name: String) {
         require(name.isNotBlank()) { "Usage: use <database>" }
         client.database = name
@@ -196,6 +296,25 @@ class Repl(private val client: Client) {
         if (head == null) return el.toString()
         val headStr = formatAtom(head)
         val bodyStr = body?.joinToString(", ") { formatAtom(it) } ?: ""
+        return "$headStr :- $bodyStr"
+    }
+
+    /** Plain text atom — no ANSI, for file export */
+    private fun formatAtomPlain(el: JsonElement): String {
+        if (el !is JsonObject) return el.toString()
+        val pred = el["predicate"]?.jsonPrimitive?.contentOrNull ?: "?"
+        val args = el["args"]?.jsonArray?.joinToString(", ") { it.jsonPrimitive.content } ?: ""
+        val neg = if (el["negated"]?.jsonPrimitive?.booleanOrNull == true) "NOT " else ""
+        return if (args.isEmpty()) "$neg$pred" else "$neg$pred($args)"
+    }
+
+    /** Plain text rule — no ANSI, for file export */
+    private fun formatRulePlain(el: JsonElement): String {
+        if (el !is JsonObject) return el.toString()
+        val head = el["head"]?.jsonObject ?: return el.toString()
+        val body = el["body"]?.jsonArray ?: return formatAtomPlain(head)
+        val headStr = formatAtomPlain(head)
+        val bodyStr = body.joinToString(", ") { formatAtomPlain(it) }
         return "$headStr :- $bodyStr"
     }
 
@@ -284,6 +403,10 @@ ${BOLD}Operations:$RESET
   cleanup [threshold]               Evict expired/low-salience facts
   dsl <command>                     Raw Logiql DSL
 
+${BOLD}Import / Export:$RESET
+  import <file.ab>                  Load facts & rules from file
+  export [file.ab]                  Dump knowledge (to file or stdout)
+
 ${BOLD}Admin:$RESET
   use <database>                    Switch database
   dbs                               List databases
@@ -291,13 +414,21 @@ ${BOLD}Admin:$RESET
 
 ${BOLD}Shortcuts:$RESET
   ?  = ask    +  = tell    ++ = teach    -  = forget    ls = inspect
-  ctx = context    exec = dsl    q = exit
+  ctx = context    exec = dsl    load = import    dump = export    q = exit
 
 ${BOLD}Examples:$RESET
   tell human(socrates)
   teach mortal(?x) :- human(?x)
   ask mortal(?who)
   inspect
+  export kb.ab
+  import kb.ab
+
+${BOLD}File format (.ab):$RESET
+  # Comments start with #
+  human(socrates)
+  human(plato)
+  mortal(?x) :- human(?x)
         """.trimIndent())
     }
 
