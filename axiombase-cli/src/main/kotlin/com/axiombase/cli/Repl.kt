@@ -26,6 +26,7 @@ class Repl(private val client: Client) {
                 "tell", "+"       -> doTell(rest)
                 "teach", "++"     -> doTeach(rest)
                 "forget", "-"     -> doForget(rest)
+                "ingest"          -> doIngest(rest)
                 "inspect", "ls"   -> doInspect(rest)
                 "context", "ctx"  -> doContext(rest)
                 "compress"        -> doCompress()
@@ -59,6 +60,7 @@ class Repl(private val client: Client) {
                     "tell", "+"       -> doTell(rest)
                     "teach", "++"     -> doTeach(rest)
                     "forget", "-"     -> doForget(rest)
+                    "ingest"          -> doIngest(rest)
                     "inspect", "ls"   -> doInspect(rest)
                     "context", "ctx"  -> doContext(rest)
                     "compress"        -> doCompress()
@@ -86,16 +88,88 @@ class Repl(private val client: Client) {
 
     // ── commands ──
 
+    /**
+     * Smart ask — auto-detects natural language vs predicate syntax.
+     *   ask mortal(?who)                → structured /ask query
+     *   ask who is mortal?              → NL /synthesize
+     *   ask what did Alice tell Bob?    → NL /synthesize
+     */
     private fun doAsk(text: String) = runBlocking {
-        require(text.isNotBlank()) { "Usage: ask predicate(?var)" }
-        val resp = client.ask(Parser.atomToJson(text))
-        printResult(resp)
+        require(text.isNotBlank()) { "Usage: ask mortal(?who)  OR  ask <natural language question>" }
+        if (looksLikePredicate(text)) {
+            val resp = client.ask(Parser.atomToJson(text))
+            printResult(resp)
+        } else {
+            doSynthesize(text)
+        }
+    }
+
+    /** NL question → /synthesize → LLM-powered answer from the knowledge base */
+    private fun doSynthesize(question: String) = runBlocking {
+        println("${DIM}Querying knowledge base...${RESET}")
+        val resp = client.synthesize(question)
+        try {
+            val obj = json.parseToJsonElement(resp).jsonObject
+
+            // Check for error
+            val errCode = obj["code"]?.jsonPrimitive?.contentOrNull
+            if (errCode != null) {
+                val errMsg = obj["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
+                println("${RED}$errCode: $errMsg${RESET}")
+                return@runBlocking
+            }
+
+            val answer = obj["answer"]?.jsonPrimitive?.contentOrNull ?: resp
+            val confidence = obj["confidence"]?.jsonPrimitive?.floatOrNull ?: 0f
+            val derivation = obj["derivation"]?.jsonArray ?: JsonArray(emptyList())
+            val missing = obj["missingContext"]?.jsonPrimitive?.contentOrNull ?: ""
+            val queries = obj["queriesExecuted"]?.jsonArray
+            val provider = obj["provider"]?.jsonPrimitive?.contentOrNull
+            val model = obj["model"]?.jsonPrimitive?.contentOrNull
+
+            println()
+            println("  $answer")
+            println()
+
+            if (derivation.isNotEmpty()) {
+                println("${DIM}Derivation:${RESET}")
+                for (step in derivation) {
+                    val fact = step.jsonObject["fact"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val type = step.jsonObject["type"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val rule = step.jsonObject["rule"]?.jsonPrimitive?.contentOrNull
+                    val typeTag = when (type) {
+                        "fact_match" -> "${GREEN}fact${RESET}"
+                        "rule_application" -> "${CYAN}rule${RESET}"
+                        else -> "${DIM}$type${RESET}"
+                    }
+                    print("  $typeTag  $fact")
+                    if (rule != null) print("  ${DIM}via $rule${RESET}")
+                    println()
+                }
+            }
+
+            if (missing.isNotBlank()) {
+                println("${DIM}Gaps: $missing${RESET}")
+            }
+
+            val confStr = String.format("%.0f%%", confidence * 100)
+            val providerStr = if (model != null) "$provider/$model" else ""
+            println("${DIM}Confidence: $confStr  $providerStr${RESET}")
+
+        } catch (_: Exception) {
+            println(resp)
+        }
     }
 
     private fun doTell(text: String) = runBlocking {
         require(text.isNotBlank()) { "Usage: tell predicate(arg1, arg2)" }
-        val resp = client.tell(Parser.factToJson(text))
-        printOk(resp, "Fact stored")
+        if (looksLikePredicate(text)) {
+            val resp = client.tell(Parser.factToJson(text))
+            printOk(resp, "Fact stored")
+        } else {
+            // Natural language → extract and assert
+            doIngest(text)
+        }
     }
 
     private fun doTeach(text: String) = runBlocking {
@@ -109,6 +183,76 @@ class Repl(private val client: Client) {
         require(text.isNotBlank()) { "Usage: forget predicate(arg1, arg2)" }
         val resp = client.forget(Parser.atomToJson(text))
         printOk(resp, "Retracted")
+    }
+
+    /**
+     * Ingest natural language text — LLM extracts facts & rules, auto-asserts.
+     *   ingest Alice is Bob's mother. Bob has three children.
+     *   ingest -f article.txt
+     */
+    private fun doIngest(text: String) = runBlocking {
+        require(text.isNotBlank()) { "Usage: ingest <text>  OR  ingest -f <file>" }
+
+        val inputText = if (text.startsWith("-f ")) {
+            val path = text.removePrefix("-f ").trim()
+            val file = File(path)
+            require(file.exists()) { "File not found: $path" }
+            file.readText()
+        } else {
+            text
+        }
+
+        println("${DIM}Extracting knowledge...${RESET}")
+        val resp = client.extract(inputText, assert = true, rules = true)
+        try {
+            val obj = json.parseToJsonElement(resp).jsonObject
+
+            // Check for error
+            val errCode = obj["code"]?.jsonPrimitive?.contentOrNull
+            if (errCode != null) {
+                val errMsg = obj["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
+                println("${RED}$errCode: $errMsg${RESET}")
+                return@runBlocking
+            }
+
+            val facts = obj["facts"]?.jsonArray ?: JsonArray(emptyList())
+            val rules = obj["rules"]?.jsonArray ?: JsonArray(emptyList())
+            val asserted = obj["asserted"]?.jsonPrimitive?.booleanOrNull ?: false
+            val provider = obj["provider"]?.jsonPrimitive?.contentOrNull
+            val model = obj["model"]?.jsonPrimitive?.contentOrNull
+
+            if (facts.isEmpty() && rules.isEmpty()) {
+                println("${YELLOW}No facts extracted.${RESET}")
+                return@runBlocking
+            }
+
+            for (f in facts) {
+                val pred = f.jsonObject["predicate"]?.jsonPrimitive?.contentOrNull ?: "?"
+                val args = f.jsonObject["args"]?.jsonArray?.joinToString(", ") { it.jsonPrimitive.content } ?: ""
+                val conf = f.jsonObject["confidence"]?.jsonPrimitive?.floatOrNull ?: 0f
+                val confStr = String.format("%.0f%%", conf * 100)
+                println("  ${GREEN}+${RESET} $CYAN$pred$RESET($args)  ${DIM}$confStr${RESET}")
+            }
+
+            for (r in rules) {
+                val head = r.jsonObject["head"]?.jsonObject
+                val body = r.jsonObject["body"]?.jsonArray
+                if (head != null) {
+                    val headStr = formatAtomPlain(head)
+                    val bodyStr = body?.joinToString(", ") { formatAtomPlain(it) } ?: ""
+                    val conf = r.jsonObject["confidence"]?.jsonPrimitive?.floatOrNull ?: 0f
+                    val confStr = String.format("%.0f%%", conf * 100)
+                    println("  ${GREEN}+${RESET} $headStr :- $bodyStr  ${DIM}$confStr${RESET}")
+                }
+            }
+
+            val status = if (asserted) "${GREEN}asserted${RESET}" else "${YELLOW}extracted only${RESET}"
+            val providerStr = if (model != null) "  ${DIM}via $provider/$model${RESET}" else ""
+            println("${facts.size} facts, ${rules.size} rules — $status$providerStr")
+
+        } catch (_: Exception) {
+            println(resp)
+        }
     }
 
     private fun doInspect(filter: String) = runBlocking {
@@ -389,10 +533,11 @@ class Repl(private val client: Client) {
     private fun printHelp() {
         println("""
 ${BOLD}Agent commands:$RESET
-  ask   <pred(?var)>                Query with reasoning
-  tell  <pred(arg, arg)>            Store a fact
+  ask   <question or pred(?var)>    Query (NL or predicate syntax)
+  tell  <text or pred(arg, arg)>    Store a fact (NL or structured)
   teach <head(?x) :- body(?x)>      Define a rule
   forget <pred(arg, arg)>           Remove a fact
+  ingest <text or -f file>          Extract facts from plain text via LLM
 
 ${BOLD}Explore:$RESET
   inspect [filter]                  Browse all knowledge
@@ -416,20 +561,31 @@ ${BOLD}Shortcuts:$RESET
   ?  = ask    +  = tell    ++ = teach    -  = forget    ls = inspect
   ctx = context    exec = dsl    load = import    dump = export    q = exit
 
-${BOLD}Examples:$RESET
+${BOLD}Examples — structured:$RESET
   tell human(socrates)
   teach mortal(?x) :- human(?x)
   ask mortal(?who)
-  inspect
-  export kb.ab
-  import kb.ab
 
-${BOLD}File format (.ab):$RESET
-  # Comments start with #
-  human(socrates)
-  human(plato)
-  mortal(?x) :- human(?x)
+${BOLD}Examples — natural language (requires LLM configured on server):$RESET
+  ingest Alice is Bob's mother. Bob works at Acme Corp.
+  ingest -f article.txt
+  ask who is Bob's mother?
+  ask what company does Bob work at?
+  tell the president met with the prime minister yesterday
         """.trimIndent())
+    }
+
+    /**
+     * Heuristic: does this look like predicate syntax or natural language?
+     *   "mortal(?who)"         → true  (has parens with args)
+     *   "likes(alice, bob)"    → true
+     *   "who is mortal?"       → false (spaces, no predicate parens)
+     *   "what did Trump say"   → false
+     */
+    private fun looksLikePredicate(text: String): Boolean {
+        val trimmed = text.trim()
+        // Contains predicate-style parens: word( ... )
+        return Regex("""^(NOT\s+)?[A-Za-z_]\w*\(.*\)$""", RegexOption.IGNORE_CASE).matches(trimmed)
     }
 
     private fun splitFirst(line: String): Pair<String, String> {
