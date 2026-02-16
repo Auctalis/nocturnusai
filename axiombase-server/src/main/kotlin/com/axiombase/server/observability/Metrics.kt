@@ -73,7 +73,7 @@ object Metrics {
 
     // ── Query / Inference ───────────────────────────────────────────────
 
-    fun queryTimer(database: String): Timer.Sample {
+    fun queryTimer(): Timer.Sample {
         return Timer.start(registry)
     }
 
