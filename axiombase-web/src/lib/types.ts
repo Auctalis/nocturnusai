@@ -65,6 +65,11 @@ export type OperationMode =
   | 'retract'
   | 'assert_template'
   | 'inspect'
+  | 'execute'
+  | 'synthesize'
+
+// User roles
+export type UserRole = 'admin' | 'developer' | 'agent'
 
 // UI state types
 export interface QueryHistoryEntry {
@@ -90,4 +95,44 @@ export interface InspectFilters {
 export interface InspectItem {
   Type: 'Fact' | 'Rule'
   Content: string | AtomResponse
+}
+
+// Context Playground types
+export interface AskResponse {
+  answer: string
+  confidence: number
+  derivation: DerivationStep[]
+  queriesExecuted: string[]
+}
+
+export interface DerivationStep {
+  type: 'fact' | 'rule'
+  content: string
+  description: string
+}
+
+export interface TellResponse {
+  count: number
+  understood: string[]
+  rules: string[]
+  rulesCount: number
+}
+
+export interface RecallResponse {
+  facts: string[]
+  count: number
+}
+
+// Memory types
+export interface ScoredAtom {
+  atom: AtomResponse
+  salience: number
+}
+
+export interface ContextWindow {
+  facts: ScoredAtom[]
+  totalAvailable: number
+  windowSize: number
+  predicateDistribution: Record<string, number>
+  generatedAt: string
 }

@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { Search } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import Spinner from './Spinner'
 import { toast } from 'sonner'
 import { useApp } from '@/context/AppContext'
 import * as api from '@/lib/api'
 import type { RecallResponse } from '@/lib/types'
-import PaginationControls from './PaginationControls'
 
 interface RecallPanelProps {
   db: string
@@ -20,7 +19,7 @@ export default function RecallPanel({ db, tenant, scope }: RecallPanelProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<RecallResponse | null>(null)
   const [page, setPage] = useState(0)
-  const [pageSize, setPageSize] = useState(25)
+  const pageSize = 25
 
   const handleRecall = async (newPage = 0) => {
     if (!query.trim()) {
@@ -82,7 +81,7 @@ export default function RecallPanel({ db, tenant, scope }: RecallPanelProps) {
             <input
               type="text"
               className="input"
-              placeholder={mode === 'topic' ? 'Search by topic (e.g., "family")' : 'Search by predicate (e.g., "Parent")'}
+              placeholder={mode === 'topic' ? 'Search by topic (e.g., "family")' : 'Search by predicate (e.g., "parent")'}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyPress}
@@ -130,18 +129,30 @@ export default function RecallPanel({ db, tenant, scope }: RecallPanelProps) {
               </div>
             )}
           </div>
-          {result.count > 0 && (
-            <PaginationControls
-              page={page}
-              totalPages={totalPages}
-              total={result.count}
-              pageSize={pageSize}
-              onPageChange={(newPage) => handleRecall(newPage)}
-              onPageSizeChange={(newSize) => {
-                setPageSize(newSize)
-                void handleRecall(0)
-              }}
-            />
+          {result.count > pageSize && (
+            <div className="card-footer" style={{ justifyContent: 'space-between' }}>
+              <span className="text-xs text-muted font-mono">
+                Page {page + 1} of {totalPages}
+              </span>
+              <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => handleRecall(page - 1)}
+                  disabled={page === 0}
+                >
+                  <ChevronLeft size={14} />
+                  Previous
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => handleRecall(page + 1)}
+                  disabled={page >= totalPages - 1}
+                >
+                  Next
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}

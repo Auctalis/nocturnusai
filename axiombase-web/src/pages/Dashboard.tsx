@@ -7,6 +7,7 @@ import * as api from '@/lib/api'
 import { PromptModal } from '@/components/Modal'
 import Skeleton from '@/components/Skeleton'
 import NetworkBackground from '@/components/NetworkBackground'
+import Onboarding from '@/components/Onboarding'
 import {
   Hexagon,
   Plus,
@@ -21,6 +22,7 @@ export default function Dashboard() {
   const { databases, loading, error, refresh } = useDatabases()
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState<string | null>(null)
 
   const handleCreate = async (name: string) => {
     try {
@@ -98,6 +100,32 @@ export default function Dashboard() {
                 <div className="empty-state-text">No databases found. Create one to get started!</div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Onboarding: show when a database is selected for quick start */}
+        {showOnboarding && (
+          <div style={{ marginTop: 'var(--space-xl)' }}>
+            <Onboarding
+              database={showOnboarding}
+              onComplete={() => navigate(`/db/${showOnboarding}`)}
+            />
+          </div>
+        )}
+
+        {/* Quick Start CTA: show when databases exist but no onboarding is active */}
+        {!loading && !error && databases.length > 0 && !showOnboarding && (
+          <div style={{ marginTop: 'var(--space-xl)', textAlign: 'center' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-sm)' }}>
+              New to AxiomBase? Try the guided walkthrough.
+            </p>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowOnboarding(databases[0]?.name ?? '')}
+            >
+              Quick Start Tutorial
+              <ArrowRight size={14} />
+            </button>
           </div>
         )}
       </div>

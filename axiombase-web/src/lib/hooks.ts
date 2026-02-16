@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useApp } from '@/context/AppContext'
+import { toast } from 'sonner'
 import * as api from './api'
 import type {
   AtomResponse,
@@ -145,6 +146,9 @@ export function useQuery(database: string, tenantId?: string) {
           case 'retract':
             response = await api.retractFact(apiKey, database, body as FactRequest, tenantId)
             break
+          case 'execute':
+            response = await api.execute(apiKey, database, inputData, tenantId)
+            break
           default:
             throw new Error(`Unknown mode: ${mode as string}`)
         }
@@ -166,6 +170,109 @@ export function useQuery(database: string, tenantId?: string) {
   }, [])
 
   return { result, error, isLoading, execute, clear }
+}
+
+// ── useDatabaseActions ────────────────────────────────────────
+
+interface DatabaseActionCallbacks {
+  onDeletedCurrentDb?: () => void
+  onNukedDb?: () => void
+  onNukedTenant?: () => void
+}
+
+export function useDatabaseActions(
+  currentDb: string | undefined,
+  refreshDbs: () => Promise<void>,
+  refreshTenants: () => Promise<void>,
+  setCurrentTenant: (id: string) => void,
+  callbacks: DatabaseActionCallbacks = {},
+) {
+  const { apiKey } = useApp()
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [nukeTarget, setNukeTarget] = useState<string | null>(null)
+  const [nukeTenantTarget, setNukeTenantTarget] = useState<string | null>(null)
+  const [createTenantOpen, setCreateTenantOpen] = useState(false)
+
+  const handleCreateDb = useCallback(() => {
+    // Handled by parent component's PromptModal
+  }, [])
+
+  const handleDeleteDb = useCallback(
+    async (name: string) => {
+      try {
+        await api.deleteDatabase(apiKey, name)
+        toast.success(`Database "${name}" deleted`)
+        await refreshDbs()
+        if (name === currentDb) callbacks.onDeletedCurrentDb?.()
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to delete')
+      }
+    },
+    [apiKey, currentDb, refreshDbs, callbacks],
+  )
+
+  const handleNukeDb = useCallback(
+    async (name: string) => {
+      try {
+        await api.nukeDatabase(apiKey, name)
+        toast.success(`Database "${name}" cleared`)
+        callbacks.onNukedDb?.()
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to clear')
+      }
+    },
+    [apiKey, callbacks],
+  )
+
+  const handleCreateTenant = useCallback(
+    async (tenantId: string) => {
+      if (!currentDb) return
+      try {
+        await api.createTenant(apiKey, currentDb, tenantId)
+        toast.success(`Tenant "${tenantId}" created`)
+        await refreshTenants()
+        setCurrentTenant(tenantId)
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to create tenant')
+      }
+    },
+    [apiKey, currentDb, refreshTenants, setCurrentTenant],
+  )
+
+  const handleNukeTenant = useCallback(
+    async (tenantId: string) => {
+      if (!currentDb) return
+      try {
+        await api.nukeTenant(apiKey, currentDb, tenantId)
+        toast.success(`Tenant "${tenantId}" cleared`)
+        callbacks.onNukedTenant?.()
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to clear tenant')
+      }
+    },
+    [apiKey, currentDb, callbacks],
+  )
+
+  return {
+    sidebarActions: {
+      onCreateDb: handleCreateDb,
+      onDeleteDb: handleDeleteDb,
+      onNukeDb: handleNukeDb,
+      onCreateTenant: () => setCreateTenantOpen(true),
+      onNukeTenant: handleNukeTenant,
+    },
+    modalState: {
+      deleteTarget,
+      setDeleteTarget,
+      nukeTarget,
+      setNukeTarget,
+      nukeTenantTarget,
+      setNukeTenantTarget,
+      createTenantOpen,
+      setCreateTenantOpen,
+      onCreateTenant: handleCreateTenant,
+    },
+  }
 }
 
 // ── useKeyboardShortcut ───────────────────────────────────────

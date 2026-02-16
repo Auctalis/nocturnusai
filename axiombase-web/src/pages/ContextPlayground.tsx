@@ -1,29 +1,27 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useDatabases, useTenants, useDatabaseActions } from '@/lib/hooks'
 import Layout from '@/components/Layout'
 import Sidebar from '@/components/Sidebar'
 import DatabaseModals from '@/components/DatabaseModals'
-import { useDatabases, useTenants, useDatabaseActions } from '@/lib/hooks'
 import AskPanel from '@/components/AskPanel'
 import TellPanel from '@/components/TellPanel'
 import RecallPanel from '@/components/RecallPanel'
+import { MessageCircle } from 'lucide-react'
 
-type TabType = 'ask' | 'tell' | 'recall'
+type Tab = 'ask' | 'tell' | 'recall'
 
 export default function ContextPlayground() {
   const { dbName } = useParams<{ dbName: string }>()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<TabType>('ask')
+  const [activeTab, setActiveTab] = useState<Tab>('ask')
   const [scope, setScope] = useState('')
 
   const { databases, refresh: refreshDbs } = useDatabases()
   const currentDb = databases.find((d) => d.name === dbName)
   const isMultiTenant = currentDb?.isMultiTenant ?? false
 
-  const { tenants, currentTenant, setCurrentTenant, refresh: refreshTenants } = useTenants(
-    dbName,
-    isMultiTenant,
-  )
+  const { tenants, currentTenant, setCurrentTenant, refresh: refreshTenants } = useTenants(dbName, isMultiTenant)
 
   const { sidebarActions, modalState } = useDatabaseActions(
     dbName,
@@ -32,6 +30,17 @@ export default function ContextPlayground() {
     setCurrentTenant,
     { onDeletedCurrentDb: () => navigate('/') },
   )
+
+  if (!dbName) {
+    navigate('/')
+    return null
+  }
+
+  const tabs: { id: Tab; label: string; description: string }[] = [
+    { id: 'ask', label: 'Ask', description: 'Query knowledge with natural language' },
+    { id: 'tell', label: 'Tell', description: 'Assert facts in natural language' },
+    { id: 'recall', label: 'Recall', description: 'Search and retrieve stored facts' },
+  ]
 
   return (
     <>
@@ -51,15 +60,13 @@ export default function ContextPlayground() {
         toolbar={
           <div className="toolbar-row">
             <div className="toolbar-left">
-              <h1 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, margin: 0 }}>
-                Context Playground
-              </h1>
-              {dbName && (
-                <span className="badge badge-info">{dbName}</span>
-              )}
-              {currentTenant && (
-                <span className="badge badge-success">{currentTenant}</span>
-              )}
+              <MessageCircle size={18} />
+              <span style={{ fontWeight: 600 }}>Context Playground</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+                {dbName}
+              </span>
+            </div>
+            <div className="toolbar-right">
               <input
                 type="text"
                 className="input"
@@ -72,46 +79,38 @@ export default function ContextPlayground() {
           </div>
         }
       >
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 'var(--space-md)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', height: '100%' }}>
           <div className="tabs">
-            <button
-              className={`tab ${activeTab === 'ask' ? 'active' : ''}`}
-              onClick={() => setActiveTab('ask')}
-            >
-              Ask
-            </button>
-            <button
-              className={`tab ${activeTab === 'tell' ? 'active' : ''}`}
-              onClick={() => setActiveTab('tell')}
-            >
-              Tell
-            </button>
-            <button
-              className={`tab ${activeTab === 'recall' ? 'active' : ''}`}
-              onClick={() => setActiveTab('recall')}
-            >
-              Recall
-            </button>
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                className={`tab ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+                title={tab.description}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ flex: 1, minHeight: 0 }}>
             {activeTab === 'ask' && (
               <AskPanel
-                db={dbName ?? ''}
+                db={dbName}
                 tenant={isMultiTenant ? currentTenant : undefined}
                 scope={scope || undefined}
               />
             )}
             {activeTab === 'tell' && (
               <TellPanel
-                db={dbName ?? ''}
+                db={dbName}
                 tenant={isMultiTenant ? currentTenant : undefined}
                 scope={scope || undefined}
               />
             )}
             {activeTab === 'recall' && (
               <RecallPanel
-                db={dbName ?? ''}
+                db={dbName}
                 tenant={isMultiTenant ? currentTenant : undefined}
                 scope={scope || undefined}
               />

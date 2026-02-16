@@ -1,5 +1,4 @@
 import type { OperationMode } from '@/lib/types'
-import { useTransaction } from '@/context/TransactionContext'
 import {
   Search,
   CirclePlus,
@@ -12,8 +11,6 @@ import {
   SlidersHorizontal,
   Code2,
   Terminal,
-  Sparkles,
-  GitCommitHorizontal,
 } from 'lucide-react'
 import Kbd from './Kbd'
 
@@ -24,8 +21,6 @@ interface ActionToolbarProps {
   isRunning: boolean
   useVisual: boolean
   onToggleVisual: () => void
-  database?: string
-  tenantId?: string
   scope?: string
   onScopeChange?: (scope: string) => void
 }
@@ -38,7 +33,6 @@ const MODES: { id: OperationMode; label: string; icon: typeof Search }[] = [
   { id: 'assert_template', label: 'Template', icon: LayoutTemplate },
   { id: 'inspect', label: 'Inspect', icon: Eye },
   { id: 'execute', label: 'Execute', icon: Terminal },
-  { id: 'synthesize', label: 'Synthesize', icon: Sparkles },
 ]
 
 export default function ActionToolbar({
@@ -48,13 +42,9 @@ export default function ActionToolbar({
   isRunning,
   useVisual,
   onToggleVisual,
-  database,
-  tenantId,
   scope,
   onScopeChange,
 }: ActionToolbarProps) {
-  const { txId, begin } = useTransaction()
-
   const showVisualToggle = !['execute', 'synthesize'].includes(mode)
 
   return (
@@ -101,23 +91,6 @@ export default function ActionToolbar({
             onChange={(e) => onScopeChange(e.target.value)}
             style={{ width: 120, fontSize: 'var(--text-xs)', padding: '4px 8px' }}
           />
-        )}
-
-        {/* Transaction button */}
-        {database && !txId && (
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => void begin(database, tenantId)}
-            title="Begin Transaction"
-          >
-            <GitCommitHorizontal size={12} />
-            Begin TX
-          </button>
-        )}
-        {txId && (
-          <span className="badge badge-info" style={{ fontSize: 'var(--text-xs)' }}>
-            TX: {txId.slice(0, 8)}...
-          </span>
         )}
 
         {showVisualToggle && (

@@ -113,6 +113,8 @@ const DESCRIPTIONS: Record<OperationMode, string> = {
   retract: 'Remove a Fact.',
   inspect: 'Browse the Knowledge Base.',
   assert_template: 'Use a Logic Template.',
+  execute: 'Execute a DSL command.',
+  synthesize: 'Synthesize knowledge.',
 }
 
 // ── Main Component ────────────────────────────────────────────

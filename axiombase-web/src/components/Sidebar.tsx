@@ -12,14 +12,10 @@ import {
   LogOut,
   Search,
   MessageCircle,
-  BookOpen,
-  FlaskConical,
   Terminal,
-  Heart,
-  Archive,
-  GitFork,
-  TestTube2,
+  Share2,
   Home,
+  FileText,
 } from 'lucide-react'
 import Kbd from './Kbd'
 
@@ -65,39 +61,20 @@ export default function Sidebar({
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Use selectedDb from AppContext as fallback when no URL-based db is provided (e.g. ops pages)
   const currentDb = currentDbProp ?? (selectedDb || undefined)
 
-  // Sync URL-based db selection to AppContext so it persists across route changes
   useEffect(() => {
     if (currentDbProp) setSelectedDb(currentDbProp)
   }, [currentDbProp, setSelectedDb])
 
-  const contextNav: NavItem[] = [
-    { label: 'Ask / Tell / Recall', icon: MessageCircle, path: `/db/${currentDb}/context`, roles: ['agent', 'developer', 'admin'] },
-  ]
-
-  const knowledgeNav: NavItem[] = [
-    { label: 'Facts & Rules', icon: BookOpen, path: `/db/${currentDb}/knowledge`, roles: ['developer', 'admin'] },
-    { label: 'Extraction Lab', icon: FlaskConical, path: `/db/${currentDb}/extract`, roles: ['developer', 'admin'] },
-  ]
-
-  const consoleNav: NavItem[] = [
-    { label: 'Query Console', icon: Terminal, path: `/db/${currentDb}/console`, roles: ['admin'] },
-  ]
-
-  const opsNav: NavItem[] = [
-    { label: 'Health & Metrics', icon: Heart, path: '/ops/health', roles: ['admin'] },
-    { label: 'Backups', icon: Archive, path: '/ops/backups', roles: ['admin'] },
-    { label: 'Replication', icon: GitFork, path: '/ops/replication', roles: ['admin'] },
-    { label: 'Test Runner', icon: TestTube2, path: '/ops/tests', roles: ['admin'] },
+  const mainNav: NavItem[] = [
+    { label: 'Query Console', icon: Terminal, path: `/db/${currentDb}`, roles: ['admin', 'developer', 'agent'] },
+    { label: 'Knowledge Graph', icon: Share2, path: `/db/${currentDb}/graph`, roles: ['admin', 'developer', 'agent'] },
+    { label: 'Context Playground', icon: MessageCircle, path: `/db/${currentDb}/context`, roles: ['admin', 'developer', 'agent'] },
+    { label: 'API Reference', icon: FileText, path: `/db/${currentDb}/api`, roles: ['admin', 'developer', 'agent'] },
   ]
 
   const isActive = (path: string) => {
-    if (path.startsWith('/db/') && path.endsWith('/console')) {
-      // Also match /db/:name without /console suffix
-      return location.pathname === path || location.pathname === `/db/${currentDb}`
-    }
     return location.pathname === path
   }
 
@@ -242,55 +219,11 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Navigation Sections */}
+      {/* Navigation */}
       {currentDb && (
-        <>
-          {/* Context Section */}
-          {contextNav.some((n) => n.roles.includes(role)) && (
-            <div className="sidebar-section" style={{ paddingTop: 0 }}>
-              <div className="sidebar-label">
-                {!sidebarCollapsed && <span>Context</span>}
-              </div>
-              <div className="flex-col gap-1">
-                {renderNavItems(contextNav)}
-              </div>
-            </div>
-          )}
-
-          {/* Knowledge Section */}
-          {knowledgeNav.some((n) => n.roles.includes(role)) && (
-            <div className="sidebar-section" style={{ paddingTop: 0 }}>
-              <div className="sidebar-label">
-                {!sidebarCollapsed && <span>Knowledge</span>}
-              </div>
-              <div className="flex-col gap-1">
-                {renderNavItems(knowledgeNav)}
-              </div>
-            </div>
-          )}
-
-          {/* Console Section */}
-          {consoleNav.some((n) => n.roles.includes(role)) && (
-            <div className="sidebar-section" style={{ paddingTop: 0 }}>
-              <div className="sidebar-label">
-                {!sidebarCollapsed && <span>Console</span>}
-              </div>
-              <div className="flex-col gap-1">
-                {renderNavItems(consoleNav)}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Operations Section */}
-      {opsNav.some((n) => n.roles.includes(role)) && (
         <div className="sidebar-section" style={{ paddingTop: 0 }}>
-          <div className="sidebar-label">
-            {!sidebarCollapsed && <span>Operations</span>}
-          </div>
           <div className="flex-col gap-1">
-            {renderNavItems(opsNav)}
+            {renderNavItems(mainNav)}
           </div>
         </div>
       )}
