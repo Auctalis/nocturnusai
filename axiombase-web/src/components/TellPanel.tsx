@@ -5,7 +5,6 @@ import { toast } from 'sonner'
 import { useApp } from '@/context/AppContext'
 import * as api from '@/lib/api'
 import type { TellResponse } from '@/lib/types'
-import ExtractedRulesList from '@/components/ExtractedRulesList'
 
 interface TellPanelProps {
   db: string
@@ -111,7 +110,13 @@ export default function TellPanel({ db, tenant, scope }: TellPanelProps) {
                 <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
                   Extracted Rules: {lastResponse.rulesCount}
                 </div>
-                <ExtractedRulesList rules={lastResponse.rules} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}>
+                  {lastResponse.rules.map((rule, index) => (
+                    <div key={index} className="logic-item">
+                      <span className="font-mono text-sm">{rule}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
