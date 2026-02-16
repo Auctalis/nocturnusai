@@ -2,6 +2,8 @@ import type { AtomResponse, AskResponse, TellResponse, RecallResponse, ContextWi
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:9300'
 
+export { BASE_URL }
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -51,7 +53,8 @@ async function request<T>(
   return (await response.text()) as T
 }
 
-// Database operations
+// ── Database operations ─────────────────────────────────────
+
 export async function listDatabases(apiKey: string): Promise<Database[]> {
   return request<Database[]>('/admin/databases', { apiKey })
 }
@@ -81,7 +84,8 @@ export async function nukeDatabase(apiKey: string, name: string): Promise<string
   })
 }
 
-// Tenant operations
+// ── Tenant operations ───────────────────────────────────────
+
 export async function listTenants(apiKey: string, dbName: string): Promise<string[]> {
   const result = await request<string[]>(`/admin/databases/${encodeURIComponent(dbName)}/tenants`, { apiKey })
   return Array.isArray(result) ? result : []
@@ -107,7 +111,8 @@ export async function nukeTenant(apiKey: string, dbName: string, tenantId: strin
   )
 }
 
-// Knowledge base operations
+// ── Knowledge operations ────────────────────────────────────
+
 export async function listFacts(
   apiKey: string,
   dbName: string,
@@ -134,7 +139,73 @@ export async function listRules(
   })
 }
 
-// Logic operations
+// ── Simplified API (primary surface) ────────────────────────
+
+export async function tell(
+  apiKey: string,
+  database: string,
+  body: FactRequest,
+  tenantId?: string,
+): Promise<string> {
+  return request<string>('/tell', {
+    apiKey,
+    database,
+    tenantId,
+    method: 'POST',
+    body: JSON.stringify(body),
+    parseJson: false,
+  })
+}
+
+export async function ask(
+  apiKey: string,
+  database: string,
+  body: FactRequest,
+  tenantId?: string,
+): Promise<AtomResponse[]> {
+  return request<AtomResponse[]>('/ask', {
+    apiKey,
+    database,
+    tenantId,
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function teach(
+  apiKey: string,
+  database: string,
+  body: RuleRequest,
+  tenantId?: string,
+): Promise<string> {
+  return request<string>('/teach', {
+    apiKey,
+    database,
+    tenantId,
+    method: 'POST',
+    body: JSON.stringify(body),
+    parseJson: false,
+  })
+}
+
+export async function forget(
+  apiKey: string,
+  database: string,
+  body: FactRequest,
+  tenantId?: string,
+): Promise<string> {
+  return request<string>('/forget', {
+    apiKey,
+    database,
+    tenantId,
+    method: 'POST',
+    body: JSON.stringify(body),
+    parseJson: false,
+  })
+}
+
+// ── Legacy API (backward compat) ────────────────────────────
+
 export async function infer(
   apiKey: string,
   database: string,
@@ -230,7 +301,8 @@ export async function execute(
   })
 }
 
-// Context operations
+// ── Context / Memory operations ─────────────────────────────
+
 export async function contextAsk(
   apiKey: string,
   database: string,
@@ -258,7 +330,7 @@ export async function contextTell(
 ): Promise<TellResponse> {
   const body: Record<string, string> = { text }
   if (scope) body.scope = scope
-  return request<TellResponse>('/assert/fact', {
+  return request<TellResponse>('/tell', {
     apiKey,
     database,
     tenantId,
@@ -266,7 +338,6 @@ export async function contextTell(
     body: JSON.stringify(body),
     parseJson: false,
   }).then((raw) => {
-    // Wrap the string response into TellResponse shape
     const msg = typeof raw === 'string' ? raw : String(raw)
     return { count: 1, understood: [msg], rules: [], rulesCount: 0 }
   })
@@ -286,14 +357,13 @@ export async function contextRecall(
     body.limit = pagination.limit
     body.offset = pagination.offset
   }
-  return request<RecallResponse>('/memory/query/temporal', {
+  return request<RecallResponse>('/memory/recall', {
     apiKey,
     database,
     tenantId,
     method: 'POST',
     body: JSON.stringify(body),
   }).then((raw) => {
-    // Normalize: if the server returns an array of atoms, wrap it
     if (Array.isArray(raw)) {
       const atoms = raw as AtomResponse[]
       return {
@@ -322,7 +392,8 @@ export async function getContextWindow(
   })
 }
 
-// Health
+// ── Health ───────────────────────────────────────────────────
+
 export async function getHealth(apiKey: string): Promise<Record<string, unknown>> {
   return request<Record<string, unknown>>('/health', { apiKey })
 }

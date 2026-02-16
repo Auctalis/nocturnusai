@@ -107,6 +107,10 @@ function AtomInput({
 // ── Descriptions ──────────────────────────────────────────────
 
 const DESCRIPTIONS: Record<OperationMode, string> = {
+  ask: 'Ask a question — find answers via reasoning.',
+  tell: 'Tell a fact — store knowledge.',
+  teach: 'Teach a rule — define reasoning logic.',
+  forget: 'Forget — remove knowledge and derived facts.',
   infer: 'Query the database for patterns.',
   assert_fact: 'Add a known Fact.',
   assert_rule: 'Add a logical Rule (Head \u2190 Body).',
@@ -171,7 +175,7 @@ export default function VisualBuilder({ mode, onJsonChange }: VisualBuilderProps
   useEffect(() => {
     let json: Record<string, unknown> = {}
 
-    if (mode === 'assert_rule') {
+    if (mode === 'assert_rule' || mode === 'teach') {
       json = {
         head: {
           predicate: ruleHead.predicate,
@@ -202,7 +206,7 @@ export default function VisualBuilder({ mode, onJsonChange }: VisualBuilderProps
         args: factState.args.filter((a) => a.trim() !== ''),
         negated: factState.negated,
       }
-      if (mode === 'assert_fact') {
+      if (mode === 'assert_fact' || mode === 'tell') {
         json.truthVal = !factState.negated
         if (metadataJson.trim()) {
           try {
@@ -275,7 +279,7 @@ export default function VisualBuilder({ mode, onJsonChange }: VisualBuilderProps
   }
 
   // ── Rule Mode ──
-  if (mode === 'assert_rule') {
+  if (mode === 'assert_rule' || mode === 'teach') {
     return (
       <div className="flex-col gap-4" style={{ padding: 'var(--space-md)' }}>
         <div className="vb-section">
@@ -344,7 +348,7 @@ export default function VisualBuilder({ mode, onJsonChange }: VisualBuilderProps
   }
 
   // ── Template Mode ──
-  if (mode === 'assert_template') {
+  if (mode === 'assert_template' /* legacy */) {
     const showPQ = [
       'SYLLOGISM',
       'MODUS_PONENS',
@@ -469,7 +473,7 @@ export default function VisualBuilder({ mode, onJsonChange }: VisualBuilderProps
     <div className="flex-col gap-4" style={{ padding: 'var(--space-md)' }}>
       <div className="vb-section">
         <div className="vb-section-title">
-          {mode === 'infer' ? 'Query' : mode === 'retract' ? 'Retract' : 'Fact Editor'}
+          {(mode === 'infer' || mode === 'ask') ? 'Ask' : (mode === 'retract' || mode === 'forget') ? 'Forget' : 'Tell'}
         </div>
         <div className="vb-section-desc">{DESCRIPTIONS[mode]}</div>
       </div>

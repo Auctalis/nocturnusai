@@ -18,21 +18,21 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    title: 'Assert a fact',
-    description: 'Store a basic fact: "Tom is the parent of Bob"',
-    action: 'Assert',
+    title: 'Tell it a fact',
+    description: 'Tell AxiomBase: "Tom is the parent of Bob"',
+    action: 'Tell',
     code: JSON.stringify({ predicate: 'parent', args: ['tom', 'bob'] }, null, 2),
   },
   {
-    title: 'Assert another fact',
-    description: 'Store: "Bob is the parent of Charlie"',
-    action: 'Assert',
+    title: 'Tell it another fact',
+    description: 'Tell AxiomBase: "Bob is the parent of Charlie"',
+    action: 'Tell',
     code: JSON.stringify({ predicate: 'parent', args: ['bob', 'charlie'] }, null, 2),
   },
   {
-    title: 'Assert a rule',
-    description: 'Define: "If X is parent of Y and Y is parent of Z, then X is grandparent of Z"',
-    action: 'Assert Rule',
+    title: 'Teach it a rule',
+    description: 'Teach: "If X is parent of Y and Y is parent of Z, then X is grandparent of Z"',
+    action: 'Teach',
     code: JSON.stringify({
       head: { predicate: 'grandparent', args: ['?x', '?z'] },
       body: [
@@ -42,9 +42,9 @@ const STEPS: Step[] = [
     }, null, 2),
   },
   {
-    title: 'Run inference',
+    title: 'Ask it a question',
     description: 'Ask: "Who is a grandparent of whom?"',
-    action: 'Query',
+    action: 'Ask',
     code: JSON.stringify({ predicate: 'grandparent', args: ['?who', '?of'] }, null, 2),
   },
 ]
@@ -66,14 +66,14 @@ export default function Onboarding({ database, onComplete }: OnboardingProps) {
       let result: string
 
       if (currentStep < 2) {
-        // Assert facts
-        result = await api.assertFact(apiKey, database, body)
+        // Tell facts
+        result = await api.tell(apiKey, database, body)
       } else if (currentStep === 2) {
-        // Assert rule
-        result = await api.assertRule(apiKey, database, body)
+        // Teach rule
+        result = await api.teach(apiKey, database, body)
       } else {
-        // Query
-        const atoms = await api.infer(apiKey, database, body)
+        // Ask question
+        const atoms = await api.ask(apiKey, database, body)
         result = atoms.length > 0
           ? atoms.map((a) => `${a.predicate}(${a.args.join(', ')})`).join('\n')
           : 'No results'
@@ -87,7 +87,7 @@ export default function Onboarding({ database, onComplete }: OnboardingProps) {
       newCompleted[currentStep] = true
       setCompleted(newCompleted)
 
-      toast.success(currentStep === 3 ? 'Inference complete!' : 'Done!')
+      toast.success(currentStep === 3 ? 'Answer found!' : 'Done!')
 
       if (currentStep < STEPS.length - 1) {
         setTimeout(() => setCurrentStep(currentStep + 1), 600)
@@ -105,7 +105,7 @@ export default function Onboarding({ database, onComplete }: OnboardingProps) {
     <div className="card" style={{ maxWidth: 600, margin: '0 auto' }}>
       <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
         <Sparkles size={16} style={{ color: 'var(--accent)' }} />
-        <span>Quick Start: Your First Inference</span>
+        <span>Quick Start: Tell, Teach, Ask</span>
       </div>
       <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
         {STEPS.map((step, i) => {
@@ -186,13 +186,13 @@ export default function Onboarding({ database, onComplete }: OnboardingProps) {
         {allDone && (
           <div style={{ textAlign: 'center', padding: 'var(--space-md)' }}>
             <p style={{ fontWeight: 600, color: 'var(--green-50)', marginBottom: 'var(--space-sm)' }}>
-              You just ran your first logical inference!
+              AxiomBase derived the answer automatically!
             </p>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-md)' }}>
-              Tom is the grandparent of Charlie, derived from two parent facts and one rule.
+              You told it two facts, taught it one rule, and it figured out that Tom is Charlie's grandparent.
             </p>
             <button className="btn btn-primary" onClick={onComplete}>
-              Open Query Console
+              Open Console
               <ChevronRight size={14} />
             </button>
           </div>

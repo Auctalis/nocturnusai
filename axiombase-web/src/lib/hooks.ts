@@ -131,6 +131,20 @@ export function useQuery(database: string, tenantId?: string) {
         let response: string | AtomResponse[]
 
         switch (mode) {
+          // Simplified API (primary)
+          case 'ask':
+            response = await api.ask(apiKey, database, body as FactRequest, tenantId)
+            break
+          case 'tell':
+            response = await api.tell(apiKey, database, body as FactRequest, tenantId)
+            break
+          case 'teach':
+            response = await api.teach(apiKey, database, body as RuleRequest, tenantId)
+            break
+          case 'forget':
+            response = await api.forget(apiKey, database, body as FactRequest, tenantId)
+            break
+          // Legacy modes (backward compat)
           case 'infer':
             response = await api.infer(apiKey, database, body as FactRequest, tenantId)
             break

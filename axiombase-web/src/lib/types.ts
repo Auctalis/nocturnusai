@@ -59,13 +59,18 @@ export interface TemplateRequest {
 
 // Operation modes for the query console
 export type OperationMode =
+  | 'ask'
+  | 'tell'
+  | 'teach'
+  | 'forget'
+  | 'inspect'
+  | 'execute'
+  // Legacy names (backward compat)
   | 'infer'
   | 'assert_fact'
   | 'assert_rule'
   | 'retract'
   | 'assert_template'
-  | 'inspect'
-  | 'execute'
   | 'synthesize'
 
 // User roles

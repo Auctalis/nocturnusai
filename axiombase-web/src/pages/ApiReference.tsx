@@ -3,11 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { FileText, Copy, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDatabases, useTenants, useDatabaseActions } from '@/lib/hooks'
+import { BASE_URL } from '@/lib/api'
 import Layout from '@/components/Layout'
 import Sidebar from '@/components/Sidebar'
 import DatabaseModals from '@/components/DatabaseModals'
-
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:9300'
 
 interface CodeBlockProps {
   code: string
@@ -58,12 +57,13 @@ interface EndpointSectionProps {
   title: string
   method: string
   path: string
+  description?: string
   curl: string
   python: string
   typescript: string
 }
 
-function EndpointSection({ title, method, path, curl, python, typescript }: EndpointSectionProps) {
+function EndpointSection({ title, method, path, description, curl, python, typescript }: EndpointSectionProps) {
   return (
     <details className="card" style={{ marginBottom: 'var(--space-md)' }}>
       <summary className="card-header" style={{ cursor: 'pointer', userSelect: 'none' }}>
@@ -77,6 +77,9 @@ function EndpointSection({ title, method, path, curl, python, typescript }: Endp
         </span>
       </summary>
       <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+        {description && (
+          <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{description}</p>
+        )}
         <CodeBlock label="cURL" code={curl} />
         <CodeBlock label="Python SDK" code={python} />
         <CodeBlock label="TypeScript SDK" code={typescript} />
@@ -156,9 +159,9 @@ export default function ApiReference() {
           <div className="card">
             <div className="card-body">
               <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                AxiomBase provides HTTP REST, Python SDK, TypeScript SDK, and MCP protocol access.
-                All endpoints accept JSON and require the <code>X-API-Key</code> header for authentication.
-                Use the <code>X-Database</code> header to select a database and <code>X-Tenant-ID</code> for multi-tenant databases.
+                Four verbs: <strong>Tell</strong>, <strong>Ask</strong>, <strong>Teach</strong>, <strong>Forget</strong>.
+                Plus memory management for context, recall, compression, and cleanup.
+                All endpoints accept JSON. Use <code>X-Database</code> header to select a database and <code>X-Tenant-ID</code> for multi-tenant databases.
               </p>
               <div style={{ marginTop: 'var(--space-sm)', display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
                 <span className="text-muted text-xs">Base URL:</span>
@@ -167,303 +170,229 @@ export default function ApiReference() {
             </div>
           </div>
 
-          {/* Assert Facts */}
+          <h2 style={{ fontSize: 'var(--text-md)', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>Core API</h2>
+
+          {/* Tell */}
           <EndpointSection
-            title="Assert Facts"
+            title="Tell — Store Knowledge"
             method="POST"
-            path="/assert/fact"
-            curl={`curl -X POST ${BASE_URL}/assert/fact \\
+            path="/tell"
+            description="Tell AxiomBase something it should know. Supports auto-expiration via ttl or validUntil."
+            curl={`curl -X POST ${BASE_URL}/tell \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: YOUR_KEY" \\
   -H "X-Database: ${db}" \\
   -d '{
-    "predicate": "Parent",
-    "args": ["Zeus", "Ares"],
-    "truthVal": true
+    "predicate": "parent",
+    "args": ["alice", "bob"]
   }'`}
             python={`from axiombase import SyncAxiomBaseClient
 
-client = SyncAxiomBaseClient(
-    base_url="${BASE_URL}",
-    api_key="YOUR_KEY",
-    database="${db}"
-)
+client = SyncAxiomBaseClient("${BASE_URL}", database="${db}")
 
-result = client.assert_fact(
-    predicate="Parent",
-    args=["Zeus", "Ares"],
-    truth_val=True
-)
-print(result)`}
-            typescript={`import { AxiomBaseClient } from '@axiombase/sdk'
+client.tell("parent", ["alice", "bob"])
 
-const client = new AxiomBaseClient({
-  baseUrl: '${BASE_URL}',
-  apiKey: 'YOUR_KEY',
-  database: '${db}'
-})
+# With auto-expiration (1 hour TTL):
+client.tell("status", ["task_1", "active"], ttl=3600000)`}
+            typescript={`import { AxiomBaseClient } from '@axiombase/sdk';
 
-const result = await client.assertFact({
-  predicate: 'Parent',
-  args: ['Zeus', 'Ares'],
-  truthVal: true
-})
-console.log(result)`}
+const ab = new AxiomBaseClient({ baseUrl: '${BASE_URL}', database: '${db}' });
+
+await ab.tell('parent', ['alice', 'bob']);
+
+// With auto-expiration:
+await ab.tell('status', ['task_1', 'active'], { ttl: 3600000 });`}
           />
 
-          {/* Assert Rules */}
+          {/* Teach */}
           <EndpointSection
-            title="Assert Rules"
+            title="Teach — Define Rules"
             method="POST"
-            path="/assert/rule"
-            curl={`curl -X POST ${BASE_URL}/assert/rule \\
+            path="/teach"
+            description="Teach AxiomBase an if-then rule. Use ?prefix for variables. When all conditions (body) are true, the conclusion (head) is automatically derivable."
+            curl={`curl -X POST ${BASE_URL}/teach \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: YOUR_KEY" \\
   -H "X-Database: ${db}" \\
   -d '{
     "head": {
-      "predicate": "GrandParent",
+      "predicate": "grandparent",
       "args": ["?x", "?z"]
     },
     "body": [
-      { "predicate": "Parent", "args": ["?x", "?y"] },
-      { "predicate": "Parent", "args": ["?y", "?z"] }
+      { "predicate": "parent", "args": ["?x", "?y"] },
+      { "predicate": "parent", "args": ["?y", "?z"] }
     ]
   }'`}
             python={`from axiombase import SyncAxiomBaseClient
 
-client = SyncAxiomBaseClient(
-    base_url="${BASE_URL}",
-    api_key="YOUR_KEY",
-    database="${db}"
-)
+client = SyncAxiomBaseClient("${BASE_URL}", database="${db}")
 
-result = client.assert_rule(
-    head={"predicate": "GrandParent", "args": ["?x", "?z"]},
+client.teach(
+    head={"predicate": "grandparent", "args": ["?x", "?z"]},
     body=[
-        {"predicate": "Parent", "args": ["?x", "?y"]},
-        {"predicate": "Parent", "args": ["?y", "?z"]}
+        {"predicate": "parent", "args": ["?x", "?y"]},
+        {"predicate": "parent", "args": ["?y", "?z"]}
     ]
-)
-print(result)`}
-            typescript={`import { AxiomBaseClient } from '@axiombase/sdk'
+)`}
+            typescript={`import { AxiomBaseClient } from '@axiombase/sdk';
 
-const client = new AxiomBaseClient({
-  baseUrl: '${BASE_URL}',
-  apiKey: 'YOUR_KEY',
-  database: '${db}'
-})
+const ab = new AxiomBaseClient({ baseUrl: '${BASE_URL}', database: '${db}' });
 
-const result = await client.assertRule({
-  head: { predicate: 'GrandParent', args: ['?x', '?z'] },
-  body: [
-    { predicate: 'Parent', args: ['?x', '?y'] },
-    { predicate: 'Parent', args: ['?y', '?z'] }
+await ab.teach(
+  { predicate: 'grandparent', args: ['?x', '?z'] },
+  [
+    { predicate: 'parent', args: ['?x', '?y'] },
+    { predicate: 'parent', args: ['?y', '?z'] },
   ]
-})
-console.log(result)`}
+);`}
           />
 
-          {/* Query / Infer */}
+          {/* Ask */}
           <EndpointSection
-            title="Query / Infer"
+            title="Ask — Query with Reasoning"
             method="POST"
-            path="/infer"
-            curl={`curl -X POST ${BASE_URL}/infer \\
+            path="/ask"
+            description="Ask AxiomBase a question. Finds all provable answers by applying rules and matching facts. Use ?prefix for unknowns."
+            curl={`curl -X POST ${BASE_URL}/ask \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: YOUR_KEY" \\
   -H "X-Database: ${db}" \\
   -d '{
-    "predicate": "GrandParent",
-    "args": ["?x", "?y"]
+    "predicate": "grandparent",
+    "args": ["?who", "?of"]
   }'`}
             python={`from axiombase import SyncAxiomBaseClient
 
-client = SyncAxiomBaseClient(
-    base_url="${BASE_URL}",
-    api_key="YOUR_KEY",
-    database="${db}"
-)
+client = SyncAxiomBaseClient("${BASE_URL}", database="${db}")
 
-results = client.infer(
-    predicate="GrandParent",
-    args=["?x", "?y"]
-)
+results = client.ask("grandparent", ["?who", "?of"])
 for atom in results:
-    print(f"{atom.predicate}({', '.join(atom.args)})")`}
-            typescript={`import { AxiomBaseClient } from '@axiombase/sdk'
+    print(f"{atom.predicate}({', '.join(atom.args)})")
 
-const client = new AxiomBaseClient({
-  baseUrl: '${BASE_URL}',
-  apiKey: 'YOUR_KEY',
-  database: '${db}'
-})
+# With proof chain:
+proofs = client.ask("grandparent", ["?who", "charlie"], with_proof=True)`}
+            typescript={`import { AxiomBaseClient } from '@axiombase/sdk';
 
-const results = await client.infer({
-  predicate: 'GrandParent',
-  args: ['?x', '?y']
-})
+const ab = new AxiomBaseClient({ baseUrl: '${BASE_URL}', database: '${db}' });
+
+const results = await ab.ask('grandparent', ['?who', '?of']);
 results.forEach(atom =>
   console.log(\`\${atom.predicate}(\${atom.args.join(', ')})\`)
-)`}
+);`}
           />
 
-          {/* Retract */}
+          {/* Forget */}
           <EndpointSection
-            title="Retract"
+            title="Forget — Remove Knowledge"
             method="POST"
-            path="/retract"
-            curl={`curl -X POST ${BASE_URL}/retract \\
+            path="/forget"
+            description="Make AxiomBase forget a fact. Any knowledge derived from it is also automatically forgotten (cascading retraction)."
+            curl={`curl -X POST ${BASE_URL}/forget \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: YOUR_KEY" \\
   -H "X-Database: ${db}" \\
   -d '{
-    "predicate": "Parent",
-    "args": ["Zeus", "Ares"]
+    "predicate": "parent",
+    "args": ["alice", "bob"]
   }'`}
             python={`from axiombase import SyncAxiomBaseClient
 
-client = SyncAxiomBaseClient(
-    base_url="${BASE_URL}",
-    api_key="YOUR_KEY",
-    database="${db}"
-)
+client = SyncAxiomBaseClient("${BASE_URL}", database="${db}")
 
-result = client.retract(
-    predicate="Parent",
-    args=["Zeus", "Ares"]
-)
-print(result)`}
-            typescript={`import { AxiomBaseClient } from '@axiombase/sdk'
+client.forget("parent", ["alice", "bob"])`}
+            typescript={`import { AxiomBaseClient } from '@axiombase/sdk';
 
-const client = new AxiomBaseClient({
-  baseUrl: '${BASE_URL}',
-  apiKey: 'YOUR_KEY',
-  database: '${db}'
-})
+const ab = new AxiomBaseClient({ baseUrl: '${BASE_URL}', database: '${db}' });
 
-const result = await client.retract({
-  predicate: 'Parent',
-  args: ['Zeus', 'Ares']
-})
-console.log(result)`}
+await ab.forget('parent', ['alice', 'bob']);`}
           />
 
-          {/* Memory: Context Window */}
+          <h2 style={{ fontSize: 'var(--text-md)', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>Memory</h2>
+
+          {/* Memory: Context */}
           <EndpointSection
-            title="Memory: Context Window"
+            title="Get Context — Most Relevant Knowledge"
             method="POST"
             path="/memory/context"
+            description="Get the most relevant knowledge for the current reasoning step, ranked by recency, frequency, and priority."
             curl={`curl -X POST ${BASE_URL}/memory/context \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: YOUR_KEY" \\
   -H "X-Database: ${db}" \\
-  -d '{
-    "maxFacts": 50
-  }'`}
-            python={`from axiombase import SyncAxiomBaseClient
-
-client = SyncAxiomBaseClient(
-    base_url="${BASE_URL}",
-    api_key="YOUR_KEY",
-    database="${db}"
-)
-
-context = client.get_context_window(max_facts=50)
+  -d '{ "maxFacts": 50 }'`}
+            python={`context = client.get_context_window(max_facts=50)
 for scored in context.facts:
     atom = scored.atom
     print(f"[{scored.salience:.2f}] {atom.predicate}({', '.join(atom.args)})")`}
-            typescript={`import { AxiomBaseClient } from '@axiombase/sdk'
-
-const client = new AxiomBaseClient({
-  baseUrl: '${BASE_URL}',
-  apiKey: 'YOUR_KEY',
-  database: '${db}'
-})
-
-const context = await client.getContextWindow({ maxFacts: 50 })
+            typescript={`const context = await ab.getContextWindow({ maxFacts: 50 });
 context.facts.forEach(({ atom, salience }) =>
   console.log(\`[\${salience.toFixed(2)}] \${atom.predicate}(\${atom.args.join(', ')})\`)
-)`}
+);`}
           />
 
-          {/* Memory: Temporal Query */}
+          {/* Memory: Recall */}
           <EndpointSection
-            title="Memory: Temporal Query"
+            title="Recall — Time-Travel Queries"
             method="POST"
-            path="/memory/query/temporal"
-            curl={`curl -X POST ${BASE_URL}/memory/query/temporal \\
+            path="/memory/recall"
+            description="Recall what was known at a specific point in time. Filters by validFrom/validUntil/ttl."
+            curl={`curl -X POST ${BASE_URL}/memory/recall \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: YOUR_KEY" \\
   -H "X-Database: ${db}" \\
   -d '{
-    "predicate": "Parent",
-    "from": "2024-01-01T00:00:00Z",
-    "to": "2025-01-01T00:00:00Z"
+    "predicate": "location",
+    "args": ["alice", "?where"],
+    "timestamp": 1700000000000
   }'`}
-            python={`from axiombase import SyncAxiomBaseClient
-
-client = SyncAxiomBaseClient(
-    base_url="${BASE_URL}",
-    api_key="YOUR_KEY",
-    database="${db}"
-)
-
-results = client.query_temporal(
-    predicate="Parent",
-    from_time="2024-01-01T00:00:00Z",
-    to_time="2025-01-01T00:00:00Z"
-)
-for fact in results:
-    print(fact)`}
-            typescript={`import { AxiomBaseClient } from '@axiombase/sdk'
-
-const client = new AxiomBaseClient({
-  baseUrl: '${BASE_URL}',
-  apiKey: 'YOUR_KEY',
-  database: '${db}'
-})
-
-const results = await client.queryTemporal({
-  predicate: 'Parent',
-  from: '2024-01-01T00:00:00Z',
-  to: '2025-01-01T00:00:00Z'
-})
-console.log(results)`}
+            python={`import time
+one_hour_ago = int((time.time() - 3600) * 1000)
+results = client.recall("location", ["alice", "?where"], timestamp=one_hour_ago)`}
+            typescript={`const oneHourAgo = Date.now() - 3600000;
+const results = await ab.recall('location', ['alice', '?where'], { timestamp: oneHourAgo });`}
           />
+
+          {/* Memory: Compress */}
+          <EndpointSection
+            title="Compress — Consolidate Patterns"
+            method="POST"
+            path="/memory/compress"
+            description="Compress repeated episodic patterns into semantic summary facts. Helps manage memory growth."
+            curl={`curl -X POST ${BASE_URL}/memory/compress \\
+  -H "Content-Type: application/json" \\
+  -H "X-Database: ${db}" \\
+  -d '{}'`}
+            python={`result = client.compress()
+print(f"Compressed {result.facts_consolidated} facts into {len(result.new_facts)} summaries")`}
+            typescript={`const result = await ab.compress();
+console.log(\`Compressed \${result.factsConsolidated} facts\`);`}
+          />
+
+          {/* Memory: Cleanup */}
+          <EndpointSection
+            title="Cleanup — Expire Stale Knowledge"
+            method="POST"
+            path="/memory/cleanup"
+            description="Expire facts past their TTL and evict low-relevance facts. Run periodically in long-running sessions."
+            curl={`curl -X POST ${BASE_URL}/memory/cleanup \\
+  -H "Content-Type: application/json" \\
+  -H "X-Database: ${db}" \\
+  -d '{ "threshold": 0.05 }'`}
+            python={`result = client.cleanup(threshold=0.05)
+print(f"Expired: {result.expired_count}, Evicted: {result.evicted_count}")`}
+            typescript={`const result = await ab.cleanup({ threshold: 0.05 });
+console.log(\`Expired: \${result.expiredCount}, Evicted: \${result.evictedCount}\`);`}
+          />
+
+          <h2 style={{ fontSize: 'var(--text-md)', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>Advanced</h2>
 
           {/* Execute DSL */}
           <EndpointSection
-            title="Execute DSL"
+            title="Execute — Raw DSL"
             method="POST"
             path="/execute"
+            description="Execute raw Logiql DSL commands for advanced users."
             curl={`curl -X POST ${BASE_URL}/execute \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: YOUR_KEY" \\
   -H "X-Database: ${db}" \\
-  -d '{
-    "command": "assert Parent(Zeus, Ares)."
-  }'`}
-            python={`from axiombase import SyncAxiomBaseClient
-
-client = SyncAxiomBaseClient(
-    base_url="${BASE_URL}",
-    api_key="YOUR_KEY",
-    database="${db}"
-)
-
-result = client.execute("assert Parent(Zeus, Ares).")
-print(result)`}
-            typescript={`import { AxiomBaseClient } from '@axiombase/sdk'
-
-const client = new AxiomBaseClient({
-  baseUrl: '${BASE_URL}',
-  apiKey: 'YOUR_KEY',
-  database: '${db}'
-})
-
-const result = await client.execute('assert Parent(Zeus, Ares).')
-console.log(result)`}
+  -d '{ "command": "ASSERT parent(alice, bob)." }'`}
+            python={`result = client.execute("ASSERT parent(alice, bob).")`}
+            typescript={`const result = await ab.execute('ASSERT parent(alice, bob).');`}
           />
         </div>
       </Layout>

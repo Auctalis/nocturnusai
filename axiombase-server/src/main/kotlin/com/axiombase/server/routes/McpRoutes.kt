@@ -169,95 +169,85 @@ private fun handleInitialize(request: JsonRpcRequest): JsonRpcResponse {
 private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
     val tools = buildJsonArray {
         add(toolSchema(
-            name = "assert_fact",
-            description = "Assert a fact into the AxiomBase knowledge base. Facts are predicate-argument structures that represent knowledge. Supports temporal fields (validFrom, validUntil, ttl) for automatic expiration.",
+            name = "tell",
+            description = "Tell AxiomBase something it should know. Stores a fact (knowledge) that can be queried and used in reasoning. Supports auto-expiration via ttl (milliseconds) or validUntil (epoch ms).",
             properties = mapOf(
-                "predicate" to propString("The predicate name (e.g., 'parent', 'likes', 'located_in')"),
-                "args" to propArray("List of arguments. Use ?prefix for variables (e.g., ['alice', 'bob'])"),
-                "scope" to propString("Optional scope for fact isolation (e.g., 'session_123')"),
-                "negated" to propBool("Set true to assert the negation of this fact"),
-                "ttl" to propNumber("Time-to-live in milliseconds. Fact auto-expires after this duration."),
-                "validUntil" to propNumber("Epoch ms when this fact expires")
+                "predicate" to propString("The relationship or property name (e.g., 'parent', 'likes', 'located_in')"),
+                "args" to propArray("The entities involved (e.g., ['alice', 'bob'] for 'alice is parent of bob')"),
+                "scope" to propString("Optional isolation scope (e.g., 'session_123', 'hypothesis_a')"),
+                "negated" to propBool("Set true to store the negation of this fact"),
+                "ttl" to propNumber("Auto-expire after this many milliseconds"),
+                "validUntil" to propNumber("Epoch ms when this fact stops being valid")
             ),
             required = listOf("predicate", "args")
         ))
         add(toolSchema(
-            name = "assert_rule",
-            description = "Assert a logical rule (Horn clause) for inference. Rules enable multi-step deductive reasoning. Format: head :- body1 AND body2 AND ... Use ?prefix for variables.",
+            name = "teach",
+            description = "Teach AxiomBase a rule for automatic reasoning. When conditions (body) are all true, the conclusion (head) is automatically derivable. Use ?prefix for variables (e.g., ?x, ?who). Example: 'If ?x is parent of ?y AND ?y is parent of ?z, THEN ?x is grandparent of ?z'.",
             properties = mapOf(
-                "head" to propObject("The consequent atom", mapOf(
-                    "predicate" to propString("Predicate name"),
-                    "args" to propArray("Arguments (use ?prefix for variables)")
+                "head" to propObject("The conclusion (what becomes true)", mapOf(
+                    "predicate" to propString("Conclusion relationship name"),
+                    "args" to propArray("Arguments (use ?x, ?y for variables)")
                 )),
-                "body" to propArray("List of antecedent atoms, each with 'predicate' and 'args'"),
+                "body" to propArray("The conditions (list of facts that must be true), each with 'predicate' and 'args'"),
                 "scope" to propString("Optional scope")
             ),
             required = listOf("head", "body")
         ))
         add(toolSchema(
-            name = "query",
-            description = "Query facts matching a pattern. Use ?prefix for variable positions that should match any value. Returns all matching facts from the knowledge base.",
+            name = "ask",
+            description = "Ask AxiomBase a question. Finds all answers by applying rules and matching facts through multi-step logical reasoning. Use ?prefix for unknowns you want to discover. Returns all provable answers, optionally with full proof chains showing how each answer was derived.",
             properties = mapOf(
-                "predicate" to propString("Predicate to query"),
-                "args" to propArray("Arguments. Use ?x, ?y etc. for wildcards"),
-                "scope" to propString("Optional scope filter")
+                "predicate" to propString("What you're asking about (e.g., 'grandparent')"),
+                "args" to propArray("Use ?x, ?who etc. for unknowns, concrete values to constrain (e.g., ['?who', 'charlie'])"),
+                "scope" to propString("Optional scope filter"),
+                "withProof" to propBool("If true, include the full reasoning chain showing how each answer was derived")
             ),
             required = listOf("predicate", "args")
         ))
         add(toolSchema(
-            name = "infer",
-            description = "Run backward-chaining logical inference. Unlike query (which only matches stored facts), infer applies rules to derive new conclusions through multi-step deductive reasoning. Returns all provable results with optional proof trees.",
+            name = "forget",
+            description = "Make AxiomBase forget a fact. Any knowledge that was derived from this fact is also automatically forgotten (cascading retraction).",
             properties = mapOf(
-                "predicate" to propString("Goal predicate"),
-                "args" to propArray("Goal arguments. Use ?prefix for variables."),
-                "scope" to propString("Optional scope"),
-                "withProof" to propBool("If true, include full proof tree showing the derivation chain")
-            ),
-            required = listOf("predicate", "args")
-        ))
-        add(toolSchema(
-            name = "retract",
-            description = "Retract (remove) a fact from the knowledge base. Triggers the Truth Maintenance System: any facts that were derived from this fact will be automatically cascade-retracted.",
-            properties = mapOf(
-                "predicate" to propString("Predicate to retract"),
-                "args" to propArray("Arguments of the fact to retract"),
+                "predicate" to propString("The relationship to forget"),
+                "args" to propArray("The specific entities to forget about"),
                 "scope" to propString("Optional scope")
             ),
             required = listOf("predicate", "args")
         ))
         add(toolSchema(
-            name = "context_window",
-            description = "Get the most salient (relevant) facts for the current reasoning context. Returns facts ranked by a composite score of recency, access frequency, and priority. Use this to efficiently populate your context with the most important knowledge.",
+            name = "recall",
+            description = "Recall what was known at a specific point in time. Useful for time-travel queries like 'What was true an hour ago?' Respects temporal bounds (validFrom/validUntil/ttl).",
             properties = mapOf(
-                "maxFacts" to propNumber("Maximum number of facts to return (default: 100)"),
-                "minSalience" to propNumber("Minimum salience score 0.0-1.0 (default: 0.0)"),
-                "predicates" to propArray("Optional list of predicates to filter by"),
-                "scope" to propString("Optional scope filter")
-            ),
-            required = emptyList()
-        ))
-        add(toolSchema(
-            name = "temporal_query",
-            description = "Query facts that were valid at a specific point in time. Useful for historical reasoning: 'What was true at timestamp T?' Filters by validFrom/validUntil/ttl.",
-            properties = mapOf(
-                "predicate" to propString("Predicate to query"),
-                "args" to propArray("Arguments (use ?prefix for variables)"),
-                "timestamp" to propNumber("Epoch milliseconds — the point in time to query"),
+                "predicate" to propString("What to recall"),
+                "args" to propArray("Arguments (use ?prefix for unknowns)"),
+                "timestamp" to propNumber("Epoch milliseconds — the moment in time to recall"),
                 "scope" to propString("Optional scope filter")
             ),
             required = listOf("predicate", "args", "timestamp")
         ))
         add(toolSchema(
-            name = "consolidate",
-            description = "Run memory consolidation: detect repeated episodic patterns and compress them into semantic summary facts. Helps manage memory growth for long-running agent sessions.",
+            name = "context",
+            description = "Get the most relevant knowledge for your current reasoning step. Returns facts ranked by relevance (composite of recency, access frequency, and priority). Use this to efficiently populate your context window with the most important knowledge.",
+            properties = mapOf(
+                "maxFacts" to propNumber("Maximum facts to return (default: 100)"),
+                "minRelevance" to propNumber("Minimum relevance score 0.0-1.0 (default: 0.0)"),
+                "predicates" to propArray("Optional: only include these relationship types"),
+                "scope" to propString("Optional scope filter")
+            ),
+            required = emptyList()
+        ))
+        add(toolSchema(
+            name = "compress",
+            description = "Compress repeated patterns into summary knowledge. Detects episodic patterns (e.g., 'user asked about X five times') and creates semantic summaries. Helps manage memory growth in long-running sessions.",
             properties = emptyMap(),
             required = emptyList()
         ))
         add(toolSchema(
-            name = "decay",
-            description = "Run memory decay: expire facts that have exceeded their TTL and evict low-salience facts if the knowledge base is over capacity. Essential for long-running agents.",
+            name = "cleanup",
+            description = "Clean up stale knowledge. Expires facts past their TTL and evicts low-relevance facts when memory is over capacity. Run periodically in long-running agent sessions.",
             properties = mapOf(
-                "threshold" to propNumber("Salience threshold below which facts are evicted (default: 0.05)")
+                "threshold" to propNumber("Relevance threshold below which facts are evicted (default: 0.05)")
             ),
             required = emptyList()
         ))
@@ -280,6 +270,16 @@ private fun handleToolCall(
 
     return try {
         val result = when (toolName) {
+            // Simplified names (primary)
+            "tell" -> callAssertFact(db, tenantId, arguments)
+            "teach" -> callAssertRule(db, tenantId, arguments)
+            "ask" -> callInfer(db, tenantId, arguments)
+            "forget" -> callRetract(db, tenantId, arguments)
+            "recall" -> callTemporalQuery(db, tenantId, arguments)
+            "context" -> callContextWindow(db, tenantId, arguments)
+            "compress" -> callConsolidate(db, tenantId)
+            "cleanup" -> callDecay(db, tenantId, arguments)
+            // Legacy names (backward compatible)
             "assert_fact" -> callAssertFact(db, tenantId, arguments)
             "assert_rule" -> callAssertRule(db, tenantId, arguments)
             "query" -> callQuery(db, tenantId, arguments)
@@ -339,7 +339,7 @@ private fun callAssertFact(db: com.axiombase.AxiomBase, tenantId: String, args: 
         validUntil = validUntil
     )
     db.assertFact(atom, tenantId)
-    return "Fact asserted: $atom"
+    return "Stored: $atom"
 }
 
 private fun callAssertRule(db: com.axiombase.AxiomBase, tenantId: String, args: JsonObject): String {
@@ -363,7 +363,7 @@ private fun callAssertRule(db: com.axiombase.AxiomBase, tenantId: String, args: 
     val variables = allTerms.filterIsInstance<com.axiombase.core.Term.Variable>().distinct()
     val rule = com.axiombase.core.Rule(variables, headAtom, bodyAtoms, scope = scope)
     db.assertRule(rule, tenantId)
-    return "Rule asserted: $rule"
+    return "Rule stored: $rule"
 }
 
 private fun callQuery(db: com.axiombase.AxiomBase, tenantId: String, args: JsonObject): String {
@@ -423,7 +423,7 @@ private fun callRetract(db: com.axiombase.AxiomBase, tenantId: String, args: Jso
     val terms = argsList.map { parseTerm(it) }
     val atom = com.axiombase.core.Atom(predicate, terms, scope = scope)
     db.retractFact(atom, tenantId)
-    return "Retracted: $atom (and any facts derived from it via TMS)"
+    return "Forgotten: $atom (and any knowledge derived from it)"
 }
 
 private fun callContextWindow(db: com.axiombase.AxiomBase, tenantId: String, args: JsonObject): String {

@@ -1,10 +1,9 @@
 import type { OperationMode } from '@/lib/types'
 import {
   Search,
-  CirclePlus,
-  GitBranch,
-  Minus,
-  LayoutTemplate,
+  MessageSquarePlus,
+  GraduationCap,
+  Eraser,
   Eye,
   Play,
   Loader2,
@@ -25,14 +24,13 @@ interface ActionToolbarProps {
   onScopeChange?: (scope: string) => void
 }
 
-const MODES: { id: OperationMode; label: string; icon: typeof Search }[] = [
-  { id: 'infer', label: 'Query', icon: Search },
-  { id: 'assert_fact', label: 'Fact', icon: CirclePlus },
-  { id: 'assert_rule', label: 'Rule', icon: GitBranch },
-  { id: 'retract', label: 'Retract', icon: Minus },
-  { id: 'assert_template', label: 'Template', icon: LayoutTemplate },
-  { id: 'inspect', label: 'Inspect', icon: Eye },
-  { id: 'execute', label: 'Execute', icon: Terminal },
+const MODES: { id: OperationMode; label: string; icon: typeof Search; description: string }[] = [
+  { id: 'ask', label: 'Ask', icon: Search, description: 'Ask a question — find answers via reasoning' },
+  { id: 'tell', label: 'Tell', icon: MessageSquarePlus, description: 'Tell a fact — store knowledge' },
+  { id: 'teach', label: 'Teach', icon: GraduationCap, description: 'Teach a rule — define reasoning logic' },
+  { id: 'forget', label: 'Forget', icon: Eraser, description: 'Forget — remove knowledge and derived facts' },
+  { id: 'inspect', label: 'Inspect', icon: Eye, description: 'Inspect — browse all stored knowledge' },
+  { id: 'execute', label: 'DSL', icon: Terminal, description: 'Execute raw Logiql DSL commands' },
 ]
 
 export default function ActionToolbar({
@@ -58,6 +56,7 @@ export default function ActionToolbar({
                 key={m.id}
                 className={`tab ${mode === m.id ? 'active' : ''}`}
                 onClick={() => onModeChange(m.id)}
+                title={m.description}
               >
                 <Icon size={14} style={{ marginRight: 4 }} />
                 {m.label}
