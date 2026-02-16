@@ -8,7 +8,13 @@ fun main(args: Array<String>) {
         apiKey = parsed.apiKey,
         tenantId = parsed.tenantId,
     )
-    Repl(client).run()
+
+    if (parsed.exec != null) {
+        // Single command mode: run one command and exit
+        Repl(client).execSingle(parsed.exec)
+    } else {
+        Repl(client).run()
+    }
 }
 
 private data class CliArgs(
@@ -16,6 +22,7 @@ private data class CliArgs(
     val database: String = "default",
     val apiKey: String? = null,
     val tenantId: String? = null,
+    val exec: String? = null,
 )
 
 private fun parseArgs(args: Array<String>): CliArgs {
@@ -23,6 +30,7 @@ private fun parseArgs(args: Array<String>): CliArgs {
     var database = "default"
     var apiKey: String? = null
     var tenantId: String? = null
+    var exec: String? = null
 
     var i = 0
     while (i < args.size) {
@@ -31,12 +39,13 @@ private fun parseArgs(args: Array<String>): CliArgs {
             "--db", "-d"       -> { database = args.getOrElse(i + 1) { database }; i += 2 }
             "--api-key", "-k"  -> { apiKey = args.getOrElse(i + 1) { null }; i += 2 }
             "--tenant", "-t"   -> { tenantId = args.getOrElse(i + 1) { null }; i += 2 }
+            "-e", "--exec"     -> { exec = args.getOrElse(i + 1) { null }; i += 2 }
             "--help", "-h"     -> { printUsage(); return CliArgs() }
             else               -> { i++ }
         }
     }
 
-    return CliArgs(server, database, apiKey, tenantId)
+    return CliArgs(server, database, apiKey, tenantId, exec)
 }
 
 private fun printUsage() {
@@ -44,17 +53,23 @@ private fun printUsage() {
 AxiomBase CLI — logic server for agentic AI
 
 Usage:
-  axiombase-cli [options]
+  axiombase-cli [options]             Interactive REPL
+  axiombase-cli -e "tell likes(a,b)"  Run one command and exit
+  cat kb.ab | axiombase-cli -e "import /dev/stdin"
 
 Options:
   -s, --server <url>      Server URL (default: http://localhost:9300)
   -d, --db <name>         Database name (default: default)
   -k, --api-key <key>     API key for authentication
   -t, --tenant <id>       Tenant ID for multi-tenant databases
+  -e, --exec <command>    Execute a single command and exit
   -h, --help              Show this help
 
 Examples:
   axiombase-cli
-  axiombase-cli --server http://prod:9300 --db mydb --api-key secret
+  axiombase-cli -d mydb -e "tell human(socrates)"
+  axiombase-cli -d mydb -e "ask mortal(?who)"
+  axiombase-cli -d mydb -e "export"
+  axiombase-cli -d mydb -e "import knowledge.ab"
     """.trimIndent())
 }

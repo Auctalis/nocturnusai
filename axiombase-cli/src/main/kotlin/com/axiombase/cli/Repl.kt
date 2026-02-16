@@ -2,6 +2,7 @@ package com.axiombase.cli
 
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
+import java.io.File
 
 // ANSI colors
 private const val RESET  = "\u001B[0m"
@@ -15,6 +16,36 @@ private const val RED    = "\u001B[31m"
 class Repl(private val client: Client) {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+
+    /** Execute a single command and exit (for -e flag / scripting) */
+    fun execSingle(command: String) {
+        val (cmd, rest) = splitFirst(command.trim())
+        try {
+            when (cmd.lowercase()) {
+                "ask", "?"        -> doAsk(rest)
+                "tell", "+"       -> doTell(rest)
+                "teach", "++"     -> doTeach(rest)
+                "forget", "-"     -> doForget(rest)
+                "ingest"          -> doIngest(rest)
+                "inspect", "ls"   -> doInspect(rest)
+                "context", "ctx"  -> doContext(rest)
+                "compress"        -> doCompress()
+                "cleanup"         -> doCleanup(rest)
+                "dsl", "exec"     -> doDsl(rest)
+                "import", "load"  -> doImport(rest)
+                "export", "dump"  -> doExport(rest)
+                "dbs"             -> doDbs()
+                "health"          -> doHealth()
+                "status"          -> doStatus()
+                "setup"           -> doSetup()
+                else              -> System.err.println("Unknown command: $cmd")
+            }
+        } catch (e: Exception) {
+            System.err.println("Error: ${e.message}")
+        } finally {
+            client.close()
+        }
+    }
 
     fun run() {
         printBanner()
@@ -31,14 +62,19 @@ class Repl(private val client: Client) {
                     "tell", "+"       -> doTell(rest)
                     "teach", "++"     -> doTeach(rest)
                     "forget", "-"     -> doForget(rest)
+                    "ingest"          -> doIngest(rest)
                     "inspect", "ls"   -> doInspect(rest)
                     "context", "ctx"  -> doContext(rest)
                     "compress"        -> doCompress()
                     "cleanup"         -> doCleanup(rest)
                     "dsl", "exec"     -> doDsl(rest)
+                    "import", "load"  -> doImport(rest)
+                    "export", "dump"  -> doExport(rest)
                     "use"             -> doUse(rest)
                     "dbs"             -> doDbs()
                     "health"          -> doHealth()
+                    "status"          -> doStatus()
+                    "setup"           -> doSetup()
                     "help", "h"       -> printHelp()
                     "exit", "quit", "q" -> { client.close(); return }
                     else              -> {
@@ -56,16 +92,88 @@ class Repl(private val client: Client) {
 
     // ── commands ──
 
+    /**
+     * Smart ask — auto-detects natural language vs predicate syntax.
+     *   ask mortal(?who)                → structured /ask query
+     *   ask who is mortal?              → NL /synthesize
+     *   ask what did Alice tell Bob?    → NL /synthesize
+     */
     private fun doAsk(text: String) = runBlocking {
-        require(text.isNotBlank()) { "Usage: ask predicate(?var)" }
-        val resp = client.ask(Parser.atomToJson(text))
-        printResult(resp)
+        require(text.isNotBlank()) { "Usage: ask mortal(?who)  OR  ask <natural language question>" }
+        if (looksLikePredicate(text)) {
+            val resp = client.ask(Parser.atomToJson(text))
+            printResult(resp)
+        } else {
+            doSynthesize(text)
+        }
+    }
+
+    /** NL question → /synthesize → LLM-powered answer from the knowledge base */
+    private fun doSynthesize(question: String) = runBlocking {
+        println("${DIM}Querying knowledge base...${RESET}")
+        val resp = client.synthesize(question)
+        try {
+            val obj = json.parseToJsonElement(resp).jsonObject
+
+            // Check for error
+            val errCode = obj["code"]?.jsonPrimitive?.contentOrNull
+            if (errCode != null) {
+                val errMsg = obj["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
+                println("${RED}$errCode: $errMsg${RESET}")
+                return@runBlocking
+            }
+
+            val answer = obj["answer"]?.jsonPrimitive?.contentOrNull ?: resp
+            val confidence = obj["confidence"]?.jsonPrimitive?.floatOrNull ?: 0f
+            val derivation = obj["derivation"]?.jsonArray ?: JsonArray(emptyList())
+            val missing = obj["missingContext"]?.jsonPrimitive?.contentOrNull ?: ""
+            val queries = obj["queriesExecuted"]?.jsonArray
+            val provider = obj["provider"]?.jsonPrimitive?.contentOrNull
+            val model = obj["model"]?.jsonPrimitive?.contentOrNull
+
+            println()
+            println("  $answer")
+            println()
+
+            if (derivation.isNotEmpty()) {
+                println("${DIM}Derivation:${RESET}")
+                for (step in derivation) {
+                    val fact = step.jsonObject["fact"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val type = step.jsonObject["type"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val rule = step.jsonObject["rule"]?.jsonPrimitive?.contentOrNull
+                    val typeTag = when (type) {
+                        "fact_match" -> "${GREEN}fact${RESET}"
+                        "rule_application" -> "${CYAN}rule${RESET}"
+                        else -> "${DIM}$type${RESET}"
+                    }
+                    print("  $typeTag  $fact")
+                    if (rule != null) print("  ${DIM}via $rule${RESET}")
+                    println()
+                }
+            }
+
+            if (missing.isNotBlank()) {
+                println("${DIM}Gaps: $missing${RESET}")
+            }
+
+            val confStr = String.format("%.0f%%", confidence * 100)
+            val providerStr = if (model != null) "$provider/$model" else ""
+            println("${DIM}Confidence: $confStr  $providerStr${RESET}")
+
+        } catch (_: Exception) {
+            println(resp)
+        }
     }
 
     private fun doTell(text: String) = runBlocking {
         require(text.isNotBlank()) { "Usage: tell predicate(arg1, arg2)" }
-        val resp = client.tell(Parser.factToJson(text))
-        printOk(resp, "Fact stored")
+        if (looksLikePredicate(text)) {
+            val resp = client.tell(Parser.factToJson(text))
+            printOk(resp, "Fact stored")
+        } else {
+            // Natural language → extract and assert
+            doIngest(text)
+        }
     }
 
     private fun doTeach(text: String) = runBlocking {
@@ -79,6 +187,76 @@ class Repl(private val client: Client) {
         require(text.isNotBlank()) { "Usage: forget predicate(arg1, arg2)" }
         val resp = client.forget(Parser.atomToJson(text))
         printOk(resp, "Retracted")
+    }
+
+    /**
+     * Ingest natural language text — LLM extracts facts & rules, auto-asserts.
+     *   ingest Alice is Bob's mother. Bob has three children.
+     *   ingest -f article.txt
+     */
+    private fun doIngest(text: String) = runBlocking {
+        require(text.isNotBlank()) { "Usage: ingest <text>  OR  ingest -f <file>" }
+
+        val inputText = if (text.startsWith("-f ")) {
+            val path = text.removePrefix("-f ").trim()
+            val file = File(path)
+            require(file.exists()) { "File not found: $path" }
+            file.readText()
+        } else {
+            text
+        }
+
+        println("${DIM}Extracting knowledge...${RESET}")
+        val resp = client.extract(inputText, assert = true, rules = true)
+        try {
+            val obj = json.parseToJsonElement(resp).jsonObject
+
+            // Check for error
+            val errCode = obj["code"]?.jsonPrimitive?.contentOrNull
+            if (errCode != null) {
+                val errMsg = obj["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
+                println("${RED}$errCode: $errMsg${RESET}")
+                return@runBlocking
+            }
+
+            val facts = obj["facts"]?.jsonArray ?: JsonArray(emptyList())
+            val rules = obj["rules"]?.jsonArray ?: JsonArray(emptyList())
+            val asserted = obj["asserted"]?.jsonPrimitive?.booleanOrNull ?: false
+            val provider = obj["provider"]?.jsonPrimitive?.contentOrNull
+            val model = obj["model"]?.jsonPrimitive?.contentOrNull
+
+            if (facts.isEmpty() && rules.isEmpty()) {
+                println("${YELLOW}No facts extracted.${RESET}")
+                return@runBlocking
+            }
+
+            for (f in facts) {
+                val pred = f.jsonObject["predicate"]?.jsonPrimitive?.contentOrNull ?: "?"
+                val args = f.jsonObject["args"]?.jsonArray?.joinToString(", ") { it.jsonPrimitive.content } ?: ""
+                val conf = f.jsonObject["confidence"]?.jsonPrimitive?.floatOrNull ?: 0f
+                val confStr = String.format("%.0f%%", conf * 100)
+                println("  ${GREEN}+${RESET} $CYAN$pred$RESET($args)  ${DIM}$confStr${RESET}")
+            }
+
+            for (r in rules) {
+                val head = r.jsonObject["head"]?.jsonObject
+                val body = r.jsonObject["body"]?.jsonArray
+                if (head != null) {
+                    val headStr = formatAtomPlain(head)
+                    val bodyStr = body?.joinToString(", ") { formatAtomPlain(it) } ?: ""
+                    val conf = r.jsonObject["confidence"]?.jsonPrimitive?.floatOrNull ?: 0f
+                    val confStr = String.format("%.0f%%", conf * 100)
+                    println("  ${GREEN}+${RESET} $headStr :- $bodyStr  ${DIM}$confStr${RESET}")
+                }
+            }
+
+            val status = if (asserted) "${GREEN}asserted${RESET}" else "${YELLOW}extracted only${RESET}"
+            val providerStr = if (model != null) "  ${DIM}via $provider/$model${RESET}" else ""
+            println("${facts.size} facts, ${rules.size} rules — $status$providerStr")
+
+        } catch (_: Exception) {
+            println(resp)
+        }
     }
 
     private fun doInspect(filter: String) = runBlocking {
@@ -151,6 +329,76 @@ class Repl(private val client: Client) {
         println(resp)
     }
 
+    private fun doImport(path: String) = runBlocking {
+        require(path.isNotBlank()) { "Usage: import <file.ab>" }
+        val file = File(path)
+        require(file.exists()) { "File not found: $path" }
+
+        val lines = file.readLines()
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !it.startsWith("#") }
+
+        var facts = 0
+        var rules = 0
+        var errors = 0
+
+        for ((idx, line) in lines.withIndex()) {
+            try {
+                if (Parser.isRule(line)) {
+                    client.teach(Parser.ruleToJson(line))
+                    rules++
+                } else {
+                    client.tell(Parser.factToJson(line))
+                    facts++
+                }
+            } catch (e: Exception) {
+                errors++
+                println("  ${RED}line ${idx + 1}: ${e.message}$RESET  $DIM$line$RESET")
+            }
+        }
+
+        println("${GREEN}Imported$RESET — $facts facts, $rules rules" +
+            if (errors > 0) ", ${RED}$errors errors$RESET" else "")
+    }
+
+    private fun doExport(path: String) = runBlocking {
+        val factsRaw = client.listFacts()
+        val rulesRaw = client.listRules()
+        val facts = tryParseArray(factsRaw)
+        val rules = tryParseArray(rulesRaw)
+
+        val sb = StringBuilder()
+        sb.appendLine("# AxiomBase knowledge dump — ${client.database}")
+        sb.appendLine("# ${java.time.Instant.now()}")
+        sb.appendLine()
+
+        if (facts.isNotEmpty()) {
+            sb.appendLine("# Facts")
+            for (f in facts) {
+                sb.appendLine(formatAtomPlain(f))
+            }
+            sb.appendLine()
+        }
+
+        if (rules.isNotEmpty()) {
+            sb.appendLine("# Rules")
+            for (r in rules) {
+                sb.appendLine(formatRulePlain(r))
+            }
+            sb.appendLine()
+        }
+
+        val text = sb.toString()
+
+        if (path.isBlank()) {
+            // Print to stdout
+            println(text)
+        } else {
+            File(path).writeText(text)
+            println("${GREEN}Exported$RESET — ${facts.size} facts, ${rules.size} rules → $path")
+        }
+    }
+
     private fun doUse(name: String) {
         require(name.isNotBlank()) { "Usage: use <database>" }
         client.database = name
@@ -173,7 +421,193 @@ class Repl(private val client: Client) {
 
     private fun doHealth() = runBlocking {
         val resp = client.health()
-        println(resp)
+        try {
+            val obj = json.parseToJsonElement(resp).jsonObject
+            val status = obj["status"]?.jsonPrimitive?.contentOrNull ?: "unknown"
+            val statusColor = when (status) {
+                "healthy" -> GREEN
+                "degraded" -> YELLOW
+                else -> RED
+            }
+            println("${statusColor}$status${RESET}")
+            val checks = obj["checks"]?.jsonObject
+            if (checks != null) {
+                for ((name, check) in checks) {
+                    val checkStatus = check.jsonObject["status"]?.jsonPrimitive?.contentOrNull ?: "?"
+                    val checkColor = when (checkStatus) {
+                        "pass" -> GREEN
+                        "warn" -> YELLOW
+                        else -> RED
+                    }
+                    val detail = check.jsonObject["message"]?.jsonPrimitive?.contentOrNull ?: ""
+                    println("  ${checkColor}$checkStatus${RESET}  $name  ${DIM}$detail${RESET}")
+                }
+            }
+        } catch (_: Exception) {
+            println(resp)
+        }
+    }
+
+    /** Show server status: health, LLM provider, databases, features */
+    private fun doStatus() = runBlocking {
+        println("${BOLD}AxiomBase Status${RESET}")
+        println("${DIM}Server: ${client.server}${RESET}")
+        println("${DIM}Database: ${client.database}${RESET}")
+        println()
+
+        // Health
+        try {
+            val healthResp = client.health()
+            val health = json.parseToJsonElement(healthResp).jsonObject
+            val status = health["status"]?.jsonPrimitive?.contentOrNull ?: "unknown"
+            val statusColor = when (status) { "healthy" -> GREEN; "degraded" -> YELLOW; else -> RED }
+            println("  Health:     ${statusColor}$status${RESET}")
+        } catch (e: Exception) {
+            println("  Health:     ${RED}unreachable (${e.message})${RESET}")
+        }
+
+        // LLM — check via extract endpoint probe
+        try {
+            val extractResp = client.extract("test", assert = false, rules = false)
+            val extractObj = json.parseToJsonElement(extractResp).jsonObject
+            val provider = extractObj["provider"]?.jsonPrimitive?.contentOrNull
+            val model = extractObj["model"]?.jsonPrimitive?.contentOrNull
+            val errCode = extractObj["code"]?.jsonPrimitive?.contentOrNull
+            if (errCode != null) {
+                val msg = extractObj["message"]?.jsonPrimitive?.contentOrNull ?: ""
+                when (errCode) {
+                    "LLM_NOT_CONFIGURED" -> println("  LLM:        ${YELLOW}not configured${RESET}  ${DIM}(set API key in .env)${RESET}")
+                    "EXTRACTION_DISABLED" -> println("  Extraction: ${YELLOW}disabled${RESET}  ${DIM}(set EXTRACTION_ENABLED=true)${RESET}")
+                    else -> println("  LLM:        ${YELLOW}$errCode${RESET}  ${DIM}$msg${RESET}")
+                }
+            } else if (provider != null) {
+                println("  LLM:        ${GREEN}$provider/$model${RESET}")
+                println("  Extraction: ${GREEN}enabled${RESET}")
+            }
+        } catch (_: Exception) {
+            println("  LLM:        ${DIM}unknown${RESET}")
+        }
+
+        // Databases
+        try {
+            val dbsResp = client.listDatabases()
+            val dbs = tryParseArray(dbsResp)
+            println("  Databases:  ${dbs.size}")
+        } catch (_: Exception) {}
+
+        // Facts/rules in current db
+        try {
+            val facts = tryParseArray(client.listFacts())
+            val rules = tryParseArray(client.listRules())
+            println("  Knowledge:  ${facts.size} facts, ${rules.size} rules (in ${client.database})")
+        } catch (_: Exception) {}
+
+        println()
+    }
+
+    /** Interactive setup — configure LLM keys and server options */
+    private fun doSetup() {
+        println()
+        println("${BOLD}AxiomBase Setup${RESET}")
+        println("${DIM}Configure your LLM provider for natural language features.${RESET}")
+        println()
+        println("  1) Ollama (local, free, private)")
+        println("  2) Anthropic Claude")
+        println("  3) OpenAI GPT")
+        println("  4) Google Gemini")
+        println("  5) Custom (any OpenAI-compatible endpoint)")
+        println("  q) Cancel")
+        println()
+        print("Choice [1]: ")
+
+        val choice = readlnOrNull()?.trim() ?: return
+        if (choice == "q") return
+
+        val envLines = mutableListOf<String>()
+
+        when (choice.ifBlank { "1" }) {
+            "1" -> {
+                println()
+                println("${GREEN}Ollama selected.${RESET}")
+                println("${DIM}Make sure Ollama is running: ollama serve${RESET}")
+                println("${DIM}Or start with Docker: make up-ollama${RESET}")
+                print("Model [llama3.2]: ")
+                val model = readlnOrNull()?.trim()?.ifBlank { "llama3.2" } ?: "llama3.2"
+                print("Ollama URL [http://localhost:11434/v1]: ")
+                val url = readlnOrNull()?.trim()?.ifBlank { "http://localhost:11434/v1" } ?: "http://localhost:11434/v1"
+                envLines.add("LLM_PROVIDER=ollama")
+                envLines.add("LLM_MODEL=$model")
+                envLines.add("LLM_BASE_URL=$url")
+            }
+            "2" -> {
+                print("Anthropic API key (sk-ant-...): ")
+                val key = readlnOrNull()?.trim() ?: return
+                if (key.isBlank()) { println("${RED}No key entered.${RESET}"); return }
+                envLines.add("ANTHROPIC_API_KEY=$key")
+            }
+            "3" -> {
+                print("OpenAI API key (sk-...): ")
+                val key = readlnOrNull()?.trim() ?: return
+                if (key.isBlank()) { println("${RED}No key entered.${RESET}"); return }
+                envLines.add("OPENAI_API_KEY=$key")
+            }
+            "4" -> {
+                print("Google API key (AIza...): ")
+                val key = readlnOrNull()?.trim() ?: return
+                if (key.isBlank()) { println("${RED}No key entered.${RESET}"); return }
+                envLines.add("GOOGLE_API_KEY=$key")
+            }
+            "5" -> {
+                print("Base URL (e.g. https://api.groq.com/openai/v1): ")
+                val url = readlnOrNull()?.trim() ?: return
+                print("Model name: ")
+                val model = readlnOrNull()?.trim() ?: return
+                print("API key (leave blank if none): ")
+                val key = readlnOrNull()?.trim() ?: ""
+                envLines.add("LLM_PROVIDER=custom")
+                envLines.add("LLM_BASE_URL=$url")
+                envLines.add("LLM_MODEL=$model")
+                if (key.isNotBlank()) envLines.add("LLM_API_KEY=$key")
+            }
+            else -> { println("${RED}Invalid choice.${RESET}"); return }
+        }
+
+        envLines.add("EXTRACTION_ENABLED=true")
+
+        println()
+        println("${BOLD}Configuration:${RESET}")
+        for (line in envLines) {
+            val parts = line.split("=", limit = 2)
+            val value = if (parts[0].contains("KEY") && parts[1].length > 8) {
+                parts[1].take(6) + "..." + parts[1].takeLast(4)
+            } else parts[1]
+            println("  ${CYAN}${parts[0]}${RESET} = $value")
+        }
+        println()
+        println("${DIM}Add these to your server's .env file, then restart the server.${RESET}")
+        println("${DIM}If using Docker: edit .env then run 'docker compose restart'${RESET}")
+
+        // Try to write to .env if it exists in current directory or parent
+        val envFile = listOf(File(".env"), File("../.env"), File(System.getProperty("user.dir", ".") + "/.env"))
+            .firstOrNull { it.exists() }
+
+        if (envFile != null) {
+            println()
+            print("Write to ${envFile.absolutePath}? [y/N]: ")
+            val confirm = readlnOrNull()?.trim()?.lowercase()
+            if (confirm == "y" || confirm == "yes") {
+                val existing = envFile.readText()
+                val newContent = StringBuilder(existing)
+                if (!existing.endsWith("\n")) newContent.append("\n")
+                newContent.append("\n# Added by 'setup' command\n")
+                for (line in envLines) {
+                    newContent.appendLine(line)
+                }
+                envFile.writeText(newContent.toString())
+                println("${GREEN}Written!${RESET} Restart the server for changes to take effect.")
+            }
+        }
+        println()
     }
 
     // ── formatting ──
@@ -196,6 +630,25 @@ class Repl(private val client: Client) {
         if (head == null) return el.toString()
         val headStr = formatAtom(head)
         val bodyStr = body?.joinToString(", ") { formatAtom(it) } ?: ""
+        return "$headStr :- $bodyStr"
+    }
+
+    /** Plain text atom — no ANSI, for file export */
+    private fun formatAtomPlain(el: JsonElement): String {
+        if (el !is JsonObject) return el.toString()
+        val pred = el["predicate"]?.jsonPrimitive?.contentOrNull ?: "?"
+        val args = el["args"]?.jsonArray?.joinToString(", ") { it.jsonPrimitive.content } ?: ""
+        val neg = if (el["negated"]?.jsonPrimitive?.booleanOrNull == true) "NOT " else ""
+        return if (args.isEmpty()) "$neg$pred" else "$neg$pred($args)"
+    }
+
+    /** Plain text rule — no ANSI, for file export */
+    private fun formatRulePlain(el: JsonElement): String {
+        if (el !is JsonObject) return el.toString()
+        val head = el["head"]?.jsonObject ?: return el.toString()
+        val body = el["body"]?.jsonArray ?: return formatAtomPlain(head)
+        val headStr = formatAtomPlain(head)
+        val bodyStr = body.joinToString(", ") { formatAtomPlain(it) }
         return "$headStr :- $bodyStr"
     }
 
@@ -262,18 +715,36 @@ class Repl(private val client: Client) {
     private fun printBanner() {
         println()
         println("${BOLD}AxiomBase CLI$RESET — logic server for agentic AI")
-        println("${DIM}Connected to ${client.database} @ server${RESET}")
-        println("${DIM}Type 'help' for commands, 'exit' to quit.${RESET}")
+        println("${DIM}Server:   ${client.server}${RESET}")
+        println("${DIM}Database: ${client.database}${RESET}")
+
+        // Quick connectivity check
+        try {
+            val resp = runBlocking { client.health() }
+            val obj = json.parseToJsonElement(resp).jsonObject
+            val status = obj["status"]?.jsonPrimitive?.contentOrNull ?: "unknown"
+            when (status) {
+                "healthy" -> println("${GREEN}Connected.${RESET}")
+                "degraded" -> println("${YELLOW}Connected (degraded).${RESET}")
+                else -> println("${RED}Connected ($status).${RESET}")
+            }
+        } catch (e: Exception) {
+            println("${RED}Cannot reach server: ${e.message}${RESET}")
+            println("${DIM}Is the server running? Start with: make up${RESET}")
+        }
+
+        println("${DIM}Type 'help' for commands, 'status' for details, 'setup' to configure LLM.${RESET}")
         println()
     }
 
     private fun printHelp() {
         println("""
 ${BOLD}Agent commands:$RESET
-  ask   <pred(?var)>                Query with reasoning
-  tell  <pred(arg, arg)>            Store a fact
+  ask   <question or pred(?var)>    Query (NL or predicate syntax)
+  tell  <text or pred(arg, arg)>    Store a fact (NL or structured)
   teach <head(?x) :- body(?x)>      Define a rule
   forget <pred(arg, arg)>           Remove a fact
+  ingest <text or -f file>          Extract facts from plain text via LLM
 
 ${BOLD}Explore:$RESET
   inspect [filter]                  Browse all knowledge
@@ -284,21 +755,46 @@ ${BOLD}Operations:$RESET
   cleanup [threshold]               Evict expired/low-salience facts
   dsl <command>                     Raw Logiql DSL
 
+${BOLD}Import / Export:$RESET
+  import <file.ab>                  Load facts & rules from file
+  export [file.ab]                  Dump knowledge (to file or stdout)
+
 ${BOLD}Admin:$RESET
   use <database>                    Switch database
   dbs                               List databases
   health                            Server health check
+  status                            Full server status (health, LLM, KB)
+  setup                             Interactive LLM provider configuration
 
 ${BOLD}Shortcuts:$RESET
   ?  = ask    +  = tell    ++ = teach    -  = forget    ls = inspect
-  ctx = context    exec = dsl    q = exit
+  ctx = context    exec = dsl    load = import    dump = export    q = exit
 
-${BOLD}Examples:$RESET
+${BOLD}Examples — structured:$RESET
   tell human(socrates)
   teach mortal(?x) :- human(?x)
   ask mortal(?who)
-  inspect
+
+${BOLD}Examples — natural language (requires LLM configured on server):$RESET
+  ingest Alice is Bob's mother. Bob works at Acme Corp.
+  ingest -f article.txt
+  ask who is Bob's mother?
+  ask what company does Bob work at?
+  tell the president met with the prime minister yesterday
         """.trimIndent())
+    }
+
+    /**
+     * Heuristic: does this look like predicate syntax or natural language?
+     *   "mortal(?who)"         → true  (has parens with args)
+     *   "likes(alice, bob)"    → true
+     *   "who is mortal?"       → false (spaces, no predicate parens)
+     *   "what did Trump say"   → false
+     */
+    private fun looksLikePredicate(text: String): Boolean {
+        val trimmed = text.trim()
+        // Contains predicate-style parens: word( ... )
+        return Regex("""^(NOT\s+)?[A-Za-z_]\w*\(.*\)$""", RegexOption.IGNORE_CASE).matches(trimmed)
     }
 
     private fun splitFirst(line: String): Pair<String, String> {

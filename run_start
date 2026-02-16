@@ -1,17 +1,44 @@
 #!/bin/bash
+set -e
 
-# Configuration
-SERVER_IMAGE="logic-server"
-WEB_IMAGE="logic-web"
-API_PORT=9300
-WEB_PORT=9400
+# ─────────────────────────────────────────────────────────────────────────────
+# AxiomBase Launcher
+# Detects docker/podman, creates .env if missing, starts the stack.
+# Usage:
+#   ./run_start              # server only (cloud LLM)
+#   ./run_start --ollama     # server + local Ollama
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Function to check for command existence
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+NC='\033[0m'
 
-# Determine Compose Command
+OLLAMA_PROFILE=""
+if [[ "$1" == "--ollama" || "$1" == "-o" ]]; then
+    OLLAMA_PROFILE="--profile ollama"
+fi
+
+# ── First-time setup ────────────────────────────────────────────────────────
+if [ ! -f .env ]; then
+    echo -e "${YELLOW}No .env found — creating from .env.example...${NC}"
+    cp .env.example .env
+    echo -e "${GREEN}.env created. Default: Ollama (local LLM, no API key needed).${NC}"
+    echo -e "Edit .env to switch to Anthropic/OpenAI/Google."
+    echo ""
+fi
+
+# Source .env for port variable
+set -a
+source .env 2>/dev/null || true
+set +a
+
+API_PORT="${PORT:-9300}"
+
+# ── Find container runtime ──────────────────────────────────────────────────
+command_exists() { command -v "$1" >/dev/null 2>&1; }
+
 COMPOSE_CMD=""
 if command_exists "docker" && docker compose version >/dev/null 2>&1; then
     COMPOSE_CMD="docker compose"
@@ -21,76 +48,74 @@ elif command_exists "podman-compose"; then
     COMPOSE_CMD="podman-compose"
 fi
 
-# Cleanup Function
 cleanup() {
-    echo "Stopping..."
+    echo ""
+    echo -e "${YELLOW}Stopping...${NC}"
     if [ -n "$COMPOSE_CMD" ]; then
-        $COMPOSE_CMD down
+        $COMPOSE_CMD --profile ollama down
     else
-        podman stop logic-server logic-web 2>/dev/null
-        podman rm logic-server logic-web 2>/dev/null
-        podman network rm logic-net 2>/dev/null
+        podman stop axiombase axiombase-ollama 2>/dev/null
+        podman rm axiombase axiombase-ollama 2>/dev/null
+        podman network rm axiombase-net 2>/dev/null
     fi
-    echo "Done."
+    echo -e "${GREEN}Done.${NC}"
     exit
 }
 
 trap cleanup SIGINT SIGTERM
 
-echo "=== Logic Server Launcher ==="
+# ── Start ────────────────────────────────────────────────────────────────────
+echo -e "${CYAN}=== AxiomBase — Logic Server for Agentic AI ===${NC}"
 
 if [ -n "$COMPOSE_CMD" ]; then
-    echo "Using orchestration tool: $COMPOSE_CMD"
-    
-    echo "Building and Starting Stack..."
-    $COMPOSE_CMD up -d --build
-    
-    if [ $? -eq 0 ]; then
-        echo "=== Running ==="
-        echo "Server: http://localhost:$API_PORT"
-        echo "Web:    http://localhost:$WEB_PORT"
-        echo "Logs (Server):"
-        $COMPOSE_CMD logs -f logic-server
+    echo -e "Runtime: ${GREEN}$COMPOSE_CMD${NC}"
+    if [ -n "$OLLAMA_PROFILE" ]; then
+        echo -e "Mode:    ${GREEN}Server + Ollama (local LLM)${NC}"
     else
-        echo "Failed to start stack."
-        exit 1
+        echo -e "Mode:    ${GREEN}Server only (cloud LLM)${NC}"
     fi
+    echo ""
+
+    echo "Building and starting..."
+    $COMPOSE_CMD $OLLAMA_PROFILE up -d --build
+
+    echo ""
+    echo -e "${GREEN}=== AxiomBase Running ===${NC}"
+    echo -e "  API:     http://localhost:$API_PORT"
+    echo -e "  Health:  http://localhost:$API_PORT/health"
+    echo -e "  Docs:    http://localhost:$API_PORT/llm.txt"
+    echo -e "  MCP:     http://localhost:$API_PORT/mcp"
+    if [ -n "$OLLAMA_PROFILE" ]; then
+        echo -e "  Ollama:  http://localhost:11434"
+    fi
+    echo ""
+    echo -e "${CYAN}CLI:${NC} ./gradlew :axiombase-cli:run --args='--server http://localhost:$API_PORT --db default'"
+    echo ""
+    echo "Tailing logs (Ctrl+C to stop)..."
+    $COMPOSE_CMD logs -f axiombase
 
 else
-    echo "No docker-compose/podman-compose found. Falling back to manual podman commands."
-    
-    # Manual Fallback
-    NETWORK="logic-net"
-    SERVER_CONTAINER="logic-server"
-    WEB_CONTAINER="logic-web"
-    
-    # Cleanup
-    podman stop $SERVER_CONTAINER $WEB_CONTAINER 2>/dev/null
-    podman rm $SERVER_CONTAINER $WEB_CONTAINER 2>/dev/null
-    podman network rm $NETWORK 2>/dev/null
-    
+    echo -e "${YELLOW}No docker-compose found. Using podman directly.${NC}"
+
+    NETWORK="axiombase-net"
+    SERVER_CONTAINER="axiombase"
+
+    podman stop $SERVER_CONTAINER 2>/dev/null || true
+    podman rm $SERVER_CONTAINER 2>/dev/null || true
     podman network create $NETWORK 2>/dev/null || true
     mkdir -p data
-    
-    echo "Building Server..."
-    podman build -t $SERVER_IMAGE -f Dockerfile .
-    
-    echo "Building Web..."
-    podman build --build-arg VITE_API_URL=http://localhost:$API_PORT -t $WEB_IMAGE -f axiombase-web/Dockerfile axiombase-web
-    
-    echo "Starting Server..."
+
+    echo "Building..."
+    podman build -t axiombase -f Dockerfile .
+
+    echo "Starting..."
     podman run -d --name $SERVER_CONTAINER --network $NETWORK \
-        -p $API_PORT:9300 -v $(pwd)/data:/data \
-        -e STORAGE_DIR=/data \
-        $SERVER_IMAGE
-        
-    echo "Starting Web..."
-    podman run -d --name $WEB_CONTAINER --network $NETWORK \
-        -p $WEB_PORT:80 \
-        $WEB_IMAGE
-        
-    echo "=== Running ==="
-    echo "Server: http://localhost:$API_PORT"
-    echo "Web:    http://localhost:$WEB_PORT"
+        -p $API_PORT:9300 -v "$(pwd)/data:/data" \
+        --env-file .env \
+        axiombase
+
+    echo ""
+    echo -e "${GREEN}=== AxiomBase Running ===${NC}"
+    echo -e "  API:     http://localhost:$API_PORT"
     podman logs -f $SERVER_CONTAINER
 fi

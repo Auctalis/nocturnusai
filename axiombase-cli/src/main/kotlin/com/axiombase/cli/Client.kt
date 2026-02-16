@@ -15,6 +15,8 @@ class Client(
     private val apiKey: String?,
     var tenantId: String? = null,
 ) {
+    val server: String get() = serverUrl
+
     private val http = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true; prettyPrint = true })
@@ -53,6 +55,17 @@ class Client(
     suspend fun compress() = post("/memory/compress", "{}")
     suspend fun cleanup(threshold: Double) = post("/memory/cleanup", """{"threshold":$threshold}""")
     suspend fun health() = get("/health")
+
+    /** POST /extract — send plain text, LLM extracts facts & rules */
+    suspend fun extract(text: String, assert: Boolean = true, rules: Boolean = true, context: String? = null): String {
+        val ctxField = if (context != null) ""","context":"${context.replace("\"", "\\\"")}"""" else ""
+        return post("/extract", """{"text":"${text.replace("\"", "\\\"")}","assert":$assert,"rules":$rules$ctxField}""")
+    }
+
+    /** POST /synthesize — natural language question → LLM-powered answer */
+    suspend fun synthesize(question: String): String {
+        return post("/synthesize", """{"question":"${question.replace("\"", "\\\"")}"}""")
+    }
 
     fun close() = http.close()
 }

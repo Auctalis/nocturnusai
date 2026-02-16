@@ -1,35 +1,107 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AxiomBase — Logic Server for Agentic AI
+#
+# Quick start:
+#   cp .env.example .env        # configure provider & keys
+#   docker compose up -d        # server only (bring your own LLM)
+#   docker compose --profile ollama up -d   # server + local Ollama
+#
+# Shortcuts via Makefile:
+#   make up                     # server only
+#   make up-ollama              # server + Ollama sidecar
+#   make down / make logs / make health
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
-  logic-server:
-    image: logic-server:latest
-    build: 
+  # ── AxiomBase Logic Server ─────────────────────────────────────────────────
+  axiombase:
+    image: axiombase:latest
+    build:
       context: .
       dockerfile: Dockerfile
-    container_name: logic-server
+    container_name: axiombase
     restart: unless-stopped
     ports:
-      - "9300:9300"
-      # - "9443:9443"  # Uncomment for TLS
+      - "${PORT:-9300}:${PORT:-9300}"
+      # - "${TLS_PORT:-9443}:${TLS_PORT:-9443}"  # Uncomment for TLS
     volumes:
-      - ./data:/data
+      - axiombase-data:/data
+    env_file:
+      - path: .env
+        required: false
     environment:
-      - PORT=9300
-      - STORAGE_DIR=/data
+      # These are always set — .env overrides take precedence
+      - PORT=${PORT:-9300}
       - HOST=0.0.0.0
-      # - ENCRYPTION_KEY=        # 64 hex chars for AES-256 encryption at rest
-      # - TLS_ENABLED=true       # Enable HTTPS
-      # - TLS_PORT=9443
-      # - TLS_KEYSTORE_PATH=/data/keystore.p12
-      # - TLS_KEYSTORE_PASSWORD=changeit
-      # - TLS_KEY_ALIAS=axiombase
+      - STORAGE_DIR=/data
     networks:
-      - logic-net
+      - axiombase-net
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:9300/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 30s
+    depends_on:
+      ollama:
+        condition: service_started
+        required: false
+
+  # ── Ollama (local LLM — opt-in via profile) ───────────────────────────────
+  # Activated with:  docker compose --profile ollama up -d
+  # Or:  make up-ollama
+  #
+  # On first start, pulls the model (~2GB for llama3.2).
+  # GPU passthrough: uncomment the deploy section below.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: axiombase-ollama
+    profiles:
+      - ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    networks:
+      - axiombase-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    # ── GPU support (uncomment for NVIDIA) ──
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # ── Ollama model bootstrap ────────────────────────────────────────────────
+  # Pulls the configured model on first start, then exits.
+  ollama-pull:
+    image: curlimages/curl:latest
+    container_name: axiombase-ollama-pull
+    profiles:
+      - ollama
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - axiombase-net
+    restart: "no"
+    entrypoint: >
+      sh -c "curl -sf http://ollama:11434/api/pull -d '{\"name\": \"${LLM_MODEL:-llama3.2}\"}' && echo 'Model ready.'"
+
+volumes:
+  axiombase-data:
+    driver: local
+  ollama-models:
+    driver: local
 
 networks:
-  logic-net:
+  axiombase-net:
     driver: bridge
