@@ -85,6 +85,17 @@ export type {
   // Error
   AxiomBaseError,
 
+  // Auth / Key management
+  AuthStatus,
+  CreateKeyOptions,
+  CreateKeyResponse,
+  KeyInfo,
+  WhoAmI,
+
+  // Schema discovery
+  PredicateInfo,
+  SchemaDiscovery,
+
   // MCP types
   JsonRpcRequest,
   JsonRpcResponse,

@@ -167,6 +167,49 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
         }
     }
 
+    // Schema discovery: list all predicates in the knowledge base
+    get("/predicates") {
+        try {
+            val (db, tenantId) = call.getContext(dbManager)
+            val scope = call.request.queryParameters["scope"]
+
+            // Get all facts and group by predicate
+            val allFacts = db.getAllFacts(tenantId, scope).toList()
+            val factsByPred = allFacts.groupBy { it.predicate }
+
+            // Get all rules
+            val rules = db.getRules(tenantId, scope)
+            val rulesByHead = rules.groupBy { it.head.predicate }
+
+            // Build unified predicate list
+            val allPredicates = (factsByPred.keys + rulesByHead.keys).distinct().sorted()
+            val predicateInfos = allPredicates.map { pred ->
+                val facts = factsByPred[pred] ?: emptyList()
+                val predRules = rulesByHead[pred] ?: emptyList()
+                mapOf(
+                    "predicate" to pred,
+                    "factCount" to facts.size,
+                    "ruleCount" to predRules.size,
+                    "arity" to (facts.firstOrNull()?.args?.size ?: predRules.firstOrNull()?.head?.args?.size ?: 0),
+                    "hasRules" to predRules.isNotEmpty()
+                )
+            }
+
+            call.respond(mapOf(
+                "predicates" to predicateInfos,
+                "totalPredicates" to predicateInfos.size,
+                "totalFacts" to allFacts.size,
+                "totalRules" to rules.size
+            ))
+        } catch (e: ValidationException) {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
+        } catch (e: DatabaseNotFoundException) {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
+        } catch (e: Exception) {
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", e.message ?: "Error"))
+        }
+    }
+
     // Endpoint 3: Ask Questions (INFER)
     post("/infer") {
         try {

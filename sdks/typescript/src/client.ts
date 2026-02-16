@@ -38,6 +38,12 @@ import type {
   KnowledgeEvent,
   HealthStatus,
   AxiomBaseError,
+  AuthStatus,
+  CreateKeyOptions,
+  CreateKeyResponse,
+  KeyInfo,
+  WhoAmI,
+  SchemaDiscovery,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -478,6 +484,137 @@ export class AxiomBaseClient {
    */
   async health(): Promise<HealthStatus> {
     return this.requestJson<HealthStatus>('GET', '/health');
+  }
+
+  // -----------------------------------------------------------------------
+  // Schema discovery
+  // -----------------------------------------------------------------------
+
+  /**
+   * Discover the knowledge base schema.
+   *
+   * Lists all predicates (relationship types) currently stored, with
+   * argument counts and fact counts.
+   *
+   * @param scope - Optional scope filter.
+   * @returns Schema discovery response with predicates and counts.
+   *
+   * @example
+   * ```ts
+   * const schema = await client.predicates();
+   * for (const p of schema.predicates) {
+   *   console.log(`${p.predicate}/${p.arity} — ${p.factCount} facts`);
+   * }
+   * ```
+   */
+  async predicates(scope?: string): Promise<SchemaDiscovery> {
+    const queryParams = scope ? `?scope=${encodeURIComponent(scope)}` : '';
+    return this.requestJson<SchemaDiscovery>('GET', `/predicates${queryParams}`);
+  }
+
+  // -----------------------------------------------------------------------
+  // Auth / key management
+  // -----------------------------------------------------------------------
+
+  /**
+   * Check the authentication status and mode of the server.
+   *
+   * @returns Auth status including mode and whether keys exist.
+   *
+   * @example
+   * ```ts
+   * const status = await client.authStatus();
+   * console.log(`Auth mode: ${status.mode}`);
+   * ```
+   */
+  async authStatus(): Promise<AuthStatus> {
+    return this.requestJson<AuthStatus>('GET', '/auth/status');
+  }
+
+  /**
+   * Bootstrap the first admin API key.
+   *
+   * Only works when RBAC auth is enabled and no keys exist yet.
+   *
+   * @param name - Name for the admin key. Defaults to "admin".
+   * @param description - Description for the key.
+   * @returns The created key info including the raw key (shown only once).
+   *
+   * @example
+   * ```ts
+   * const result = await client.bootstrap('my-admin');
+   * console.log(`Save this key: ${result.key}`);
+   * ```
+   */
+  async bootstrap(name: string = 'admin', description: string = 'Initial admin key'): Promise<CreateKeyResponse> {
+    return this.requestJson<CreateKeyResponse>('POST', '/auth/bootstrap', { name, description });
+  }
+
+  /**
+   * Create a new API key. Requires ADMIN role.
+   *
+   * @param opts - Key creation options (name, role, optional scoping).
+   * @returns The created key info including the raw key (shown only once).
+   *
+   * @example
+   * ```ts
+   * const key = await client.createKey({
+   *   name: 'agent-writer',
+   *   role: 'writer',
+   *   databases: ['prod'],
+   * });
+   * console.log(`New key: ${key.key}`);
+   * ```
+   */
+  async createKey(opts: CreateKeyOptions): Promise<CreateKeyResponse> {
+    return this.requestJson<CreateKeyResponse>('POST', '/auth/keys', opts);
+  }
+
+  /**
+   * List all API keys. Requires ADMIN role.
+   *
+   * @returns List of key info objects (without raw keys).
+   *
+   * @example
+   * ```ts
+   * const keys = await client.listKeys();
+   * for (const key of keys) {
+   *   console.log(`${key.name} (${key.role}) — ${key.prefix}`);
+   * }
+   * ```
+   */
+  async listKeys(): Promise<KeyInfo[]> {
+    return this.requestJson<KeyInfo[]>('GET', '/auth/keys');
+  }
+
+  /**
+   * Revoke (delete) an API key. Requires ADMIN role.
+   *
+   * @param keyId - The ID of the key to revoke.
+   * @returns Server confirmation message.
+   *
+   * @example
+   * ```ts
+   * await client.revokeKey('some-uuid');
+   * ```
+   */
+  async revokeKey(keyId: string): Promise<string> {
+    return this.requestText('DELETE', `/auth/keys/${keyId}`);
+  }
+
+  /**
+   * Get information about the currently authenticated key.
+   *
+   * @returns Key identity including name, role, and permissions.
+   *
+   * @example
+   * ```ts
+   * const me = await client.whoami();
+   * console.log(`Authenticated as: ${me.name} (${me.role})`);
+   * ```
+   */
+  async whoami(): Promise<WhoAmI> {
+    return this.requestJson<WhoAmI>('GET', '/auth/whoami');
   }
 
   // -----------------------------------------------------------------------

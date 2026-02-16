@@ -1,6 +1,7 @@
 package com.axiombase.server.routes
 
 import com.axiombase.server.*
+import com.axiombase.server.observability.Metrics
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -19,16 +20,15 @@ import kotlinx.serialization.json.*
  * Spec: https://modelcontextprotocol.io/specification/2025-11-25
  *
  * Tools exposed:
- *   - assert_fact: Assert a fact into the knowledge base
- *   - assert_rule: Assert a logical rule (Horn clause)
- *   - query: Query facts matching a pattern
- *   - infer: Run backward-chaining inference
- *   - retract: Retract a fact (triggers TMS cascade)
- *   - explain: Get proof tree for an inference result
- *   - context_window: Get salience-ranked context for agent reasoning
- *   - temporal_query: Query facts valid at a specific point in time
- *   - consolidate: Run memory consolidation
- *   - decay: Run memory decay/eviction
+ *   - tell / assert_fact: Assert a fact into the knowledge base
+ *   - teach / assert_rule: Assert a logical rule (Horn clause)
+ *   - ask / infer: Run backward-chaining inference
+ *   - forget / retract: Retract a fact (triggers TMS cascade)
+ *   - recall / temporal_query: Query facts valid at a specific point in time
+ *   - context / context_window: Get salience-ranked context for agent reasoning
+ *   - compress / consolidate: Run memory consolidation
+ *   - cleanup / decay: Run memory decay/eviction
+ *   - predicates: Discover the knowledge base schema
  */
 
 private val json = Json {
@@ -64,6 +64,20 @@ data class JsonRpcError(
 // MCP Protocol version
 private const val MCP_PROTOCOL_VERSION = "2025-11-25"
 
+// MCP JSON-RPC error codes (standard + custom)
+private object McpErrorCodes {
+    const val PARSE_ERROR = -32700
+    const val INVALID_REQUEST = -32600
+    const val METHOD_NOT_FOUND = -32601
+    const val INVALID_PARAMS = -32602
+    const val INTERNAL_ERROR = -32603
+    // Custom AxiomBase error codes
+    const val DATABASE_NOT_FOUND = -32001
+    const val VALIDATION_ERROR = -32002
+    const val CONFLICT_ERROR = -32003
+    const val UNKNOWN_TOOL = -32004
+}
+
 fun Route.mcpRoutes(dbManager: DatabaseManager) {
 
     // MCP endpoint: handles all JSON-RPC requests
@@ -76,22 +90,33 @@ fun Route.mcpRoutes(dbManager: DatabaseManager) {
             val tenantId = call.request.header("X-Tenant-ID") ?: "default"
             val db = dbManager.getDatabase(dbName)
                 ?: return@post call.respond(
-                    jsonRpcError(request.id, -32001, "Database '$dbName' not found")
+                    jsonRpcError(request.id, McpErrorCodes.DATABASE_NOT_FOUND, "Database '$dbName' not found")
                 )
 
             val response = when (request.method) {
                 "initialize" -> handleInitialize(request)
                 "tools/list" -> handleToolsList(request)
-                "tools/call" -> handleToolCall(request, db, tenantId)
+                "tools/call" -> {
+                    val timer = Metrics.mcpToolCallTimer()
+                    val toolName = request.params?.get("name")?.jsonPrimitive?.content ?: "unknown"
+                    handleToolCall(request, db, tenantId).also {
+                        val isError = it.error != null ||
+                            (it.result as? JsonObject)?.get("isError")?.jsonPrimitive?.booleanOrNull == true
+                        val status = if (isError) "error" else "success"
+                        Metrics.mcpToolCallCompleted(timer, toolName, status)
+                    }
+                }
                 "ping" -> JsonRpcResponse(id = request.id, result = JsonObject(emptyMap()))
-                else -> jsonRpcError(request.id, -32601, "Method not found: ${request.method}")
+                else -> jsonRpcError(request.id, McpErrorCodes.METHOD_NOT_FOUND, "Method not found: ${request.method}")
             }
 
+            // Add request-id header for traceability
+            call.response.header("X-Request-ID", java.util.UUID.randomUUID().toString())
             call.respond(response)
         } catch (e: Exception) {
             call.respond(
                 JsonRpcResponse(
-                    error = JsonRpcError(-32700, "Parse error: ${e.message}")
+                    error = JsonRpcError(McpErrorCodes.PARSE_ERROR, "Parse error: ${e.message}")
                 )
             )
         }
@@ -103,7 +128,9 @@ fun Route.mcpRoutes(dbManager: DatabaseManager) {
         val tenantId = call.request.header("X-Tenant-ID") ?: "default"
         val db = dbManager.getDatabase(dbName)
 
+        Metrics.mcpSseConnected()
         call.response.cacheControl(CacheControl.NoCache(null))
+        call.response.header("X-Request-ID", java.util.UUID.randomUUID().toString())
         call.respondTextWriter(contentType = ContentType.Text.EventStream) {
             // Send endpoint info
             write("event: endpoint\ndata: /mcp\n\n")
@@ -144,6 +171,7 @@ fun Route.mcpRoutes(dbManager: DatabaseManager) {
                     }
                 } finally {
                     db.unsubscribe(subId, tenantId)
+                    Metrics.mcpSseDisconnected()
                 }
             }
         }
@@ -156,11 +184,14 @@ private fun handleInitialize(request: JsonRpcRequest): JsonRpcResponse {
         "capabilities" to JsonObject(mapOf(
             "tools" to JsonObject(mapOf(
                 "listChanged" to JsonPrimitive(false)
+            )),
+            "resources" to JsonObject(mapOf(
+                "subscribe" to JsonPrimitive(true)
             ))
         )),
         "serverInfo" to JsonObject(mapOf(
             "name" to JsonPrimitive("axiombase"),
-            "version" to JsonPrimitive("1.0.0")
+            "version" to JsonPrimitive("2.0.0")
         ))
     ))
     return JsonRpcResponse(id = request.id, result = result)
@@ -251,6 +282,14 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
             ),
             required = emptyList()
         ))
+        add(toolSchema(
+            name = "predicates",
+            description = "Discover the knowledge base schema. Lists all predicates (relationship types) currently stored, with argument counts and fact counts. Useful for understanding what knowledge is available before querying.",
+            properties = mapOf(
+                "scope" to propString("Optional scope filter")
+            ),
+            required = emptyList()
+        ))
     }
 
     val result = JsonObject(mapOf("tools" to tools))
@@ -262,9 +301,9 @@ private fun handleToolCall(
     db: com.axiombase.AxiomBase,
     tenantId: String
 ): JsonRpcResponse {
-    val params = request.params ?: return jsonRpcError(request.id, -32602, "Missing params")
+    val params = request.params ?: return jsonRpcError(request.id, McpErrorCodes.INVALID_PARAMS, "Missing params")
     val toolName = params["name"]?.jsonPrimitive?.content
-        ?: return jsonRpcError(request.id, -32602, "Missing tool name")
+        ?: return jsonRpcError(request.id, McpErrorCodes.INVALID_PARAMS, "Missing tool name")
     val arguments = params["arguments"]?.jsonObject
         ?: JsonObject(emptyMap())
 
@@ -279,6 +318,7 @@ private fun handleToolCall(
             "context" -> callContextWindow(db, tenantId, arguments)
             "compress" -> callConsolidate(db, tenantId)
             "cleanup" -> callDecay(db, tenantId, arguments)
+            "predicates" -> callPredicates(db, tenantId, arguments)
             // Legacy names (backward compatible)
             "assert_fact" -> callAssertFact(db, tenantId, arguments)
             "assert_rule" -> callAssertRule(db, tenantId, arguments)
@@ -289,7 +329,10 @@ private fun handleToolCall(
             "temporal_query" -> callTemporalQuery(db, tenantId, arguments)
             "consolidate" -> callConsolidate(db, tenantId)
             "decay" -> callDecay(db, tenantId, arguments)
-            else -> return jsonRpcError(request.id, -32602, "Unknown tool: $toolName")
+            else -> return jsonRpcError(
+                request.id, McpErrorCodes.UNKNOWN_TOOL, "Unknown tool: $toolName",
+                JsonObject(mapOf("tool" to JsonPrimitive(toolName)))
+            )
         }
 
         JsonRpcResponse(
@@ -303,20 +346,34 @@ private fun handleToolCall(
                 }
             ))
         )
+    } catch (e: IllegalArgumentException) {
+        // Validation / missing argument errors
+        Metrics.mcpToolCallError(toolName, "validation")
+        toolErrorResponse(request.id, toolName, "VALIDATION_ERROR", e.message ?: "Invalid arguments")
     } catch (e: Exception) {
-        JsonRpcResponse(
-            id = request.id,
-            result = JsonObject(mapOf(
-                "content" to buildJsonArray {
-                    add(JsonObject(mapOf(
-                        "type" to JsonPrimitive("text"),
-                        "text" to JsonPrimitive("Error: ${e.message}")
-                    )))
-                },
-                "isError" to JsonPrimitive(true)
-            ))
-        )
+        Metrics.mcpToolCallError(toolName, "internal")
+        toolErrorResponse(request.id, toolName, "INTERNAL_ERROR", e.message ?: "Unexpected error")
     }
+}
+
+/** Build a structured MCP tool error response with error metadata. */
+private fun toolErrorResponse(id: JsonElement?, toolName: String, errorCode: String, message: String): JsonRpcResponse {
+    return JsonRpcResponse(
+        id = id,
+        result = JsonObject(mapOf(
+            "content" to buildJsonArray {
+                add(JsonObject(mapOf(
+                    "type" to JsonPrimitive("text"),
+                    "text" to JsonPrimitive("Error [$errorCode]: $message")
+                )))
+            },
+            "isError" to JsonPrimitive(true),
+            "_meta" to JsonObject(mapOf(
+                "errorCode" to JsonPrimitive(errorCode),
+                "tool" to JsonPrimitive(toolName)
+            ))
+        ))
+    )
 }
 
 // --- Tool Implementations ---
@@ -486,6 +543,46 @@ private fun callDecay(db: com.axiombase.AxiomBase, tenantId: String, args: JsonO
     return "Decay complete: ${result.expiredCount} expired, ${result.evictedCount} evicted (${result.removedAtoms.size} total removed)"
 }
 
+private fun callPredicates(db: com.axiombase.AxiomBase, tenantId: String, args: JsonObject): String {
+    val scope = args["scope"]?.jsonPrimitive?.contentOrNull
+
+    // Get all facts and group by predicate
+    val allFacts = db.getAllFacts(tenantId, scope).toList()
+    val factsByPredicate = allFacts.groupBy { it.predicate }
+    val predicateMap = mutableMapOf<String, MutableMap<String, Any>>()
+
+    for ((pred, facts) in factsByPredicate) {
+        predicateMap[pred] = mutableMapOf(
+            "count" to facts.size,
+            "arity" to (facts.firstOrNull()?.args?.size ?: 0)
+        )
+    }
+
+    // Also include rules' head predicates
+    val rules = db.getRules(tenantId, scope)
+    for (rule in rules) {
+        val pred = rule.head.predicate
+        if (pred !in predicateMap) {
+            predicateMap[pred] = mutableMapOf(
+                "count" to 0,
+                "arity" to rule.head.args.size
+            )
+        }
+        predicateMap.getOrPut(pred) { mutableMapOf() }["hasRules"] = true
+    }
+
+    if (predicateMap.isEmpty()) return "Knowledge base is empty. No predicates found."
+
+    val sb = StringBuilder("Schema: ${predicateMap.size} predicate(s) found:\n\n")
+    for ((pred, info) in predicateMap.entries.sortedByDescending { it.value["count"] as? Int ?: 0 }) {
+        val count = info["count"] ?: 0
+        val arity = info["arity"] ?: "?"
+        val hasRules = if (info["hasRules"] == true) " [has rules]" else ""
+        sb.append("  $pred/$arity — $count fact(s)$hasRules\n")
+    }
+    return sb.toString()
+}
+
 // --- Helpers ---
 
 private fun formatProof(node: com.axiombase.core.ProofNode, indent: String): String {
@@ -504,8 +601,8 @@ private fun formatProof(node: com.axiombase.core.ProofNode, indent: String): Str
     return sb.toString()
 }
 
-private fun jsonRpcError(id: JsonElement?, code: Int, message: String): JsonRpcResponse {
-    return JsonRpcResponse(id = id, error = JsonRpcError(code, message))
+private fun jsonRpcError(id: JsonElement?, code: Int, message: String, data: JsonElement? = null): JsonRpcResponse {
+    return JsonRpcResponse(id = id, error = JsonRpcError(code, message, data))
 }
 
 // --- Schema builder helpers ---
