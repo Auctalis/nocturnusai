@@ -14,7 +14,7 @@ import CopyAsCode from '@/components/CopyAsCode'
 export default function QueryConsole() {
   const { dbName } = useParams<{ dbName: string }>()
   const navigate = useNavigate()
-  const [mode, setMode] = useState<OperationMode>('infer')
+  const [mode, setMode] = useState<OperationMode>('ask')
   const [scope, setScope] = useState('')
   const [useVisual, setUseVisual] = useState(true)
   const [inputData, setInputData] = useState('')

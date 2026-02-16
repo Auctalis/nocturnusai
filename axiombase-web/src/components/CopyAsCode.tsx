@@ -18,6 +18,16 @@ interface EndpointMapping {
 
 function getEndpointMapping(mode: OperationMode): EndpointMapping {
   switch (mode) {
+    // Simplified API (primary)
+    case 'ask':
+      return { endpoint: '/ask', pythonMethod: 'ask', tsMethod: 'ask' }
+    case 'tell':
+      return { endpoint: '/tell', pythonMethod: 'tell', tsMethod: 'tell' }
+    case 'teach':
+      return { endpoint: '/teach', pythonMethod: 'teach', tsMethod: 'teach' }
+    case 'forget':
+      return { endpoint: '/forget', pythonMethod: 'forget', tsMethod: 'forget' }
+    // Legacy API
     case 'infer':
       return { endpoint: '/infer', pythonMethod: 'infer', tsMethod: 'infer' }
     case 'assert_fact':

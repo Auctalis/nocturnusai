@@ -60,9 +60,9 @@ fun Route.observabilityRoutes(appMicrometerRegistry: PrometheusMeterRegistry, db
 
         val agentCard = mapOf(
             "name" to "AxiomBase",
-            "description" to "Logic-based inference engine and agent context server. Provides deterministic multi-step reasoning, truth maintenance, temporal knowledge management, salience-ranked retrieval, and memory lifecycle management for AI agents.",
+            "description" to "The knowledge and reasoning backend for AI agents. Tell it facts, teach it rules, ask it questions — and get deterministic, provable answers. Manages agent memory with temporal awareness, relevance scoring, and automatic cleanup.",
             "url" to baseUrl,
-            "version" to "1.0.0",
+            "version" to "2.0.0",
             "documentationUrl" to "$baseUrl/userguide",
             "provider" to mapOf(
                 "organization" to "AxiomBase"
@@ -79,46 +79,53 @@ fun Route.observabilityRoutes(appMicrometerRegistry: PrometheusMeterRegistry, db
             "defaultOutputModes" to listOf("application/json", "text/event-stream"),
             "skills" to listOf(
                 mapOf(
-                    "id" to "assert_fact",
-                    "name" to "Assert Fact",
-                    "description" to "Assert a fact into the knowledge base with optional temporal bounds (validFrom, validUntil, ttl).",
-                    "tags" to listOf("knowledge", "facts", "memory"),
-                    "examples" to listOf("Assert that Alice is Bob's parent", "Store user preference with 1-hour TTL")
+                    "id" to "tell",
+                    "name" to "Tell",
+                    "description" to "Tell AxiomBase something it should know. Store facts with optional auto-expiration (TTL).",
+                    "tags" to listOf("knowledge", "store", "facts"),
+                    "examples" to listOf("Tell it that Alice is Bob's parent", "Store a user preference that expires in 1 hour")
                 ),
                 mapOf(
-                    "id" to "assert_rule",
-                    "name" to "Assert Rule",
-                    "description" to "Assert a logical rule (Horn clause) for multi-step deductive inference.",
-                    "tags" to listOf("logic", "rules", "inference"),
+                    "id" to "teach",
+                    "name" to "Teach",
+                    "description" to "Teach AxiomBase a rule so it can derive new knowledge automatically. Define if-then relationships between concepts.",
+                    "tags" to listOf("rules", "reasoning", "logic"),
                     "examples" to listOf("If X is parent of Y and Y is parent of Z, then X is grandparent of Z")
                 ),
                 mapOf(
-                    "id" to "infer",
-                    "name" to "Logical Inference",
-                    "description" to "Run backward-chaining SLD resolution to derive conclusions from facts and rules. Returns provable results with optional proof trees.",
-                    "tags" to listOf("reasoning", "inference", "logic"),
+                    "id" to "ask",
+                    "name" to "Ask",
+                    "description" to "Ask AxiomBase a question and get provable answers derived from stored facts and rules. Optionally see the full reasoning chain.",
+                    "tags" to listOf("query", "reasoning", "answers"),
                     "examples" to listOf("Who are Alice's grandchildren?", "Is Bob authorized to access this resource?")
                 ),
                 mapOf(
-                    "id" to "context_window",
-                    "name" to "Context Window",
-                    "description" to "Get salience-ranked facts for optimal agent context. Returns the most relevant knowledge based on recency, access frequency, and priority.",
-                    "tags" to listOf("memory", "context", "salience"),
+                    "id" to "forget",
+                    "name" to "Forget",
+                    "description" to "Make AxiomBase forget a fact. Any knowledge that was derived from it is also automatically forgotten.",
+                    "tags" to listOf("retract", "cleanup", "knowledge"),
+                    "examples" to listOf("Forget that Alice is Bob's parent")
+                ),
+                mapOf(
+                    "id" to "context",
+                    "name" to "Get Context",
+                    "description" to "Get the most relevant knowledge for the current reasoning step, ranked by recency, frequency, and priority.",
+                    "tags" to listOf("memory", "context", "relevance"),
                     "examples" to listOf("Get the 50 most relevant facts for the current conversation")
                 ),
                 mapOf(
-                    "id" to "temporal_query",
-                    "name" to "Temporal Query",
-                    "description" to "Query facts valid at a specific point in time. Supports historical reasoning.",
-                    "tags" to listOf("temporal", "history", "time"),
+                    "id" to "recall",
+                    "name" to "Recall",
+                    "description" to "Recall what was known at a specific point in time. Time-travel queries for historical reasoning.",
+                    "tags" to listOf("temporal", "history", "recall"),
                     "examples" to listOf("What was the user's location at 3pm yesterday?")
                 ),
                 mapOf(
-                    "id" to "memory_management",
+                    "id" to "memory",
                     "name" to "Memory Management",
-                    "description" to "Run consolidation (compress episodic patterns) and decay (expire stale facts). Essential for long-running agent sessions.",
-                    "tags" to listOf("memory", "lifecycle", "management"),
-                    "examples" to listOf("Consolidate repeated user queries into interest facts", "Evict low-relevance facts")
+                    "description" to "Compress repeated patterns into summaries and clean up expired/irrelevant knowledge. Essential for long-running sessions.",
+                    "tags" to listOf("memory", "compress", "cleanup"),
+                    "examples" to listOf("Compress repeated user queries into interest summaries", "Clean up low-relevance facts")
                 )
             )
         )

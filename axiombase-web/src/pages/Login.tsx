@@ -27,6 +27,9 @@ export default function Login() {
           </div>
           <span className="login-title">AxiomBase</span>
         </div>
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--text-xs)', margin: '0 0 var(--space-md)' }}>
+          Knowledge &amp; reasoning backend for AI agents
+        </p>
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 'var(--space-md)' }}>
             <label className="input-label">

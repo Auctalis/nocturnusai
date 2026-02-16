@@ -191,7 +191,10 @@ fun Application.module() {
     }
 
     routing {
-        // Register Routes
+        // Simplified developer-friendly routes (primary API surface)
+        simplifiedRoutes(dbManager)
+
+        // Full routes (advanced / backward-compatible)
         adminRoutes(dbManager)
         logicRoutes(dbManager)
         transactionRoutes(dbManager)
