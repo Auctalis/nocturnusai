@@ -1,16 +1,25 @@
-import type { Database } from '@/lib/types'
+import { useEffect } from 'react'
+import type { Database, UserRole } from '@/lib/types'
 import { useApp } from '@/context/AppContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Database as DatabaseIcon,
   Plus,
   Trash2,
   Eraser,
-  Users,
   Clock,
   Command,
   LogOut,
   Search,
+  MessageCircle,
+  BookOpen,
+  FlaskConical,
+  Terminal,
+  Heart,
+  Archive,
+  GitFork,
+  TestTube2,
+  Home,
 } from 'lucide-react'
 import Kbd from './Kbd'
 
@@ -27,11 +36,19 @@ interface SidebarProps {
   onCreateTenant: () => void
   onNukeTenant: (id: string) => void
   isMultiTenant: boolean
+  role?: UserRole
+}
+
+interface NavItem {
+  label: string
+  icon: typeof Search
+  path: string
+  roles: UserRole[]
 }
 
 export default function Sidebar({
   databases,
-  currentDb,
+  currentDb: currentDbProp,
   onSelectDb,
   onCreateDb,
   onDeleteDb,
@@ -42,97 +59,238 @@ export default function Sidebar({
   onCreateTenant,
   onNukeTenant,
   isMultiTenant,
+  role = 'admin',
 }: SidebarProps) {
-  const { setCommandPaletteOpen, queryHistory, logout, sidebarCollapsed } = useApp()
+  const { setCommandPaletteOpen, queryHistory, logout, sidebarCollapsed, selectedDb, setSelectedDb } = useApp()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Use selectedDb from AppContext as fallback when no URL-based db is provided (e.g. ops pages)
+  const currentDb = currentDbProp ?? (selectedDb || undefined)
+
+  // Sync URL-based db selection to AppContext so it persists across route changes
+  useEffect(() => {
+    if (currentDbProp) setSelectedDb(currentDbProp)
+  }, [currentDbProp, setSelectedDb])
+
+  const contextNav: NavItem[] = [
+    { label: 'Ask / Tell / Recall', icon: MessageCircle, path: `/db/${currentDb}/context`, roles: ['agent', 'developer', 'admin'] },
+  ]
+
+  const knowledgeNav: NavItem[] = [
+    { label: 'Facts & Rules', icon: BookOpen, path: `/db/${currentDb}/knowledge`, roles: ['developer', 'admin'] },
+    { label: 'Extraction Lab', icon: FlaskConical, path: `/db/${currentDb}/extract`, roles: ['developer', 'admin'] },
+  ]
+
+  const consoleNav: NavItem[] = [
+    { label: 'Query Console', icon: Terminal, path: `/db/${currentDb}/console`, roles: ['admin'] },
+  ]
+
+  const opsNav: NavItem[] = [
+    { label: 'Health & Metrics', icon: Heart, path: '/ops/health', roles: ['admin'] },
+    { label: 'Backups', icon: Archive, path: '/ops/backups', roles: ['admin'] },
+    { label: 'Replication', icon: GitFork, path: '/ops/replication', roles: ['admin'] },
+    { label: 'Test Runner', icon: TestTube2, path: '/ops/tests', roles: ['admin'] },
+  ]
+
+  const isActive = (path: string) => {
+    if (path.startsWith('/db/') && path.endsWith('/console')) {
+      // Also match /db/:name without /console suffix
+      return location.pathname === path || location.pathname === `/db/${currentDb}`
+    }
+    return location.pathname === path
+  }
+
+  const renderNavItems = (items: NavItem[]) =>
+    items
+      .filter((item) => item.roles.includes(role))
+      .map((item) => {
+        const Icon = item.icon
+        return (
+          <div
+            key={item.path}
+            className={`sidebar-item ${isActive(item.path) ? 'active' : ''}`}
+            onClick={() => navigate(item.path)}
+            title={sidebarCollapsed ? item.label : undefined}
+          >
+            <Icon size={14} className="sidebar-item-icon" />
+            {!sidebarCollapsed && <span className="truncate" style={{ flex: 1 }}>{item.label}</span>}
+          </div>
+        )
+      })
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-      {/* Databases */}
+      {/* Database Selector */}
       <div className="sidebar-section">
         <div className="sidebar-label">
-          {!sidebarCollapsed && <span>Databases</span>}
+          {!sidebarCollapsed && <span>Database</span>}
           <button className="btn btn-ghost btn-sm" onClick={onCreateDb} title="New Database">
             <Plus size={14} />
           </button>
         </div>
-        <div className="flex-col gap-1">
-          {databases.map((db) => (
-            <div
-              key={db.name}
-              className={`sidebar-item ${currentDb === db.name ? 'active' : ''}`}
-              onClick={() => onSelectDb(db.name)}
-              title={sidebarCollapsed ? db.name : undefined}
+        {!sidebarCollapsed ? (
+          <div className="flex-col gap-1">
+            <select
+              className="input"
+              value={currentDb ?? ''}
+              onChange={(e) => { setSelectedDb(e.target.value); onSelectDb(e.target.value) }}
+              style={{
+                background: 'var(--gray-80)',
+                color: 'var(--text-inverse)',
+                border: '1px solid var(--gray-70)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '6px 8px',
+                fontSize: 'var(--text-sm)',
+              }}
             >
-              <DatabaseIcon size={14} className="sidebar-item-icon" />
-              {!sidebarCollapsed && <span className="truncate" style={{ flex: 1 }}>{db.name}</span>}
-              {!sidebarCollapsed && db.name !== 'default' && (
-                <div className="sidebar-item-actions">
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onNukeDb(db.name)
-                    }}
-                    title="Clear all data"
-                  >
-                    <Eraser size={12} />
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onDeleteDb(db.name)
-                    }}
-                    title="Delete database"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+              <option value="">Select database...</option>
+              {databases.map((db) => (
+                <option key={db.name} value={db.name}>{db.name}</option>
+              ))}
+            </select>
+            {currentDb && currentDb !== 'default' && (
+              <div className="flex gap-1" style={{ justifyContent: 'flex-end' }}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => onNukeDb(currentDb)}
+                  title="Clear all data"
+                  style={{ color: 'var(--gray-40)' }}
+                >
+                  <Eraser size={12} />
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => onDeleteDb(currentDb)}
+                  title="Delete database"
+                  style={{ color: 'var(--gray-40)' }}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-col gap-1">
+            {databases.slice(0, 3).map((db) => (
+              <div
+                key={db.name}
+                className={`sidebar-item ${currentDb === db.name ? 'active' : ''}`}
+                onClick={() => { setSelectedDb(db.name); onSelectDb(db.name) }}
+                title={db.name}
+              >
+                <DatabaseIcon size={14} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Tenants */}
+      {/* Tenant Selector */}
       {currentDb && isMultiTenant && !sidebarCollapsed && (
-        <div className="sidebar-section">
+        <div className="sidebar-section" style={{ paddingTop: 0 }}>
           <div className="sidebar-label">
-            <span>Tenants</span>
+            <span>Tenant</span>
             <button className="btn btn-ghost btn-sm" onClick={onCreateTenant} title="New Tenant">
               <Plus size={14} />
             </button>
           </div>
-          <div className="flex-col gap-1">
-            {tenants.length > 0 ? (
-              tenants.map((t) => (
-                <div
-                  key={t}
-                  className={`sidebar-item ${currentTenant === t ? 'active' : ''}`}
-                  onClick={() => onSelectTenant(t)}
-                >
-                  <Users size={14} className="sidebar-item-icon" />
-                  <span className="truncate text-sm" style={{ flex: 1 }}>{t}</span>
-                  <div className="sidebar-item-actions">
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onNukeTenant(t)
-                      }}
-                      title="Clear tenant data"
-                    >
-                      <Eraser size={12} />
-                    </button>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-muted text-sm" style={{ padding: 'var(--space-sm)', fontStyle: 'italic' }}>
-                No tenants yet.
+          <select
+            className="input"
+            value={currentTenant}
+            onChange={(e) => onSelectTenant(e.target.value)}
+            style={{
+              background: 'var(--gray-80)',
+              color: 'var(--text-inverse)',
+              border: '1px solid var(--gray-70)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '4px 8px',
+              fontSize: 'var(--text-xs)',
+            }}
+          >
+            {tenants.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          {currentTenant && (
+            <div className="flex gap-1" style={{ justifyContent: 'flex-end', marginTop: 2 }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => onNukeTenant(currentTenant)}
+                title="Clear tenant data"
+                style={{ color: 'var(--gray-40)' }}
+              >
+                <Eraser size={10} />
+                <span style={{ fontSize: 10, marginLeft: 2 }}>Clear</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Dashboard Link */}
+      <div className="sidebar-section" style={{ paddingTop: 0 }}>
+        <div className="flex-col gap-1">
+          <div
+            className={`sidebar-item ${location.pathname === '/' ? 'active' : ''}`}
+            onClick={() => navigate('/')}
+            title={sidebarCollapsed ? 'Dashboard' : undefined}
+          >
+            <Home size={14} className="sidebar-item-icon" />
+            {!sidebarCollapsed && <span className="truncate" style={{ flex: 1 }}>Dashboard</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Sections */}
+      {currentDb && (
+        <>
+          {/* Context Section */}
+          {contextNav.some((n) => n.roles.includes(role)) && (
+            <div className="sidebar-section" style={{ paddingTop: 0 }}>
+              <div className="sidebar-label">
+                {!sidebarCollapsed && <span>Context</span>}
               </div>
-            )}
+              <div className="flex-col gap-1">
+                {renderNavItems(contextNav)}
+              </div>
+            </div>
+          )}
+
+          {/* Knowledge Section */}
+          {knowledgeNav.some((n) => n.roles.includes(role)) && (
+            <div className="sidebar-section" style={{ paddingTop: 0 }}>
+              <div className="sidebar-label">
+                {!sidebarCollapsed && <span>Knowledge</span>}
+              </div>
+              <div className="flex-col gap-1">
+                {renderNavItems(knowledgeNav)}
+              </div>
+            </div>
+          )}
+
+          {/* Console Section */}
+          {consoleNav.some((n) => n.roles.includes(role)) && (
+            <div className="sidebar-section" style={{ paddingTop: 0 }}>
+              <div className="sidebar-label">
+                {!sidebarCollapsed && <span>Console</span>}
+              </div>
+              <div className="flex-col gap-1">
+                {renderNavItems(consoleNav)}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Operations Section */}
+      {opsNav.some((n) => n.roles.includes(role)) && (
+        <div className="sidebar-section" style={{ paddingTop: 0 }}>
+          <div className="sidebar-label">
+            {!sidebarCollapsed && <span>Operations</span>}
+          </div>
+          <div className="flex-col gap-1">
+            {renderNavItems(opsNav)}
           </div>
         </div>
       )}
@@ -144,7 +302,7 @@ export default function Sidebar({
             <span>History</span>
           </div>
           <div className="flex-col gap-1">
-            {queryHistory.slice(0, 8).map((entry) => (
+            {queryHistory.slice(0, 5).map((entry) => (
               <div key={entry.id} className="sidebar-item">
                 <Clock size={12} className="sidebar-item-icon" style={{ flexShrink: 0 }} />
                 <span className="badge badge-info" style={{ marginRight: 'var(--space-xs)' }}>
@@ -177,7 +335,7 @@ export default function Sidebar({
         </div>
         {!sidebarCollapsed && (
           <div style={{ marginTop: 'var(--space-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="text-muted text-xs">v1.0.0</span>
+            <span className="text-muted text-xs">v2.0.0</span>
             <button className="btn btn-ghost btn-sm" onClick={() => { logout(); navigate('/login') }}>
               <LogOut size={12} />
               <span style={{ marginLeft: 4 }}>Sign out</span>

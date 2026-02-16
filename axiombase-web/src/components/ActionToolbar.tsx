@@ -1,4 +1,5 @@
 import type { OperationMode } from '@/lib/types'
+import { useTransaction } from '@/context/TransactionContext'
 import {
   Search,
   CirclePlus,
@@ -10,6 +11,9 @@ import {
   Loader2,
   SlidersHorizontal,
   Code2,
+  Terminal,
+  Sparkles,
+  GitCommitHorizontal,
 } from 'lucide-react'
 import Kbd from './Kbd'
 
@@ -20,6 +24,10 @@ interface ActionToolbarProps {
   isRunning: boolean
   useVisual: boolean
   onToggleVisual: () => void
+  database?: string
+  tenantId?: string
+  scope?: string
+  onScopeChange?: (scope: string) => void
 }
 
 const MODES: { id: OperationMode; label: string; icon: typeof Search }[] = [
@@ -29,6 +37,8 @@ const MODES: { id: OperationMode; label: string; icon: typeof Search }[] = [
   { id: 'retract', label: 'Retract', icon: Minus },
   { id: 'assert_template', label: 'Template', icon: LayoutTemplate },
   { id: 'inspect', label: 'Inspect', icon: Eye },
+  { id: 'execute', label: 'Execute', icon: Terminal },
+  { id: 'synthesize', label: 'Synthesize', icon: Sparkles },
 ]
 
 export default function ActionToolbar({
@@ -38,11 +48,19 @@ export default function ActionToolbar({
   isRunning,
   useVisual,
   onToggleVisual,
+  database,
+  tenantId,
+  scope,
+  onScopeChange,
 }: ActionToolbarProps) {
+  const { txId, begin } = useTransaction()
+
+  const showVisualToggle = !['execute', 'synthesize'].includes(mode)
+
   return (
     <div className="toolbar-row">
       <div className="toolbar-left">
-        <div className="tabs">
+        <div className="tabs" style={{ flexWrap: 'wrap' }}>
           {MODES.map((m) => {
             const Icon = m.icon
             return (
@@ -74,22 +92,52 @@ export default function ActionToolbar({
       </div>
 
       <div className="toolbar-right">
-        <div className="segmented-toggle">
+        {onScopeChange && (
+          <input
+            type="text"
+            className="input"
+            placeholder="scope"
+            value={scope ?? ''}
+            onChange={(e) => onScopeChange(e.target.value)}
+            style={{ width: 120, fontSize: 'var(--text-xs)', padding: '4px 8px' }}
+          />
+        )}
+
+        {/* Transaction button */}
+        {database && !txId && (
           <button
-            className={`segmented-toggle-btn ${useVisual ? 'active' : ''}`}
-            onClick={useVisual ? undefined : onToggleVisual}
+            className="btn btn-secondary btn-sm"
+            onClick={() => void begin(database, tenantId)}
+            title="Begin Transaction"
           >
-            <SlidersHorizontal size={12} style={{ marginRight: 4 }} />
-            Visual
+            <GitCommitHorizontal size={12} />
+            Begin TX
           </button>
-          <button
-            className={`segmented-toggle-btn ${!useVisual ? 'active' : ''}`}
-            onClick={useVisual ? onToggleVisual : undefined}
-          >
-            <Code2 size={12} style={{ marginRight: 4 }} />
-            Code
-          </button>
-        </div>
+        )}
+        {txId && (
+          <span className="badge badge-info" style={{ fontSize: 'var(--text-xs)' }}>
+            TX: {txId.slice(0, 8)}...
+          </span>
+        )}
+
+        {showVisualToggle && (
+          <div className="segmented-toggle">
+            <button
+              className={`segmented-toggle-btn ${useVisual ? 'active' : ''}`}
+              onClick={useVisual ? undefined : onToggleVisual}
+            >
+              <SlidersHorizontal size={12} style={{ marginRight: 4 }} />
+              Visual
+            </button>
+            <button
+              className={`segmented-toggle-btn ${!useVisual ? 'active' : ''}`}
+              onClick={useVisual ? onToggleVisual : undefined}
+            >
+              <Code2 size={12} style={{ marginRight: 4 }} />
+              Code
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

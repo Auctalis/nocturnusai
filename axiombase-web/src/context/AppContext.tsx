@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
-import type { QueryHistoryEntry, OperationMode } from '@/lib/types'
+import type { QueryHistoryEntry, OperationMode, UserRole } from '@/lib/types'
 
 interface AppState {
   apiKey: string
@@ -11,6 +11,12 @@ interface AppState {
   addToHistory: (mode: OperationMode, input: string) => void
   sidebarCollapsed: boolean
   toggleSidebar: () => void
+  role: UserRole
+  setRole: (role: UserRole) => void
+  selectedDb: string
+  setSelectedDb: (db: string) => void
+  selectedTenant: string
+  setSelectedTenant: (tenant: string) => void
 }
 
 const AppContext = createContext<AppState | null>(null)
@@ -20,7 +26,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [queryHistory, setQueryHistory] = useState<QueryHistoryEntry[]>([])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-
+  const [role, setRole] = useState<UserRole>('admin')
+  const [selectedDb, setSelectedDb] = useState('')
+  const [selectedTenant, setSelectedTenant] = useState('')
   const setApiKey = useCallback((key: string) => {
     localStorage.setItem('api_key', key)
     setApiKeyState(key)
@@ -29,6 +37,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem('api_key')
     setApiKeyState('')
+    setRole('admin')
+    setSelectedDb('')
+    setSelectedTenant('')
   }, [])
 
   const addToHistory = useCallback((mode: OperationMode, input: string) => {
@@ -59,6 +70,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addToHistory,
         sidebarCollapsed,
         toggleSidebar,
+        role,
+        setRole,
+        selectedDb,
+        setSelectedDb,
+        selectedTenant,
+        setSelectedTenant,
       }}
     >
       {children}
