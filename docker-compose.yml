@@ -30,23 +30,6 @@ services:
       retries: 5
       start_period: 10s
 
-  logic-web:
-    image: logic-web:latest
-    build:
-      context: ./axiombase-web
-      dockerfile: Dockerfile
-      args:
-        - VITE_API_URL=http://localhost:9300
-    container_name: logic-web
-    restart: unless-stopped
-    ports:
-      - "9400:80"
-    depends_on:
-      logic-server:
-        condition: service_healthy
-    networks:
-      - logic-net
-
 networks:
   logic-net:
     driver: bridge

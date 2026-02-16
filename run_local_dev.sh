@@ -2,7 +2,6 @@
 
 # Configuration
 API_PORT=9300
-WEB_PORT=9350
 
 # Colors
 GREEN='\033[0;32m'
@@ -29,7 +28,7 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
-echo -e "${GREEN}=== Starting Local Development Environment ===${NC}"
+echo -e "${GREEN}=== Starting AxiomBase ===${NC}"
 
 # Check for Java
 if ! command -v java &> /dev/null; then
@@ -37,15 +36,8 @@ if ! command -v java &> /dev/null; then
     exit 1
 fi
 
-# Check for Node
-if ! command -v npm &> /dev/null; then
-    echo -e "${RED}npm is not installed.${NC}"
-    exit 1
-fi
-
 # Kill any conflicting processes
 kill_port $API_PORT
-kill_port $WEB_PORT
 
 # Load .env if present
 if [ -f .env ]; then
@@ -56,21 +48,12 @@ if [ -f .env ]; then
 fi
 
 # Start Server
-echo -e "${GREEN}Starting Gradle Server...${NC}"
+echo -e "${GREEN}Starting AxiomBase Server on port $API_PORT...${NC}"
 ./gradlew :axiombase-server:run --console=plain &
 SERVER_PID=$!
 
-# Start Web
-echo -e "${GREEN}Starting Web Client...${NC}"
-cd axiombase-web
-npm install # Ensure dependencies are installed
-npm run dev -- --port $WEB_PORT &
-WEB_PID=$!
-cd ..
-
 echo -e "${GREEN}Server running with PID $SERVER_PID${NC}"
-echo -e "${GREEN}Web running with PID $WEB_PID${NC}"
-echo -e "${GREEN}Access Web at http://localhost:$WEB_PORT${NC}"
-echo -e "${GREEN}Access Server at http://localhost:$API_PORT${NC}"
+echo -e "${GREEN}API at http://localhost:$API_PORT${NC}"
+echo -e "${GREEN}CLI: ./gradlew :axiombase-cli:run --args='--server http://localhost:$API_PORT --db default'${NC}"
 
 wait
