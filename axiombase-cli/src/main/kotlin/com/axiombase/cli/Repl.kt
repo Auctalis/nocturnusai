@@ -38,6 +38,9 @@ class Repl(private val client: Client) {
                 "health"          -> doHealth()
                 "status"          -> doStatus()
                 "setup"           -> doSetup()
+                "login"           -> doLogin()
+                "whoami"          -> doWhoAmI()
+                "keys"            -> doKeys(rest)
                 else              -> System.err.println("Unknown command: $cmd")
             }
         } catch (e: Exception) {
@@ -75,6 +78,9 @@ class Repl(private val client: Client) {
                     "health"          -> doHealth()
                     "status"          -> doStatus()
                     "setup"           -> doSetup()
+                    "login"           -> doLogin()
+                    "whoami"          -> doWhoAmI()
+                    "keys"            -> doKeys(rest)
                     "help", "h"       -> printHelp()
                     "exit", "quit", "q" -> { client.close(); return }
                     else              -> {
@@ -495,6 +501,25 @@ class Repl(private val client: Client) {
             println("  Databases:  ${dbs.size}")
         } catch (_: Exception) {}
 
+        // Auth status
+        try {
+            val authResp = client.authStatus()
+            val auth = json.parseToJsonElement(authResp).jsonObject
+            val mode = auth["mode"]?.jsonPrimitive?.contentOrNull ?: "unknown"
+            val keyCount = auth["keyCount"]?.jsonPrimitive?.intOrNull ?: 0
+            val modeColor = when (mode) {
+                "rbac" -> GREEN
+                "legacy" -> CYAN
+                else -> YELLOW
+            }
+            val modeLabel = when (mode) {
+                "rbac" -> "RBAC ($keyCount keys)"
+                "legacy" -> "legacy (single key)"
+                else -> "disabled (dev mode)"
+            }
+            println("  Auth:       ${modeColor}$modeLabel${RESET}")
+        } catch (_: Exception) {}
+
         // Facts/rules in current db
         try {
             val facts = tryParseArray(client.listFacts())
@@ -608,6 +633,207 @@ class Repl(private val client: Client) {
             }
         }
         println()
+    }
+
+    // ── auth commands ──
+
+    /** Bootstrap or login: create first admin key or show auth status */
+    private fun doLogin() = runBlocking {
+        println()
+        println("${BOLD}AxiomBase Auth${RESET}")
+
+        // Check current auth status
+        try {
+            val statusResp = client.authStatus()
+            val obj = json.parseToJsonElement(statusResp).jsonObject
+            val mode = obj["mode"]?.jsonPrimitive?.contentOrNull ?: "unknown"
+            val bootstrapRequired = obj["bootstrapRequired"]?.jsonPrimitive?.booleanOrNull ?: false
+            val keyCount = obj["keyCount"]?.jsonPrimitive?.intOrNull ?: 0
+
+            println("  Mode: $CYAN$mode$RESET")
+
+            when {
+                mode == "disabled" -> {
+                    println("${YELLOW}Auth is disabled (dev mode).${RESET}")
+                    println("${DIM}To enable: set AUTH_ENABLED=true in .env and restart.${RESET}")
+                }
+                mode == "legacy" -> {
+                    println("${YELLOW}Legacy single-key auth.${RESET}")
+                    println("${DIM}To upgrade: set AUTH_ENABLED=true in .env and restart.${RESET}")
+                }
+                bootstrapRequired -> {
+                    println("${GREEN}RBAC auth enabled — no keys yet.${RESET}")
+                    println("${DIM}Let's create your first admin key.${RESET}")
+                    println()
+
+                    print("Admin username [admin]: ")
+                    val user = readlnOrNull()?.trim()?.ifBlank { "admin" } ?: "admin"
+                    print("Admin password: ")
+                    val pass = readlnOrNull()?.trim() ?: return@runBlocking
+                    if (pass.isBlank()) { println("${RED}Password required.${RESET}"); return@runBlocking }
+                    print("Key name [admin]: ")
+                    val keyName = readlnOrNull()?.trim()?.ifBlank { "admin" } ?: "admin"
+
+                    val resp = client.authBootstrap(user, pass, keyName)
+                    val respObj = json.parseToJsonElement(resp).jsonObject
+
+                    val errCode = respObj["code"]?.jsonPrimitive?.contentOrNull
+                    if (errCode != null) {
+                        val errMsg = respObj["message"]?.jsonPrimitive?.contentOrNull ?: ""
+                        println("${RED}$errCode: $errMsg${RESET}")
+                        return@runBlocking
+                    }
+
+                    val key = respObj["key"]?.jsonPrimitive?.contentOrNull
+                    val prefix = respObj["prefix"]?.jsonPrimitive?.contentOrNull
+                    val id = respObj["id"]?.jsonPrimitive?.contentOrNull
+
+                    println()
+                    println("${GREEN}Admin key created!${RESET}")
+                    println()
+                    println("  ${BOLD}API Key:${RESET}  $key")
+                    println("  ${DIM}Prefix:   $prefix${RESET}")
+                    println("  ${DIM}ID:       $id${RESET}")
+                    println()
+                    println("${YELLOW}Save this key — it won't be shown again.${RESET}")
+                    println("${DIM}Use it with: --api-key $key${RESET}")
+                    println("${DIM}Or set in .env: API_KEY=$key${RESET}")
+                }
+                else -> {
+                    println("${GREEN}RBAC auth active — $keyCount key(s) configured.${RESET}")
+                    println("${DIM}Use 'whoami' to check your current identity.${RESET}")
+                    println("${DIM}Use 'keys list' to manage keys.${RESET}")
+                }
+            }
+        } catch (e: Exception) {
+            // Server may not support auth routes yet
+            println("${RED}Error: ${e.message}${RESET}")
+            println("${DIM}Is the server running and up to date?${RESET}")
+        }
+        println()
+    }
+
+    /** Show current key identity and permissions */
+    private fun doWhoAmI() = runBlocking {
+        val resp = client.authWhoAmI()
+        try {
+            val obj = json.parseToJsonElement(resp).jsonObject
+            val errCode = obj["code"]?.jsonPrimitive?.contentOrNull
+            if (errCode != null) {
+                println("${RED}${obj["message"]?.jsonPrimitive?.contentOrNull ?: errCode}${RESET}")
+                return@runBlocking
+            }
+
+            val mode = obj["mode"]?.jsonPrimitive?.contentOrNull ?: "?"
+            val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: "?"
+            val role = obj["role"]?.jsonPrimitive?.contentOrNull ?: "?"
+            val perms = obj["permissions"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+            val dbs = obj["databases"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+            val tenants = obj["tenants"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+
+            val roleColor = when (role) { "admin" -> GREEN; "writer" -> CYAN; else -> DIM }
+            println("  Mode:     $mode")
+            println("  Name:     $BOLD$name$RESET")
+            println("  Role:     $roleColor$role$RESET")
+            println("  DBs:      ${if (dbs.isEmpty()) "${DIM}all${RESET}" else dbs.joinToString(", ")}")
+            println("  Tenants:  ${if (tenants.isEmpty()) "${DIM}all${RESET}" else tenants.joinToString(", ")}")
+            println("  Perms:    ${DIM}${perms.joinToString(", ")}${RESET}")
+        } catch (_: Exception) {
+            println(resp)
+        }
+    }
+
+    /** Key management: keys list, keys create <name> <role>, keys revoke <id> */
+    private fun doKeys(args: String) = runBlocking {
+        val (subcmd, rest) = splitFirst(args.ifBlank { "list" })
+
+        when (subcmd.lowercase()) {
+            "list", "ls" -> {
+                val resp = client.authListKeys()
+                try {
+                    val arr = json.parseToJsonElement(resp).jsonArray
+                    if (arr.isEmpty()) {
+                        println("${DIM}No keys.${RESET}")
+                        return@runBlocking
+                    }
+                    println("${BOLD}API Keys:${RESET}")
+                    for (k in arr) {
+                        val obj = k.jsonObject
+                        val id = obj["id"]?.jsonPrimitive?.contentOrNull ?: "?"
+                        val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: "?"
+                        val prefix = obj["prefix"]?.jsonPrimitive?.contentOrNull ?: "?"
+                        val role = obj["role"]?.jsonPrimitive?.contentOrNull ?: "?"
+                        val enabled = obj["enabled"]?.jsonPrimitive?.booleanOrNull ?: true
+                        val dbs = obj["databases"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+
+                        val roleColor = when (role) { "admin" -> GREEN; "writer" -> CYAN; else -> DIM }
+                        val statusStr = if (enabled) "" else " ${RED}[disabled]${RESET}"
+                        val dbStr = if (dbs.isEmpty()) "" else " ${DIM}dbs=${dbs.joinToString(",")}${RESET}"
+                        println("  $prefix...  $roleColor$role$RESET  $name$statusStr$dbStr  ${DIM}$id${RESET}")
+                    }
+                } catch (_: Exception) {
+                    println(resp)
+                }
+            }
+
+            "create", "new" -> {
+                val parts = rest.split(" ", limit = 2)
+                val name = parts.getOrNull(0)?.takeIf { it.isNotBlank() }
+                val role = parts.getOrNull(1)?.takeIf { it.isNotBlank() } ?: "writer"
+
+                if (name == null) {
+                    println("Usage: keys create <name> [role]")
+                    println("  Roles: admin, writer (default), reader")
+                    return@runBlocking
+                }
+
+                val resp = client.authCreateKey(name, role)
+                try {
+                    val obj = json.parseToJsonElement(resp).jsonObject
+                    val errCode = obj["code"]?.jsonPrimitive?.contentOrNull
+                    if (errCode != null) {
+                        println("${RED}${obj["message"]?.jsonPrimitive?.contentOrNull ?: errCode}${RESET}")
+                        return@runBlocking
+                    }
+
+                    val key = obj["key"]?.jsonPrimitive?.contentOrNull
+                    val prefix = obj["prefix"]?.jsonPrimitive?.contentOrNull
+                    println("${GREEN}Key created:${RESET}")
+                    println("  Key:    $key")
+                    println("  Prefix: $prefix")
+                    println("  Role:   $role")
+                    println("${YELLOW}Save this key — it won't be shown again.${RESET}")
+                } catch (_: Exception) {
+                    println(resp)
+                }
+            }
+
+            "revoke", "delete", "rm" -> {
+                if (rest.isBlank()) {
+                    println("Usage: keys revoke <key-id>")
+                    return@runBlocking
+                }
+                val resp = client.authRevokeKey(rest.trim())
+                try {
+                    val obj = json.parseToJsonElement(resp).jsonObject
+                    val errCode = obj["code"]?.jsonPrimitive?.contentOrNull
+                    if (errCode != null) {
+                        println("${RED}${obj["message"]?.jsonPrimitive?.contentOrNull ?: errCode}${RESET}")
+                    } else {
+                        println("${GREEN}Key revoked.${RESET}")
+                    }
+                } catch (_: Exception) {
+                    println(resp)
+                }
+            }
+
+            else -> {
+                println("Usage: keys <list|create|revoke>")
+                println("  keys list              — show all keys")
+                println("  keys create <name> [role] — create a new key")
+                println("  keys revoke <id>       — revoke a key")
+            }
+        }
     }
 
     // ── formatting ──
@@ -765,6 +991,13 @@ ${BOLD}Admin:$RESET
   health                            Server health check
   status                            Full server status (health, LLM, KB)
   setup                             Interactive LLM provider configuration
+
+${BOLD}Auth:$RESET
+  login                             Bootstrap auth or check auth status
+  whoami                            Show current key identity & permissions
+  keys list                         List all API keys
+  keys create <name> [role]         Create a new key (admin/writer/reader)
+  keys revoke <id>                  Revoke a key
 
 ${BOLD}Shortcuts:$RESET
   ?  = ask    +  = tell    ++ = teach    -  = forget    ls = inspect

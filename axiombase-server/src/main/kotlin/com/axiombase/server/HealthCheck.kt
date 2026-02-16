@@ -42,6 +42,13 @@ object HealthChecker {
             CheckResult("warn", "No LLM provider — NL features unavailable")
         }
 
+        // 7. Auth status
+        checks["auth"] = when (ServerConfig.authMode) {
+            com.axiombase.server.auth.AuthMode.RBAC -> CheckResult("pass", "RBAC auth enabled")
+            com.axiombase.server.auth.AuthMode.LEGACY -> CheckResult("pass", "Legacy API key auth enabled")
+            com.axiombase.server.auth.AuthMode.DISABLED -> CheckResult("warn", "Auth disabled (dev mode)")
+        }
+
         val hasFailure = checks.values.any { it.status == "fail" }
         val hasWarning = checks.values.any { it.status == "warn" }
         val overallStatus = when {

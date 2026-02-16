@@ -1,6 +1,9 @@
 package com.axiombase.server
 
 import com.axiombase.TenantNotFoundException
+import com.axiombase.server.auth.ApiKeyManager
+import com.axiombase.server.auth.AuthInterceptor
+import com.axiombase.server.auth.AuthMode
 import com.axiombase.server.llm.LlmConfig
 import com.axiombase.server.llm.LlmFactExtractor
 import com.axiombase.server.llm.LlmRuleExtractor
@@ -176,25 +179,19 @@ fun Application.module() {
         }
     }
 
-    // Authentication Middleware
-    intercept(ApplicationCallPipeline.Call) {
-        val apiKey = ServerConfig.apiKey
-        if (apiKey != null) {
-            val keyContext = call.request.header("X-API-Key")
-            val isPublic = call.request.uri == "/health" ||
-                call.request.uri == "/health/live" ||
-                call.request.uri == "/health/ready" ||
-                call.request.uri == "/metrics" ||
-                call.request.uri == "/llm.txt" ||
-                call.request.uri == "/userguide" ||
-                call.request.uri == "/.well-known/agent.json"
-
-            if (!isPublic && keyContext != apiKey) {
-                call.respondText("Unauthorized", status = HttpStatusCode.Unauthorized)
-                return@intercept finish()
-            }
+    // ── Authentication & Authorization ──────────────────────────────────
+    val keyManager = if (ServerConfig.authMode == AuthMode.RBAC) {
+        val km = ApiKeyManager(ServerConfig.storageDir)
+        environment.log.info("Auth mode: RBAC (${km.listKeys().size} keys loaded)")
+        if (!km.hasKeys()) {
+            environment.log.warn("No API keys found — POST /auth/bootstrap to create the first admin key")
         }
+        km
+    } else {
+        environment.log.info("Auth mode: ${ServerConfig.authMode.name}")
+        null
     }
+    AuthInterceptor.install(this, keyManager)
 
     // Graceful shutdown: close all databases when application stops
     environment.monitor.subscribe(ApplicationStopping) {
@@ -204,6 +201,9 @@ fun Application.module() {
     }
 
     routing {
+        // Auth routes (bootstrap, key management, whoami)
+        authRoutes(keyManager)
+
         // Simplified developer-friendly routes (primary API surface)
         simplifiedRoutes(dbManager)
 
