@@ -53,7 +53,8 @@ object LlmConfig {
             }
             "ollama" -> {
                 val m = model ?: "llama3.2"
-                val url = baseUrl ?: "http://localhost:11434/v1"
+                // Default varies: Docker uses service name "ollama", local uses localhost
+                val url = baseUrl ?: detectOllamaUrl()
                 logger.info("Using Ollama provider with model: $m, baseUrl: $url")
                 OpenAiCompatibleProvider(m, null, url)
             }
@@ -85,6 +86,24 @@ object LlmConfig {
             !googleApiKey.isNullOrBlank() -> "google"
             !baseUrl.isNullOrBlank() -> "custom"
             else -> null
+        }
+    }
+
+    /**
+     * Detect Ollama URL based on runtime environment.
+     * In Docker (when /proc/1/cgroup contains "docker" or /.dockerenv exists),
+     * use the compose service name "ollama". Otherwise use localhost.
+     */
+    private fun detectOllamaUrl(): String {
+        val inDocker = try {
+            java.io.File("/.dockerenv").exists() ||
+                java.io.File("/proc/1/cgroup").readText().contains("docker")
+        } catch (_: Exception) { false }
+
+        return if (inDocker) {
+            "http://ollama:11434/v1"
+        } else {
+            "http://localhost:11434/v1"
         }
     }
 }

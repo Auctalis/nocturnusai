@@ -39,7 +39,11 @@ fi
 # Kill any conflicting processes
 kill_port $API_PORT
 
-# Load .env if present
+# Load .env (create from example if missing)
+if [ ! -f .env ] && [ -f .env.example ]; then
+    cp .env.example .env
+    echo -e "${YELLOW}Created .env from .env.example — edit it to configure LLM provider.${NC}"
+fi
 if [ -f .env ]; then
     set -a
     source .env
