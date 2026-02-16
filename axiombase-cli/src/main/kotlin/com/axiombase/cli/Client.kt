@@ -15,6 +15,8 @@ class Client(
     private val apiKey: String?,
     var tenantId: String? = null,
 ) {
+    val server: String get() = serverUrl
+
     private val http = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true; prettyPrint = true })

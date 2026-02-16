@@ -36,6 +36,8 @@ class Repl(private val client: Client) {
                 "export", "dump"  -> doExport(rest)
                 "dbs"             -> doDbs()
                 "health"          -> doHealth()
+                "status"          -> doStatus()
+                "setup"           -> doSetup()
                 else              -> System.err.println("Unknown command: $cmd")
             }
         } catch (e: Exception) {
@@ -71,6 +73,8 @@ class Repl(private val client: Client) {
                     "use"             -> doUse(rest)
                     "dbs"             -> doDbs()
                     "health"          -> doHealth()
+                    "status"          -> doStatus()
+                    "setup"           -> doSetup()
                     "help", "h"       -> printHelp()
                     "exit", "quit", "q" -> { client.close(); return }
                     else              -> {
@@ -417,7 +421,193 @@ class Repl(private val client: Client) {
 
     private fun doHealth() = runBlocking {
         val resp = client.health()
-        println(resp)
+        try {
+            val obj = json.parseToJsonElement(resp).jsonObject
+            val status = obj["status"]?.jsonPrimitive?.contentOrNull ?: "unknown"
+            val statusColor = when (status) {
+                "healthy" -> GREEN
+                "degraded" -> YELLOW
+                else -> RED
+            }
+            println("${statusColor}$status${RESET}")
+            val checks = obj["checks"]?.jsonObject
+            if (checks != null) {
+                for ((name, check) in checks) {
+                    val checkStatus = check.jsonObject["status"]?.jsonPrimitive?.contentOrNull ?: "?"
+                    val checkColor = when (checkStatus) {
+                        "pass" -> GREEN
+                        "warn" -> YELLOW
+                        else -> RED
+                    }
+                    val detail = check.jsonObject["message"]?.jsonPrimitive?.contentOrNull ?: ""
+                    println("  ${checkColor}$checkStatus${RESET}  $name  ${DIM}$detail${RESET}")
+                }
+            }
+        } catch (_: Exception) {
+            println(resp)
+        }
+    }
+
+    /** Show server status: health, LLM provider, databases, features */
+    private fun doStatus() = runBlocking {
+        println("${BOLD}AxiomBase Status${RESET}")
+        println("${DIM}Server: ${client.server}${RESET}")
+        println("${DIM}Database: ${client.database}${RESET}")
+        println()
+
+        // Health
+        try {
+            val healthResp = client.health()
+            val health = json.parseToJsonElement(healthResp).jsonObject
+            val status = health["status"]?.jsonPrimitive?.contentOrNull ?: "unknown"
+            val statusColor = when (status) { "healthy" -> GREEN; "degraded" -> YELLOW; else -> RED }
+            println("  Health:     ${statusColor}$status${RESET}")
+        } catch (e: Exception) {
+            println("  Health:     ${RED}unreachable (${e.message})${RESET}")
+        }
+
+        // LLM — check via extract endpoint probe
+        try {
+            val extractResp = client.extract("test", assert = false, rules = false)
+            val extractObj = json.parseToJsonElement(extractResp).jsonObject
+            val provider = extractObj["provider"]?.jsonPrimitive?.contentOrNull
+            val model = extractObj["model"]?.jsonPrimitive?.contentOrNull
+            val errCode = extractObj["code"]?.jsonPrimitive?.contentOrNull
+            if (errCode != null) {
+                val msg = extractObj["message"]?.jsonPrimitive?.contentOrNull ?: ""
+                when (errCode) {
+                    "LLM_NOT_CONFIGURED" -> println("  LLM:        ${YELLOW}not configured${RESET}  ${DIM}(set API key in .env)${RESET}")
+                    "EXTRACTION_DISABLED" -> println("  Extraction: ${YELLOW}disabled${RESET}  ${DIM}(set EXTRACTION_ENABLED=true)${RESET}")
+                    else -> println("  LLM:        ${YELLOW}$errCode${RESET}  ${DIM}$msg${RESET}")
+                }
+            } else if (provider != null) {
+                println("  LLM:        ${GREEN}$provider/$model${RESET}")
+                println("  Extraction: ${GREEN}enabled${RESET}")
+            }
+        } catch (_: Exception) {
+            println("  LLM:        ${DIM}unknown${RESET}")
+        }
+
+        // Databases
+        try {
+            val dbsResp = client.listDatabases()
+            val dbs = tryParseArray(dbsResp)
+            println("  Databases:  ${dbs.size}")
+        } catch (_: Exception) {}
+
+        // Facts/rules in current db
+        try {
+            val facts = tryParseArray(client.listFacts())
+            val rules = tryParseArray(client.listRules())
+            println("  Knowledge:  ${facts.size} facts, ${rules.size} rules (in ${client.database})")
+        } catch (_: Exception) {}
+
+        println()
+    }
+
+    /** Interactive setup — configure LLM keys and server options */
+    private fun doSetup() {
+        println()
+        println("${BOLD}AxiomBase Setup${RESET}")
+        println("${DIM}Configure your LLM provider for natural language features.${RESET}")
+        println()
+        println("  1) Ollama (local, free, private)")
+        println("  2) Anthropic Claude")
+        println("  3) OpenAI GPT")
+        println("  4) Google Gemini")
+        println("  5) Custom (any OpenAI-compatible endpoint)")
+        println("  q) Cancel")
+        println()
+        print("Choice [1]: ")
+
+        val choice = readlnOrNull()?.trim() ?: return
+        if (choice == "q") return
+
+        val envLines = mutableListOf<String>()
+
+        when (choice.ifBlank { "1" }) {
+            "1" -> {
+                println()
+                println("${GREEN}Ollama selected.${RESET}")
+                println("${DIM}Make sure Ollama is running: ollama serve${RESET}")
+                println("${DIM}Or start with Docker: make up-ollama${RESET}")
+                print("Model [llama3.2]: ")
+                val model = readlnOrNull()?.trim()?.ifBlank { "llama3.2" } ?: "llama3.2"
+                print("Ollama URL [http://localhost:11434/v1]: ")
+                val url = readlnOrNull()?.trim()?.ifBlank { "http://localhost:11434/v1" } ?: "http://localhost:11434/v1"
+                envLines.add("LLM_PROVIDER=ollama")
+                envLines.add("LLM_MODEL=$model")
+                envLines.add("LLM_BASE_URL=$url")
+            }
+            "2" -> {
+                print("Anthropic API key (sk-ant-...): ")
+                val key = readlnOrNull()?.trim() ?: return
+                if (key.isBlank()) { println("${RED}No key entered.${RESET}"); return }
+                envLines.add("ANTHROPIC_API_KEY=$key")
+            }
+            "3" -> {
+                print("OpenAI API key (sk-...): ")
+                val key = readlnOrNull()?.trim() ?: return
+                if (key.isBlank()) { println("${RED}No key entered.${RESET}"); return }
+                envLines.add("OPENAI_API_KEY=$key")
+            }
+            "4" -> {
+                print("Google API key (AIza...): ")
+                val key = readlnOrNull()?.trim() ?: return
+                if (key.isBlank()) { println("${RED}No key entered.${RESET}"); return }
+                envLines.add("GOOGLE_API_KEY=$key")
+            }
+            "5" -> {
+                print("Base URL (e.g. https://api.groq.com/openai/v1): ")
+                val url = readlnOrNull()?.trim() ?: return
+                print("Model name: ")
+                val model = readlnOrNull()?.trim() ?: return
+                print("API key (leave blank if none): ")
+                val key = readlnOrNull()?.trim() ?: ""
+                envLines.add("LLM_PROVIDER=custom")
+                envLines.add("LLM_BASE_URL=$url")
+                envLines.add("LLM_MODEL=$model")
+                if (key.isNotBlank()) envLines.add("LLM_API_KEY=$key")
+            }
+            else -> { println("${RED}Invalid choice.${RESET}"); return }
+        }
+
+        envLines.add("EXTRACTION_ENABLED=true")
+
+        println()
+        println("${BOLD}Configuration:${RESET}")
+        for (line in envLines) {
+            val parts = line.split("=", limit = 2)
+            val value = if (parts[0].contains("KEY") && parts[1].length > 8) {
+                parts[1].take(6) + "..." + parts[1].takeLast(4)
+            } else parts[1]
+            println("  ${CYAN}${parts[0]}${RESET} = $value")
+        }
+        println()
+        println("${DIM}Add these to your server's .env file, then restart the server.${RESET}")
+        println("${DIM}If using Docker: edit .env then run 'docker compose restart'${RESET}")
+
+        // Try to write to .env if it exists in current directory or parent
+        val envFile = listOf(File(".env"), File("../.env"), File(System.getProperty("user.dir", ".") + "/.env"))
+            .firstOrNull { it.exists() }
+
+        if (envFile != null) {
+            println()
+            print("Write to ${envFile.absolutePath}? [y/N]: ")
+            val confirm = readlnOrNull()?.trim()?.lowercase()
+            if (confirm == "y" || confirm == "yes") {
+                val existing = envFile.readText()
+                val newContent = StringBuilder(existing)
+                if (!existing.endsWith("\n")) newContent.append("\n")
+                newContent.append("\n# Added by 'setup' command\n")
+                for (line in envLines) {
+                    newContent.appendLine(line)
+                }
+                envFile.writeText(newContent.toString())
+                println("${GREEN}Written!${RESET} Restart the server for changes to take effect.")
+            }
+        }
+        println()
     }
 
     // ── formatting ──
@@ -525,8 +715,25 @@ class Repl(private val client: Client) {
     private fun printBanner() {
         println()
         println("${BOLD}AxiomBase CLI$RESET — logic server for agentic AI")
-        println("${DIM}Connected to ${client.database} @ server${RESET}")
-        println("${DIM}Type 'help' for commands, 'exit' to quit.${RESET}")
+        println("${DIM}Server:   ${client.server}${RESET}")
+        println("${DIM}Database: ${client.database}${RESET}")
+
+        // Quick connectivity check
+        try {
+            val resp = runBlocking { client.health() }
+            val obj = json.parseToJsonElement(resp).jsonObject
+            val status = obj["status"]?.jsonPrimitive?.contentOrNull ?: "unknown"
+            when (status) {
+                "healthy" -> println("${GREEN}Connected.${RESET}")
+                "degraded" -> println("${YELLOW}Connected (degraded).${RESET}")
+                else -> println("${RED}Connected ($status).${RESET}")
+            }
+        } catch (e: Exception) {
+            println("${RED}Cannot reach server: ${e.message}${RESET}")
+            println("${DIM}Is the server running? Start with: make up${RESET}")
+        }
+
+        println("${DIM}Type 'help' for commands, 'status' for details, 'setup' to configure LLM.${RESET}")
         println()
     }
 
@@ -556,6 +763,8 @@ ${BOLD}Admin:$RESET
   use <database>                    Switch database
   dbs                               List databases
   health                            Server health check
+  status                            Full server status (health, LLM, KB)
+  setup                             Interactive LLM provider configuration
 
 ${BOLD}Shortcuts:$RESET
   ?  = ask    +  = tell    ++ = teach    -  = forget    ls = inspect
