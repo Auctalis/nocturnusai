@@ -1,0 +1,31 @@
+{
+  "name": "@axiombase/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for AxiomBase — a logic-based inference engine and knowledge database",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "tsc"
+  },
+  "keywords": [
+    "axiombase",
+    "logic",
+    "inference",
+    "knowledge-base",
+    "reasoning",
+    "mcp"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

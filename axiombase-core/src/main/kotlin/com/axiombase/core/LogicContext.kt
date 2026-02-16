@@ -4,6 +4,7 @@ import com.axiombase.inference.ReteEngine
 import com.axiombase.inference.BackwardChainer
 import com.axiombase.logic.ConsistencyGuard
 import com.axiombase.logic.ProvenanceTracker
+import com.axiombase.memory.MemoryManager
 import com.axiombase.storage.Hexastore
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -14,11 +15,14 @@ import java.util.concurrent.CopyOnWriteArrayList
 class LogicContext {
     val store = Hexastore() // Positive Store
     val negativeStore = Hexastore() // Negative Store (Explicit NOT)
-    
+
     val tracker = ProvenanceTracker()
     val rules = CopyOnWriteArrayList<Rule>()
-    
+
     val rete = ReteEngine(store, tracker)
     val backwardChainer = BackwardChainer(store, rules)
     val consistencyGuard = ConsistencyGuard(store)
+
+    /** Agent memory manager for temporal queries, salience, consolidation, decay. */
+    val memoryManager = MemoryManager()
 }

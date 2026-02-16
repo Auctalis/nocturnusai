@@ -5,7 +5,8 @@ import kotlinx.serialization.json.JsonElement
 
 enum class SourceType {
     USER_INPUT,
-    INFERRED
+    INFERRED,
+    CONSOLIDATED
 }
 
 @Serializable
@@ -15,8 +16,28 @@ data class Atom(
     val truthVal: Boolean = true,
     val source: SourceType = SourceType.USER_INPUT,
     val scope: String? = null,
-    val metadata: Map<String, JsonElement> = emptyMap()
+    val metadata: Map<String, JsonElement> = emptyMap(),
+    // Temporal fields — excluded from equals/hashCode (like metadata)
+    val createdAt: Long? = null,
+    val validFrom: Long? = null,
+    val validUntil: Long? = null,
+    val ttl: Long? = null
 ) {
+    /** Returns true if this atom is temporally valid at the given timestamp. */
+    fun isValidAt(timestamp: Long): Boolean {
+        if (validFrom != null && timestamp < validFrom) return false
+        if (validUntil != null && timestamp >= validUntil) return false
+        if (ttl != null && createdAt != null && timestamp >= createdAt + ttl) return false
+        return true
+    }
+
+    /** Returns true if this atom has expired (validUntil passed or TTL elapsed). */
+    fun isExpired(now: Long = System.currentTimeMillis()): Boolean {
+        if (validUntil != null && now >= validUntil) return true
+        if (ttl != null && createdAt != null && now >= createdAt + ttl) return true
+        return false
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Atom) return false

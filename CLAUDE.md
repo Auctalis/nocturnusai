@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AxiomBase is a logic-based inference engine and knowledge database ("Symbolic Cortex") built in Kotlin. It provides deterministic multi-step logical reasoning, rule-based inference, and state management via an HTTP API, with a React web console.
+AxiomBase is the **logic server for Agentic AI**. It provides deterministic multi-step reasoning, truth maintenance, and agent memory lifecycle management via HTTP API, MCP protocol, and client SDKs (Python, TypeScript). Agents use AxiomBase as their semantic memory and reasoning backend — storing facts, defining rules, running inference, and managing context windows with temporal awareness and salience scoring.
 
 ## Build & Run Commands
 
@@ -48,10 +48,10 @@ Three-module Gradle project (`settings.gradle.kts` includes `axiombase-core` and
 Package: `com.axiombase`
 
 **Domain model** (`core/`):
-- `Atom` — fundamental unit of knowledge: predicate + args + truth value + source + optional scope
+- `Atom` — fundamental unit of knowledge: predicate + args + truth value + source + scope + temporal fields (createdAt, validFrom, validUntil, ttl)
 - `Term` — sealed class: `Identifier`, `StringLit`, `NumberLit`, `Variable` (prefixed with `?`)
 - `Rule` — Horn clause: head (consequent) + body (antecedent conditions)
-- `LogicContext` — per-tenant container holding a Hexastore, rules, and inference engines
+- `LogicContext` — per-tenant container holding a Hexastore, rules, inference engines, and MemoryManager
 
 **Storage** (`storage/Hexastore.kt`):
 - 6-way indexed triple store (SPO/SOP/PSO/POS/OSP/OPS) for binary predicates
@@ -78,6 +78,11 @@ Package: `com.axiombase`
 **Parser** (`parser/`):
 - `Tokenizer` + `Parser` for the Logiql DSL (used by `/execute` endpoint)
 
+**Agent Memory** (`memory/`):
+- `MemoryManager` — agent-facing memory lifecycle controller (temporal queries, salience-ranked retrieval, consolidation, decay)
+- `SalienceTracker` — computes composite salience scores from recency, frequency, and explicit priority
+- `EventBus` — pub/sub for knowledge change events (fact asserted/retracted, expired, consolidated)
+
 **Entry point**: `Main.kt` (interactive REPL)
 
 ### axiombase-server — Ktor HTTP API
@@ -87,9 +92,11 @@ Built on Ktor 2.3.7 with Netty. Depends on `:axiombase-core`.
 
 **Routes** (`routes/`):
 - `LogicRoutes` — `POST /assert/fact`, `/assert/rule`, `/assert/template`, `/infer`, `/retract`, `/execute`
+- `MemoryRoutes` — `POST /memory/query/temporal`, `/memory/query/salient`, `/memory/context`, `/memory/priority`, `/memory/consolidate`, `/memory/decay`, `GET /memory/events` (SSE)
+- `McpRoutes` — `POST /mcp` (JSON-RPC 2.0), `GET /mcp/sse` (MCP streaming transport)
 - `AdminRoutes` — `GET/POST/DELETE /admin/databases`, facts/rules listing, tenant management
 - `TransactionRoutes` — `POST /tx/begin`, `/tx/commit/{id}`, `/tx/rollback/{id}`
-- `ObservabilityRoutes` — `GET /health`, `/metrics` (Prometheus), `/llm.txt`
+- `ObservabilityRoutes` — `GET /health`, `/metrics` (Prometheus), `/llm.txt`, `GET /.well-known/agent.json` (A2A Agent Card)
 - `ReplicationRoutes` — `GET /replication/wal`, `POST /admin/backups`
 
 **Key classes**:
@@ -109,6 +116,24 @@ Vite 7 + React 19 + react-router-dom 7. Plain JavaScript (no TypeScript).
 
 API base URL configured via `VITE_API_URL` env var.
 
+### sdks/python — Python SDK (`axiombase` on PyPI)
+- Async client (`AxiomBaseClient`) and sync wrapper (`SyncAxiomBaseClient`) using httpx
+- Pydantic models for all DTOs
+- LangChain tool wrappers (`axiombase.langchain`) — `AxiomBaseAssertTool`, `AxiomBaseQueryTool`, `AxiomBaseInferTool`, `AxiomBaseContextTool`
+- MCP client helper (`axiombase.mcp`) for JSON-RPC 2.0 communication
+
+### sdks/typescript — TypeScript SDK (`@axiombase/sdk` on npm)
+- `AxiomBaseClient` with full API coverage using standard fetch
+- SSE event subscription support
+- MCP client helper (`AxiomBaseMCPClient`)
+- Zero runtime dependencies (uses built-in fetch)
+
+### Agent Integration Points
+- **MCP**: `POST /mcp` (JSON-RPC 2.0) + `GET /mcp/sse` (streaming). Configure via `mcp-config.json`.
+- **A2A**: `GET /.well-known/agent.json` for Agent2Agent Protocol discovery
+- **REST**: Full HTTP API with `X-Database` and `X-Tenant-ID` headers
+- **SSE**: `GET /memory/events` for real-time knowledge change subscriptions
+
 ## Tech Stack Summary
 
 | Layer | Technology | Version |
@@ -126,10 +151,14 @@ API base URL configured via `VITE_API_URL` env var.
 
 ## Key Design Decisions
 
+- **Agent-first architecture**: All features are designed for AI agent consumption. MCP protocol, salience-ranked retrieval, temporal queries, and memory lifecycle management are first-class concerns.
 - **In-memory store**: All data lives in memory with WAL + snapshots for durability. No disk-based B-tree/LSM.
 - **Hexastore indexing**: 6 index permutations enable efficient pattern matching regardless of which terms are bound vs. variable.
 - **Backward chaining as primary inference**: Goal-driven resolution (Prolog-style) via `BackwardChainer`. Forward chaining via `ReteEngine` supplements.
 - **Truth Maintenance System**: `ProvenanceTracker` automatically maintains consistency when facts are retracted.
+- **Temporal atoms**: Facts carry `createdAt`, `validFrom`, `validUntil`, and `ttl` for point-in-time queries and automatic expiration.
+- **Salience-based memory**: Composite scoring (recency × frequency × priority) determines which facts are most relevant for agent context windows.
+- **Memory lifecycle**: Consolidation compresses repeated episodic patterns into semantic facts. Decay evicts expired/low-salience facts.
 - **Variables use `?` prefix**: e.g., `?x`, `?who` — this convention is used throughout the codebase and API.
 - **Scope-based multi-tenancy**: Facts/rules can be scoped for hypothetical reasoning, versioning, or tenant isolation.
 
