@@ -330,7 +330,7 @@ export async function contextTell(
 ): Promise<TellResponse> {
   const body: Record<string, string> = { text }
   if (scope) body.scope = scope
-  return request<TellResponse>('/tell', {
+  return request<TellResponse>('/assert/fact', {
     apiKey,
     database,
     tenantId,
@@ -384,6 +384,52 @@ export async function getContextWindow(
   const body: Record<string, unknown> = {}
   if (maxFacts) body.maxFacts = maxFacts
   return request<ContextWindow>('/memory/context', {
+    apiKey,
+    database,
+    tenantId,
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+// ── Memory lifecycle operations ──────────────────────────────
+
+export interface CompressResult {
+  factsConsolidated: number
+  newFacts: AtomResponse[]
+  timestamp: number
+}
+
+export interface CleanupResult {
+  expiredCount: number
+  evictedCount: number
+  removedAtoms: AtomResponse[]
+  timestamp: number
+}
+
+export async function compress(
+  apiKey: string,
+  database: string,
+  tenantId?: string,
+): Promise<CompressResult> {
+  return request<CompressResult>('/memory/compress', {
+    apiKey,
+    database,
+    tenantId,
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
+export async function cleanup(
+  apiKey: string,
+  database: string,
+  threshold?: number,
+  tenantId?: string,
+): Promise<CleanupResult> {
+  const body: Record<string, unknown> = {}
+  if (threshold != null) body.threshold = threshold
+  return request<CleanupResult>('/memory/cleanup', {
     apiKey,
     database,
     tenantId,

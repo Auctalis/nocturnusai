@@ -469,6 +469,85 @@ select.input {
   gap: var(--space-sm);
 }
 
+/* ── Three-plane toolbar ──────── */
+
+.toolbar-planes {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.toolbar-planes::-webkit-scrollbar {
+  display: none;
+}
+
+.toolbar-plane {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  position: relative;
+}
+
+.toolbar-plane-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  line-height: 1;
+  padding: 0 2px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.toolbar-plane-tabs {
+  display: flex;
+  gap: 1px;
+  padding: 3px;
+  background: var(--gray-10);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.toolbar-plane-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: calc(var(--radius-md) - 3px);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--duration-normal) ease;
+  background: transparent;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.toolbar-plane-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-hover);
+}
+
+.toolbar-plane-btn.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-xs);
+  font-weight: 600;
+}
+
+.toolbar-plane-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border-color);
+  margin: 4px 6px;
+  flex-shrink: 0;
+}
+
 /* Segmented toggle (Visual/Code) */
 .segmented-toggle {
   display: flex;

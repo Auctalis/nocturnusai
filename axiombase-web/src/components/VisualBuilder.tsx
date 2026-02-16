@@ -111,6 +111,8 @@ const DESCRIPTIONS: Record<OperationMode, string> = {
   tell: 'Tell a fact — store knowledge.',
   teach: 'Teach a rule — define reasoning logic.',
   forget: 'Forget — remove knowledge and derived facts.',
+  context: 'View the agent context window — facts ranked by salience.',
+  memory: 'Manage memory lifecycle — compress patterns or cleanup expired knowledge.',
   infer: 'Query the database for patterns.',
   assert_fact: 'Add a known Fact.',
   assert_rule: 'Add a logical Rule (Head \u2190 Body).',
@@ -154,6 +156,13 @@ export default function VisualBuilder({ mode, onJsonChange }: VisualBuilderProps
   const [metadataJson, setMetadataJson] = useState('')
   const [metadataError, setMetadataError] = useState('')
 
+  // Context state
+  const [contextMaxFacts, setContextMaxFacts] = useState(50)
+
+  // Memory state
+  const [memoryOp, setMemoryOp] = useState<'compress' | 'cleanup'>('compress')
+  const [cleanupThreshold, setCleanupThreshold] = useState(0.05)
+
   // Scope
   const [scope, setScope] = useState('')
 
@@ -169,6 +178,9 @@ export default function VisualBuilder({ mode, onJsonChange }: VisualBuilderProps
     setTemplateType('SYLLOGISM')
     setTemplatePreds({ P: '', Q: '' })
     setTemplateArgs([''])
+    setContextMaxFacts(50)
+    setMemoryOp('compress')
+    setCleanupThreshold(0.05)
   }, [mode])
 
   // JSON construction
@@ -193,6 +205,13 @@ export default function VisualBuilder({ mode, onJsonChange }: VisualBuilderProps
         type: inspectFilters.type,
         filter: inspectFilters.filter,
         scope: inspectFilters.scope.trim() || undefined,
+      }
+    } else if (mode === 'context') {
+      json = { maxFacts: contextMaxFacts }
+    } else if (mode === 'memory') {
+      json = { operation: memoryOp }
+      if (memoryOp === 'cleanup') {
+        json.threshold = cleanupThreshold
       }
     } else if (mode === 'assert_template') {
       json = {
@@ -235,8 +254,106 @@ export default function VisualBuilder({ mode, onJsonChange }: VisualBuilderProps
     templateType,
     templatePredicates,
     templateArgs,
+    contextMaxFacts,
+    memoryOp,
+    cleanupThreshold,
     onJsonChange,
   ])
+
+  // ── Context Mode ──
+  if (mode === 'context') {
+    return (
+      <div className="flex-col gap-4" style={{ padding: 'var(--space-md)' }}>
+        <div className="vb-section">
+          <div className="vb-section-title">Agent Context Window</div>
+          <div className="vb-section-desc">
+            View the most relevant knowledge for the current reasoning step, ranked by salience (recency + frequency + priority).
+          </div>
+        </div>
+        <div>
+          <label className="input-label">Max Facts</label>
+          <input
+            className="input"
+            type="number"
+            min={1}
+            max={500}
+            value={contextMaxFacts}
+            onChange={(e) => setContextMaxFacts(Number(e.target.value) || 50)}
+            style={{ width: 120 }}
+          />
+          <p className="text-muted text-xs" style={{ marginTop: 4 }}>
+            Number of top-salience facts to retrieve.
+          </p>
+        </div>
+        <p className="text-muted text-xs text-center">Click &apos;Run&apos; to fetch the context window.</p>
+      </div>
+    )
+  }
+
+  // ── Memory Mode ──
+  if (mode === 'memory') {
+    return (
+      <div className="flex-col gap-4" style={{ padding: 'var(--space-md)' }}>
+        <div className="vb-section">
+          <div className="vb-section-title">Memory Management</div>
+          <div className="vb-section-desc">
+            Manage the knowledge lifecycle — consolidate patterns or expire stale facts.
+          </div>
+        </div>
+        <div>
+          <label className="input-label">Operation</label>
+          <div className="vb-type-toggle" style={{ marginBottom: 'var(--space-md)' }}>
+            <button
+              className={`vb-type-toggle-btn ${memoryOp === 'compress' ? 'active' : ''}`}
+              onClick={() => setMemoryOp('compress')}
+            >
+              Compress
+            </button>
+            <button
+              className={`vb-type-toggle-btn ${memoryOp === 'cleanup' ? 'active' : ''}`}
+              onClick={() => setMemoryOp('cleanup')}
+            >
+              Cleanup
+            </button>
+          </div>
+        </div>
+
+        {memoryOp === 'compress' && (
+          <div className="card card-body">
+            <div className="vb-section-title" style={{ fontSize: 'var(--text-sm)' }}>Compress</div>
+            <p className="text-secondary text-xs" style={{ margin: '4px 0 0' }}>
+              Consolidate repeated episodic patterns into summary facts. Reduces memory size while preserving semantics.
+            </p>
+          </div>
+        )}
+
+        {memoryOp === 'cleanup' && (
+          <div className="card card-body">
+            <div className="vb-section-title" style={{ fontSize: 'var(--text-sm)' }}>Cleanup</div>
+            <p className="text-secondary text-xs" style={{ margin: '4px 0 8px' }}>
+              Expire facts past their TTL and evict low-salience facts below the threshold.
+            </p>
+            <label className="input-label">Salience Threshold</label>
+            <input
+              className="input"
+              type="number"
+              step={0.01}
+              min={0}
+              max={1}
+              value={cleanupThreshold}
+              onChange={(e) => setCleanupThreshold(Number(e.target.value) || 0.05)}
+              style={{ width: 120 }}
+            />
+            <p className="text-muted text-xs" style={{ marginTop: 4 }}>
+              Facts with salience below this value will be evicted (0.0 to 1.0).
+            </p>
+          </div>
+        )}
+
+        <p className="text-muted text-xs text-center">Click &apos;Run&apos; to execute.</p>
+      </div>
+    )
+  }
 
   // ── Inspect Mode ──
   if (mode === 'inspect') {

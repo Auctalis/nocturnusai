@@ -11,7 +11,6 @@ import {
   Command,
   LogOut,
   Search,
-  MessageCircle,
   Terminal,
   Share2,
   Home,
@@ -70,7 +69,6 @@ export default function Sidebar({
   const mainNav: NavItem[] = [
     { label: 'Console', icon: Terminal, path: `/db/${currentDb}`, roles: ['admin', 'developer', 'agent'] },
     { label: 'Knowledge Graph', icon: Share2, path: `/db/${currentDb}/graph`, roles: ['admin', 'developer', 'agent'] },
-    { label: 'Ask / Tell / Recall', icon: MessageCircle, path: `/db/${currentDb}/context`, roles: ['admin', 'developer', 'agent'] },
     { label: 'API Reference', icon: FileText, path: `/db/${currentDb}/api`, roles: ['admin', 'developer', 'agent'] },
   ]
 
