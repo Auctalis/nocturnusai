@@ -63,13 +63,14 @@ object LoggingConfig {
                 this.context = context
                 file = logFile
 
+                val appender = this
                 rollingPolicy = SizeAndTimeBasedRollingPolicy<ILoggingEvent>().apply {
                     this.context = context
                     fileNamePattern = "$logFile.%d{yyyy-MM-dd}.%i.gz"
                     setMaxFileSize(FileSize.valueOf("50MB"))
                     maxHistory = 30
                     setTotalSizeCap(FileSize.valueOf("1GB"))
-                    setParent(this@apply)
+                    setParent(appender)
                     start()
                 }
 
