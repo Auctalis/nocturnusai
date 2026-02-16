@@ -2,13 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useApp } from '@/context/AppContext'
 import { toast } from 'sonner'
 import * as api from './api'
+import { parseAtom, parseRule, isRule } from './parse'
 import type {
   AtomResponse,
   Database,
   OperationMode,
-  FactRequest,
-  RuleRequest,
-  TemplateRequest,
   InspectItem,
 } from './types'
 
@@ -82,117 +80,128 @@ export function useQuery(database: string, tenantId?: string) {
   const [isLoading, setIsLoading] = useState(false)
 
   const execute = useCallback(
-    async (mode: OperationMode, inputData: string) => {
+    async (mode: OperationMode, inputText: string) => {
       setResult(null)
       setError(null)
       setIsLoading(true)
 
-      try {
-        if (mode === 'inspect') {
-          let filterPred = ''
-          let filterType: 'ALL' | 'FACT' | 'RULE' = 'ALL'
-          let filterScope: string | undefined
-          try {
-            const fJson = JSON.parse(inputData) as Record<string, unknown>
-            if (typeof fJson.filter === 'string') filterPred = fJson.filter.toLowerCase()
-            if (fJson.type === 'FACT' || fJson.type === 'RULE') filterType = fJson.type
-            if (typeof fJson.scope === 'string' && fJson.scope) filterScope = fJson.scope
-          } catch {
-            // filters are optional
-          }
+      const text = inputText.trim()
 
+      try {
+        // ── Inspect: browse all knowledge (text is optional filter) ──
+        if (mode === 'inspect') {
+          const filter = text.toLowerCase()
           const [facts, rules] = await Promise.all([
-            api.listFacts(apiKey, database, tenantId, filterScope),
-            api.listRules(apiKey, database, tenantId, filterScope),
+            api.listFacts(apiKey, database, tenantId),
+            api.listRules(apiKey, database, tenantId),
           ])
 
-          let combined: InspectItem[] = []
-          if (filterType === 'ALL' || filterType === 'FACT') {
-            combined.push(...facts.map((f) => ({ Type: 'Fact' as const, Content: f as AtomResponse })))
-          }
-          if (filterType === 'ALL' || filterType === 'RULE') {
-            combined.push(...rules.map((r) => ({ Type: 'Rule' as const, Content: r })))
-          }
-          if (filterPred) {
+          let combined: InspectItem[] = [
+            ...facts.map((f) => ({ Type: 'Fact' as const, Content: f as AtomResponse })),
+            ...rules.map((r) => ({ Type: 'Rule' as const, Content: r })),
+          ]
+          if (filter) {
             combined = combined.filter((item) =>
-              JSON.stringify(item.Content).toLowerCase().includes(filterPred),
+              JSON.stringify(item.Content).toLowerCase().includes(filter),
             )
           }
           setResult(combined)
-          addToHistory(mode, inputData)
+          addToHistory(mode, text)
           return
         }
 
-        // Parse JSON input
-        const cleanedInput = inputData.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const body: any = cleanedInput.trim() ? JSON.parse(cleanedInput) : {}
+        // ── Context: fetch salience-ranked context window ──
+        if (mode === 'context') {
+          const maxFacts = text ? parseInt(text, 10) || 50 : 50
+          const ctx = await api.getContextWindow(apiKey, database, tenantId, maxFacts)
+          const lines = [`Context Window — ${ctx.facts.length} of ${ctx.totalAvailable} facts (ranked by salience)\n`]
+          for (const scored of ctx.facts) {
+            const a = scored.atom
+            const neg = a.negated ? 'NOT ' : ''
+            lines.push(`  [${scored.salience.toFixed(3)}]  ${neg}${a.predicate}(${a.args.join(', ')})`)
+          }
+          if (Object.keys(ctx.predicateDistribution).length > 0) {
+            lines.push(`\nPredicate distribution:`)
+            for (const [pred, count] of Object.entries(ctx.predicateDistribution)) {
+              lines.push(`  ${pred}: ${count}`)
+            }
+          }
+          setResult(lines.join('\n'))
+          addToHistory(mode, text)
+          return
+        }
+
+        // ── Memory: compress or cleanup ──
+        if (mode === 'memory') {
+          const lower = text.toLowerCase()
+          if (lower.startsWith('cleanup')) {
+            const parts = lower.split(/\s+/)
+            const threshold = parts[1] ? parseFloat(parts[1]) : 0.05
+            const r = await api.cleanup(apiKey, database, threshold, tenantId)
+            setResult(`Cleanup complete\n  Expired: ${r.expiredCount}\n  Evicted: ${r.evictedCount}\n  Total removed: ${r.removedAtoms.length}`)
+          } else {
+            const r = await api.compress(apiKey, database, tenantId)
+            setResult(`Compression complete\n  Facts consolidated: ${r.factsConsolidated}\n  New summary facts: ${r.newFacts.length}`)
+          }
+          addToHistory(mode, text)
+          return
+        }
+
+        // ── DSL: pass raw text to /execute ──
+        if (mode === 'execute') {
+          if (!text) throw new Error('Enter a Logiql command')
+          const response = await api.execute(apiKey, database, text, tenantId)
+          setResult(response)
+          addToHistory(mode, text)
+          return
+        }
+
+        // ── Agent modes: parse predicate(args) syntax ──
+        if (!text) throw new Error('Enter a predicate, e.g. likes(alice, bob)')
 
         let response: string | AtomResponse[]
 
         switch (mode) {
-          // Simplified API (primary)
-          case 'ask':
-            response = await api.ask(apiKey, database, body as FactRequest, tenantId)
-            break
-          case 'tell':
-            response = await api.tell(apiKey, database, body as FactRequest, tenantId)
-            break
-          case 'teach':
-            response = await api.teach(apiKey, database, body as RuleRequest, tenantId)
-            break
-          case 'forget':
-            response = await api.forget(apiKey, database, body as FactRequest, tenantId)
-            break
-          // Legacy modes (backward compat)
-          case 'infer':
-            response = await api.infer(apiKey, database, body as FactRequest, tenantId)
-            break
-          case 'assert_fact':
-            response = await api.assertFact(apiKey, database, body as FactRequest, tenantId)
-            break
-          case 'assert_rule':
-            response = await api.assertRule(apiKey, database, body as RuleRequest, tenantId)
-            break
-          case 'assert_template':
-            response = await api.assertTemplate(apiKey, database, body as TemplateRequest, tenantId)
-            break
-          case 'retract':
-            response = await api.retractFact(apiKey, database, body as FactRequest, tenantId)
-            break
-          case 'execute':
-            response = await api.execute(apiKey, database, inputData, tenantId)
-            break
-          case 'context': {
-            const ctxBody = cleanedInput.trim() ? JSON.parse(cleanedInput) as Record<string, unknown> : {}
-            const maxFacts = typeof ctxBody.maxFacts === 'number' ? ctxBody.maxFacts : 50
-            const ctx = await api.getContextWindow(apiKey, database, tenantId, maxFacts)
-            const lines = [`Context Window — ${ctx.facts.length} of ${ctx.totalAvailable} facts (ranked by salience)\n`]
-            for (const scored of ctx.facts) {
-              const a = scored.atom
-              const neg = a.negated ? 'NOT ' : ''
-              lines.push(`  [${scored.salience.toFixed(3)}]  ${neg}${a.predicate}(${a.args.join(', ')})`)
-            }
-            if (Object.keys(ctx.predicateDistribution).length > 0) {
-              lines.push(`\nPredicate distribution:`)
-              for (const [pred, count] of Object.entries(ctx.predicateDistribution)) {
-                lines.push(`  ${pred}: ${count}`)
-              }
-            }
-            response = lines.join('\n')
+          case 'ask': {
+            const atom = parseAtom(text)
+            response = await api.ask(apiKey, database, atom, tenantId)
             break
           }
-          case 'memory': {
-            const memBody = cleanedInput.trim() ? JSON.parse(cleanedInput) as Record<string, unknown> : {}
-            const op = (memBody.operation as string) || 'compress'
-            if (op === 'cleanup') {
-              const threshold = typeof memBody.threshold === 'number' ? memBody.threshold : 0.05
-              const result = await api.cleanup(apiKey, database, threshold, tenantId)
-              response = `Cleanup complete\n  Expired: ${result.expiredCount}\n  Evicted: ${result.evictedCount}\n  Total removed: ${result.removedAtoms.length}`
-            } else {
-              const result = await api.compress(apiKey, database, tenantId)
-              response = `Compression complete\n  Facts consolidated: ${result.factsConsolidated}\n  New summary facts: ${result.newFacts.length}`
-            }
+          case 'tell': {
+            const atom = parseAtom(text)
+            response = await api.tell(apiKey, database, { ...atom, truthVal: !atom.negated }, tenantId)
+            break
+          }
+          case 'teach': {
+            if (!isRule(text)) throw new Error('Use rule syntax: head(?x) :- body(?x)')
+            const rule = parseRule(text)
+            response = await api.teach(apiKey, database, rule, tenantId)
+            break
+          }
+          case 'forget': {
+            const atom = parseAtom(text)
+            response = await api.forget(apiKey, database, atom, tenantId)
+            break
+          }
+          // Legacy modes
+          case 'infer': {
+            const atom = parseAtom(text)
+            response = await api.infer(apiKey, database, atom, tenantId)
+            break
+          }
+          case 'assert_fact': {
+            const atom = parseAtom(text)
+            response = await api.assertFact(apiKey, database, { ...atom, truthVal: !atom.negated }, tenantId)
+            break
+          }
+          case 'assert_rule': {
+            const rule = parseRule(text)
+            response = await api.assertRule(apiKey, database, rule, tenantId)
+            break
+          }
+          case 'retract': {
+            const atom = parseAtom(text)
+            response = await api.retractFact(apiKey, database, atom, tenantId)
             break
           }
           default:
@@ -200,7 +209,7 @@ export function useQuery(database: string, tenantId?: string) {
         }
 
         setResult(response)
-        addToHistory(mode, inputData)
+        addToHistory(mode, text)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {

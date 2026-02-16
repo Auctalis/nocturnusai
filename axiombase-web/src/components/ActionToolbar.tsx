@@ -7,8 +7,6 @@ import {
   Eye,
   Play,
   Loader2,
-  SlidersHorizontal,
-  Code2,
   Terminal,
   Brain,
   Layers,
@@ -20,10 +18,6 @@ interface ActionToolbarProps {
   onModeChange: (mode: OperationMode) => void
   onRun: () => void
   isRunning: boolean
-  useVisual: boolean
-  onToggleVisual: () => void
-  scope?: string
-  onScopeChange?: (scope: string) => void
 }
 
 interface ModeItem {
@@ -69,15 +63,9 @@ export default function ActionToolbar({
   onModeChange,
   onRun,
   isRunning,
-  useVisual,
-  onToggleVisual,
-  scope,
-  onScopeChange,
 }: ActionToolbarProps) {
-  const showVisualToggle = !['execute', 'synthesize'].includes(mode)
-
   return (
-    <div className="toolbar-row" style={{ flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
+    <div className="toolbar-row">
       <div className="toolbar-left" style={{ gap: 0, flex: 1, minWidth: 0 }}>
         <div className="toolbar-planes">
           {PLANES.map((plane, planeIdx) => (
@@ -105,12 +93,13 @@ export default function ActionToolbar({
           ))}
         </div>
 
-        <button className="btn btn-primary" onClick={onRun} disabled={isRunning} style={{ marginLeft: 'var(--space-sm)', flexShrink: 0 }}>
-          {isRunning ? (
-            <Loader2 size={14} className="spin" />
-          ) : (
-            <Play size={14} />
-          )}
+        <button
+          className="btn btn-primary"
+          onClick={onRun}
+          disabled={isRunning}
+          style={{ marginLeft: 'var(--space-sm)', flexShrink: 0 }}
+        >
+          {isRunning ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
           {isRunning ? 'Running...' : 'Run'}
           {!isRunning && (
             <span style={{ marginLeft: 'var(--space-sm)', opacity: 0.7 }}>
@@ -118,38 +107,6 @@ export default function ActionToolbar({
             </span>
           )}
         </button>
-      </div>
-
-      <div className="toolbar-right">
-        {onScopeChange && (
-          <input
-            type="text"
-            className="input"
-            placeholder="scope"
-            value={scope ?? ''}
-            onChange={(e) => onScopeChange(e.target.value)}
-            style={{ width: 120, fontSize: 'var(--text-xs)', padding: '4px 8px' }}
-          />
-        )}
-
-        {showVisualToggle && (
-          <div className="segmented-toggle">
-            <button
-              className={`segmented-toggle-btn ${useVisual ? 'active' : ''}`}
-              onClick={useVisual ? undefined : onToggleVisual}
-            >
-              <SlidersHorizontal size={12} style={{ marginRight: 4 }} />
-              Visual
-            </button>
-            <button
-              className={`segmented-toggle-btn ${!useVisual ? 'active' : ''}`}
-              onClick={useVisual ? onToggleVisual : undefined}
-            >
-              <Code2 size={12} style={{ marginRight: 4 }} />
-              Code
-            </button>
-          </div>
-        )}
       </div>
     </div>
   )

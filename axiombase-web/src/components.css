@@ -1454,11 +1454,42 @@ select.input {
   gap: var(--space-md);
 }
 
-.console-editor-area {
-  flex: 1;
-  min-height: 0;
+.console-input-area {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.console-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--duration-normal) ease, box-shadow var(--duration-normal) ease;
+}
+
+.console-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.console-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.console-hint {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  padding: 0 4px;
 }
 
 /* ── Utilities ─────────────────── */

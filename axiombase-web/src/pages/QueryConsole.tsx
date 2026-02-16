@@ -1,23 +1,41 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDatabases, useTenants, useQuery, useKeyboardShortcut, useDatabaseActions } from '@/lib/hooks'
 import type { OperationMode } from '@/lib/types'
 import Layout from '@/components/Layout'
 import Sidebar from '@/components/Sidebar'
 import ActionToolbar from '@/components/ActionToolbar'
-import VisualBuilder from '@/components/VisualBuilder'
-import CodeEditor from '@/components/CodeEditor'
 import ResultsPanel from '@/components/ResultsPanel'
 import DatabaseModals from '@/components/DatabaseModals'
-import CopyAsCode from '@/components/CopyAsCode'
+
+const PLACEHOLDERS: Record<string, string> = {
+  ask:     'mortal(?who)',
+  tell:    'likes(alice, bob)',
+  teach:   'mortal(?x) :- human(?x)',
+  forget:  'likes(alice, bob)',
+  inspect: 'filter by predicate name…',
+  context: '50',
+  memory:  'compress   or   cleanup 0.05',
+  execute: 'ASSERT human(socrates).',
+}
+
+const HINTS: Record<string, string> = {
+  ask:     'Query the knowledge base.  Variables start with ?',
+  tell:    'Store a fact.  e.g. parent(tom, bob)',
+  teach:   'Define a rule.  head(?x) :- condition1(?x), condition2(?x)',
+  forget:  'Remove a fact and any derived conclusions.',
+  inspect: 'Leave empty to see everything, or type a predicate name to filter.',
+  context: 'Number of top-salience facts to retrieve (default 50).',
+  memory:  'Type "compress" to consolidate, or "cleanup 0.05" to evict low-salience facts.',
+  execute: 'Raw Logiql DSL.  e.g. QUERY mortal(?x).',
+}
 
 export default function QueryConsole() {
   const { dbName } = useParams<{ dbName: string }>()
   const navigate = useNavigate()
   const [mode, setMode] = useState<OperationMode>('ask')
-  const [scope, setScope] = useState('')
-  const [useVisual, setUseVisual] = useState(true)
-  const [inputData, setInputData] = useState('')
+  const [inputText, setInputText] = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const { databases, refresh: refreshDbs } = useDatabases()
   const currentDb = databases.find((d) => d.name === dbName)
@@ -38,16 +56,31 @@ export default function QueryConsole() {
     isMultiTenant ? currentTenant : undefined,
   )
 
+  // For inspect and context, allow running with empty input
+  const canRunEmpty = ['inspect', 'context', 'memory'].includes(mode)
+
   const handleRun = useCallback(() => {
-    if (!dbName || !inputData.trim()) return
-    void execute(mode, inputData)
-  }, [dbName, inputData, mode, execute])
+    if (!dbName) return
+    if (!inputText.trim() && !canRunEmpty) return
+    void execute(mode, inputText)
+  }, [dbName, inputText, mode, execute, canRunEmpty])
 
   useKeyboardShortcut('Enter', handleRun, { meta: true })
 
+  // Clear results and refocus input on mode change
   useEffect(() => {
+    setInputText('')
     clear()
+    textareaRef.current?.focus()
   }, [mode, clear])
+
+  // Handle Cmd+Enter inside the textarea
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      handleRun()
+    }
+  }
 
   if (!dbName) {
     navigate('/')
@@ -75,42 +108,31 @@ export default function QueryConsole() {
             onModeChange={setMode}
             onRun={handleRun}
             isRunning={isLoading}
-            useVisual={useVisual}
-            onToggleVisual={() => setUseVisual(!useVisual)}
-            scope={scope}
-            onScopeChange={setScope}
           />
         }
       >
         <div className="console-content">
-          <div className="console-editor-area">
-            {useVisual && !['execute', 'synthesize'].includes(mode) ? (
-              <VisualBuilder
-                mode={mode}
-                onJsonChange={setInputData}
-              />
-            ) : (
-              <CodeEditor
-                value={inputData}
-                onChange={setInputData}
-                onRun={handleRun}
-              />
-            )}
+          <div className="console-input-area">
+            <textarea
+              ref={textareaRef}
+              className="console-textarea"
+              placeholder={PLACEHOLDERS[mode] ?? ''}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={mode === 'execute' ? 5 : 2}
+              spellCheck={false}
+              autoFocus
+            />
+            <div className="console-hint">{HINTS[mode]}</div>
           </div>
+
           <ResultsPanel
             result={result}
             error={error}
             isLoading={isLoading}
             mode={mode}
           />
-          {result && (
-            <CopyAsCode
-              mode={mode}
-              inputData={inputData}
-              database={dbName}
-              tenantId={isMultiTenant ? currentTenant : undefined}
-            />
-          )}
         </div>
       </Layout>
       <DatabaseModals {...modalState} />
