@@ -28,21 +28,21 @@ AxiomBase is the **logic server for Agentic AI**. It provides deterministic mult
 # Run a single test class
 ./gradlew :axiombase-core:test --tests "com.axiombase.TransactionTest"
 
-# Frontend (separate terminal)
-cd axiombase-web && npm install && npm run dev    # dev server on :5173
-cd axiombase-web && npm run build                 # production build
-cd axiombase-web && npm run lint                  # ESLint
+# CLI (interactive REPL — connect to running server)
+./gradlew :axiombase-cli:run                                           # defaults: localhost:9300, db=default
+./gradlew :axiombase-cli:run --args='--server http://host:9300 --db mydb'
+./gradlew :axiombase-cli:run --args='--api-key secret --db prod'
 
-# Run both server + web together
-./run_local_dev.sh    # server on :9300, web on :9350
+# Run server + use CLI
+./run_local_dev.sh    # starts server on :9300
 
-# Docker (full stack)
-docker-compose up --build    # server on :9300, web on :9400
+# Docker
+docker-compose up --build    # server on :9300
 ```
 
 ## Architecture
 
-Three-module Gradle project (`settings.gradle.kts` includes `axiombase-core` and `axiombase-server`; `axiombase-web` is a standalone npm project):
+Three-module Gradle project (`settings.gradle.kts` includes `axiombase-core`, `axiombase-server`, and `axiombase-cli`):
 
 ### axiombase-core — Pure Logic Engine Library
 Package: `com.axiombase`
@@ -108,13 +108,16 @@ Built on Ktor 2.3.7 with Netty. Depends on `:axiombase-core`.
 
 **Multi-tenancy**: `X-Database` header selects database, `X-Tenant-ID` header selects tenant within database.
 
-### axiombase-web — React Web Console
-Vite 7 + React 19 + react-router-dom 7. Plain JavaScript (no TypeScript).
+### axiombase-cli — Interactive REPL
+Package: `com.axiombase.cli`
 
-**Pages**: `Login.jsx` (API key), `Dashboard.jsx` (database list), `QueryConsole.jsx` (query interface)
-**Components**: `Layout`, `Sidebar`, `ActionToolbar`, `VisualBuilder`, `ResultsTable`, `LogicResultVisualizer`
+Ktor-client based CLI that connects to a running AxiomBase server over HTTP.
 
-API base URL configured via `VITE_API_URL` env var.
+**Commands**: `ask`, `tell`, `teach`, `forget`, `inspect`, `context`, `compress`, `cleanup`, `dsl`, `use`, `dbs`, `health`
+**Shortcuts**: `?`=ask, `+`=tell, `++`=teach, `-`=forget, `ls`=inspect, `ctx`=context
+
+Parses natural predicate syntax (`likes(alice, bob)`, `mortal(?x) :- human(?x)`) client-side.
+Args: `--server`, `--db`, `--api-key`, `--tenant`.
 
 ### sdks/python — Python SDK (`axiombase` on PyPI)
 - Async client (`AxiomBaseClient`) and sync wrapper (`SyncAxiomBaseClient`) using httpx
@@ -145,7 +148,6 @@ API base URL configured via `VITE_API_URL` env var.
 | HTTP Engine | Netty | (via Ktor) |
 | Metrics | Micrometer + Prometheus | 1.10.3 |
 | Logging | Logback + SLF4J | 1.4.14 / 2.0.9 |
-| Frontend | React + Vite | 19.2.0 / 7.2.4 |
 | Build | Gradle (Kotlin DSL) | wrapper included |
 | Runtime | JDK 17+ (Docker uses JDK 21) | — |
 
