@@ -1,6 +1,7 @@
 package com.axiombase.server.routes
 
 import com.axiombase.server.*
+import com.axiombase.server.observability.Metrics
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -84,6 +85,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
 
             val txId = call.request.header("X-Transaction-ID")?.toLongOrNull()
 
+            val dbName = call.request.header("X-Database") ?: "default"
             if (txId != null) {
                 if (effectiveTruth) {
                     db.transactionManager.assertFact(txId, atom)
@@ -96,6 +98,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
                 db.assertFact(atom, tenantId)
                 call.respondText("Stored: $atom")
             }
+            Metrics.factAsserted(dbName, tenantId ?: "-")
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: DatabaseNotFoundException) {
@@ -116,16 +119,20 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
             val req = call.receive<AskRequest>()
             Validator.validateFactRequest(FactRequest(req.predicate, req.args))
             call.application.environment.log.info("Endpoint /ask hit. Tenant: $tenantId")
+            val dbName = call.request.header("X-Database") ?: "default"
+            val sample = Metrics.inferenceTimer()
             val terms = req.args.map { parseTerm(it) }
             val queryAtom = com.axiombase.core.Atom(req.predicate, terms, scope = req.scope)
 
             if (req.withProof) {
                 val proofTrees = db.inferWithProof(queryAtom, tenantId)
                 val response = proofTrees.map { ProofTreeResponse.from(it) }.toList()
+                Metrics.inferenceCompleted(sample, dbName, response.size)
                 call.respond(response)
             } else {
                 val results = db.infer(queryAtom, tenantId)
                 val response = results.map { AtomResponse.from(it) }.toList()
+                Metrics.inferenceCompleted(sample, dbName, response.size)
                 call.respond(response)
             }
         } catch (e: ValidationException) {
@@ -159,6 +166,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
 
             val txId = call.request.header("X-Transaction-ID")?.toLongOrNull()
 
+            val dbName = call.request.header("X-Database") ?: "default"
             if (txId != null) {
                 db.transactionManager.assertRule(txId, rule)
                 call.respondText("Rule stored in Tx $txId: $rule")
@@ -166,6 +174,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
                 db.assertRule(rule, tenantId)
                 call.respondText("Rule stored: $rule")
             }
+            Metrics.ruleAsserted(dbName, tenantId ?: "-")
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: DatabaseNotFoundException) {
@@ -187,6 +196,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
 
             val txId = call.request.header("X-Transaction-ID")?.toLongOrNull()
 
+            val dbName = call.request.header("X-Database") ?: "default"
             if (txId != null) {
                 db.transactionManager.retractFact(txId, atom)
                 call.respondText("Forgotten in Tx $txId: $atom")
@@ -194,6 +204,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
                 db.retractFact(atom, tenantId)
                 call.respondText("Forgotten: $atom (and any knowledge derived from it)")
             }
+            Metrics.factRetracted(dbName, tenantId ?: "-")
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: DatabaseNotFoundException) {
@@ -230,6 +241,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
         try {
             val (db, tenantId) = call.getContext(dbManager)
             val result = db.runConsolidation(tenantId)
+            Metrics.memoryConsolidation(result.factsConsolidated, result.newFacts.size)
             call.respond(ConsolidationResponse(
                 factsConsolidated = result.factsConsolidated,
                 newFacts = result.newFacts.map { AtomResponse.from(it) },
@@ -246,6 +258,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
             val (db, tenantId) = call.getContext(dbManager)
             val req = try { call.receive<DecayRequest>() } catch (_: Exception) { DecayRequest() }
             val result = db.runDecay(tenantId, req.threshold)
+            Metrics.memoryDecay(result.expiredCount, result.evictedCount)
             call.respond(DecayResponse(
                 expiredCount = result.expiredCount,
                 evictedCount = result.evictedCount,

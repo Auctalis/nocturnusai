@@ -5,6 +5,7 @@ import com.axiombase.extraction.FactExtractor
 import com.axiombase.extraction.RuleExtractor
 import com.axiombase.server.*
 import com.axiombase.server.llm.LlmProvider
+import com.axiombase.server.observability.Metrics
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -45,7 +46,18 @@ fun Route.extractionRoutes(dbManager: DatabaseManager, extractor: FactExtractor?
                 return@post
             }
 
-            val facts = extractor.extract(req.text, req.context)
+            val llmSample = Metrics.llmCallTimer()
+            val facts = try {
+                val result = extractor.extract(req.text, req.context)
+                Metrics.llmCallCompleted(llmSample, provider.name, "extract", "success")
+                Metrics.llmFactsExtracted(result.size)
+                Metrics.llmTokensUsed(provider.name, "extract", req.text.length / 4) // rough estimate
+                result
+            } catch (e: Exception) {
+                Metrics.llmCallCompleted(llmSample, provider.name, "extract", "error")
+                Metrics.errorOccurred("/extract", "llm_error")
+                throw e
+            }
             var asserted = false
 
             if (req.assert && facts.isNotEmpty()) {

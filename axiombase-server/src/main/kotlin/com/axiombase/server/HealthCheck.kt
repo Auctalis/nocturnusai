@@ -17,7 +17,7 @@ data class CheckResult(
 
 object HealthChecker {
 
-    fun check(dbManager: DatabaseManager, storageDir: File): HealthStatus {
+    fun check(dbManager: DatabaseManager, storageDir: File, llmConfigured: Boolean = false): HealthStatus {
         val checks = mutableMapOf<String, CheckResult>()
 
         // 1. WAL writable
@@ -34,6 +34,13 @@ object HealthChecker {
 
         // 5. Transactions
         checks["transactions"] = checkTransactions(dbManager)
+
+        // 6. LLM provider status
+        checks["llm"] = if (llmConfigured) {
+            CheckResult("pass", "LLM provider configured (extraction=${if (ServerConfig.extractionEnabled) "on" else "off"})")
+        } else {
+            CheckResult("warn", "No LLM provider — NL features unavailable")
+        }
 
         val hasFailure = checks.values.any { it.status == "fail" }
         val hasWarning = checks.values.any { it.status == "warn" }

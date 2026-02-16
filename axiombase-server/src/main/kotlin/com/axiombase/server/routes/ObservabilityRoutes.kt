@@ -11,15 +11,13 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.io.File
 
-fun Route.observabilityRoutes(appMicrometerRegistry: PrometheusMeterRegistry, dbManager: DatabaseManager, storageDir: File) {
+fun Route.observabilityRoutes(appMicrometerRegistry: PrometheusMeterRegistry, dbManager: DatabaseManager, storageDir: File, llmConfigured: Boolean = false) {
     get("/metrics") {
-         call.application.environment.log.info("Endpoint /metrics hit")
          call.respondText(appMicrometerRegistry.scrape())
     }
 
     get("/health") {
-        call.application.environment.log.debug("Endpoint /health hit")
-        val healthStatus = HealthChecker.check(dbManager, storageDir)
+        val healthStatus = HealthChecker.check(dbManager, storageDir, llmConfigured)
         val statusCode = if (healthStatus.status == "unhealthy") HttpStatusCode.ServiceUnavailable else HttpStatusCode.OK
         call.respond(statusCode, healthStatus)
     }
@@ -29,7 +27,7 @@ fun Route.observabilityRoutes(appMicrometerRegistry: PrometheusMeterRegistry, db
     }
 
     get("/health/ready") {
-        val healthStatus = HealthChecker.check(dbManager, storageDir)
+        val healthStatus = HealthChecker.check(dbManager, storageDir, llmConfigured)
         val statusCode = if (healthStatus.status == "unhealthy") HttpStatusCode.ServiceUnavailable else HttpStatusCode.OK
         call.respond(statusCode, healthStatus)
     }
