@@ -17,7 +17,7 @@ data class CheckResult(
 
 object HealthChecker {
 
-    fun check(dbManager: DatabaseManager, storageDir: File): HealthStatus {
+    fun check(dbManager: DatabaseManager, storageDir: File, llmConfigured: Boolean = false): HealthStatus {
         val checks = mutableMapOf<String, CheckResult>()
 
         // 1. WAL writable
@@ -34,6 +34,20 @@ object HealthChecker {
 
         // 5. Transactions
         checks["transactions"] = checkTransactions(dbManager)
+
+        // 6. LLM provider status
+        checks["llm"] = if (llmConfigured) {
+            CheckResult("pass", "LLM provider configured (extraction=${if (ServerConfig.extractionEnabled) "on" else "off"})")
+        } else {
+            CheckResult("warn", "No LLM provider — NL features unavailable")
+        }
+
+        // 7. Auth status
+        checks["auth"] = when (ServerConfig.authMode) {
+            com.axiombase.server.auth.AuthMode.RBAC -> CheckResult("pass", "RBAC auth enabled")
+            com.axiombase.server.auth.AuthMode.LEGACY -> CheckResult("pass", "Legacy API key auth enabled")
+            com.axiombase.server.auth.AuthMode.DISABLED -> CheckResult("warn", "Auth disabled (dev mode)")
+        }
 
         val hasFailure = checks.values.any { it.status == "fail" }
         val hasWarning = checks.values.any { it.status == "warn" }

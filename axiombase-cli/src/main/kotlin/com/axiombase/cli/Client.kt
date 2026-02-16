@@ -67,5 +67,38 @@ class Client(
         return post("/synthesize", """{"question":"${question.replace("\"", "\\\"")}"}""")
     }
 
+    // ── Auth endpoints ────────────────────────────────────────────────────
+
+    /** GET /auth/status — check auth mode */
+    suspend fun authStatus() = get("/auth/status")
+
+    /** POST /auth/bootstrap — create first admin key */
+    suspend fun authBootstrap(username: String, password: String, keyName: String? = null): String {
+        val nameField = if (keyName != null) ""","keyName":"${keyName.replace("\"", "\\\"")}"""" else ""
+        return post("/auth/bootstrap", """{"username":"${username.replace("\"", "\\\"")}","password":"${password.replace("\"", "\\\"")}\"$nameField}""")
+    }
+
+    /** POST /auth/keys — create a new API key */
+    suspend fun authCreateKey(name: String, role: String, databases: List<String> = emptyList(), tenants: List<String> = emptyList()): String {
+        val dbsJson = databases.joinToString(",") { "\"$it\"" }
+        val tenantsJson = tenants.joinToString(",") { "\"$it\"" }
+        return post("/auth/keys", """{"name":"${name.replace("\"", "\\\"")}","role":"$role","databases":[$dbsJson],"tenants":[$tenantsJson]}""")
+    }
+
+    /** GET /auth/keys — list all keys */
+    suspend fun authListKeys() = get("/auth/keys")
+
+    /** DELETE /auth/keys/{id} — revoke a key */
+    suspend fun authRevokeKey(id: String): String {
+        val resp = http.delete("$serverUrl/auth/keys/$id") {
+            header("X-Database", database)
+            apiKey?.let { header("X-API-Key", it) }
+        }
+        return resp.bodyAsText()
+    }
+
+    /** GET /auth/whoami — show current identity */
+    suspend fun authWhoAmI() = get("/auth/whoami")
+
     fun close() = http.close()
 }

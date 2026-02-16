@@ -1,13 +1,30 @@
 package com.axiombase.server
 
+import com.axiombase.server.auth.AuthMode
 import java.io.File
 
 object ServerConfig {
     val port: Int = System.getenv("PORT")?.toIntOrNull() ?: 9300
     val host: String = System.getenv("HOST") ?: "0.0.0.0"
-    val apiKey: String? = System.getenv("API_KEY") // If null, auth disabled (dev mode)
+    val apiKey: String? = System.getenv("API_KEY") // Legacy single-key auth
     val storageDir: File = System.getenv("STORAGE_DIR")?.let { File(it) } ?: File("data")
-    
+
+    // Authentication mode
+    // AUTH_ENABLED=true → RBAC mode (managed API keys with roles)
+    // API_KEY set, AUTH_ENABLED absent → LEGACY mode (single static key)
+    // Neither set → DISABLED (dev mode, no auth)
+    val authEnabled: Boolean = System.getenv("AUTH_ENABLED")?.toBoolean() ?: false
+    val authMode: AuthMode
+        get() = when {
+            authEnabled -> AuthMode.RBAC
+            apiKey != null -> AuthMode.LEGACY
+            else -> AuthMode.DISABLED
+        }
+
+    // Admin credentials for bootstrap (used when AUTH_ENABLED=true and no keys exist yet)
+    val adminUser: String = System.getenv("AXIOMBASE_ADMIN_USER") ?: "admin"
+    val adminPass: String = System.getenv("AXIOMBASE_ADMIN_PASS") ?: "axiombase"
+
     // Encryption at Rest
     val encryptionKey: String? = System.getenv("ENCRYPTION_KEY") // 64 hex chars = 32 bytes AES-256
 

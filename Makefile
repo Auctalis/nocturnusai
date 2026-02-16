@@ -2,7 +2,7 @@
 # AxiomBase — Logic Server for Agentic AI
 # ─────────────────────────────────────────────────────────────────────────────
 
-.PHONY: help setup up up-ollama down restart logs health status \
+.PHONY: help setup up up-ollama up-monitoring down restart logs health status \
         build test cli clean env-check
 
 # ── Default ──────────────────────────────────────────────────────────────────
@@ -39,8 +39,16 @@ up-ollama: env-check ## Start server + local Ollama (no API key needed)
 	@echo "  Model pull may take a few minutes on first start."
 	@echo "  CLI:     make cli"
 
+up-monitoring: env-check ## Start server + Prometheus + Grafana
+	docker compose --profile monitoring up -d --build
+	@echo ""
+	@echo "\033[32mAxiomBase + Monitoring running.\033[0m"
+	@echo "  Server:     http://localhost:$${PORT:-9300}"
+	@echo "  Grafana:    http://localhost:3000  (admin / axiombase)"
+	@echo "  Prometheus: http://localhost:9090"
+
 down: ## Stop everything
-	docker compose --profile ollama down
+	docker compose --profile ollama --profile monitoring down
 
 restart: down up ## Restart server
 
@@ -55,8 +63,12 @@ health: ## Check server health
 		curl -sf http://localhost:$${PORT:-9300}/health || \
 		echo "\033[31mServer not responding.\033[0m"
 
+metrics: ## Show raw Prometheus metrics
+	@curl -sf http://localhost:$${PORT:-9300}/metrics | grep axiombase_ || \
+		echo "\033[31mServer not responding.\033[0m"
+
 status: ## Show running containers
-	docker compose --profile ollama ps
+	docker compose --profile ollama --profile monitoring ps
 
 # ── Local development (no Docker) ───────────────────────────────────────────
 build: ## Build all modules with Gradle
@@ -79,7 +91,7 @@ clean: ## Remove build artifacts and data
 
 clean-all: ## Remove everything (build, Docker volumes, data)
 	./gradlew clean
-	docker compose --profile ollama down -v
+	docker compose --profile ollama --profile monitoring down -v
 	rm -rf data
 
 # ── Utilities ────────────────────────────────────────────────────────────────

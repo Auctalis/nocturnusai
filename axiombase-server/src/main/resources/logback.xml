@@ -1,14 +1,27 @@
 <configuration>
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <!-- ─────────────────────────────────────────────────────────────────────
+         AxiomBase Logging Configuration
+
+         Env vars:
+           LOG_FORMAT=json|text        (default: text — programmatic switch in LoggingConfig.kt)
+           LOG_LEVEL=DEBUG|INFO|WARN   (default: INFO)
+           LOG_FILE=/path/to/file.log  (optional — enables file output with rotation)
+         ───────────────────────────────────────────────────────────────────── -->
+
+    <!-- ── Text console (human-readable, default for development) ──────── -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %cyan(%logger{36}) - %msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) %cyan(%-30logger{30}) [%X{requestId:--}] [db=%X{database:--} t=%X{tenantId:--}] %msg%n</pattern>
         </encoder>
     </appender>
 
-    <root level="INFO">
-        <appender-ref ref="STDOUT" />
+    <!-- ── Root logger ────────────────────────────────────────────────── -->
+    <root level="${LOG_LEVEL:-INFO}">
+        <appender-ref ref="CONSOLE" />
     </root>
 
-    <logger name="io.netty" level="INFO"/>
-    <logger name="com.axiombase" level="DEBUG"/>
+    <!-- ── Per-package levels ─────────────────────────────────────────── -->
+    <logger name="io.netty" level="WARN"/>
+    <logger name="io.ktor" level="${LOG_LEVEL:-INFO}"/>
+    <logger name="com.axiombase" level="${LOG_LEVEL:-INFO}"/>
 </configuration>
