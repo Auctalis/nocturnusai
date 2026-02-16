@@ -57,13 +57,18 @@ export interface TemplateRequest {
   scope?: string | null
 }
 
-// Operation modes for the query console
+// Operation modes for the query console — organized by plane
 export type OperationMode =
+  // Agent plane
   | 'ask'
   | 'tell'
   | 'teach'
   | 'forget'
+  // Explore plane
   | 'inspect'
+  | 'context'
+  // Ops plane
+  | 'memory'
   | 'execute'
   // Legacy names (backward compat)
   | 'infer'

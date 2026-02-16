@@ -163,6 +163,38 @@ export function useQuery(database: string, tenantId?: string) {
           case 'execute':
             response = await api.execute(apiKey, database, inputData, tenantId)
             break
+          case 'context': {
+            const ctxBody = cleanedInput.trim() ? JSON.parse(cleanedInput) as Record<string, unknown> : {}
+            const maxFacts = typeof ctxBody.maxFacts === 'number' ? ctxBody.maxFacts : 50
+            const ctx = await api.getContextWindow(apiKey, database, tenantId, maxFacts)
+            const lines = [`Context Window — ${ctx.facts.length} of ${ctx.totalAvailable} facts (ranked by salience)\n`]
+            for (const scored of ctx.facts) {
+              const a = scored.atom
+              const neg = a.negated ? 'NOT ' : ''
+              lines.push(`  [${scored.salience.toFixed(3)}]  ${neg}${a.predicate}(${a.args.join(', ')})`)
+            }
+            if (Object.keys(ctx.predicateDistribution).length > 0) {
+              lines.push(`\nPredicate distribution:`)
+              for (const [pred, count] of Object.entries(ctx.predicateDistribution)) {
+                lines.push(`  ${pred}: ${count}`)
+              }
+            }
+            response = lines.join('\n')
+            break
+          }
+          case 'memory': {
+            const memBody = cleanedInput.trim() ? JSON.parse(cleanedInput) as Record<string, unknown> : {}
+            const op = (memBody.operation as string) || 'compress'
+            if (op === 'cleanup') {
+              const threshold = typeof memBody.threshold === 'number' ? memBody.threshold : 0.05
+              const result = await api.cleanup(apiKey, database, threshold, tenantId)
+              response = `Cleanup complete\n  Expired: ${result.expiredCount}\n  Evicted: ${result.evictedCount}\n  Total removed: ${result.removedAtoms.length}`
+            } else {
+              const result = await api.compress(apiKey, database, tenantId)
+              response = `Compression complete\n  Facts consolidated: ${result.factsConsolidated}\n  New summary facts: ${result.newFacts.length}`
+            }
+            break
+          }
           default:
             throw new Error(`Unknown mode: ${mode as string}`)
         }

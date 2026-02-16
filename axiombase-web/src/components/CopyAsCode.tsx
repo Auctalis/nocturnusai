@@ -40,6 +40,10 @@ function getEndpointMapping(mode: OperationMode): EndpointMapping {
       return { endpoint: '/assert/template', pythonMethod: 'assert_template', tsMethod: 'assertTemplate' }
     case 'execute':
       return { endpoint: '/execute', pythonMethod: 'execute', tsMethod: 'execute' }
+    case 'context':
+      return { endpoint: '/memory/context', pythonMethod: 'get_context_window', tsMethod: 'getContextWindow' }
+    case 'memory':
+      return { endpoint: '/memory/compress', pythonMethod: 'compress', tsMethod: 'compress' }
     case 'inspect':
       return { endpoint: '', pythonMethod: '', tsMethod: '' }
     case 'synthesize':
