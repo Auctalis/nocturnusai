@@ -338,6 +338,14 @@ class AxiomBase(
         else ctx.rules.filter { it.scope == scope }
     }
 
+    /** Get all facts in the knowledge base for a tenant, optionally filtered by scope. */
+    fun getAllFacts(tenantId: String? = null, scope: String? = null): Sequence<Atom> {
+        val ctx = getContext(tenantId)
+        val allAtoms = ctx.store.getAllAtoms()
+        return if (scope == null) allAtoms
+        else allAtoms.filter { it.scope == scope }
+    }
+
     // --- Agent Memory API ---
 
     /** Query facts that were valid at a specific point in time. */

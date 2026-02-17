@@ -384,6 +384,104 @@ export interface AxiomBaseError {
 }
 
 // ---------------------------------------------------------------------------
+// Auth / Key management types
+// ---------------------------------------------------------------------------
+
+/**
+ * Response from the auth status endpoint.
+ */
+export interface AuthStatus {
+  authEnabled: boolean;
+  mode: string;
+  hasKeys: boolean;
+}
+
+/**
+ * Options for creating a new API key.
+ */
+export interface CreateKeyOptions {
+  /** Human-readable name for the key. */
+  name: string;
+
+  /** Role: "admin", "writer", or "reader". */
+  role: string;
+
+  /** Optional database scope (empty = all databases). */
+  databases?: string[];
+
+  /** Optional tenant scope (empty = all tenants). */
+  tenants?: string[];
+
+  /** Optional expiration in days. */
+  expiresInDays?: number;
+
+  /** Optional description. */
+  description?: string;
+}
+
+/**
+ * Response from creating a new API key.
+ * The raw key is only available in this response.
+ */
+export interface CreateKeyResponse {
+  id: string;
+  name: string;
+  key: string;
+  prefix: string;
+  role: string;
+  databases: string[];
+  tenants: string[];
+  expiresAt: number | null;
+}
+
+/**
+ * Information about an API key (without the raw key).
+ */
+export interface KeyInfo {
+  id: string;
+  name: string;
+  prefix: string;
+  role: string;
+  databases: string[];
+  tenants: string[];
+  createdAt: number;
+  lastUsedAt: number | null;
+  expiresAt: number | null;
+  enabled: boolean;
+  description: string;
+}
+
+/**
+ * Response from the whoami endpoint.
+ */
+export interface WhoAmI {
+  keyId: string;
+  name: string;
+  role: string;
+  permissions: string[];
+  databases: string[];
+  tenants: string[];
+}
+
+/**
+ * Schema discovery response from GET /predicates.
+ */
+export interface PredicateInfo {
+  predicate: string;
+  factCount: number;
+  ruleCount: number;
+  arity: number;
+  hasRules: boolean;
+}
+
+export interface SchemaDiscovery {
+  predicates: PredicateInfo[];
+  totalPredicates: number;
+  totalFacts: number;
+  totalRules: number;
+}
+
+// ---------------------------------------------------------------------------
 // MCP types
 // ---------------------------------------------------------------------------
 

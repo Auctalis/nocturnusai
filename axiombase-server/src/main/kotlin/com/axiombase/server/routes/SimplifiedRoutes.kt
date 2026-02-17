@@ -98,7 +98,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
                 db.assertFact(atom, tenantId)
                 call.respondText("Stored: $atom")
             }
-            Metrics.factAsserted(dbName, tenantId ?: "-")
+            Metrics.factAsserted(dbName, tenantId)
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: DatabaseNotFoundException) {
@@ -174,7 +174,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
                 db.assertRule(rule, tenantId)
                 call.respondText("Rule stored: $rule")
             }
-            Metrics.ruleAsserted(dbName, tenantId ?: "-")
+            Metrics.ruleAsserted(dbName, tenantId)
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: DatabaseNotFoundException) {
@@ -204,7 +204,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
                 db.retractFact(atom, tenantId)
                 call.respondText("Forgotten: $atom (and any knowledge derived from it)")
             }
-            Metrics.factRetracted(dbName, tenantId ?: "-")
+            Metrics.factRetracted(dbName, tenantId)
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: DatabaseNotFoundException) {

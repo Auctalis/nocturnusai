@@ -71,7 +71,13 @@ fun Route.observabilityRoutes(appMicrometerRegistry: PrometheusMeterRegistry, db
                 "stateTransitionHistory" to false
             ),
             "authentication" to mapOf(
-                "schemes" to listOf("apiKey")
+                "schemes" to listOf("apiKey"),
+                "credentials" to mapOf(
+                    "headerName" to "X-API-Key",
+                    "alternativeHeader" to "Authorization: Bearer <key>",
+                    "bootstrapEndpoint" to "/auth/bootstrap",
+                    "keyManagementEndpoint" to "/auth/keys"
+                )
             ),
             "defaultInputModes" to listOf("application/json"),
             "defaultOutputModes" to listOf("application/json", "text/event-stream"),
@@ -124,6 +130,28 @@ fun Route.observabilityRoutes(appMicrometerRegistry: PrometheusMeterRegistry, db
                     "description" to "Compress repeated patterns into summaries and clean up expired/irrelevant knowledge. Essential for long-running sessions.",
                     "tags" to listOf("memory", "compress", "cleanup"),
                     "examples" to listOf("Compress repeated user queries into interest summaries", "Clean up low-relevance facts")
+                ),
+                mapOf(
+                    "id" to "predicates",
+                    "name" to "Schema Discovery",
+                    "description" to "Discover the knowledge base schema — list all predicate types with fact/rule counts and arity. Useful for understanding available knowledge before querying.",
+                    "tags" to listOf("schema", "discovery", "predicates"),
+                    "examples" to listOf("What predicates are stored?", "How many facts exist for each relationship type?")
+                )
+            ),
+            "protocolSupport" to mapOf(
+                "mcp" to mapOf(
+                    "endpoint" to "$baseUrl/mcp",
+                    "sseEndpoint" to "$baseUrl/mcp/sse",
+                    "protocolVersion" to "2025-11-25"
+                ),
+                "rest" to mapOf(
+                    "baseUrl" to baseUrl,
+                    "headers" to mapOf(
+                        "X-Database" to "Database name (default: 'default')",
+                        "X-Tenant-ID" to "Tenant ID for multi-tenancy",
+                        "X-API-Key" to "API key for authentication"
+                    )
                 )
             )
         )

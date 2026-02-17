@@ -62,6 +62,9 @@ object AuthInterceptor {
         RouteMatch("POST", "/teach") to Permission.RULE_WRITE,
         RouteMatch("POST", "/forget") to Permission.FACT_WRITE,
 
+        // Schema discovery
+        RouteMatch("GET", "/predicates") to Permission.FACT_READ,
+
         // Logic routes
         RouteMatch("POST", "/assert/fact") to Permission.FACT_WRITE,
         RouteMatch("POST", "/assert/rule") to Permission.RULE_WRITE,

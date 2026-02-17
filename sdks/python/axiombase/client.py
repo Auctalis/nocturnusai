@@ -682,6 +682,178 @@ class AxiomBaseClient:
         return str(result)
 
     # ------------------------------------------------------------------
+    # Schema Discovery
+    # ------------------------------------------------------------------
+
+    async def predicates(self, scope: str | None = None) -> dict[str, Any]:
+        """Discover the knowledge base schema.
+
+        Lists all predicates (relationship types) currently stored, with
+        argument counts and fact counts.
+
+        Args:
+            scope: Optional scope filter.
+
+        Returns:
+            A dict with ``"predicates"`` (list of predicate info),
+            ``"totalPredicates"``, ``"totalFacts"``, and ``"totalRules"``.
+
+        Example::
+
+            schema = await client.predicates()
+            for p in schema["predicates"]:
+                print(f"{p['predicate']}/{p['arity']} — {p['factCount']} facts")
+        """
+        params: dict[str, Any] = {}
+        if scope is not None:
+            params["scope"] = scope
+
+        result = await self._request("GET", "/predicates", params=params)
+        if isinstance(result, dict):
+            return result
+        return {"predicates": []}
+
+    # ------------------------------------------------------------------
+    # Auth / Key Management
+    # ------------------------------------------------------------------
+
+    async def auth_status(self) -> dict[str, Any]:
+        """Check the authentication status and mode of the server.
+
+        Returns:
+            A dict with ``"authEnabled"``, ``"mode"``, and ``"hasKeys"`` fields.
+
+        Example::
+
+            status = await client.auth_status()
+            print(f"Auth mode: {status['mode']}")
+        """
+        result = await self._request("GET", "/auth/status")
+        if isinstance(result, dict):
+            return result
+        return {"status": result}
+
+    async def bootstrap(
+        self,
+        name: str = "admin",
+        description: str = "Initial admin key",
+    ) -> dict[str, Any]:
+        """Bootstrap the first admin API key.
+
+        Only works when RBAC auth is enabled and no keys exist yet.
+
+        Args:
+            name: Name for the admin key.
+            description: Description for the key.
+
+        Returns:
+            A dict containing the key ``"id"``, ``"name"``, ``"key"``
+            (raw key, shown only once), ``"prefix"``, ``"role"``, etc.
+
+        Example::
+
+            result = await client.bootstrap(name="my-admin")
+            print(f"Save this key: {result['key']}")
+        """
+        body: dict[str, Any] = {"name": name, "description": description}
+        return await self._request("POST", "/auth/bootstrap", json_body=body)
+
+    async def create_key(
+        self,
+        name: str,
+        role: str = "writer",
+        databases: list[str] | None = None,
+        tenants: list[str] | None = None,
+        expires_in_days: int | None = None,
+        description: str = "",
+    ) -> dict[str, Any]:
+        """Create a new API key. Requires ADMIN role.
+
+        Args:
+            name: Human-readable name for the key.
+            role: One of ``"admin"``, ``"writer"``, ``"reader"``.
+            databases: Optional list of databases this key can access.
+                Empty means all databases.
+            tenants: Optional list of tenants this key can access.
+                Empty means all tenants.
+            expires_in_days: Optional expiration in days.
+            description: Optional description.
+
+        Returns:
+            A dict containing the key ``"id"``, ``"key"`` (raw key, shown
+            only once), ``"prefix"``, ``"role"``, etc.
+
+        Example::
+
+            result = await client.create_key(
+                name="agent-writer",
+                role="writer",
+                databases=["prod"],
+            )
+            print(f"New key: {result['key']}")
+        """
+        body: dict[str, Any] = {"name": name, "role": role, "description": description}
+        if databases is not None:
+            body["databases"] = databases
+        if tenants is not None:
+            body["tenants"] = tenants
+        if expires_in_days is not None:
+            body["expiresInDays"] = expires_in_days
+        return await self._request("POST", "/auth/keys", json_body=body)
+
+    async def list_keys(self) -> list[dict[str, Any]]:
+        """List all API keys. Requires ADMIN role.
+
+        Returns:
+            A list of key info dicts (without raw keys or hashes).
+
+        Example::
+
+            keys = await client.list_keys()
+            for key in keys:
+                print(f"{key['name']} ({key['role']}) — prefix: {key['prefix']}")
+        """
+        result = await self._request("GET", "/auth/keys")
+        if isinstance(result, list):
+            return result
+        return []
+
+    async def revoke_key(self, key_id: str) -> dict[str, Any]:
+        """Revoke (delete) an API key. Requires ADMIN role.
+
+        Args:
+            key_id: The ID of the key to revoke.
+
+        Returns:
+            A dict with a confirmation message.
+
+        Example::
+
+            await client.revoke_key("some-uuid")
+        """
+        result = await self._request("DELETE", f"/auth/keys/{key_id}")
+        if isinstance(result, dict):
+            return result
+        return {"result": result}
+
+    async def whoami(self) -> dict[str, Any]:
+        """Get information about the currently authenticated key.
+
+        Returns:
+            A dict with ``"keyId"``, ``"name"``, ``"role"``,
+            ``"permissions"``, ``"databases"``, and ``"tenants"``.
+
+        Example::
+
+            me = await client.whoami()
+            print(f"Authenticated as: {me['name']} (role: {me['role']})")
+        """
+        result = await self._request("GET", "/auth/whoami")
+        if isinstance(result, dict):
+            return result
+        return {"result": result}
+
+    # ------------------------------------------------------------------
     # Observability
     # ------------------------------------------------------------------
 
@@ -928,6 +1100,48 @@ class SyncAxiomBaseClient:
     def health(self) -> dict[str, Any]:
         """Check server health. See :meth:`AxiomBaseClient.health`."""
         return self._run(self._async_client.health())
+
+    def predicates(self, scope: str | None = None) -> dict[str, Any]:
+        """Discover the KB schema. See :meth:`AxiomBaseClient.predicates`."""
+        return self._run(self._async_client.predicates(scope=scope))
+
+    def auth_status(self) -> dict[str, Any]:
+        """Check auth status. See :meth:`AxiomBaseClient.auth_status`."""
+        return self._run(self._async_client.auth_status())
+
+    def bootstrap(self, name: str = "admin", description: str = "Initial admin key") -> dict[str, Any]:
+        """Bootstrap first admin key. See :meth:`AxiomBaseClient.bootstrap`."""
+        return self._run(self._async_client.bootstrap(name=name, description=description))
+
+    def create_key(
+        self,
+        name: str,
+        role: str = "writer",
+        databases: list[str] | None = None,
+        tenants: list[str] | None = None,
+        expires_in_days: int | None = None,
+        description: str = "",
+    ) -> dict[str, Any]:
+        """Create an API key. See :meth:`AxiomBaseClient.create_key`."""
+        return self._run(
+            self._async_client.create_key(
+                name=name, role=role, databases=databases,
+                tenants=tenants, expires_in_days=expires_in_days,
+                description=description,
+            )
+        )
+
+    def list_keys(self) -> list[dict[str, Any]]:
+        """List all API keys. See :meth:`AxiomBaseClient.list_keys`."""
+        return self._run(self._async_client.list_keys())
+
+    def revoke_key(self, key_id: str) -> dict[str, Any]:
+        """Revoke an API key. See :meth:`AxiomBaseClient.revoke_key`."""
+        return self._run(self._async_client.revoke_key(key_id=key_id))
+
+    def whoami(self) -> dict[str, Any]:
+        """Get current key info. See :meth:`AxiomBaseClient.whoami`."""
+        return self._run(self._async_client.whoami())
 
     def close(self) -> None:
         """Close the underlying client and event loop."""

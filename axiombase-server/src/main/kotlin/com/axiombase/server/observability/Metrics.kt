@@ -43,6 +43,11 @@ object Metrics {
         Gauge.builder("axiombase_rules_total", totalRules) { it.toDouble() }
             .description("Total rules across all databases")
             .register(registry)
+
+        // ── MCP gauges ──────────────────────────────────────────────────
+        Gauge.builder("axiombase_mcp_sse_subscribers", mcpSseSubscribers) { it.toDouble() }
+            .description("Active MCP SSE subscribers")
+            .register(registry)
     }
 
     // ── Knowledge operations ────────────────────────────────────────────
@@ -73,7 +78,7 @@ object Metrics {
 
     // ── Query / Inference ───────────────────────────────────────────────
 
-    fun queryTimer(database: String): Timer.Sample {
+    fun queryTimer(): Timer.Sample {
         return Timer.start(registry)
     }
 
@@ -161,6 +166,41 @@ object Metrics {
         Counter.builder("axiombase_memory_evicted_total")
             .description("Facts evicted by low salience")
             .register(registry).increment(evicted.toDouble())
+    }
+
+    // ── MCP ──────────────────────────────────────────────────────────────
+
+    val mcpSseSubscribers = AtomicInteger(0)
+
+    fun mcpToolCallTimer(): Timer.Sample {
+        return Timer.start(registry)
+    }
+
+    fun mcpToolCallCompleted(sample: Timer.Sample, tool: String, status: String) {
+        sample.stop(Timer.builder("axiombase_mcp_tool_call_duration_seconds")
+            .description("MCP tool call duration")
+            .tag("tool", tool)
+            .tag("status", status) // success, error
+            .register(registry))
+    }
+
+    fun mcpToolCallError(tool: String, errorType: String) {
+        Counter.builder("axiombase_mcp_tool_errors_total")
+            .description("MCP tool call errors")
+            .tag("tool", tool)
+            .tag("error_type", errorType) // validation, internal
+            .register(registry).increment()
+    }
+
+    fun mcpSseConnected() {
+        mcpSseSubscribers.incrementAndGet()
+        Counter.builder("axiombase_mcp_sse_connections_total")
+            .description("Total MCP SSE connections")
+            .register(registry).increment()
+    }
+
+    fun mcpSseDisconnected() {
+        mcpSseSubscribers.decrementAndGet()
     }
 
     // ── Errors ──────────────────────────────────────────────────────────
