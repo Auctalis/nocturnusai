@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# AxiomBase — Logic Server for Agentic AI
+# NocturnusAI — Logic Server for Agentic AI
 #
 # Quick start:
 #   cp .env.example .env        # configure provider & keys
@@ -13,19 +13,19 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
-  # ── AxiomBase Logic Server ─────────────────────────────────────────────────
-  axiombase:
-    image: axiombase:latest
+  # ── NocturnusAI Logic Server ─────────────────────────────────────────────────
+  nocturnusai:
+    image: nocturnusai:latest
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: axiombase
+    container_name: nocturnusai
     restart: unless-stopped
     ports:
       - "${PORT:-9300}:${PORT:-9300}"
       # - "${TLS_PORT:-9443}:${TLS_PORT:-9443}"  # Uncomment for TLS
     volumes:
-      - axiombase-data:/data
+      - nocturnusai-data:/data
     env_file:
       - path: .env
         required: false
@@ -35,7 +35,7 @@ services:
       - HOST=0.0.0.0
       - STORAGE_DIR=/data
     networks:
-      - axiombase-net
+      - nocturnusai-net
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
       interval: 10s
@@ -55,7 +55,7 @@ services:
   # GPU passthrough: uncomment the deploy section below.
   ollama:
     image: ollama/ollama:latest
-    container_name: axiombase-ollama
+    container_name: nocturnusai-ollama
     profiles:
       - ollama
     restart: unless-stopped
@@ -64,7 +64,7 @@ services:
     volumes:
       - ollama-models:/root/.ollama
     networks:
-      - axiombase-net
+      - nocturnusai-net
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
       interval: 10s
@@ -84,14 +84,14 @@ services:
   # Pulls the configured model on first start, then exits.
   ollama-pull:
     image: curlimages/curl:latest
-    container_name: axiombase-ollama-pull
+    container_name: nocturnusai-ollama-pull
     profiles:
       - ollama
     depends_on:
       ollama:
         condition: service_healthy
     networks:
-      - axiombase-net
+      - nocturnusai-net
     restart: "no"
     entrypoint: >
       sh -c "curl -sf http://ollama:11434/api/pull -d '{\"name\": \"${LLM_MODEL:-llama3.2}\"}' && echo 'Model ready.'"
@@ -102,7 +102,7 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: axiombase-prometheus
+    container_name: nocturnusai-prometheus
     profiles:
       - monitoring
     restart: unless-stopped
@@ -112,7 +112,7 @@ services:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     networks:
-      - axiombase-net
+      - nocturnusai-net
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=30d'
@@ -120,7 +120,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: axiombase-grafana
+    container_name: nocturnusai-grafana
     profiles:
       - monitoring
     restart: unless-stopped
@@ -132,15 +132,15 @@ services:
       - grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-axiombase}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-nocturnusai}
       - GF_USERS_ALLOW_SIGN_UP=false
     networks:
-      - axiombase-net
+      - nocturnusai-net
     depends_on:
       - prometheus
 
 volumes:
-  axiombase-data:
+  nocturnusai-data:
     driver: local
   ollama-models:
     driver: local
@@ -150,5 +150,5 @@ volumes:
     driver: local
 
 networks:
-  axiombase-net:
+  nocturnusai-net:
     driver: bridge

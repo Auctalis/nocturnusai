@@ -1,8 +1,8 @@
 /**
  * @module types
- * Type definitions for the AxiomBase TypeScript SDK.
+ * Type definitions for the NocturnusAI TypeScript SDK.
  *
- * These types mirror the server-side DTOs defined in the AxiomBase HTTP API
+ * These types mirror the server-side DTOs defined in the NocturnusAI HTTP API
  * and provide full type safety for all client operations.
  */
 
@@ -11,10 +11,10 @@
 // ---------------------------------------------------------------------------
 
 /**
- * Configuration for connecting to an AxiomBase server instance.
+ * Configuration for connecting to an NocturnusAI server instance.
  */
-export interface AxiomBaseConfig {
-  /** Base URL of the AxiomBase server (e.g. "http://localhost:9300"). */
+export interface NocturnusAIConfig {
+  /** Base URL of the NocturnusAI server (e.g. "http://localhost:9300"). */
   baseUrl: string;
 
   /** Optional API key for authenticated access. Sent as `X-API-Key` header. */
@@ -370,9 +370,9 @@ export interface KnowledgeEvent {
 // ---------------------------------------------------------------------------
 
 /**
- * Error response from the AxiomBase server.
+ * Error response from the NocturnusAI server.
  */
-export interface AxiomBaseError {
+export interface NocturnusAIError {
   /** Error code (e.g. "VALIDATION_ERROR", "NOT_FOUND", "CONFLICT"). */
   code: string;
 

@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# AxiomBase — Logic Server for Agentic AI
+# NocturnusAI — Logic Server for Agentic AI
 # ─────────────────────────────────────────────────────────────────────────────
 
 .PHONY: help setup up up-ollama up-monitoring down restart logs health status \
@@ -25,7 +25,7 @@ setup: ## First-time setup: copy .env, create data dir
 up: env-check ## Start server (cloud LLM — needs API key in .env)
 	docker compose up -d --build
 	@echo ""
-	@echo "\033[32mAxiomBase running at http://localhost:$${PORT:-9300}\033[0m"
+	@echo "\033[32mNocturnusAI running at http://localhost:$${PORT:-9300}\033[0m"
 	@echo "  Health:  curl http://localhost:$${PORT:-9300}/health"
 	@echo "  Docs:    curl http://localhost:$${PORT:-9300}/llm.txt"
 	@echo "  CLI:     make cli"
@@ -33,7 +33,7 @@ up: env-check ## Start server (cloud LLM — needs API key in .env)
 up-ollama: env-check ## Start server + local Ollama (no API key needed)
 	docker compose --profile ollama up -d --build
 	@echo ""
-	@echo "\033[32mAxiomBase + Ollama running.\033[0m"
+	@echo "\033[32mNocturnusAI + Ollama running.\033[0m"
 	@echo "  Server:  http://localhost:$${PORT:-9300}"
 	@echo "  Ollama:  http://localhost:11434"
 	@echo "  Model pull may take a few minutes on first start."
@@ -42,9 +42,9 @@ up-ollama: env-check ## Start server + local Ollama (no API key needed)
 up-monitoring: env-check ## Start server + Prometheus + Grafana
 	docker compose --profile monitoring up -d --build
 	@echo ""
-	@echo "\033[32mAxiomBase + Monitoring running.\033[0m"
+	@echo "\033[32mNocturnusAI + Monitoring running.\033[0m"
 	@echo "  Server:     http://localhost:$${PORT:-9300}"
-	@echo "  Grafana:    http://localhost:3000  (admin / axiombase)"
+	@echo "  Grafana:    http://localhost:3000  (admin / nocturnusai)"
 	@echo "  Prometheus: http://localhost:9090"
 
 down: ## Stop everything
@@ -53,7 +53,7 @@ down: ## Stop everything
 restart: down up ## Restart server
 
 logs: ## Tail server logs
-	docker compose logs -f axiombase
+	docker compose logs -f nocturnusai
 
 logs-ollama: ## Tail Ollama logs
 	docker compose logs -f ollama
@@ -64,7 +64,7 @@ health: ## Check server health
 		echo "\033[31mServer not responding.\033[0m"
 
 metrics: ## Show raw Prometheus metrics
-	@curl -sf http://localhost:$${PORT:-9300}/metrics | grep axiombase_ || \
+	@curl -sf http://localhost:$${PORT:-9300}/metrics | grep nocturnusai_ || \
 		echo "\033[31mServer not responding.\033[0m"
 
 status: ## Show running containers
@@ -82,7 +82,7 @@ dev: ## Run server locally (Gradle, port 9300)
 
 cli: ## Connect CLI to running server
 	@echo "Connecting to http://localhost:$${PORT:-9300}..."
-	./gradlew :axiombase-cli:run --args='--server http://localhost:$${PORT:-9300} --db default' --console=plain
+	./gradlew :nocturnusai-cli:run --args='--server http://localhost:$${PORT:-9300} --db default' --console=plain
 
 # ── Maintenance ──────────────────────────────────────────────────────────────
 clean: ## Remove build artifacts and data

@@ -1,4 +1,4 @@
-# AxiomBase — Comprehensive Developer & User Guide
+# NocturnusAI — Comprehensive Developer & User Guide
 
 ## The Symbolic Cortex: A Logic Inference Engine and Knowledge Database
 
@@ -6,8 +6,8 @@
 
 ## Table of Contents
 
-1. [What Is AxiomBase and Why Does It Exist?](#1-what-is-axiombase-and-why-does-it-exist)
-2. [Core Concepts: How AxiomBase Thinks](#2-core-concepts-how-axiombase-thinks)
+1. [What Is NocturnusAI and Why Does It Exist?](#1-what-is-nocturnusai-and-why-does-it-exist)
+2. [Core Concepts: How NocturnusAI Thinks](#2-core-concepts-how-nocturnusai-thinks)
 3. [Architecture Overview](#3-architecture-overview)
 4. [Connecting Securely](#4-connecting-securely)
 5. [Authentication & Headers](#5-authentication--headers)
@@ -30,7 +30,7 @@
 
 ---
 
-## 1. What Is AxiomBase and Why Does It Exist?
+## 1. What Is NocturnusAI and Why Does It Exist?
 
 ### The Problem
 
@@ -45,11 +45,11 @@ You *could* encode all of this in `if/else` chains, nested SQL queries, or graph
 
 ### The Solution
 
-AxiomBase is a **logic inference engine and knowledge database**. Instead of writing procedural code that checks conditions, you **declare facts** (what is true) and **declare rules** (what can be derived from what is true), and then **ask questions**. The engine figures out the answers using formal logic—specifically, SLD resolution (the same algorithm that powers Prolog) combined with forward chaining (the Rete algorithm used in production rule systems like Drools and CLIPS).
+NocturnusAI is a **logic inference engine and knowledge database**. Instead of writing procedural code that checks conditions, you **declare facts** (what is true) and **declare rules** (what can be derived from what is true), and then **ask questions**. The engine figures out the answers using formal logic—specifically, SLD resolution (the same algorithm that powers Prolog) combined with forward chaining (the Rete algorithm used in production rule systems like Drools and CLIPS).
 
 Think of it this way:
 
-| Traditional Approach | AxiomBase Approach |
+| Traditional Approach | NocturnusAI Approach |
 |---|---|
 | Write code that checks conditions | Declare what is true |
 | Debug tangled `if/else` chains | Declare inference rules |
@@ -61,15 +61,15 @@ Think of it this way:
 
 The name comes from its intended use as a companion to Large Language Models (LLMs). LLMs are exceptional at understanding natural language, generating text, and reasoning probabilistically—but they struggle with:
 
-1. **Deterministic multi-step reasoning**: "If A implies B, and B implies C, and A is true, what about C?" An LLM might get this right 95% of the time. AxiomBase gets it right 100% of the time.
-2. **State maintenance**: An LLM's "memory" is its context window, which is limited and lossy. AxiomBase maintains persistent, queryable state with ACID transactions.
-3. **Consistency enforcement**: An LLM can accidentally contradict itself. AxiomBase will throw an error if you try to assert both "X is alive" and "X is dead."
+1. **Deterministic multi-step reasoning**: "If A implies B, and B implies C, and A is true, what about C?" An LLM might get this right 95% of the time. NocturnusAI gets it right 100% of the time.
+2. **State maintenance**: An LLM's "memory" is its context window, which is limited and lossy. NocturnusAI maintains persistent, queryable state with ACID transactions.
+3. **Consistency enforcement**: An LLM can accidentally contradict itself. NocturnusAI will throw an error if you try to assert both "X is alive" and "X is dead."
 
-By offloading strict logic, state management, and rule evaluation to AxiomBase, an AI system gets the best of both worlds: the creativity and language understanding of an LLM, plus the rigor and reliability of a formal logic engine.
+By offloading strict logic, state management, and rule evaluation to NocturnusAI, an AI system gets the best of both worlds: the creativity and language understanding of an LLM, plus the rigor and reliability of a formal logic engine.
 
 ### Core Directives for AI Agents
 
-If you are an AI agent using AxiomBase as your symbolic backend:
+If you are an AI agent using NocturnusAI as your symbolic backend:
 
 1. **Do not guess** the state of the world. Query it via `/infer`.
 2. **Do not simulate** complex logic in your context window. Assert the rules via `/assert/rule` and let the engine solve it.
@@ -77,13 +77,13 @@ If you are an AI agent using AxiomBase as your symbolic backend:
 
 ---
 
-## 2. Core Concepts: How AxiomBase Thinks
+## 2. Core Concepts: How NocturnusAI Thinks
 
-Before diving into the API, you need to understand the four fundamental abstractions that AxiomBase uses to represent and reason about knowledge. These are not arbitrary implementation details—they are the building blocks of formal logic, and understanding them is essential to using the system effectively.
+Before diving into the API, you need to understand the four fundamental abstractions that NocturnusAI uses to represent and reason about knowledge. These are not arbitrary implementation details—they are the building blocks of formal logic, and understanding them is essential to using the system effectively.
 
 ### 2.1 Terms: The Building Blocks
 
-A **Term** is the most basic unit of data in AxiomBase. There are four kinds:
+A **Term** is the most basic unit of data in NocturnusAI. There are four kinds:
 
 | Term Type | Syntax | Example | When to Use |
 |---|---|---|---|
@@ -186,18 +186,18 @@ The API returns these as string representations of the substituted atom:
 
 ## 3. Architecture Overview
 
-AxiomBase is a three-module system:
+NocturnusAI is a three-module system:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        axiombase-web (React)                        │
+│                        nocturnusai-web (React)                        │
 │               Web console for interactive exploration               │
 │                     TypeScript + Vite + React 19                    │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │ HTTP (JSON)
                                ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     axiombase-server (Ktor)                         │
+│                     nocturnusai-server (Ktor)                         │
 │            HTTP API layer: routing, auth, validation                │
 │          Multi-database management, replication, TLS                │
 │                     Kotlin + Ktor 2.3.7 + Netty                    │
@@ -205,7 +205,7 @@ AxiomBase is a three-module system:
                                │ Direct Kotlin API
                                ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     axiombase-core (Pure Logic)                     │
+│                     nocturnusai-core (Pure Logic)                     │
 │                                                                     │
 │  ┌──────────┐  ┌──────────────┐  ┌────────────────────────────┐    │
 │  │ Hexastore│  │   Backward   │  │    Truth Maintenance       │    │
@@ -230,23 +230,23 @@ AxiomBase is a three-module system:
 
 **Why this separation?**
 
-- **axiombase-core** is a pure logic library with zero HTTP dependencies. You can embed it directly in a Kotlin/JVM application without running a server. This makes it testable, embeddable, and reusable.
-- **axiombase-server** adds the HTTP layer, authentication, multi-database management, replication, and observability. It depends on axiombase-core.
-- **axiombase-web** is a standalone React application that provides an interactive web console for exploring databases, running queries, and managing the system visually.
+- **nocturnusai-core** is a pure logic library with zero HTTP dependencies. You can embed it directly in a Kotlin/JVM application without running a server. This makes it testable, embeddable, and reusable.
+- **nocturnusai-server** adds the HTTP layer, authentication, multi-database management, replication, and observability. It depends on nocturnusai-core.
+- **nocturnusai-web** is a standalone React application that provides an interactive web console for exploring databases, running queries, and managing the system visually.
 
 ---
 
 ## 4. Connecting Securely
 
-AxiomBase supports multiple layers of security. Here is how to configure and use each one, from development to production.
+NocturnusAI supports multiple layers of security. Here is how to configure and use each one, from development to production.
 
 ### 4.1 Development Mode (No Security)
 
-By default, AxiomBase runs with no authentication and plain HTTP:
+By default, NocturnusAI runs with no authentication and plain HTTP:
 
 ```bash
 # Start the server
-./gradlew :axiombase-server:run
+./gradlew :nocturnusai-server:run
 
 # Connect with curl — no auth needed
 curl http://localhost:9300/health
@@ -260,7 +260,7 @@ Set the `API_KEY` environment variable to enable header-based authentication:
 
 ```bash
 # Start with authentication
-API_KEY=my-secret-key-12345 ./gradlew :axiombase-server:run
+API_KEY=my-secret-key-12345 ./gradlew :nocturnusai-server:run
 ```
 
 Now every request (except health/metrics endpoints) must include the key:
@@ -291,12 +291,12 @@ curl http://localhost:9300/admin/databases
 
 ### 4.3 TLS/HTTPS (Encryption in Transit)
 
-AxiomBase has built-in TLS support using a PKCS12 keystore:
+NocturnusAI has built-in TLS support using a PKCS12 keystore:
 
 ```bash
 # Generate a self-signed keystore (for testing)
 keytool -genkeypair \
-  -alias axiombase \
+  -alias nocturnusai \
   -keyalg RSA \
   -keysize 2048 \
   -storetype PKCS12 \
@@ -309,8 +309,8 @@ TLS_ENABLED=true \
 TLS_PORT=9443 \
 TLS_KEYSTORE_PATH=./keystore.p12 \
 TLS_KEYSTORE_PASSWORD=changeit \
-TLS_KEY_ALIAS=axiombase \
-./gradlew :axiombase-server:run
+TLS_KEY_ALIAS=nocturnusai \
+./gradlew :nocturnusai-server:run
 ```
 
 Now the server listens on both ports:
@@ -334,17 +334,17 @@ curl -k -H "X-API-Key: my-secret-key" \
      -in fullchain.pem \
      -inkey privkey.pem \
      -out keystore.p12 \
-     -name axiombase \
+     -name nocturnusai \
      -password pass:your-password
    ```
 3. Configure the environment variables accordingly.
 
 **Alternative: Reverse Proxy TLS Termination**
 
-In many production deployments, you'll place a reverse proxy (Nginx, Caddy, HAProxy) in front of AxiomBase that handles TLS termination:
+In many production deployments, you'll place a reverse proxy (Nginx, Caddy, HAProxy) in front of NocturnusAI that handles TLS termination:
 
 ```
-Client ──HTTPS──▶ Nginx (TLS) ──HTTP──▶ AxiomBase:9300
+Client ──HTTPS──▶ Nginx (TLS) ──HTTP──▶ NocturnusAI:9300
 ```
 
 This is often simpler because:
@@ -354,7 +354,7 @@ This is often simpler because:
 
 ### 4.4 Encryption at Rest (AES-256-GCM)
 
-AxiomBase can encrypt all persisted data (WAL entries and snapshots) using AES-256-GCM:
+NocturnusAI can encrypt all persisted data (WAL entries and snapshots) using AES-256-GCM:
 
 ```bash
 # Generate a 32-byte (256-bit) key as 64 hex characters
@@ -362,7 +362,7 @@ ENCRYPTION_KEY=$(openssl rand -hex 32)
 echo "Save this key securely: $ENCRYPTION_KEY"
 
 # Start with encryption
-ENCRYPTION_KEY=$ENCRYPTION_KEY ./gradlew :axiombase-server:run
+ENCRYPTION_KEY=$ENCRYPTION_KEY ./gradlew :nocturnusai-server:run
 ```
 
 **What gets encrypted**:
@@ -381,16 +381,16 @@ Here is the complete configuration for a production deployment:
 ```bash
 export PORT=9300
 export HOST=0.0.0.0
-export API_KEY=$(cat /run/secrets/axiombase-api-key)
-export ENCRYPTION_KEY=$(cat /run/secrets/axiombase-encryption-key)
-export STORAGE_DIR=/data/axiombase
+export API_KEY=$(cat /run/secrets/nocturnusai-api-key)
+export ENCRYPTION_KEY=$(cat /run/secrets/nocturnusai-encryption-key)
+export STORAGE_DIR=/data/nocturnusai
 export TLS_ENABLED=true
 export TLS_PORT=9443
-export TLS_KEYSTORE_PATH=/etc/axiombase/keystore.p12
+export TLS_KEYSTORE_PATH=/etc/nocturnusai/keystore.p12
 export TLS_KEYSTORE_PASSWORD=$(cat /run/secrets/keystore-password)
-export TLS_KEY_ALIAS=axiombase
+export TLS_KEY_ALIAS=nocturnusai
 
-./gradlew :axiombase-server:run
+./gradlew :nocturnusai-server:run
 ```
 
 This gives you:
@@ -427,7 +427,7 @@ All inputs are validated before processing:
 
 ## 5. Authentication & Headers
 
-Every request to AxiomBase uses a set of HTTP headers to identify the target database, tenant, and authentication context. Understanding these headers is essential.
+Every request to NocturnusAI uses a set of HTTP headers to identify the target database, tenant, and authentication context. Understanding these headers is essential.
 
 ### 5.1 Header Reference
 
@@ -444,7 +444,7 @@ Every request to AxiomBase uses a set of HTTP headers to identify the target dat
 
 ### 5.2 How Multi-Database Selection Works
 
-AxiomBase supports multiple independent databases, each with its own set of tenants, facts, rules, and persistence. The `X-Database` header selects which database a request operates on.
+NocturnusAI supports multiple independent databases, each with its own set of tenants, facts, rules, and persistence. The `X-Database` header selects which database a request operates on.
 
 ```bash
 # Create two separate databases
@@ -595,7 +595,7 @@ curl -X POST http://localhost:9300/assert/fact \
 
 Response: `Fact Asserted: NOT Parent(alice, charlie)`
 
-**Why explicit negation matters**: In classical logic, there's a difference between "I don't know if P is true" (absence of P) and "I know P is false" (explicit ¬P). AxiomBase supports explicit negation. This means you can assert "Alice is NOT a parent of Charlie" as a positive piece of knowledge, not just the absence of "Alice is a parent of Charlie." This is critical for rules like Modus Tollens that reason about negation.
+**Why explicit negation matters**: In classical logic, there's a difference between "I don't know if P is true" (absence of P) and "I know P is false" (explicit ¬P). NocturnusAI supports explicit negation. This means you can assert "Alice is NOT a parent of Charlie" as a positive piece of knowledge, not just the absence of "Alice is a parent of Charlie." This is critical for rules like Modus Tollens that reason about negation.
 
 **Error responses**:
 
@@ -610,7 +610,7 @@ Response: `Fact Asserted: NOT Parent(alice, charlie)`
 
 **Purpose**: Teach the engine how to derive new knowledge from existing facts.
 
-**Why it exists**: Rules are what make AxiomBase more than a key-value store. Without rules, you can only retrieve exactly what you stored. With rules, the engine can derive knowledge you never explicitly stated—like inferring that Alice is a grandparent of Dave because she's a parent of Bob who is a parent of Dave.
+**Why it exists**: Rules are what make NocturnusAI more than a key-value store. Without rules, you can only retrieve exactly what you stored. With rules, the engine can derive knowledge you never explicitly stated—like inferring that Alice is a grandparent of Dave because she's a parent of Bob who is a parent of Dave.
 
 **Request**:
 ```bash
@@ -709,7 +709,7 @@ Rule Asserted: Ground_Is_Wet(?location) :- Raining(?location)
 
 **Purpose**: Ask the engine a question and get all answers that can be derived from facts and rules.
 
-**Why it exists**: This is the core value proposition of AxiomBase. You state facts, define rules, and then ask questions. The engine uses backward chaining (SLD resolution) to find all possible answers, following rule chains to arbitrary depth (up to the configurable limit of 100).
+**Why it exists**: This is the core value proposition of NocturnusAI. You state facts, define rules, and then ask questions. The engine uses backward chaining (SLD resolution) to find all possible answers, following rule chains to arbitrary depth (up to the configurable limit of 100).
 
 **Request**:
 ```bash
@@ -859,7 +859,7 @@ Retracted: Parent(alice, bob)
 
 **What happens internally — Truth Maintenance**:
 
-This is where AxiomBase's ProvenanceTracker shines. When you retract a fact:
+This is where NocturnusAI's ProvenanceTracker shines. When you retract a fact:
 
 1. The fact is removed from the Hexastore.
 2. The ProvenanceTracker checks: "Are there any derived facts that depended on this fact?"
@@ -874,11 +874,11 @@ This is where AxiomBase's ProvenanceTracker shines. When you retract a fact:
 
 And you retract `Parent(alice, bob)`, then `Grandparent(alice, dave)` is **automatically retracted** because its premise no longer holds.
 
-This is called **non-monotonic reasoning** (or "belief revision"), and it's one of the most powerful features of AxiomBase. In classical monotonic logic, once something is proven, it's true forever. In AxiomBase, truth depends on its supporting evidence, and removing evidence removes conclusions.
+This is called **non-monotonic reasoning** (or "belief revision"), and it's one of the most powerful features of NocturnusAI. In classical monotonic logic, once something is proven, it's true forever. In NocturnusAI, truth depends on its supporting evidence, and removing evidence removes conclusions.
 
 ### 6.6 Execute DSL Command — `POST /execute`
 
-**Purpose**: Execute one or more commands in the LogiQL DSL (AxiomBase's native logic programming language).
+**Purpose**: Execute one or more commands in the LogiQL DSL (NocturnusAI's native logic programming language).
 
 **Why it exists**: For power users and AI agents that want to send multiple operations in a single request, or use the full expressiveness of the DSL syntax.
 
@@ -1084,11 +1084,11 @@ See [Section 10](#10-logic-testing-framework) for the full testing guide.
 
 ## 7. The Logic Engine: How It Works Under the Hood
 
-This section explains the algorithms and data structures that power AxiomBase. Understanding these will help you write efficient queries, design effective rule sets, and troubleshoot unexpected behavior.
+This section explains the algorithms and data structures that power NocturnusAI. Understanding these will help you write efficient queries, design effective rule sets, and troubleshoot unexpected behavior.
 
 ### 7.1 The Hexastore: Why 6 Indices?
 
-The Hexastore is the heart of AxiomBase's storage layer. For every binary fact (a predicate with exactly 2 arguments), it maintains **six separate indices**—one for each permutation of Subject (S), Predicate (P), and Object (O).
+The Hexastore is the heart of NocturnusAI's storage layer. For every binary fact (a predicate with exactly 2 arguments), it maintains **six separate indices**—one for each permutation of Subject (S), Predicate (P), and Object (O).
 
 ```
 Fact: Parent(alice, bob)
@@ -1208,7 +1208,7 @@ While backward chaining is query-driven (lazy), forward chaining is assertion-dr
 - **Forward chaining** eagerly derives all possible conclusions when facts are asserted. This is great for: maintaining a fully materialized view of derived knowledge, triggering side effects, and having instant query responses (since everything is pre-computed).
 - **Backward chaining** lazily derives answers only when queried. This is great for: large rule sets where materializing everything would be expensive, and for queries where you only need specific answers.
 
-AxiomBase uses both. Forward chaining runs on every assertion (populating derived facts in the store), and backward chaining runs on every query (finding answers that might not yet be materialized or that require deeper exploration).
+NocturnusAI uses both. Forward chaining runs on every assertion (populating derived facts in the store), and backward chaining runs on every query (finding answers that might not yet be materialized or that require deeper exploration).
 
 ### 7.4 Unification: How Pattern Matching Works
 
@@ -1282,7 +1282,7 @@ This is separate from the simple contradiction check (which catches `P` and `¬P
 
 ## 8. Proof Trees: Explaining Derivations
 
-When AxiomBase answers a query, it doesn't just tell you *what* is true — it can tell you *why* it's true. Proof trees capture the full derivation path: which facts were matched, which rules were applied, and how variables were bound at each step. This is essential for debugging knowledge bases, auditing inferences, and building explainable AI systems.
+When NocturnusAI answers a query, it doesn't just tell you *what* is true — it can tell you *why* it's true. Proof trees capture the full derivation path: which facts were matched, which rules were applied, and how variables were bound at each step. This is essential for debugging knowledge bases, auditing inferences, and building explainable AI systems.
 
 ### 8.1 What Is a Proof Tree?
 
@@ -2048,7 +2048,7 @@ curl -X POST http://localhost:9300/infer \
 # Returns: [] (empty — Bob has a fraud flag, so the exception blocks approval)
 ```
 
-**Important — Explicit Negation**: AxiomBase uses explicit negation, not negation-as-failure. For the `NOT Exception` condition to be satisfied, you must explicitly assert the negative fact: `{"predicate": "Fraud_Flag", "args": ["alice"], "truth": false}`. Simply not asserting `Fraud_Flag(alice)` is NOT sufficient — the engine won't assume it's false just because it's absent.
+**Important — Explicit Negation**: NocturnusAI uses explicit negation, not negation-as-failure. For the `NOT Exception` condition to be satisfied, you must explicitly assert the negative fact: `{"predicate": "Fraud_Flag", "args": ["alice"], "truth": false}`. Simply not asserting `Fraud_Flag(alice)` is NOT sufficient — the engine won't assume it's false just because it's absent.
 
 **Software engineering examples**:
 - Deployment gates: `{"CONCLUSION": "Deploy_To_Prod", "EVIDENCE": "All_Tests_Pass", "EXCEPTION": "Deploy_Freeze"}` — "Deploy if tests pass, unless there's a freeze."
@@ -2274,7 +2274,7 @@ Templates generate the same `Rule` objects as manual `/assert/rule` calls. They'
 
 ## 10. Logic Testing Framework
 
-As knowledge bases grow, you need confidence that adding or changing rules doesn't break existing inferences. AxiomBase includes a built-in testing framework that lets you define test cases with setup (facts and rules), expectations (what should or shouldn't be provable), and run them in complete isolation from the live database.
+As knowledge bases grow, you need confidence that adding or changing rules doesn't break existing inferences. NocturnusAI includes a built-in testing framework that lets you define test cases with setup (facts and rules), expectations (what should or shouldn't be provable), and run them in complete isolation from the live database.
 
 ### 10.1 Core Concepts
 
@@ -2428,7 +2428,7 @@ When you send multiple test cases, the response aggregates results:
 
 ## 11. Multi-Tenancy & Scoping: Isolated Worlds
 
-AxiomBase provides two orthogonal isolation mechanisms that serve different purposes.
+NocturnusAI provides two orthogonal isolation mechanisms that serve different purposes.
 
 ### 11.1 Databases: Application-Level Isolation
 
@@ -2483,7 +2483,7 @@ curl -X POST http://localhost:9300/infer \
 
 ### 11.4 The Frame Problem
 
-In AI, the **Frame Problem** is the difficulty of knowing what doesn't change when an action occurs. AxiomBase's scoping mechanism provides a practical solution:
+In AI, the **Frame Problem** is the difficulty of knowing what doesn't change when an action occurs. NocturnusAI's scoping mechanism provides a practical solution:
 
 1. Create a new scope for each "turn" or "state change."
 2. Copy forward only the facts that persist.
@@ -2496,7 +2496,7 @@ This avoids the need to explicitly state "everything else stays the same" (which
 
 ## 12. Transactions: ACID Guarantees
 
-AxiomBase supports ACID transactions for atomic multi-operation changes.
+NocturnusAI supports ACID transactions for atomic multi-operation changes.
 
 ### 12.1 Why Transactions?
 
@@ -2576,7 +2576,7 @@ curl -X POST http://localhost:9300/tx/commit/$TX_ID \
 
 ## 13. Persistence & Durability
 
-AxiomBase is an in-memory database. All facts, rules, and inference state live in RAM for fast access. But it provides durability through two complementary mechanisms.
+NocturnusAI is an in-memory database. All facts, rules, and inference state live in RAM for fast access. But it provides durability through two complementary mechanisms.
 
 ### 13.1 Write-Ahead Log (WAL)
 
@@ -2647,14 +2647,14 @@ Snapshots are taken:
 
 ## 14. Replication: Leader-Follower Architecture
 
-AxiomBase supports a simple leader-follower replication model for read scaling and availability.
+NocturnusAI supports a simple leader-follower replication model for read scaling and availability.
 
 ### 14.1 Leader Mode (Default)
 
 The leader accepts all writes and exposes its WAL via the `/replication/wal` endpoint:
 
 ```bash
-REPLICATION_MODE=LEADER ./gradlew :axiombase-server:run
+REPLICATION_MODE=LEADER ./gradlew :nocturnusai-server:run
 ```
 
 Followers can poll the leader's WAL:
@@ -2676,7 +2676,7 @@ A follower automatically polls the leader every second and applies WAL entries l
 ```bash
 REPLICATION_MODE=FOLLOWER \
 LEADER_URL=http://leader-host:9300 \
-./gradlew :axiombase-server:run
+./gradlew :nocturnusai-server:run
 ```
 
 The follower:
@@ -2768,10 +2768,10 @@ This is powered by Ktor's CallLogging plugin with SLF4J MDC integration.
 # Server on http://localhost:9300, Web on http://localhost:9350
 
 # Option 2: Run server only
-./gradlew :axiombase-server:run
+./gradlew :nocturnusai-server:run
 
 # Option 3: Run web console only (for frontend development)
-cd axiombase-web && npm run dev
+cd nocturnusai-web && npm run dev
 ```
 
 ### 16.2 Docker
@@ -2817,7 +2817,7 @@ services:
 
 ## 17. The DSL: Writing Logic Programs
 
-AxiomBase includes a native DSL (Domain-Specific Language) called LogiQL that can be used via the `/execute` endpoint or the interactive REPL.
+NocturnusAI includes a native DSL (Domain-Specific Language) called LogiQL that can be used via the `/execute` endpoint or the interactive REPL.
 
 ### 17.1 Syntax Overview
 
@@ -3110,10 +3110,10 @@ curl -X POST http://localhost:9300/infer \
 
 ### 18.5 AI Agent Integration Pattern
 
-This is the primary intended use case—an AI agent (like Claude, GPT, etc.) using AxiomBase as its reasoning backend.
+This is the primary intended use case—an AI agent (like Claude, GPT, etc.) using NocturnusAI as its reasoning backend.
 
 ```python
-# Pseudocode for an AI agent using AxiomBase
+# Pseudocode for an AI agent using NocturnusAI
 
 import requests
 
@@ -3194,7 +3194,7 @@ Understanding the limitations helps you work effectively with the system.
 
 ### 17.3 Explicit Negation Only
 
-**Trade-off**: AxiomBase uses explicit negation (`NOT P` must be positively asserted), not "negation as failure" (where the absence of `P` is treated as `NOT P`).
+**Trade-off**: NocturnusAI uses explicit negation (`NOT P` must be positively asserted), not "negation as failure" (where the absence of `P` is treated as `NOT P`).
 
 **Implication**: For rules that check "if NOT suspended," you must explicitly assert `NOT Is_Suspended(user)` for each user. The mere absence of `Is_Suspended(user)` is not enough.
 
@@ -3218,7 +3218,7 @@ Understanding the limitations helps you work effectively with the system.
 
 ### 17.7 No Built-In Aggregation
 
-**Trade-off**: AxiomBase does not support aggregation (COUNT, SUM, AVG, etc.) in queries.
+**Trade-off**: NocturnusAI does not support aggregation (COUNT, SUM, AVG, etc.) in queries.
 
 **Implication**: You cannot ask "How many admins are there?" directly. You must retrieve all matching results and count them client-side.
 
@@ -3377,7 +3377,7 @@ Exceeding any limit returns `400 VALIDATION_ERROR`.
 | **Rete Engine** | A forward-chaining inference engine that indexes rule conditions for efficient matching. |
 | **Rule** | A Horn clause that defines how to derive new knowledge from existing facts. |
 | **Scope** | An optional partition key on facts/rules for hypothetical reasoning or versioning. |
-| **SLD Resolution** | Selective Linear Definite clause resolution. The algorithm used by Prolog and AxiomBase's backward chainer. |
+| **SLD Resolution** | Selective Linear Definite clause resolution. The algorithm used by Prolog and NocturnusAI's backward chainer. |
 | **Standardization Apart** | Renaming variables in a rule to unique names before each use, preventing name conflicts. |
 | **Substitution** | A mapping from variables to concrete values that makes a query true. |
 | **Term** | The basic data type: Identifier, StringLit, NumberLit, or Variable. |
@@ -3455,11 +3455,11 @@ TLS_ENABLED=false        # Enable HTTPS
 TLS_PORT=9443            # HTTPS port
 TLS_KEYSTORE_PATH=       # Path to PKCS12 keystore
 TLS_KEYSTORE_PASSWORD=   # Keystore password
-TLS_KEY_ALIAS=axiombase  # Key alias
+TLS_KEY_ALIAS=nocturnusai  # Key alias
 REPLICATION_MODE=LEADER  # LEADER or FOLLOWER
 LEADER_URL=              # Leader URL for follower mode
 ```
 
 ---
 
-*This guide documents AxiomBase as of its current implementation. For the auto-generated API documentation, visit `GET /llm.txt` on a running server. This guide is also available at `GET /userguide` on a running server.*
+*This guide documents NocturnusAI as of its current implementation. For the auto-generated API documentation, visit `GET /llm.txt` on a running server. This guide is also available at `GET /userguide` on a running server.*

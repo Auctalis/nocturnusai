@@ -2,7 +2,7 @@
 
 # Find running process for the server (checking for the Gradle run process or the Java process)
 # We look for the main class or the gradle task
-PID=$(pgrep -f "axiombase-server:run" || pgrep -f "com.axiombase.server.ApplicationKt")
+PID=$(pgrep -f "nocturnusai-server:run" || pgrep -f "com.nocturnusai.server.ApplicationKt")
 
 # Ensure a valid JAVA_HOME is set if not already
 if [ -z "$JAVA_HOME" ]; then
@@ -30,4 +30,4 @@ echo "Starting server..."
 # But if it's a script to "run", usually we want to see output.
 # If I run it in background, user won't see logs. 
 # Attempting to start.
-./gradlew :axiombase-server:run
+./gradlew :nocturnusai-server:run

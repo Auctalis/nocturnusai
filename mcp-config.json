@@ -1,18 +1,18 @@
 {
   "mcpServers": {
-    "axiombase": {
+    "nocturnusai": {
       "url": "http://localhost:9300/mcp/sse",
       "transport": "sse",
-      "description": "AxiomBase Logic Server — deterministic reasoning, truth maintenance, and agent memory management for AI agents",
+      "description": "NocturnusAI Logic Server — deterministic reasoning, truth maintenance, and agent memory management for AI agents",
       "headers": {
         "X-Database": "default",
         "X-Tenant-ID": "default",
-        "X-API-Key": "${AXIOMBASE_API_KEY}"
+        "X-API-Key": "${NOCTURNUSAI_API_KEY}"
       },
       "_comment": {
         "env_vars": {
-          "AXIOMBASE_API_KEY": "Your AxiomBase API key. Generate via POST /auth/bootstrap (first time) or POST /auth/keys (admin). Required when AUTH_ENABLED=true.",
-          "AXIOMBASE_URL": "Override the server URL (default: http://localhost:9300)"
+          "NOCTURNUSAI_API_KEY": "Your NocturnusAI API key. Generate via POST /auth/bootstrap (first time) or POST /auth/keys (admin). Required when AUTH_ENABLED=true.",
+          "NOCTURNUSAI_URL": "Override the server URL (default: http://localhost:9300)"
         },
         "auth_modes": {
           "disabled": "No API key needed. Set no env vars.",

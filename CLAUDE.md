@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AxiomBase is the **logic server for Agentic AI**. It provides deterministic multi-step reasoning, truth maintenance, and agent memory lifecycle management via HTTP API, MCP protocol, and client SDKs (Python, TypeScript). Agents use AxiomBase as their semantic memory and reasoning backend — storing facts, defining rules, running inference, and managing context windows with temporal awareness and salience scoring.
+NocturnusAI is the **logic server for Agentic AI**. It provides deterministic multi-step reasoning, truth maintenance, and agent memory lifecycle management via HTTP API, MCP protocol, and client SDKs (Python, TypeScript). Agents use NocturnusAI as their semantic memory and reasoning backend — storing facts, defining rules, running inference, and managing context windows with temporal awareness and salience scoring.
 
 ## Build & Run Commands
 
@@ -13,25 +13,25 @@ AxiomBase is the **logic server for Agentic AI**. It provides deterministic mult
 ./gradlew build
 
 # Run the HTTP API server (port 9300)
-./gradlew :axiombase-server:run
+./gradlew :nocturnusai-server:run
 
 # Run the core engine REPL directly
-./gradlew :axiombase-core:run
+./gradlew :nocturnusai-core:run
 
 # Run all tests
 ./gradlew test
 
 # Run tests for a specific module
-./gradlew :axiombase-core:test
-./gradlew :axiombase-server:test
+./gradlew :nocturnusai-core:test
+./gradlew :nocturnusai-server:test
 
 # Run a single test class
-./gradlew :axiombase-core:test --tests "com.axiombase.TransactionTest"
+./gradlew :nocturnusai-core:test --tests "com.nocturnusai.TransactionTest"
 
 # CLI (interactive REPL — connect to running server)
-./gradlew :axiombase-cli:run                                           # defaults: localhost:9300, db=default
-./gradlew :axiombase-cli:run --args='--server http://host:9300 --db mydb'
-./gradlew :axiombase-cli:run --args='--api-key secret --db prod'
+./gradlew :nocturnusai-cli:run                                           # defaults: localhost:9300, db=default
+./gradlew :nocturnusai-cli:run --args='--server http://host:9300 --db mydb'
+./gradlew :nocturnusai-cli:run --args='--api-key secret --db prod'
 
 # Run server + use CLI
 ./run_local_dev.sh    # starts server on :9300
@@ -42,10 +42,10 @@ docker-compose up --build    # server on :9300
 
 ## Architecture
 
-Three-module Gradle project (`settings.gradle.kts` includes `axiombase-core`, `axiombase-server`, and `axiombase-cli`):
+Three-module Gradle project (`settings.gradle.kts` includes `nocturnusai-core`, `nocturnusai-server`, and `nocturnusai-cli`):
 
-### axiombase-core — Pure Logic Engine Library
-Package: `com.axiombase`
+### nocturnusai-core — Pure Logic Engine Library
+Package: `com.nocturnusai`
 
 **Domain model** (`core/`):
 - `Atom` — fundamental unit of knowledge: predicate + args + truth value + source + scope + temporal fields (createdAt, validFrom, validUntil, ttl)
@@ -85,10 +85,10 @@ Package: `com.axiombase`
 
 **Entry point**: `Main.kt` (interactive REPL)
 
-### axiombase-server — Ktor HTTP API
-Package: `com.axiombase.server`
+### nocturnusai-server — Ktor HTTP API
+Package: `com.nocturnusai.server`
 
-Built on Ktor 2.3.7 with Netty. Depends on `:axiombase-core`.
+Built on Ktor 2.3.7 with Netty. Depends on `:nocturnusai-core`.
 
 **Routes** (`routes/`):
 - `LogicRoutes` — `POST /assert/fact`, `/assert/rule`, `/assert/template`, `/infer`, `/retract`, `/execute`
@@ -101,17 +101,17 @@ Built on Ktor 2.3.7 with Netty. Depends on `:axiombase-core`.
 
 **Key classes**:
 - `Application.kt` — Ktor module setup (CORS, content negotiation, call logging, optional API key auth)
-- `DatabaseManager` — manages multiple AxiomBase instances in a `ConcurrentHashMap`, database selected via `X-Database` header
+- `DatabaseManager` — manages multiple NocturnusAI instances in a `ConcurrentHashMap`, database selected via `X-Database` header
 - `ServerConfig` — env var config (`PORT`, `HOST`, `API_KEY`, `STORAGE_DIR`, `REPLICATION_MODE`, `LEADER_URL`)
 - `TemplateService` — logic template application (Modus Ponens, Modus Tollens, etc.)
 - `LlmTxtGenerator` — auto-generates `/llm.txt` API documentation via reflection
 
 **Multi-tenancy**: `X-Database` header selects database, `X-Tenant-ID` header selects tenant within database.
 
-### axiombase-cli — Interactive REPL
-Package: `com.axiombase.cli`
+### nocturnusai-cli — Interactive REPL
+Package: `com.nocturnusai.cli`
 
-Ktor-client based CLI that connects to a running AxiomBase server over HTTP.
+Ktor-client based CLI that connects to a running NocturnusAI server over HTTP.
 
 **Commands**: `ask`, `tell`, `teach`, `forget`, `inspect`, `context`, `compress`, `cleanup`, `dsl`, `use`, `dbs`, `health`
 **Shortcuts**: `?`=ask, `+`=tell, `++`=teach, `-`=forget, `ls`=inspect, `ctx`=context
@@ -119,16 +119,16 @@ Ktor-client based CLI that connects to a running AxiomBase server over HTTP.
 Parses natural predicate syntax (`likes(alice, bob)`, `mortal(?x) :- human(?x)`) client-side.
 Args: `--server`, `--db`, `--api-key`, `--tenant`.
 
-### sdks/python — Python SDK (`axiombase` on PyPI)
-- Async client (`AxiomBaseClient`) and sync wrapper (`SyncAxiomBaseClient`) using httpx
+### sdks/python — Python SDK (`nocturnusai` on PyPI)
+- Async client (`NocturnusAIClient`) and sync wrapper (`SyncNocturnusAIClient`) using httpx
 - Pydantic models for all DTOs
-- LangChain tool wrappers (`axiombase.langchain`) — `AxiomBaseAssertTool`, `AxiomBaseQueryTool`, `AxiomBaseInferTool`, `AxiomBaseContextTool`
-- MCP client helper (`axiombase.mcp`) for JSON-RPC 2.0 communication
+- LangChain tool wrappers (`nocturnusai.langchain`) — `NocturnusAIAssertTool`, `NocturnusAIQueryTool`, `NocturnusAIInferTool`, `NocturnusAIContextTool`
+- MCP client helper (`nocturnusai.mcp`) for JSON-RPC 2.0 communication
 
-### sdks/typescript — TypeScript SDK (`@axiombase/sdk` on npm)
-- `AxiomBaseClient` with full API coverage using standard fetch
+### sdks/typescript — TypeScript SDK (`@nocturnusai/sdk` on npm)
+- `NocturnusAIClient` with full API coverage using standard fetch
 - SSE event subscription support
-- MCP client helper (`AxiomBaseMCPClient`)
+- MCP client helper (`NocturnusAIMCPClient`)
 - Zero runtime dependencies (uses built-in fetch)
 
 ### Agent Integration Points

@@ -1,7 +1,7 @@
 {
-  "name": "@axiombase/sdk",
+  "name": "@nocturnusai/sdk",
   "version": "0.1.0",
-  "description": "TypeScript SDK for AxiomBase — a logic-based inference engine and knowledge database",
+  "description": "TypeScript SDK for NocturnusAI — a logic-based inference engine and knowledge database",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -14,7 +14,7 @@
     "prepublishOnly": "tsc"
   },
   "keywords": [
-    "axiombase",
+    "nocturnusai",
     "logic",
     "inference",
     "knowledge-base",

@@ -4,8 +4,8 @@ import os
 
 # Configuration
 SOURCE_FILES = [
-    'axiombase-server/src/main/kotlin/com/axiombase/server/Application.kt',
-    'axiombase-server/src/main/kotlin/com/axiombase/server/TemplateService.kt'
+    'nocturnusai-server/src/main/kotlin/com/nocturnusai/server/Application.kt',
+    'nocturnusai-server/src/main/kotlin/com/nocturnusai/server/TemplateService.kt'
 ]
 OUTPUT_FILE = 'llm.txt'
 
@@ -116,7 +116,7 @@ def generate_markdown(routes, classes):
     md.append("# Logic Server API Reference\n")
     md.append("> **Auto-Generated**: This file is dynamically generated from the source code. Do not edit manually.\n")
     md.append("## Overview\n")
-    md.append("This API allows interaction with the AxiomBase Logic Server for asserting facts, rules, and performing queries.\n")
+    md.append("This API allows interaction with the NocturnusAI Logic Server for asserting facts, rules, and performing queries.\n")
     
     md.append("\n## Data Schemas\n")
     for cls_name, fields in classes.items():

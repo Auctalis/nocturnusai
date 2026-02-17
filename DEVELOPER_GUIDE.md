@@ -1,8 +1,8 @@
-# AxiomBase Developer Guide
+# NocturnusAI Developer Guide
 
-> The complete reference for building with AxiomBase — from first `curl` to production deployment.
+> The complete reference for building with NocturnusAI — from first `curl` to production deployment.
 
-**AxiomBase** is the logic server for Agentic AI. It gives your agents deterministic multi-step reasoning, truth maintenance, and memory lifecycle management via HTTP API, MCP protocol, and client SDKs.
+**NocturnusAI** is the logic server for Agentic AI. It gives your agents deterministic multi-step reasoning, truth maintenance, and memory lifecycle management via HTTP API, MCP protocol, and client SDKs.
 
 ---
 
@@ -105,7 +105,7 @@ Variables use the `?` prefix: `?x`, `?who`, `?name`.
 
 ### Inference
 
-AxiomBase uses **backward chaining** (Prolog-style SLD resolution) as its primary inference engine. Given a query like `grandparent(?who, charlie)`, it works backward from the goal, unifying variables, and applying rules until it finds facts that satisfy all conditions.
+NocturnusAI uses **backward chaining** (Prolog-style SLD resolution) as its primary inference engine. Given a query like `grandparent(?who, charlie)`, it works backward from the goal, unifying variables, and applying rules until it finds facts that satisfy all conditions.
 
 **Forward chaining** (Rete engine) supplements backward chaining by eagerly deriving conclusions when new facts are asserted.
 
@@ -348,7 +348,7 @@ curl -sX POST http://localhost:9300/forget \
 
 ## 5. Memory Management
 
-AxiomBase provides agent-aware memory lifecycle management: temporal queries, salience-ranked retrieval, consolidation, and decay.
+NocturnusAI provides agent-aware memory lifecycle management: temporal queries, salience-ranked retrieval, consolidation, and decay.
 
 ### Context Window
 
@@ -543,7 +543,7 @@ If validation fails, the transaction is rolled back and an error is returned.
 
 ## 7. MCP Protocol
 
-AxiomBase implements the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) for seamless AI agent integration.
+NocturnusAI implements the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) for seamless AI agent integration.
 
 ### Configuration
 
@@ -552,12 +552,12 @@ Add to your MCP client settings (Claude Desktop, Cursor, Windsurf, etc.):
 ```json
 {
   "mcpServers": {
-    "axiombase": {
+    "nocturnusai": {
       "url": "http://localhost:9300/mcp/sse",
       "transport": "sse",
       "headers": {
         "X-Database": "default",
-        "X-API-Key": "${AXIOMBASE_API_KEY}"
+        "X-API-Key": "${NOCTURNUSAI_API_KEY}"
       }
     }
   }
@@ -613,7 +613,7 @@ curl -sX POST http://localhost:9300/mcp \
 
 ### A2A Agent Discovery
 
-AxiomBase publishes an [Agent2Agent Protocol](https://google.github.io/A2A/) agent card:
+NocturnusAI publishes an [Agent2Agent Protocol](https://google.github.io/A2A/) agent card:
 
 ```bash
 curl http://localhost:9300/.well-known/agent.json
@@ -626,20 +626,20 @@ curl http://localhost:9300/.well-known/agent.json
 ### Install
 
 ```bash
-pip install axiombase
+pip install nocturnusai
 
 # With LangChain integration
-pip install axiombase[langchain]
+pip install nocturnusai[langchain]
 ```
 
 ### Async client
 
 ```python
 import asyncio
-from axiombase import AxiomBaseClient
+from nocturnusai import NocturnusAIClient
 
 async def main():
-    async with AxiomBaseClient(
+    async with NocturnusAIClient(
         base_url="http://localhost:9300",
         api_key="your-key",         # optional
         database="default",
@@ -702,9 +702,9 @@ asyncio.run(main())
 ### Sync client
 
 ```python
-from axiombase import SyncAxiomBaseClient
+from nocturnusai import SyncNocturnusAIClient
 
-with SyncAxiomBaseClient("http://localhost:9300") as client:
+with SyncNocturnusAIClient("http://localhost:9300") as client:
     client.assert_fact("human", ["socrates"])
     client.assert_rule(
         head={"predicate": "mortal", "args": ["?x"]},
@@ -719,7 +719,7 @@ with SyncAxiomBaseClient("http://localhost:9300") as client:
 ```python
 import time
 
-async with AxiomBaseClient("http://localhost:9300") as client:
+async with NocturnusAIClient("http://localhost:9300") as client:
     now = int(time.time() * 1000)
 
     # Fact valid for the next hour
@@ -740,7 +740,7 @@ async with AxiomBaseClient("http://localhost:9300") as client:
 ### Auth management
 
 ```python
-async with AxiomBaseClient("http://localhost:9300") as client:
+async with NocturnusAIClient("http://localhost:9300") as client:
     # Check auth status
     status = await client.auth_status()
 
@@ -793,7 +793,7 @@ async with AxiomBaseClient("http://localhost:9300") as client:
 ### Install
 
 ```bash
-npm install @axiombase/sdk
+npm install @nocturnusai/sdk
 ```
 
 Zero runtime dependencies — uses built-in `fetch`.
@@ -801,9 +801,9 @@ Zero runtime dependencies — uses built-in `fetch`.
 ### Usage
 
 ```typescript
-import { AxiomBaseClient } from '@axiombase/sdk';
+import { NocturnusAIClient } from '@nocturnusai/sdk';
 
-const client = new AxiomBaseClient({
+const client = new NocturnusAIClient({
   baseUrl: 'http://localhost:9300',
   apiKey: 'your-key',        // optional
   database: 'default',
@@ -924,23 +924,23 @@ The Python SDK includes first-class LangChain tool wrappers.
 ### Install
 
 ```bash
-pip install axiombase[langchain]
+pip install nocturnusai[langchain]
 ```
 
 ### Quick start
 
 ```python
-from axiombase import SyncAxiomBaseClient
-from axiombase.langchain import get_axiombase_tools
+from nocturnusai import SyncNocturnusAIClient
+from nocturnusai.langchain import get_nocturnusai_tools
 
-client = SyncAxiomBaseClient("http://localhost:9300")
-tools = get_axiombase_tools(client)
+client = SyncNocturnusAIClient("http://localhost:9300")
+tools = get_nocturnusai_tools(client)
 
 # tools = [
-#   AxiomBaseAssertTool   — axiombase_assert
-#   AxiomBaseQueryTool    — axiombase_query
-#   AxiomBaseInferTool    — axiombase_infer
-#   AxiomBaseContextTool  — axiombase_context
+#   NocturnusAIAssertTool   — nocturnusai_assert
+#   NocturnusAIQueryTool    — nocturnusai_query
+#   NocturnusAIInferTool    — nocturnusai_infer
+#   NocturnusAIContextTool  — nocturnusai_context
 # ]
 ```
 
@@ -971,16 +971,16 @@ result = executor.invoke({
 
 | Tool Name | Description |
 |-----------|-------------|
-| `axiombase_assert` | Assert a fact into the knowledge base |
-| `axiombase_query` | Query facts matching a pattern |
-| `axiombase_infer` | Run multi-step logical inference |
-| `axiombase_context` | Get salience-ranked context window |
+| `nocturnusai_assert` | Assert a fact into the knowledge base |
+| `nocturnusai_query` | Query facts matching a pattern |
+| `nocturnusai_infer` | Run multi-step logical inference |
+| `nocturnusai_context` | Get salience-ranked context window |
 
 ---
 
 ## 11. CLI Reference
 
-The interactive REPL connects to a running AxiomBase server.
+The interactive REPL connects to a running NocturnusAI server.
 
 ### Start
 
@@ -989,13 +989,13 @@ The interactive REPL connects to a running AxiomBase server.
 make cli
 
 # Via Gradle
-./gradlew :axiombase-cli:run --console=plain
+./gradlew :nocturnusai-cli:run --console=plain
 
 # With options
-./gradlew :axiombase-cli:run --args='--server http://host:9300 --db mydb --api-key secret'
+./gradlew :nocturnusai-cli:run --args='--server http://host:9300 --db mydb --api-key secret'
 
 # Execute a single command
-./gradlew :axiombase-cli:run --args='-e "tell human(socrates)"'
+./gradlew :nocturnusai-cli:run --args='-e "tell human(socrates)"'
 ```
 
 ### Commands
@@ -1027,30 +1027,30 @@ make cli
 ### Example session
 
 ```
-axiombase> + human(socrates)
+nocturnusai> + human(socrates)
 Stored: human(socrates)
 
-axiombase> + human(plato)
+nocturnusai> + human(plato)
 Stored: human(plato)
 
-axiombase> ++ mortal(?x) :- human(?x)
+nocturnusai> ++ mortal(?x) :- human(?x)
 Taught: mortal(?x) :- human(?x)
 
-axiombase> ? mortal(?who)
+nocturnusai> ? mortal(?who)
 Results:
   mortal(socrates)
   mortal(plato)
 
-axiombase> ls
+nocturnusai> ls
   human(socrates)
   human(plato)
 Rules:
   mortal(?x) :- human(?x)
 
-axiombase> - human(plato)
+nocturnusai> - human(plato)
 Forgot: human(plato)
 
-axiombase> ? mortal(?who)
+nocturnusai> ? mortal(?who)
 Results:
   mortal(socrates)
 ```
@@ -1087,8 +1087,8 @@ Full role-based access control with managed API keys.
 
 ```env
 AUTH_ENABLED=true
-AXIOMBASE_ADMIN_USER=admin
-AXIOMBASE_ADMIN_PASS=change-me-in-production
+NOCTURNUSAI_ADMIN_USER=admin
+NOCTURNUSAI_ADMIN_PASS=change-me-in-production
 ```
 
 **Bootstrap the first admin key:**
@@ -1160,7 +1160,7 @@ curl -sX POST http://localhost:9300/auth/keys \
 
 ## 13. LLM-Powered Features
 
-AxiomBase can use an LLM for natural language fact extraction and question answering. Configure one provider in your `.env`.
+NocturnusAI can use an LLM for natural language fact extraction and question answering. Configure one provider in your `.env`.
 
 ### Provider priority (auto-detected)
 
@@ -1217,7 +1217,7 @@ curl -sX POST http://localhost:9300/synthesize \
 
 ## 14. Multi-Tenancy
 
-AxiomBase supports two levels of data isolation.
+NocturnusAI supports two levels of data isolation.
 
 ### Databases
 
@@ -1315,7 +1315,7 @@ make up-monitoring
 curl -fsSL https://openclaw.ai/install.sh | bash -s -- --monitoring
 ```
 
-- **Grafana:** http://localhost:3000 (admin / axiombase)
+- **Grafana:** http://localhost:3000 (admin / nocturnusai)
 - **Prometheus:** http://localhost:9090
 
 Pre-configured dashboards for request rates, inference performance, and memory utilization.
@@ -1325,7 +1325,7 @@ Pre-configured dashboards for request rates, inference performance, and memory u
 ```env
 LOG_FORMAT=json       # JSON for ELK/Datadog (default: text)
 LOG_LEVEL=INFO        # DEBUG, INFO, WARN, ERROR
-LOG_FILE=/data/axiombase.log  # Enable file logging (50MB rotation, 30 day retention)
+LOG_FILE=/data/nocturnusai.log  # Enable file logging (50MB rotation, 30 day retention)
 ```
 
 Each log line includes `requestId`, `database`, and `tenantId` for correlation.
@@ -1351,7 +1351,7 @@ curl http://localhost:9300/userguide
 curl -fsSL https://openclaw.ai/install.sh | bash -s -- --monitoring
 
 # 2. Configure .env for production
-cd ~/axiombase
+cd ~/nocturnusai
 ```
 
 Edit `.env`:
@@ -1359,8 +1359,8 @@ Edit `.env`:
 ```env
 # Auth — required in production
 AUTH_ENABLED=true
-AXIOMBASE_ADMIN_USER=admin
-AXIOMBASE_ADMIN_PASS=<strong-password>
+NOCTURNUSAI_ADMIN_USER=admin
+NOCTURNUSAI_ADMIN_PASS=<strong-password>
 
 # LLM provider
 ANTHROPIC_API_KEY=sk-ant-...
@@ -1377,7 +1377,7 @@ TLS_KEYSTORE_PASSWORD=<keystore-password>
 # Structured logging
 LOG_FORMAT=json
 LOG_LEVEL=INFO
-LOG_FILE=/data/axiombase.log
+LOG_FILE=/data/nocturnusai.log
 
 # Monitoring
 GRAFANA_USER=admin
@@ -1409,8 +1409,8 @@ The Docker image works directly in Kubernetes. Key considerations:
 # Deployment
 spec:
   containers:
-    - name: axiombase
-      image: axiombase:latest
+    - name: nocturnusai
+      image: nocturnusai:latest
       ports:
         - containerPort: 9300
       env:
@@ -1445,25 +1445,25 @@ spec:
   volumes:
     - name: data
       persistentVolumeClaim:
-        claimName: axiombase-data
+        claimName: nocturnusai-data
 ```
 
 ### Reverse proxy (nginx)
 
 ```nginx
-upstream axiombase {
+upstream nocturnusai {
     server 127.0.0.1:9300;
 }
 
 server {
     listen 443 ssl http2;
-    server_name axiombase.example.com;
+    server_name nocturnusai.example.com;
 
-    ssl_certificate /etc/ssl/certs/axiombase.crt;
-    ssl_certificate_key /etc/ssl/private/axiombase.key;
+    ssl_certificate /etc/ssl/certs/nocturnusai.crt;
+    ssl_certificate_key /etc/ssl/private/nocturnusai.key;
 
     location / {
-        proxy_pass http://axiombase;
+        proxy_pass http://nocturnusai;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -1472,7 +1472,7 @@ server {
 
     # SSE endpoints need special handling
     location /memory/events {
-        proxy_pass http://axiombase;
+        proxy_pass http://nocturnusai;
         proxy_set_header Connection '';
         proxy_http_version 1.1;
         chunked_transfer_encoding off;
@@ -1481,7 +1481,7 @@ server {
     }
 
     location /mcp/sse {
-        proxy_pass http://axiombase;
+        proxy_pass http://nocturnusai;
         proxy_set_header Connection '';
         proxy_http_version 1.1;
         chunked_transfer_encoding off;
@@ -1511,7 +1511,7 @@ server {
 
 ### Leader-follower replication
 
-AxiomBase supports leader-follower replication for read scalability and disaster recovery.
+NocturnusAI supports leader-follower replication for read scalability and disaster recovery.
 
 **Leader configuration (default):**
 
@@ -1546,7 +1546,7 @@ Backup includes:
 
 ### Recovery
 
-On startup, AxiomBase automatically:
+On startup, NocturnusAI automatically:
 1. Loads the latest snapshot
 2. Replays WAL entries since the snapshot
 
@@ -1572,21 +1572,21 @@ WAL and snapshot files will be encrypted with AES-256.
 
 ### TLS
 
-AxiomBase supports native TLS:
+NocturnusAI supports native TLS:
 
 ```env
 TLS_ENABLED=true
 TLS_PORT=9443
 TLS_KEYSTORE_PATH=/data/keystore.p12
 TLS_KEYSTORE_PASSWORD=changeit
-TLS_KEY_ALIAS=axiombase
+TLS_KEY_ALIAS=nocturnusai
 TLS_KEY_PASSWORD=changeit
 ```
 
 Generate a self-signed keystore for testing:
 
 ```bash
-keytool -genkeypair -alias axiombase -keyalg RSA -keysize 2048 \
+keytool -genkeypair -alias nocturnusai -keyalg RSA -keysize 2048 \
   -storetype PKCS12 -keystore keystore.p12 -validity 365 \
   -storepass changeit -keypass changeit \
   -dname "CN=localhost"
@@ -1594,14 +1594,14 @@ keytool -genkeypair -alias axiombase -keyalg RSA -keysize 2048 \
 
 ### Security headers
 
-AxiomBase validates all input headers:
+NocturnusAI validates all input headers:
 - `X-Database` — alphanumeric, hyphens, underscores only
 - `X-Tenant-ID` — same validation
 - Request body size limits enforced by Ktor/Netty
 
 ### Non-root container
 
-The Docker image runs as user `axiombase` (non-root) with minimal Alpine base.
+The Docker image runs as user `nocturnusai` (non-root) with minimal Alpine base.
 
 ---
 
@@ -1614,14 +1614,14 @@ The Docker image runs as user `axiombase` (non-root) with minimal Alpine base.
 | `STORAGE_DIR` | `/data` | WAL/snapshot directory |
 | `API_KEY` | — | Legacy single-key auth |
 | `AUTH_ENABLED` | `false` | Enable RBAC auth |
-| `AXIOMBASE_ADMIN_USER` | `admin` | RBAC bootstrap username |
-| `AXIOMBASE_ADMIN_PASS` | `axiombase` | RBAC bootstrap password |
+| `NOCTURNUSAI_ADMIN_USER` | `admin` | RBAC bootstrap username |
+| `NOCTURNUSAI_ADMIN_PASS` | `nocturnusai` | RBAC bootstrap password |
 | `ENCRYPTION_KEY` | — | AES-256 key (64 hex chars) |
 | `TLS_ENABLED` | `false` | Enable native TLS |
 | `TLS_PORT` | `9443` | HTTPS port |
 | `TLS_KEYSTORE_PATH` | — | Path to PKCS12 keystore |
 | `TLS_KEYSTORE_PASSWORD` | — | Keystore password |
-| `TLS_KEY_ALIAS` | `axiombase` | Key alias in keystore |
+| `TLS_KEY_ALIAS` | `nocturnusai` | Key alias in keystore |
 | `TLS_KEY_PASSWORD` | — | Private key password |
 | `REPLICATION_MODE` | `LEADER` | `LEADER` or `FOLLOWER` |
 | `LEADER_URL` | — | Leader URL (follower mode) |
@@ -1638,7 +1638,7 @@ The Docker image runs as user `axiombase` (non-root) with minimal Alpine base.
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARN`, `ERROR` |
 | `LOG_FILE` | — | File path for log rotation |
 | `GRAFANA_USER` | `admin` | Grafana admin username |
-| `GRAFANA_PASSWORD` | `axiombase` | Grafana admin password |
+| `GRAFANA_PASSWORD` | `nocturnusai` | Grafana admin password |
 
 ---
 
@@ -1647,7 +1647,7 @@ The Docker image runs as user `axiombase` (non-root) with minimal Alpine base.
 ### Module structure
 
 ```
-axiombase-core          Pure logic engine (no HTTP, no framework dependencies)
+nocturnusai-core          Pure logic engine (no HTTP, no framework dependencies)
   ├── core/             Domain: Atom, Term, Rule, LogicContext
   ├── storage/          Hexastore (6-way indexed triple store)
   ├── inference/        BackwardChainer (SLD resolution), ReteEngine (forward)
@@ -1657,13 +1657,13 @@ axiombase-core          Pure logic engine (no HTTP, no framework dependencies)
   ├── transaction/      TransactionManager (ACID)
   └── parser/           Logiql DSL tokenizer + parser
 
-axiombase-server        Ktor HTTP wrapper around core
+nocturnusai-server        Ktor HTTP wrapper around core
   ├── routes/           REST endpoints (logic, memory, admin, MCP, auth, etc.)
   ├── auth/             RBAC API key management
   ├── llm/              Anthropic/OpenAI/Google/Ollama providers
   └── observability/    Metrics, structured logging
 
-axiombase-cli           Interactive REPL client
+nocturnusai-cli           Interactive REPL client
 ```
 
 ### Hexastore indexing

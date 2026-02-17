@@ -1,20 +1,20 @@
 /**
  * @module mcp
- * MCP (Model Context Protocol) client helper for AxiomBase.
+ * MCP (Model Context Protocol) client helper for NocturnusAI.
  *
- * Communicates with the AxiomBase MCP endpoint using JSON-RPC 2.0 over HTTP.
- * This allows MCP-compatible AI agents to discover and invoke AxiomBase tools
+ * Communicates with the NocturnusAI MCP endpoint using JSON-RPC 2.0 over HTTP.
+ * This allows MCP-compatible AI agents to discover and invoke NocturnusAI tools
  * programmatically.
  *
- * The MCP endpoint is available at POST /mcp on the AxiomBase server.
+ * The MCP endpoint is available at POST /mcp on the NocturnusAI server.
  *
  * @see https://modelcontextprotocol.io/specification/2025-11-25
  *
  * @example
  * ```ts
- * import { AxiomBaseMCPClient } from '@axiombase/sdk';
+ * import { NocturnusAIMCPClient } from '@nocturnusai/sdk';
  *
- * const mcp = new AxiomBaseMCPClient({
+ * const mcp = new NocturnusAIMCPClient({
  *   baseUrl: 'http://localhost:9300',
  *   database: 'mydb',
  *   tenantId: 'default',
@@ -30,7 +30,7 @@
  */
 
 import type {
-  AxiomBaseConfig,
+  NocturnusAIConfig,
   JsonRpcRequest,
   JsonRpcResponse,
   JsonRpcError,
@@ -67,7 +67,7 @@ export class McpError extends Error {
 // ---------------------------------------------------------------------------
 
 /**
- * Client for communicating with the AxiomBase MCP (Model Context Protocol) endpoint.
+ * Client for communicating with the NocturnusAI MCP (Model Context Protocol) endpoint.
  *
  * Provides methods matching the MCP lifecycle:
  * 1. {@link initialize} - Perform MCP handshake and receive server capabilities.
@@ -76,7 +76,7 @@ export class McpError extends Error {
  *
  * All communication uses JSON-RPC 2.0 over HTTP POST to the `/mcp` endpoint.
  */
-export class AxiomBaseMCPClient {
+export class NocturnusAIMCPClient {
   private readonly baseUrl: string;
   private readonly apiKey?: string;
   private readonly database: string;
@@ -85,11 +85,11 @@ export class AxiomBaseMCPClient {
   private initialized: boolean = false;
 
   /**
-   * Create a new AxiomBaseMCPClient.
+   * Create a new NocturnusAIMCPClient.
    *
    * @param config - Connection configuration.
    */
-  constructor(config: AxiomBaseConfig) {
+  constructor(config: NocturnusAIConfig) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, '');
     this.apiKey = config.apiKey;
     this.database = config.database ?? 'default';
@@ -112,7 +112,7 @@ export class AxiomBaseMCPClient {
    * ```ts
    * const info = await mcp.initialize();
    * console.log(info.protocolVersion); // "2025-11-25"
-   * console.log(info.serverInfo.name); // "axiombase"
+   * console.log(info.serverInfo.name); // "nocturnusai"
    * ```
    */
   async initialize(): Promise<McpServerInfo> {
@@ -120,7 +120,7 @@ export class AxiomBaseMCPClient {
       protocolVersion: '2025-11-25',
       capabilities: {},
       clientInfo: {
-        name: '@axiombase/sdk',
+        name: '@nocturnusai/sdk',
         version: '0.1.0',
       },
     });
@@ -131,7 +131,7 @@ export class AxiomBaseMCPClient {
   /**
    * List all available MCP tools.
    *
-   * Returns the set of tools exposed by the AxiomBase MCP server, each with
+   * Returns the set of tools exposed by the NocturnusAI MCP server, each with
    * a name, description, and JSON Schema for its input parameters.
    *
    * @returns Array of tool descriptors.
@@ -155,7 +155,7 @@ export class AxiomBaseMCPClient {
   /**
    * Call an MCP tool by name.
    *
-   * Invokes a specific tool on the AxiomBase MCP server with the given arguments.
+   * Invokes a specific tool on the NocturnusAI MCP server with the given arguments.
    * The arguments object should match the tool's input schema (as returned by
    * {@link listTools}).
    *
@@ -210,7 +210,7 @@ export class AxiomBaseMCPClient {
   private ensureInitialized(): void {
     if (!this.initialized) {
       throw new Error(
-        'AxiomBaseMCPClient has not been initialized. Call initialize() before using other methods.',
+        'NocturnusAIMCPClient has not been initialized. Call initialize() before using other methods.',
       );
     }
   }

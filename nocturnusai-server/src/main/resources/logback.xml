@@ -1,0 +1,27 @@
+<configuration>
+    <!-- ─────────────────────────────────────────────────────────────────────
+         NocturnusAI Logging Configuration
+
+         Env vars:
+           LOG_FORMAT=json|text        (default: text — programmatic switch in LoggingConfig.kt)
+           LOG_LEVEL=DEBUG|INFO|WARN   (default: INFO)
+           LOG_FILE=/path/to/file.log  (optional — enables file output with rotation)
+         ───────────────────────────────────────────────────────────────────── -->
+
+    <!-- ── Text console (human-readable, default for development) ──────── -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) %cyan(%-30logger{30}) [%X{requestId:--}] [db=%X{database:--} t=%X{tenantId:--}] %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ── Root logger ────────────────────────────────────────────────── -->
+    <root level="${LOG_LEVEL:-INFO}">
+        <appender-ref ref="CONSOLE" />
+    </root>
+
+    <!-- ── Per-package levels ─────────────────────────────────────────── -->
+    <logger name="io.netty" level="WARN"/>
+    <logger name="io.ktor" level="${LOG_LEVEL:-INFO}"/>
+    <logger name="com.nocturnusai" level="${LOG_LEVEL:-INFO}"/>
+</configuration>
