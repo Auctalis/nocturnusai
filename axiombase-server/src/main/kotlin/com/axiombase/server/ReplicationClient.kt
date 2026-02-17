@@ -7,7 +7,6 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
@@ -24,6 +23,7 @@ class ReplicationClient(private val db: AxiomBase, private val leaderUrl: String
     private var lastWalId: Long = 0
     private var isRunning = true
     
+    @OptIn(DelicateCoroutinesApi::class)
     fun start() {
         GlobalScope.launch {
             println("Starting Replication Client (Following $leaderUrl)...")
