@@ -72,17 +72,16 @@ class DatabaseManager(
         return databases.keys
     }
     
-    fun createDatabase(name: String, multiTenant: Boolean): AxiomBase {
+    fun createDatabase(name: String, @Suppress("UNUSED_PARAMETER") multiTenant: Boolean = true): AxiomBase {
         if (databases.containsKey(name)) {
              return databases[name]!! // Already exists
         }
-        
+
         val dbDir = File(rootStorageDir, name)
         dbDir.mkdirs()
-        
+
         // Save config
         val configFile = File(dbDir, "db.config")
-        // Force true
         val config = DatabaseConfig(true)
         configFile.writeText(Json.encodeToString(config))
         
