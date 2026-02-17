@@ -77,7 +77,7 @@ if __name__ == "__main__":
     # Current RuleRequest only supports 1 body clause. BackwardChainer code supports multiple but RuleRequest DTO is simplified.
     # We'll use simple rule: B(x) <- A(x).
     # NOTE: Backward Chainer works on Rules + Store.
-    # If we asserted rules, they are in AxiomBase rules list.
+    # If we asserted rules, they are in NocturnusAI rules list.
     # If we query "Mortal", and "Man" is in store...
     # Wait, if Man is GONE (from test 2), checking Layer 4b requires re-adding.
     

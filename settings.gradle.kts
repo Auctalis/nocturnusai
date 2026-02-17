@@ -5,7 +5,7 @@ pluginManagement {
     }
 }
 
-rootProject.name = "axiombase"
-include("axiombase-core")
-include("axiombase-server")
-include("axiombase-cli")
+rootProject.name = "nocturnusai"
+include("nocturnusai-core")
+include("nocturnusai-server")
+include("nocturnusai-cli")

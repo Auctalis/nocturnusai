@@ -28,7 +28,7 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
-echo -e "${GREEN}=== Starting AxiomBase ===${NC}"
+echo -e "${GREEN}=== Starting NocturnusAI ===${NC}"
 
 # Check for Java
 if ! command -v java &> /dev/null; then
@@ -52,12 +52,12 @@ if [ -f .env ]; then
 fi
 
 # Start Server
-echo -e "${GREEN}Starting AxiomBase Server on port $API_PORT...${NC}"
-./gradlew :axiombase-server:run --console=plain &
+echo -e "${GREEN}Starting NocturnusAI Server on port $API_PORT...${NC}"
+./gradlew :nocturnusai-server:run --console=plain &
 SERVER_PID=$!
 
 echo -e "${GREEN}Server running with PID $SERVER_PID${NC}"
 echo -e "${GREEN}API at http://localhost:$API_PORT${NC}"
-echo -e "${GREEN}CLI: ./gradlew :axiombase-cli:run --args='--server http://localhost:$API_PORT --db default'${NC}"
+echo -e "${GREEN}CLI: ./gradlew :nocturnusai-cli:run --args='--server http://localhost:$API_PORT --db default'${NC}"
 
 wait

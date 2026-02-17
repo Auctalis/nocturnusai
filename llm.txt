@@ -3,7 +3,7 @@
 > **Context for Coding LLMs**: 
 > You are an advanced AI agent. You excel at probabilistic text generation but sometimes struggle with **deterministic, multi-step logical reasoning** or maintaining the **state** of a complex system over time. 
 > 
-> The **AxiomBase Logic Server** is designed to be your **Symbolic Cortex**. You should offload strict logic, rule-checking, and state validation to this system.
+> The **NocturnusAI Logic Server** is designed to be your **Symbolic Cortex**. You should offload strict logic, rule-checking, and state validation to this system.
 > 
 > **Core Directives**:
 > 1.  **Do not guess** the state of the world. Query it.
@@ -17,7 +17,7 @@
 To use this system effectively, you must understand how it represents the world.
 
 ### 1. The Atom (The Fundamental Unit)
-Unlike a SQL database (tables and rows) or a Graph DB (nodes and edges), AxiomBase uses **Atoms** (Hyperedges). An Atom is a single assertion of truth.
+Unlike a SQL database (tables and rows) or a Graph DB (nodes and edges), NocturnusAI uses **Atoms** (Hyperedges). An Atom is a single assertion of truth.
 
 Structure:
 -   **Predicate**: The category of the relationship (e.g., `Parent`, `Is_Online`, `Transfer_Valid`).
@@ -44,18 +44,18 @@ Rules allow the system to *infer* knowledge that hasn't been explicitly asserted
 ## Part 2: Advanced Theoretical Concepts
 
 ### 1. The Frame Problem & Scoping
-In AI, the "Frame Problem" is the difficulty of knowing what *doesn't* change when an action occurs. AxiomBase uses **Scopes** to handle this.
+In AI, the "Frame Problem" is the difficulty of knowing what *doesn't* change when an action occurs. NocturnusAI uses **Scopes** to handle this.
 -   **Usage**: Create a new scope for a new "turn" or "simulation step". Copy forward only what persists.
 -   **Example**: `scope="Turn_1"` vs `scope="Turn_2"`.
 
 ### 2. Monotonicity vs Non-Monotonicity
 -   **Monotonic Logic**: Adding new facts never invalidates old conclusions. (e.g., "Socrates is a Man" -> "Socrates is Mortal").
--   **Non-Monotonic Logic (TMS)**: AxiomBase supports retracting facts. If you retract "Socrates is a Man", the system *automatically withdraws* "Socrates is Mortal". This is crucial for modeling changing worlds (e.g., User logs out -> Session is no longer valid).
+-   **Non-Monotonic Logic (TMS)**: NocturnusAI supports retracting facts. If you retract "Socrates is a Man", the system *automatically withdraws* "Socrates is Mortal". This is crucial for modeling changing worlds (e.g., User logs out -> Session is no longer valid).
 
 ### 3. Negation: Explicit vs Failure
 -   **Negation as Failure (NAF)**: "If I don't know it, it's false." form.
 -   **Explicit Negation**: "I know for a fact it is NOT true."
--   AxiomBase supports **Explicit Negation** in rules via `negated: true` in body atoms.
+-   NocturnusAI supports **Explicit Negation** in rules via `negated: true` in body atoms.
 -   *Rule*: `Safe to Cross(?x) <- Traffic Light(?x, Green), NOT Traffic Incoming(?x)`
 
 ---
@@ -206,7 +206,7 @@ Isolate your implementation plans or different user sessions.
 ### `TemplateRequest`
 ```json
 {
-  "type": "Enum<com.axiombase.server.TemplateType>",
+  "type": "Enum<com.nocturnusai.server.TemplateType>",
   "predicates": "LinkedHashMap",
   "args": "ArrayList",
   "scope": "String"

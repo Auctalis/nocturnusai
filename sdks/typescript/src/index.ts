@@ -1,27 +1,27 @@
 /**
- * @module @axiombase/sdk
+ * @module @nocturnusai/sdk
  *
- * TypeScript SDK for AxiomBase — a logic-based inference engine and knowledge database.
+ * TypeScript SDK for NocturnusAI — a logic-based inference engine and knowledge database.
  *
  * This package provides two client classes:
  *
- * - {@link AxiomBaseClient} — Full-featured client for the AxiomBase HTTP API.
+ * - {@link NocturnusAIClient} — Full-featured client for the NocturnusAI HTTP API.
  *   Supports fact/rule assertion, querying, inference, retraction, memory
  *   management (context window, temporal queries, consolidation, decay),
  *   DSL execution, health checks, and SSE event subscriptions.
  *
- * - {@link AxiomBaseMCPClient} — MCP (Model Context Protocol) client for
+ * - {@link NocturnusAIMCPClient} — MCP (Model Context Protocol) client for
  *   tool discovery and invocation via JSON-RPC 2.0. Useful for integrating
- *   AxiomBase with MCP-compatible AI agents.
+ *   NocturnusAI with MCP-compatible AI agents.
  *
  * Both clients use the standard Fetch API and work in Node.js 18+ and
  * modern browsers without any dependencies.
  *
  * @example
  * ```ts
- * import { AxiomBaseClient } from '@axiombase/sdk';
+ * import { NocturnusAIClient } from '@nocturnusai/sdk';
  *
- * const client = new AxiomBaseClient({
+ * const client = new NocturnusAIClient({
  *   baseUrl: 'http://localhost:9300',
  *   database: 'mydb',
  *   tenantId: 'default',
@@ -47,13 +47,13 @@
  * @packageDocumentation
  */
 
-export { AxiomBaseClient, AxiomBaseRequestError } from './client.js';
+export { NocturnusAIClient, NocturnusAIRequestError } from './client.js';
 
-export { AxiomBaseMCPClient, McpError } from './mcp.js';
+export { NocturnusAIMCPClient, McpError } from './mcp.js';
 
 export type {
   // Configuration
-  AxiomBaseConfig,
+  NocturnusAIConfig,
 
   // Core domain
   Atom,
@@ -83,7 +83,7 @@ export type {
   KnowledgeEvent,
 
   // Error
-  AxiomBaseError,
+  NocturnusAIError,
 
   // Auth / Key management
   AuthStatus,

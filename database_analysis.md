@@ -1,6 +1,6 @@
-# Gap Analysis: AxiomBase as a Database Layer
+# Gap Analysis: NocturnusAI as a Database Layer
 
-This document analyzes the current state of `AxiomBase` and identifies critical features missing for it to function as a reliable, production-ready database layer.
+This document analyzes the current state of `NocturnusAI` and identifies critical features missing for it to function as a reliable, production-ready database layer.
 
 ## 1. ACID Compliance & Transaction Management
 The current implementation lacks the fundamental guarantees of a transactional system (Atomicity, Consistency, Isolation, Durability).
@@ -34,9 +34,9 @@ The system is entirely in-memory (`Hexastore` uses `HashMap`), which limits data
 - **Monitoring/Metrics:** No telemetry (Prometheus endpoints) to track query latency, memory usage, or rule firing counts.
 
 ## 6. Recommendations for "Database-ification"
-To transform `AxiomBase` into a proper database layer, we recommend the following roadmap:
+To transform `NocturnusAI` into a proper database layer, we recommend the following roadmap:
 
 1.  **Implement a WAL (Write-Ahead Log):** Append every command (Assert/Retract) to a file *before* applying to memory. This solves Durability.
 2.  **Add `BEGIN`, `COMMIT`, `ROLLBACK`:** Implement a Transaction Manager that locks affected predicates or uses MVCC (Multi-Version Concurrency Control) to provide Isolation.
-3.  **Standardize Persistence:** Integrate `Persistence.kt` into `AxiomBase` core to auto-save snapshots and replay WAL on startup.
+3.  **Standardize Persistence:** Integrate `Persistence.kt` into `NocturnusAI` core to auto-save snapshots and replay WAL on startup.
 4.  **Enhance API:** Add Authorization middleware to Ktor.

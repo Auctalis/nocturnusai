@@ -1,15 +1,15 @@
 /**
  * @module client
- * Main AxiomBase client for interacting with the HTTP API.
+ * Main NocturnusAI client for interacting with the HTTP API.
  *
  * Uses the standard Fetch API (available in Node.js 18+ and all modern browsers).
  * Includes automatic retry with exponential backoff for transient failures.
  *
  * @example
  * ```ts
- * import { AxiomBaseClient } from '@axiombase/sdk';
+ * import { NocturnusAIClient } from '@nocturnusai/sdk';
  *
- * const client = new AxiomBaseClient({
+ * const client = new NocturnusAIClient({
  *   baseUrl: 'http://localhost:9300',
  *   database: 'mydb',
  *   tenantId: 'default',
@@ -21,7 +21,7 @@
  */
 
 import type {
-  AxiomBaseConfig,
+  NocturnusAIConfig,
   Atom,
   ScoredAtom,
   ContextWindow,
@@ -37,7 +37,7 @@ import type {
   EventSubscriptionOptions,
   KnowledgeEvent,
   HealthStatus,
-  AxiomBaseError,
+  NocturnusAIError,
   AuthStatus,
   CreateKeyOptions,
   CreateKeyResponse,
@@ -64,20 +64,20 @@ const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
 // ---------------------------------------------------------------------------
 
 /**
- * Error thrown when an AxiomBase API request fails.
+ * Error thrown when an NocturnusAI API request fails.
  * Contains the HTTP status code and, when available, the structured error
  * response from the server.
  */
-export class AxiomBaseRequestError extends Error {
+export class NocturnusAIRequestError extends Error {
   /** HTTP status code of the failed request. */
   public readonly statusCode: number;
 
   /** Structured error response from the server, if available. */
-  public readonly error?: AxiomBaseError;
+  public readonly error?: NocturnusAIError;
 
-  constructor(message: string, statusCode: number, error?: AxiomBaseError) {
+  constructor(message: string, statusCode: number, error?: NocturnusAIError) {
     super(message);
-    this.name = 'AxiomBaseRequestError';
+    this.name = 'NocturnusAIRequestError';
     this.statusCode = statusCode;
     this.error = error;
   }
@@ -88,7 +88,7 @@ export class AxiomBaseRequestError extends Error {
 // ---------------------------------------------------------------------------
 
 /**
- * Main client for interacting with the AxiomBase HTTP API.
+ * Main client for interacting with the NocturnusAI HTTP API.
  *
  * Provides typed methods for all core operations: asserting facts and rules,
  * querying, inference, retraction, memory management (context window, temporal
@@ -99,7 +99,7 @@ export class AxiomBaseRequestError extends Error {
  * automatic retry logic with exponential backoff for transient failures
  * (HTTP 429, 502, 503, 504).
  */
-export class AxiomBaseClient {
+export class NocturnusAIClient {
   private readonly baseUrl: string;
   private readonly apiKey?: string;
   private readonly database: string;
@@ -107,12 +107,12 @@ export class AxiomBaseClient {
   private readonly maxRetries: number;
 
   /**
-   * Create a new AxiomBaseClient.
+   * Create a new NocturnusAIClient.
    *
    * @param config - Connection configuration.
    * @param maxRetries - Maximum number of retries for transient failures. Defaults to 3.
    */
-  constructor(config: AxiomBaseConfig, maxRetries: number = DEFAULT_MAX_RETRIES) {
+  constructor(config: NocturnusAIConfig, maxRetries: number = DEFAULT_MAX_RETRIES) {
     // Strip trailing slash from base URL
     this.baseUrl = config.baseUrl.replace(/\/+$/, '');
     this.apiKey = config.apiKey;
@@ -472,7 +472,7 @@ export class AxiomBaseClient {
   // -----------------------------------------------------------------------
 
   /**
-   * Check the health of the AxiomBase server.
+   * Check the health of the NocturnusAI server.
    *
    * @returns Health status object with at least a "status" field.
    *
@@ -662,7 +662,7 @@ export class AxiomBaseClient {
     this.connectSSE(url, controller.signal, callback).catch((err) => {
       // Silently ignore abort errors
       if (err instanceof Error && err.name === 'AbortError') return;
-      console.error('[AxiomBaseClient] SSE connection error:', err);
+      console.error('[NocturnusAIClient] SSE connection error:', err);
     });
 
     // Return unsubscribe function
@@ -696,7 +696,7 @@ export class AxiomBaseClient {
     });
 
     if (!response.ok) {
-      throw new AxiomBaseRequestError(
+      throw new NocturnusAIRequestError(
         `SSE connection failed: ${response.status} ${response.statusText}`,
         response.status,
       );
@@ -781,7 +781,7 @@ export class AxiomBaseClient {
     } catch {
       // If JSON parsing fails, check if this is an error response
       if (!response.ok) {
-        throw new AxiomBaseRequestError(
+        throw new NocturnusAIRequestError(
           `Request failed: ${response.status} ${response.statusText} - ${text}`,
           response.status,
         );
@@ -804,13 +804,13 @@ export class AxiomBaseClient {
     const text = await response.text();
 
     if (!response.ok) {
-      let error: AxiomBaseError | undefined;
+      let error: NocturnusAIError | undefined;
       try {
-        error = JSON.parse(text) as AxiomBaseError;
+        error = JSON.parse(text) as NocturnusAIError;
       } catch {
         // Not a JSON error response
       }
-      throw new AxiomBaseRequestError(
+      throw new NocturnusAIRequestError(
         error?.message ?? `Request failed: ${response.status} ${response.statusText}`,
         response.status,
         error,

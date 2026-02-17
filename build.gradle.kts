@@ -5,7 +5,7 @@ plugins {
 }
 
 allprojects {
-    group = "com.axiombase"
+    group = "com.nocturnusai"
     version = "1.0-SNAPSHOT"
 
     repositories {

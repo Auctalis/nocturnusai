@@ -1,4 +1,4 @@
-# AxiomBase Quickstart
+# NocturnusAI Quickstart
 
 > Logic server for Agentic AI — deterministic reasoning, truth maintenance, and agent memory.
 
@@ -9,7 +9,7 @@
 curl -fsSL https://openclaw.ai/install.sh | bash
 ```
 
-That's it. AxiomBase is now running on `http://localhost:9300`.
+That's it. NocturnusAI is now running on `http://localhost:9300`.
 
 ### Install options
 
@@ -91,7 +91,7 @@ Response:
 [{"predicate":"grandparent","args":["alice","charlie"]}]
 ```
 
-AxiomBase derived that Alice is Charlie's grandparent by chaining the two `parent` facts through the rule.
+NocturnusAI derived that Alice is Charlie's grandparent by chaining the two `parent` facts through the rule.
 
 ### Forget a fact
 
@@ -114,7 +114,7 @@ Add to your MCP config:
 ```json
 {
   "mcpServers": {
-    "axiombase": {
+    "nocturnusai": {
       "url": "http://localhost:9300/mcp/sse",
       "transport": "sse"
     }
@@ -125,13 +125,13 @@ Add to your MCP config:
 ### Python SDK
 
 ```bash
-pip install axiombase
+pip install nocturnusai
 ```
 
 ```python
-from axiombase import SyncAxiomBaseClient
+from nocturnusai import SyncNocturnusAIClient
 
-with SyncAxiomBaseClient("http://localhost:9300") as client:
+with SyncNocturnusAIClient("http://localhost:9300") as client:
     client.assert_fact("parent", ["alice", "bob"])
     results = client.infer("parent", ["?who", "bob"])
     print(results)
@@ -140,13 +140,13 @@ with SyncAxiomBaseClient("http://localhost:9300") as client:
 ### TypeScript SDK
 
 ```bash
-npm install @axiombase/sdk
+npm install @nocturnusai/sdk
 ```
 
 ```typescript
-import { AxiomBaseClient } from '@axiombase/sdk';
+import { NocturnusAIClient } from '@nocturnusai/sdk';
 
-const client = new AxiomBaseClient({ baseUrl: 'http://localhost:9300' });
+const client = new NocturnusAIClient({ baseUrl: 'http://localhost:9300' });
 await client.assertFact('parent', ['alice', 'bob']);
 const results = await client.infer('parent', ['?who', 'bob']);
 ```
@@ -156,10 +156,10 @@ const results = await client.infer('parent', ['?who', 'bob']);
 ## Manage your server
 
 ```bash
-cd ~/axiombase              # or wherever you installed
+cd ~/nocturnusai              # or wherever you installed
 
 # Logs
-docker compose logs -f axiombase
+docker compose logs -f nocturnusai
 
 # Stop
 docker compose down

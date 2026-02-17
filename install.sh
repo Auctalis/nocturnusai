@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# AxiomBase Installer
+# NocturnusAI Installer
 # Works everywhere. Installs everything. You're welcome. 🦞
 #
 # Usage:
@@ -12,14 +12,14 @@
 # Options:
 #   --ollama    Include local Ollama (no API key needed)
 #   --monitoring Include Prometheus + Grafana dashboards
-#   --dir DIR   Install directory (default: ./axiombase)
+#   --dir DIR   Install directory (default: ./nocturnusai)
 #   --port PORT Server port (default: 9300)
 #   --key KEY   LLM API key (Anthropic/OpenAI/Google — auto-detected)
 # ─────────────────────────────────────────────────────────────────────────────
 set -e
 
 VERSION="latest"
-INSTALL_DIR="./axiombase"
+INSTALL_DIR="./nocturnusai"
 PORT=9300
 USE_OLLAMA=false
 USE_MONITORING=false
@@ -49,7 +49,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --ollama       Include local Ollama LLM (no API key needed)"
             echo "  --monitoring   Include Prometheus + Grafana dashboards"
             echo "  --port PORT    Server port (default: 9300)"
-            echo "  --dir PATH     Install directory (default: ./axiombase)"
+            echo "  --dir PATH     Install directory (default: ./nocturnusai)"
             echo "  --key KEY      LLM API key (auto-detects provider)"
             echo "  --help         Show this help"
             exit 0
@@ -228,7 +228,7 @@ fi
 
 # ── Launch ───────────────────────────────────────────────────────────────────
 echo ""
-echo -e "${BOLD}Starting AxiomBase...${NC}"
+echo -e "${BOLD}Starting NocturnusAI...${NC}"
 
 PROFILE_FLAGS=""
 if $USE_OLLAMA; then
@@ -258,13 +258,13 @@ if $HEALTHY; then
     echo -e "${GREEN}${BOLD}Ready!${NC}"
 else
     echo ""
-    echo -e "${YELLOW}Server still starting — check logs:${NC} $COMPOSE_CMD logs -f axiombase"
+    echo -e "${YELLOW}Server still starting — check logs:${NC} $COMPOSE_CMD logs -f nocturnusai"
 fi
 
 # ── Success banner ───────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}${BOLD}  AxiomBase is running! 🦞${NC}"
+echo -e "${GREEN}${BOLD}  NocturnusAI is running! 🦞${NC}"
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  ${BOLD}API${NC}        http://localhost:$PORT"
@@ -276,7 +276,7 @@ if $USE_OLLAMA; then
 echo -e "  ${BOLD}Ollama${NC}     http://localhost:11434"
 fi
 if $USE_MONITORING; then
-echo -e "  ${BOLD}Grafana${NC}    http://localhost:3000  (admin / axiombase)"
+echo -e "  ${BOLD}Grafana${NC}    http://localhost:3000  (admin / nocturnusai)"
 echo -e "  ${BOLD}Prometheus${NC} http://localhost:9090"
 fi
 echo ""
@@ -299,7 +299,7 @@ echo "      -d '{\"predicate\":\"mortal\",\"args\":[\"?who\"]}'"
 echo ""
 echo -e "  ${BOLD}Manage:${NC}"
 echo -e "    cd $(pwd)"
-echo -e "    $COMPOSE_CMD logs -f axiombase   ${DIM}# tail logs${NC}"
+echo -e "    $COMPOSE_CMD logs -f nocturnusai   ${DIM}# tail logs${NC}"
 echo -e "    $COMPOSE_CMD $PROFILE_FLAGS down  ${DIM}# stop${NC}"
 echo -e "    $COMPOSE_CMD $PROFILE_FLAGS up -d ${DIM}# restart${NC}"
 echo ""
@@ -307,7 +307,7 @@ echo -e "  ${BOLD}MCP config${NC} (Claude Desktop, Cursor, Windsurf, etc.):"
 echo ""
 echo "    {"
 echo "      \"mcpServers\": {"
-echo "        \"axiombase\": {"
+echo "        \"nocturnusai\": {"
 echo "          \"url\": \"http://localhost:$PORT/mcp/sse\","
 echo "          \"transport\": \"sse\""
 echo "        }"
