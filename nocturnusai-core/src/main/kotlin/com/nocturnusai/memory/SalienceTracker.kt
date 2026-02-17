@@ -128,7 +128,7 @@ class SalienceTracker(
     /** Get atoms with salience below a threshold (candidates for eviction). */
     fun getBelowThreshold(threshold: Double, now: Long = System.currentTimeMillis()): List<AtomKey> {
         return records.entries
-            .filter { (key, record) ->
+            .filter { (_, record) ->
                 val timeSinceAccess = (now - record.lastAccessedAt.get()).coerceAtLeast(0)
                 val recencyScore = exp(-0.693 * timeSinceAccess / recencyHalfLifeMs)
                 val count = record.accessCount.get().toDouble()

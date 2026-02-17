@@ -11,6 +11,7 @@ import kotlinx.serialization.descriptors.elementNames
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 object LlmTxtGenerator {
 
     // Helper to register classes to document

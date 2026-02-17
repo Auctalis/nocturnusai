@@ -111,6 +111,7 @@ class MemoryManager(
      * Example: If "user_asked(agent, topic_X)" appears 10+ times,
      * consolidate into "user_interested_in(agent, topic_X)" with source=CONSOLIDATED.
      */
+    @Suppress("UNUSED_PARAMETER")
     fun consolidate(
         store: Hexastore,
         retractConsolidated: (Atom) -> Unit,
