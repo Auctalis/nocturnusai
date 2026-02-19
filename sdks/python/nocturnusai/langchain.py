@@ -63,9 +63,7 @@ def _parse_json_list(value: str) -> list[str]:
 # The public entry point is get_nocturnusai_tools(), which checks availability.
 
 if _LANGCHAIN_AVAILABLE:
-    from typing import Type
 
-    from nocturnusai.client import SyncNocturnusAIClient as _SyncClient
 
     # ------------------------------------------------------------------
     # Input schemas (Pydantic v2 models for LangChain tool args)
@@ -170,7 +168,7 @@ if _LANGCHAIN_AVAILABLE:
             "Use this to store information like 'parent(alice, bob)' or "
             "'likes(alice, pizza)'. Arguments should be a JSON array of strings."
         )
-        args_schema: Type[BaseModel] = AssertFactInput  # type: ignore[assignment]
+        args_schema: type[BaseModel] = AssertFactInput  # type: ignore[assignment]
         client: Any = None  # SyncNocturnusAIClient, typed as Any for Pydantic compat
 
         model_config = {"arbitrary_types_allowed": True}
@@ -227,7 +225,7 @@ if _LANGCHAIN_AVAILABLE:
             "Use ?-prefixed variables (like ?x, ?who) for wildcard positions. "
             "Returns all matching facts. Arguments should be a JSON array of strings."
         )
-        args_schema: Type[BaseModel] = QueryInput  # type: ignore[assignment]
+        args_schema: type[BaseModel] = QueryInput  # type: ignore[assignment]
         client: Any = None
 
         model_config = {"arbitrary_types_allowed": True}
@@ -288,7 +286,7 @@ if _LANGCHAIN_AVAILABLE:
             "Use ?-prefixed variables for unknowns. Arguments should be a JSON "
             "array of strings."
         )
-        args_schema: Type[BaseModel] = InferInput  # type: ignore[assignment]
+        args_schema: type[BaseModel] = InferInput  # type: ignore[assignment]
         client: Any = None
 
         model_config = {"arbitrary_types_allowed": True}
@@ -368,7 +366,7 @@ if _LANGCHAIN_AVAILABLE:
             "context with the most important knowledge. Optionally filter by "
             "predicate names and minimum salience."
         )
-        args_schema: Type[BaseModel] = ContextInput  # type: ignore[assignment]
+        args_schema: type[BaseModel] = ContextInput  # type: ignore[assignment]
         client: Any = None
 
         model_config = {"arbitrary_types_allowed": True}
