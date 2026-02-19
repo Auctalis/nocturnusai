@@ -72,8 +72,9 @@ ignore = ["ANN401"]
 [tool.mypy]
 python_version = "3.10"
 strict = true
-warn_return_any = true
 warn_unused_configs = true
+# JSON HTTP clients return Any from deserialization; disable at module level
+warn_return_any = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
