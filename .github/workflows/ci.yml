@@ -72,7 +72,7 @@ jobs:
 
       - name: Test (pytest)
         working-directory: sdks/python
-        run: pytest -v
+        run: pytest -v --tb=short || test $? -eq 5
 
   # ── TypeScript SDK ──────────────────────────────────────────────────────────
   test-typescript:

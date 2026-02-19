@@ -28,8 +28,8 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
         <h3>Start the Server</h3>
         <p>Two commands and you're live:</p>
 
-        <pre data-lang="bash"><code><span class="syn-var">$</span> git clone https://github.com/essaouirallc/logic-server.git
-<span class="syn-var">$</span> <span class="syn-keyword">cd</span> logic-server
+        <pre data-lang="bash"><code><span class="syn-var">$</span> git clone https://github.com/Auctalis/nocturnusai.git
+<span class="syn-var">$</span> <span class="syn-keyword">cd</span> nocturnusai
 
 <span class="syn-comment"># With LLM support (enables /extract and /synthesize in Steps 2–3):</span>
 <span class="syn-var">$</span> <span class="syn-type">ANTHROPIC_API_KEY</span>=sk-ant-... docker compose up -d
@@ -199,8 +199,8 @@ result = executor.<span class="syn-fn">invoke</span>(&#123;
     <!-- ============ RUN FROM SOURCE ============ -->
     <h2 id="from-source">Running From Source</h2>
     <p>Skip Docker if you're contributing to the codebase or prefer to run the JVM directly. Requires JDK 17+.</p>
-    <pre data-lang="bash"><code><span class="syn-var">$</span> git clone https://github.com/essaouirallc/logic-server.git
-<span class="syn-var">$</span> <span class="syn-keyword">cd</span> logic-server
+    <pre data-lang="bash"><code><span class="syn-var">$</span> git clone https://github.com/Auctalis/nocturnusai.git
+<span class="syn-var">$</span> <span class="syn-keyword">cd</span> nocturnusai
 
 <span class="syn-comment"># Run the HTTP API server on :9300</span>
 <span class="syn-var">$</span> ./gradlew :nocturnusai-server:run
