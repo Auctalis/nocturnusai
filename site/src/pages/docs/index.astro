@@ -166,10 +166,10 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
 <span class="syn-keyword">from</span> langchain.agents <span class="syn-keyword">import</span> AgentExecutor, create_tool_calling_agent
 <span class="syn-keyword">from</span> langchain_core.prompts <span class="syn-keyword">import</span> ChatPromptTemplate
 
-<span class="syn-comment"># Connect to Nocturnus — get 6 tools backed by the reasoning engine</span>
+<span class="syn-comment"># Connect to Nocturnus — get 4 LangChain tools backed by the reasoning engine</span>
 client = <span class="syn-fn">SyncNocturnusAIClient</span>(<span class="syn-string">"http://localhost:9300"</span>)
 tools = <span class="syn-fn">get_nocturnusai_tools</span>(client)
-<span class="syn-comment"># → tell, ask, teach, forget, recall, context</span>
+<span class="syn-comment"># → assert, query, infer, context</span>
 
 llm = <span class="syn-fn">ChatAnthropic</span>(model=<span class="syn-string">"claude-sonnet-4-6"</span>)
 prompt = ChatPromptTemplate.<span class="syn-fn">from_messages</span>([
@@ -271,13 +271,58 @@ result = executor.<span class="syn-fn">invoke</span>(&#123;
                 </tr>
                 <tr>
                     <td><code>EXTRACTION_ENABLED</code></td>
-                    <td><code>true</code></td>
-                    <td>Toggle <code>/extract</code> and <code>/synthesize</code> endpoints</td>
+                    <td><code>false</code> (<code>true</code> in Docker)</td>
+                    <td>Toggle <code>/extract</code> and <code>/synthesize</code> endpoints. The official Docker image sets this to <code>true</code> automatically.</td>
                 </tr>
                 <tr>
                     <td><code>LLM_MODEL</code></td>
                     <td><em>provider default</em></td>
                     <td>Override the LLM model (e.g. <code>claude-sonnet-4-6</code>)</td>
+                </tr>
+                <tr>
+                    <td><code>LLM_TEMPERATURE</code></td>
+                    <td><code>0.1</code></td>
+                    <td>Lower = more deterministic fact extraction</td>
+                </tr>
+                <tr>
+                    <td><code>AUTH_ENABLED</code></td>
+                    <td><code>false</code></td>
+                    <td>Enable role-based auth. When true, requires admin bootstrap on first run.</td>
+                </tr>
+                <tr>
+                    <td><code>NOCTURNUSAI_ADMIN_USER</code></td>
+                    <td><code>admin</code></td>
+                    <td>Admin username (only used when <code>AUTH_ENABLED=true</code>)</td>
+                </tr>
+                <tr>
+                    <td><code>NOCTURNUSAI_ADMIN_PASS</code></td>
+                    <td><code>nocturnusai</code></td>
+                    <td>Admin password — change this in production</td>
+                </tr>
+                <tr>
+                    <td><code>ENCRYPTION_KEY</code></td>
+                    <td><em>none</em></td>
+                    <td>64 hex-char AES-256 key for at-rest encryption. Generate with <code>openssl rand -hex 32</code></td>
+                </tr>
+                <tr>
+                    <td><code>TLS_ENABLED</code></td>
+                    <td><code>false</code></td>
+                    <td>Enable HTTPS on <code>TLS_PORT</code></td>
+                </tr>
+                <tr>
+                    <td><code>TLS_PORT</code></td>
+                    <td><code>9443</code></td>
+                    <td>HTTPS port when TLS is enabled</td>
+                </tr>
+                <tr>
+                    <td><code>TLS_KEYSTORE_PATH</code></td>
+                    <td><em>none</em></td>
+                    <td>Path to JKS or PKCS12 keystore file</td>
+                </tr>
+                <tr>
+                    <td><code>TLS_KEYSTORE_PASSWORD</code></td>
+                    <td><em>none</em></td>
+                    <td>Keystore password</td>
                 </tr>
                 <tr>
                     <td><code>REPLICATION_MODE</code></td>

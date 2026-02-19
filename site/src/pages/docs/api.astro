@@ -98,10 +98,15 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
     <pre><code class="language-json">&#123;
   "predicate": "grandparent",
   "args": ["?who", "charlie"],
-  "scope": null,
-  "withProof": false
+  "scope": null
 &#125;</code></pre>
-    <p>Set <code>withProof: true</code> to get the full derivation chain showing how each result was derived.</p>
+
+    <p>To get the full derivation chain showing how each result was derived, use <code>POST /ask</code> (the simplified alias) which accepts <code>withProof</code> in the JSON body:</p>
+    <pre><code class="language-json">&#123;
+  "predicate": "grandparent",
+  "args": ["?who", "charlie"],
+  "withProof": true
+&#125;</code></pre>
 
     <h3>Response</h3>
     <pre><code class="language-json">&#123; "results": ["grandparent(alice, charlie)"] &#125;</code></pre>
@@ -109,13 +114,17 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
     <hr />
 
     <h2 id="query">POST /query</h2>
-    <p>Direct pattern matching without inference (no rule application). Faster than <code>/infer</code> when you only need stored facts.</p>
+    <p>Direct pattern matching without inference (no rule application). Reads the Hexastore directly — faster than <code>/infer</code> when you only need stored facts and don't need derived conclusions.</p>
     <h3>Request</h3>
     <pre><code class="language-json">&#123;
   "predicate": "parent",
   "args": ["?who", "bob"],
   "scope": null
 &#125;</code></pre>
+    <h3>Response</h3>
+    <pre><code class="language-json">[
+  &#123; "predicate": "parent", "args": ["alice", "bob"], "truthVal": true &#125;
+]</code></pre>
 
     <hr />
 

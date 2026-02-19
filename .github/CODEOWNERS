@@ -1,0 +1,14 @@
+# Default owners for everything
+* @Auctalis/core
+
+# Core engine — logic-sensitive, extra review
+/nocturnusai-core/ @Auctalis/core
+
+# Server routes — API contract changes need review
+/nocturnusai-server/src/main/kotlin/com/nocturnusai/server/routes/ @Auctalis/core
+
+# CI/CD — workflow changes need review
+/.github/workflows/ @Auctalis/core
+
+# Security policy
+/SECURITY.md @Auctalis/core

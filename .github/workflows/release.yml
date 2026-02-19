@@ -1,0 +1,195 @@
+name: Release
+
+# Triggered by pushing a semantic version tag: git tag v0.1.0 && git push --tags
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write   # create GitHub Release
+  packages: write   # push to ghcr.io
+
+jobs:
+  # ── Run full CI first — don't publish a broken release ─────────────────────
+  test:
+    name: Test (JDK ${{ matrix.java }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java: ["17", "21"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java }}
+          distribution: temurin
+      - uses: gradle/actions/setup-gradle@v3
+      - run: ./gradlew build test --no-daemon
+
+  # ── Docker: multi-platform image → ghcr.io ─────────────────────────────────
+  docker:
+    name: Docker
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU (multi-platform builds)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/auctalis/nocturnusai
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Python SDK → PyPI (Trusted Publisher — no API key needed) ──────────────
+  python-sdk:
+    name: Python SDK → PyPI
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/nocturnusai
+    permissions:
+      id-token: write   # required for OIDC trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Hatch
+        run: pip install hatch
+
+      - name: Build distribution
+        working-directory: sdks/python
+        run: hatch build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: sdks/python/dist/
+
+  # ── TypeScript SDK → npm ────────────────────────────────────────────────────
+  typescript-sdk:
+    name: TypeScript SDK → npm
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install and build
+        working-directory: sdks/typescript
+        run: npm ci && npm run build
+
+      - name: Publish
+        working-directory: sdks/typescript
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ── Docs site → GitHub Pages ────────────────────────────────────────────────
+  docs:
+    name: Docs → GitHub Pages
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install and build
+        working-directory: site
+        run: npm ci && npm run build
+        env:
+          GITHUB_PAGES: "true"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@v4
+
+  # ── GitHub Release with auto-generated notes ────────────────────────────────
+  github-release:
+    name: GitHub Release
+    needs: [docker, python-sdk, typescript-sdk, docs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history for release notes
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            **Docker**
+            ```bash
+            docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:${{ github.ref_name }}
+            ```
+
+            **Python SDK**
+            ```bash
+            pip install nocturnusai==${{ github.ref_name }}
+            ```
+
+            **TypeScript / Node**
+            ```bash
+            npm install @nocturnusai/sdk@${{ github.ref_name }}
+            ```
+
+            ---
+            Full changelog and migration notes below ↓

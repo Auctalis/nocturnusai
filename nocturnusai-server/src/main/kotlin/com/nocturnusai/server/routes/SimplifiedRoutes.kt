@@ -15,7 +15,8 @@ import kotlinx.serialization.json.JsonElement
  *
  * These wrap the existing logic/memory endpoints with intuitive verbs:
  *   POST /tell    — Tell NocturnusAI a fact (wraps /assert/fact)
- *   POST /ask     — Ask NocturnusAI a question (wraps /infer)
+ *   POST /ask     — Ask NocturnusAI a question with full inference (wraps /infer)
+ *   POST /query   — Direct pattern match, no inference (reads Hexastore only)
  *   POST /teach   — Teach NocturnusAI a rule (wraps /assert/rule)
  *   POST /forget  — Make NocturnusAI forget something (wraps /retract)
  *
@@ -54,6 +55,13 @@ data class AskRequest(
 data class TeachRequest(
     val head: AtomDto,
     val body: List<AtomDto>,
+    val scope: String? = null
+)
+
+@Serializable
+data class QueryRequest(
+    val predicate: String,
+    val args: List<String>,
     val scope: String? = null
 )
 
@@ -135,6 +143,27 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
                 Metrics.inferenceCompleted(sample, dbName, response.size)
                 call.respond(response)
             }
+        } catch (e: ValidationException) {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
+        } catch (e: DatabaseNotFoundException) {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
+        } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("BAD_REQUEST", e.message ?: "Error"))
+        }
+    }
+
+    // QUERY — "Directly match stored facts (no inference, faster than /ask)"
+    post("/query") {
+        try {
+            val (db, tenantId) = call.getContext(dbManager)
+            val req = call.receive<QueryRequest>()
+            Validator.validateFactRequest(FactRequest(req.predicate, req.args))
+            call.application.environment.log.info("Endpoint /query hit. Tenant: $tenantId")
+            val terms = req.args.map { parseTerm(it) }
+            val pattern = com.nocturnusai.core.Atom(req.predicate, terms, scope = req.scope)
+            val results = db.query(pattern, tenantId, req.scope).toList()
+            val response = results.map { AtomResponse.from(it) }
+            call.respond(response)
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: DatabaseNotFoundException) {

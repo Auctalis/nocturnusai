@@ -53,10 +53,10 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/nocturnusai/nocturnusai"
-Documentation = "https://github.com/nocturnusai/nocturnusai/tree/main/sdks/python"
-Repository = "https://github.com/nocturnusai/nocturnusai"
-Issues = "https://github.com/nocturnusai/nocturnusai/issues"
+Homepage = "https://github.com/Auctalis/nocturnusai"
+Documentation = "https://github.com/Auctalis/nocturnusai/tree/main/sdks/python"
+Repository = "https://github.com/Auctalis/nocturnusai"
+Issues = "https://github.com/Auctalis/nocturnusai/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["nocturnusai"]

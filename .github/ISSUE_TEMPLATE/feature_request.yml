@@ -1,0 +1,51 @@
+name: Feature Request
+description: Propose a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a feature request, please check [GitHub Discussions](https://github.com/Auctalis/nocturnusai/discussions) to see if it's already being considered.
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What problem are you trying to solve? What are you building?
+      placeholder: "As an agent developer, I want to... so that I can..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the feature. Include proposed API shape if applicable.
+      placeholder: |
+        Add a POST /bulk/tell endpoint that accepts an array of facts:
+        [{"predicate":"...","args":[...]}, ...]
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds exist today? Why aren't they sufficient?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Core engine (inference, TMS, Hexastore)
+        - HTTP API
+        - MCP integration
+        - Python SDK
+        - TypeScript SDK
+        - CLI
+        - Documentation
+        - Performance
+        - Other
+    validations:
+      required: true
