@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2FAuctalis%2Fnocturnusai-blue?logo=docker)](https://github.com/Auctalis/nocturnusai/pkgs/container/nocturnusai)
 [![PyPI](https://img.shields.io/pypi/v/nocturnusai?logo=python&logoColor=white)](https://pypi.org/project/nocturnusai/)
 [![npm](https://img.shields.io/npm/v/@nocturnusai/sdk?logo=npm&logoColor=white)](https://www.npmjs.com/package/@nocturnusai/sdk)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-orange.svg)](LICENSE)
 
 **Verified knowledge for AI agents.** Store facts, define rules, and ask questions — get deterministic answers with proof, not LLM guesses.
 
@@ -161,4 +161,4 @@ Report vulnerabilities privately via [GitHub Security Advisories](https://github
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Business Source License 1.1 — free for non-production use. Converts to Apache 2.0 on 2030-02-19. Commercial use requires a license from [licensing@nocturnus.ai](mailto:licensing@nocturnus.ai). See [LICENSE](LICENSE).
