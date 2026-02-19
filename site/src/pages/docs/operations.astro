@@ -1,0 +1,129 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+
+<DocsLayout title="Operations">
+    <h1>Operations</h1>
+    <p class="lead text-xl text-slate-400">
+        Monitoring, replication, backup, and deployment.
+    </p>
+
+    <hr />
+
+    <h2 id="monitoring">Monitoring</h2>
+
+    <h3>Prometheus Metrics</h3>
+    <p>Nocturnus exposes 20+ metrics at <code>GET /metrics</code> in Prometheus format:</p>
+    <ul>
+        <li><strong>Fact operations</strong> — <code>nocturnusai_facts_asserted_total</code>, <code>nocturnusai_facts_retracted_total</code></li>
+        <li><strong>Inference</strong> — <code>nocturnusai_inference_duration_seconds</code>, <code>nocturnusai_rules_fired_total</code></li>
+        <li><strong>MCP</strong> — <code>nocturnusai_mcp_tool_call_duration_seconds</code>, <code>nocturnusai_mcp_sse_subscribers</code></li>
+        <li><strong>LLM</strong> — <code>nocturnusai_llm_call_duration_seconds</code>, <code>nocturnusai_llm_tokens_used</code></li>
+        <li><strong>Memory</strong> — <code>nocturnusai_memory_facts_total</code>, <code>nocturnusai_memory_decay_evicted</code></li>
+    </ul>
+
+    <h3>Grafana Dashboards</h3>
+    <p>The Docker Compose profile includes pre-built Grafana dashboards:</p>
+    <pre><code class="language-bash"># Start with monitoring stack
+docker compose --profile monitoring up -d
+
+# Open Grafana at http://localhost:3000
+# Default credentials: admin / admin</code></pre>
+
+    <h3>Health Probes</h3>
+    <p>Two endpoints for Kubernetes readiness and liveness:</p>
+    <pre><code class="language-bash"># Liveness — confirms server is running
+curl http://localhost:9300/health
+
+# Readiness — confirms all subsystems are initialized
+curl http://localhost:9300/health/ready</code></pre>
+
+    <hr />
+
+    <h2 id="logging">Logging</h2>
+    <p>Nocturnus uses structured JSON logging via SLF4J. Configure via environment variables:</p>
+    <pre><code class="language-bash"># .env
+LOG_LEVEL=INFO          # DEBUG, INFO, WARN, ERROR
+LOG_FORMAT=json         # json or plain</code></pre>
+
+    <p>Every request gets a <code>X-Request-ID</code> response header for correlation.</p>
+
+    <hr />
+
+    <h2 id="persistence">Persistence</h2>
+    <p>The in-memory Hexastore is persisted via <strong>Write-Ahead Log (WAL)</strong> and periodic snapshots:</p>
+    <ul>
+        <li><strong>WAL</strong> — every mutation is appended to a log file before being applied. On restart, the WAL is replayed to restore state.</li>
+        <li><strong>Snapshots</strong> — periodic full-state dumps for faster recovery. Old WAL segments are deleted after a snapshot.</li>
+    </ul>
+
+    <pre><code class="language-bash"># .env
+DATA_DIR=/var/lib/nocturnusai/data   # WAL + snapshot directory
+SNAPSHOT_INTERVAL_MS=300000           # Snapshot every 5 minutes</code></pre>
+
+    <hr />
+
+    <h2 id="replication">Replication</h2>
+    <p>Nocturnus supports leader/follower replication via WAL streaming. Deploy read replicas to scale query load.</p>
+
+    <h3>Leader</h3>
+    <pre><code class="language-bash"># .env (leader)
+REPLICATION_MODE=LEADER
+# The leader runs normally — no additional config needed</code></pre>
+
+    <h3>Follower</h3>
+    <pre><code class="language-bash"># .env (follower)
+REPLICATION_MODE=FOLLOWER
+LEADER_URL=http://leader-host:9300
+REPLICATION_POLL_INTERVAL_MS=5000</code></pre>
+    <p>Followers automatically poll the leader's WAL and apply changes locally. Queries against followers are eventually consistent.</p>
+
+    <hr />
+
+    <h2 id="kubernetes">Kubernetes Deployment</h2>
+    <p>Example Kubernetes deployment with health checks:</p>
+    <pre><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nocturnusai
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: nocturnusai
+          image: nocturnusai/server:latest
+          ports:
+            - containerPort: 9300
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9300
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9300
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          env:
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nocturnusai-secrets
+                  key: anthropic-api-key
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/nocturnusai/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: nocturnusai-data</code></pre>
+
+    <hr />
+
+    <h2 id="a2a">Agent-to-Agent Discovery</h2>
+    <p>Nocturnus serves an <a href="https://google.github.io/A2A/" target="_blank">Agent2Agent Protocol</a> discovery card at <code>GET /.well-known/agent.json</code>. Other agents can automatically discover and interact with your fact database.</p>
+
+</DocsLayout>

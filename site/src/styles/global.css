@@ -1,0 +1,325 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-space-950: #020617;
+  --color-space-900: #0f172a;
+  --color-space-800: #1e293b;
+
+  --color-cyan-500: #06b6d4;
+  --color-purple-500: #8b5cf6;
+  --color-emerald-500: #10b981;
+  --color-red-500: #ef4444;
+  --color-yellow-500: #f59e0b;
+}
+
+@layer base {
+  body {
+    @apply bg-space-950 text-white font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10;
+  }
+  
+  .glass-hover {
+    @apply hover:bg-white/10 hover:border-cyan-500/50 transition-all duration-300;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-500 to-purple-500;
+  }
+}
+
+/* ========================================
+   Docs-specific styles — code blocks,
+   syntax highlighting, and typography
+   ======================================== */
+
+/* Code blocks: distinct from body text */
+.docs-content pre {
+  background: #0c1222 !important;
+  border: 1px solid rgba(56, 189, 248, 0.12) !important;
+  border-radius: 12px !important;
+  padding: 1.25rem 1.5rem !important;
+  margin: 1.5rem 0 !important;
+  overflow-x: auto;
+  font-size: 0.875rem !important;
+  line-height: 1.7 !important;
+  position: relative;
+}
+
+.docs-content pre::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #06b6d4, #8b5cf6);
+  border-radius: 12px 12px 0 0;
+}
+
+.docs-content pre code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+  font-size: 0.85rem !important;
+  line-height: 1.7 !important;
+  color: #e2e8f0 !important;
+}
+
+/* Inline code */
+.docs-content :not(pre) > code {
+  background: rgba(6, 182, 212, 0.1) !important;
+  border: 1px solid rgba(6, 182, 212, 0.2) !important;
+  color: #67e8f9 !important;
+  padding: 0.15rem 0.45rem !important;
+  border-radius: 6px !important;
+  font-size: 0.85em !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-weight: 500;
+}
+
+/* ---- Syntax highlighting via CSS classes ---- */
+
+/* Language badge on code blocks — shifted left to leave room for copy button */
+.docs-content pre[data-lang]::after {
+  content: attr(data-lang);
+  position: absolute;
+  top: 11px;
+  right: 72px;
+  font-size: 0.65rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: rgba(148, 163, 184, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+}
+
+/* Copy button on code blocks */
+.docs-content .copy-btn {
+  position: absolute;
+  top: 9px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #64748b;
+  font-size: 0.68rem;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 1;
+  line-height: 1.4;
+}
+
+.docs-content .copy-btn:hover {
+  background: rgba(6, 182, 212, 0.12);
+  color: #67e8f9;
+  border-color: rgba(6, 182, 212, 0.25);
+}
+
+.docs-content .copy-btn.copied {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+/* Syntax colors — keywords, strings, comments */
+.docs-content .syn-keyword { color: #c084fc; } /* purple — import, from, const, await */
+.docs-content .syn-string { color: #86efac; }  /* green — strings */
+.docs-content .syn-comment { color: #64748b; font-style: italic; } /* grey — comments */
+.docs-content .syn-fn { color: #fbbf24; }      /* yellow/amber — function names */
+.docs-content .syn-type { color: #67e8f9; }    /* cyan — types, classes */
+.docs-content .syn-prop { color: #c4b5fd; }    /* light purple — property names */
+.docs-content .syn-num { color: #38bdf8; }     /* blue — numbers */
+.docs-content .syn-op { color: #94a3b8; }      /* slate — operators, punctuation */
+.docs-content .syn-http { color: #38bdf8; font-weight: 600; } /* blue bold — HTTP methods */
+.docs-content .syn-url { color: #e2e8f0; }     /* white — URLs */
+.docs-content .syn-flag { color: #94a3b8; }    /* slate — CLI flags */
+.docs-content .syn-ok { color: #34d399; }      /* emerald — success markers */
+.docs-content .syn-var { color: #fca5a5; }     /* red-light — $VARIABLES */
+
+/* ---- Docs typography & spacing ---- */
+
+.docs-content h1 {
+  font-size: 2.5rem !important;
+  line-height: 1.2 !important;
+  margin-bottom: 0.5rem !important;
+  background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.docs-content .lead {
+  font-size: 1.2rem !important;
+  line-height: 1.6 !important;
+  margin-bottom: 2rem !important;
+}
+
+.docs-content h2 {
+  font-size: 1.6rem !important;
+  margin-top: 3rem !important;
+  margin-bottom: 1rem !important;
+  padding-bottom: 0.6rem !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.docs-content h3 {
+  font-size: 1.15rem !important;
+  margin-top: 2rem !important;
+  margin-bottom: 0.75rem !important;
+  color: #cbd5e1 !important;
+}
+
+.docs-content p {
+  line-height: 1.8 !important;
+  margin-bottom: 1.25rem !important;
+  color: #94a3b8 !important;
+}
+
+.docs-content ul, .docs-content ol {
+  margin-bottom: 1.5rem !important;
+  padding-left: 1.5rem !important;
+}
+
+.docs-content li {
+  line-height: 1.8 !important;
+  margin-bottom: 0.5rem !important;
+  color: #94a3b8 !important;
+}
+
+.docs-content hr {
+  margin: 3rem 0 !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Tables */
+.docs-content table {
+  margin: 1.5rem 0 !important;
+  border-collapse: collapse !important;
+  width: 100% !important;
+}
+
+.docs-content th {
+  padding: 0.75rem 1rem !important;
+  text-align: left !important;
+  font-size: 0.8rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #64748b !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.docs-content td {
+  padding: 0.75rem 1rem !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Callout boxes */
+.docs-content .callout {
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin: 2rem 0;
+  font-size: 0.925rem;
+  line-height: 1.7;
+}
+
+.docs-content .callout-info {
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.15);
+  border-left: 3px solid #06b6d4;
+}
+
+.docs-content .callout-success {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  border-left: 3px solid #10b981;
+}
+
+.docs-content .callout-tip {
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-left: 3px solid #8b5cf6;
+}
+
+.docs-content .callout-warn {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  border-left: 3px solid #f59e0b;
+}
+
+.docs-content .callout strong {
+  color: #e2e8f0;
+}
+
+/* Step cards for quickstart */
+.docs-content .step-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 2rem;
+  margin: 2rem 0;
+  position: relative;
+}
+
+.docs-content .step-card::before {
+  position: absolute;
+  top: -12px;
+  left: 24px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.1em;
+  padding: 4px 12px;
+  border-radius: 20px;
+  color: white;
+}
+
+.docs-content .step-card h3 {
+  margin-top: 0.5rem !important;
+  font-size: 1.3rem !important;
+  color: #f1f5f9 !important;
+}
+
+.docs-content .step-card p {
+  color: #94a3b8 !important;
+}
+
+/* Next steps cards */
+.docs-content .next-card {
+  display: block;
+  padding: 1.25rem 1.5rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s ease;
+  text-decoration: none !important;
+}
+
+.docs-content .next-card:hover {
+  background: rgba(6, 182, 212, 0.05);
+  border-color: rgba(6, 182, 212, 0.2);
+  transform: translateY(-2px);
+}
+
+.docs-content .next-card h4 {
+  color: #e2e8f0 !important;
+  font-size: 1rem !important;
+  margin: 0 0 0.25rem 0 !important;
+}
+
+.docs-content .next-card p {
+  color: #64748b !important;
+  font-size: 0.85rem !important;
+  margin: 0 !important;
+}

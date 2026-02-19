@@ -1,0 +1,139 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+
+<DocsLayout title="MCP Integration">
+    <h1>MCP Integration</h1>
+    <p class="lead text-xl text-slate-400">
+        Connect any MCP-compatible agent to Nocturnus in 30 seconds.
+    </p>
+
+    <div class="callout callout-success">
+        <strong>Zero code required.</strong> Cursor, Claude Desktop, Windsurf, and any MCP client can use Nocturnus as a reasoning tool with a single config line. No SDK, no API wrapper — just point and go.
+    </div>
+
+    <hr />
+
+    <h2 id="what-is-mcp">What is MCP?</h2>
+    <p>The <a href="https://modelcontextprotocol.io/" target="_blank">Model Context Protocol (MCP)</a> is an open standard that lets AI agents discover and use tools via a universal interface. Nocturnus implements the MCP 2025-11-25 specification using HTTP+SSE transport.</p>
+    <p>When an agent connects to Nocturnus via MCP, it automatically discovers tools for storing facts, querying knowledge, running logical inference, and managing memory — all without writing integration code.</p>
+
+    <hr />
+
+    <h2 id="quickstart">Connect in 30 Seconds</h2>
+    <p>Add this to your MCP client configuration:</p>
+
+    <h3>Cursor</h3>
+    <p>Add to <code>.cursor/mcp.json</code> in your project root:</p>
+    <pre><code class="language-json">&#123;
+  "mcpServers": &#123;
+    "nocturnus": &#123;
+      "url": "http://localhost:9300/mcp/sse"
+    &#125;
+  &#125;
+&#125;</code></pre>
+
+    <h3>Claude Desktop</h3>
+    <p>Add to <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (macOS) or <code>%APPDATA%\Claude\claude_desktop_config.json</code> (Windows):</p>
+    <pre><code class="language-json">&#123;
+  "mcpServers": &#123;
+    "nocturnus": &#123;
+      "url": "http://localhost:9300/mcp/sse",
+      "transport": "sse"
+    &#125;
+  &#125;
+&#125;</code></pre>
+
+    <h3>Windsurf / Any MCP Client</h3>
+    <p>Use the SSE endpoint URL: <code>http://localhost:9300/mcp/sse</code></p>
+    <pre><code class="language-json">&#123;
+  "mcpServers": &#123;
+    "nocturnus": &#123;
+      "url": "http://localhost:9300/mcp/sse",
+      "transport": "sse"
+    &#125;
+  &#125;
+&#125;</code></pre>
+
+    <div class="callout callout-tip">
+        <strong>💡 Production deployment?</strong> Replace <code>localhost:9300</code> with your server's URL. Add <code>"headers": &#123;"Authorization": "Bearer YOUR_KEY"&#125;</code> when auth is enabled — see <a href="/docs/security">Security & Auth</a>.
+    </div>
+
+    <hr />
+
+    <h2 id="tools">Available MCP Tools</h2>
+    <p>Once connected, your agent can use these tools automatically:</p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Tool</th>
+                    <th class="py-2">Description</th>
+                    <th class="py-2">Example Use</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">tell</td>
+                    <td class="py-2">Store a fact in the knowledge base</td>
+                    <td class="py-2 text-sm">"Remember that Alice manages the London office"</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">teach</td>
+                    <td class="py-2">Define a logical rule for automatic reasoning</td>
+                    <td class="py-2 text-sm">"If someone manages any office, they are a manager"</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">ask</td>
+                    <td class="py-2">Query with multi-step inference (optionally with proof chains)</td>
+                    <td class="py-2 text-sm">"Who are all the managers?"</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">forget</td>
+                    <td class="py-2">Retract a fact (cascading truth maintenance)</td>
+                    <td class="py-2 text-sm">"Forget that Alice manages the London office"</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">recall</td>
+                    <td class="py-2">Temporal query — what was true at a specific time</td>
+                    <td class="py-2 text-sm">"What was true about Alice last Tuesday?"</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">context</td>
+                    <td class="py-2">Salience-ranked context window for agent reasoning</td>
+                    <td class="py-2 text-sm">"Get the 50 most relevant facts"</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">compress</td>
+                    <td class="py-2">Compress episodic patterns into semantic summaries</td>
+                    <td class="py-2 text-sm">"Consolidate repeated patterns"</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">cleanup</td>
+                    <td class="py-2">Evict expired and low-relevance facts</td>
+                    <td class="py-2 text-sm">"Clear stale session data"</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">predicates</td>
+                    <td class="py-2">Discover the KB schema (predicate names, arities, counts)</td>
+                    <td class="py-2 text-sm">"What types of facts are stored?"</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr />
+
+    <h2 id="sse">SSE Streaming</h2>
+    <p>Connect to <code>GET /mcp/sse</code> for real-time notifications when facts are asserted or retracted. The server pushes <code>notifications/resources/updated</code> events, so agents stay in sync with knowledge base changes.</p>
+
+    <pre><code class="language-bash"># Test SSE connection
+curl -N http://localhost:9300/mcp/sse</code></pre>
+
+    <hr />
+
+    <h2 id="a2a">Agent-to-Agent Discovery</h2>
+    <p>Nocturnus serves an <a href="https://google.github.io/A2A/" target="_blank">Agent2Agent Protocol</a> discovery card at <code>GET /.well-known/agent.json</code>. Other agents can automatically discover and interact with your fact database without manual configuration.</p>
+
+</DocsLayout>

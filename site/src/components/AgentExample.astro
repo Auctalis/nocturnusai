@@ -1,0 +1,177 @@
+---
+import { Terminal, Brain, HelpCircle, Trash2, Clock, SlidersHorizontal, Minimize2, Scissors, Search } from 'lucide-astro';
+
+const mcpTools = [
+  { Icon: Terminal, name: "tell" },
+  { Icon: Brain, name: "teach" },
+  { Icon: HelpCircle, name: "ask" },
+  { Icon: Trash2, name: "forget" },
+  { Icon: Clock, name: "recall" },
+  { Icon: SlidersHorizontal, name: "context" },
+  { Icon: Minimize2, name: "compress" },
+  { Icon: Scissors, name: "cleanup" },
+  { Icon: Search, name: "predicates" },
+];
+---
+
+<section id="agent-example" class="py-24 relative z-10">
+  <div class="max-w-7xl mx-auto px-6">
+
+    <!-- Section Header -->
+    <div class="text-center mb-16">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-sm font-mono mb-6">
+        The Architecture
+      </div>
+      <h2 class="text-3xl md:text-4xl font-black text-white mb-4">
+        Not a Plugin. A Foundation.
+      </h2>
+      <p class="text-slate-400 max-w-2xl mx-auto leading-relaxed">
+        Other tools sit on top of your LLM and hope for the best. Nocturnus sits beneath your agents and provides the substrate that makes correct reasoning possible — regardless of which LLM or framework is above it.
+      </p>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="max-w-4xl mx-auto mb-16">
+      <div class="relative space-y-2">
+        <!-- Agent Layer -->
+        <div class="p-4 rounded-xl bg-white/3 border border-white/8 text-center">
+          <div class="text-xs font-mono text-slate-500 uppercase tracking-wider mb-2">Your Agent Layer</div>
+          <div class="flex items-center justify-center gap-3 flex-wrap">
+            {["LangChain", "CrewAI", "AutoGen", "Claude", "Custom Agent"].map(f => (
+              <span class="px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-xs font-medium text-slate-300">{f}</span>
+            ))}
+          </div>
+        </div>
+
+        <!-- Arrow -->
+        <div class="flex justify-center">
+          <svg class="w-5 h-5 text-white/15" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 14l-5-5h10l-5 5z" />
+          </svg>
+        </div>
+
+        <!-- Protocol Layer -->
+        <div class="p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/15 text-center">
+          <div class="text-xs font-mono text-cyan-500/60 uppercase tracking-wider mb-2">Protocol Layer</div>
+          <div class="flex items-center justify-center gap-3 flex-wrap">
+            {["MCP (9 tools)", "HTTP REST API", "Python SDK", "TypeScript SDK", "A2A Protocol"].map(f => (
+              <span class="px-3 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-xs font-medium text-cyan-300">{f}</span>
+            ))}
+          </div>
+        </div>
+
+        <!-- Arrow -->
+        <div class="flex justify-center">
+          <svg class="w-5 h-5 text-white/15" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 14l-5-5h10l-5 5z" />
+          </svg>
+        </div>
+
+        <!-- Core Engine Layer -->
+        <div class="p-6 rounded-xl bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/20">
+          <div class="text-xs font-mono text-purple-400/70 uppercase tracking-wider mb-3 text-center">NocturnusAI — The Logic Engine</div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Hexastore", sub: "6-way indexed KB" },
+              { label: "Dual Inference", sub: "Backward + Rete" },
+              { label: "Truth Maintenance", sub: "Cascade retracts" },
+              { label: "Temporal Atoms", sub: "Time-aware facts" },
+              { label: "Salience Memory", sub: "Recency · freq · priority" },
+              { label: "ACID Transactions", sub: "Atomic reasoning" },
+              { label: "WAL + Snapshots", sub: "Crash recovery" },
+              { label: "Multi-Tenancy", sub: "DB + tenant headers" },
+            ].map(item => (
+              <div class="p-3 rounded-lg bg-white/5 border border-white/8 text-center hover:bg-white/10 hover:border-purple-500/30 transition-colors group">
+                <div class="text-xs font-bold text-slate-200 group-hover:text-purple-300 transition-colors">{item.label}</div>
+                <div class="text-[10px] text-slate-600 mt-0.5">{item.sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Code panels -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+
+      <!-- Left: Agent code -->
+      <div class="rounded-xl overflow-hidden bg-[#020617] border border-purple-500/20 shadow-2xl">
+        <div class="flex items-center justify-between px-4 py-3 bg-purple-500/5 border-b border-purple-500/10">
+          <span class="text-xs font-mono text-purple-400">agent.py — any framework connects the same way</span>
+        </div>
+        <div class="p-6 font-mono text-sm overflow-x-auto">
+<pre><code><span class="text-blue-400">from</span> <span class="text-slate-300">langchain_anthropic</span> <span class="text-blue-400">import</span> <span class="text-slate-300">ChatAnthropic</span>
+<span class="text-blue-400">from</span> <span class="text-slate-300">langchain.agents</span> <span class="text-blue-400">import</span> <span class="text-slate-300">AgentExecutor, create_tool_calling_agent</span>
+<span class="text-blue-400">from</span> <span class="text-slate-300">nocturnusai.langchain</span> <span class="text-blue-400">import</span> <span class="text-slate-300">get_nocturnusai_tools</span>
+
+<span class="text-slate-500"># Point your agent at the logic engine</span>
+<span class="text-slate-300">tools</span> = <span class="text-yellow-400">get_nocturnusai_tools</span>(<span class="text-green-400">"http://localhost:9300"</span>)
+<span class="text-slate-500"># tells, asks, teaches, forgets, recalls, context</span>
+<span class="text-slate-500"># — all backed by the Hexastore + inference engine</span>
+
+<span class="text-slate-300">llm</span> = <span class="text-yellow-400">ChatAnthropic</span>(<span class="text-slate-300">model</span>=<span class="text-green-400">"claude-sonnet-4-20250514"</span>)
+<span class="text-slate-300">agent</span> = <span class="text-yellow-400">create_tool_calling_agent</span>(<span class="text-slate-300">llm</span>, <span class="text-slate-300">tools</span>, <span class="text-slate-300">prompt</span>)
+<span class="text-slate-300">executor</span> = <span class="text-yellow-400">AgentExecutor</span>(<span class="text-slate-300">agent</span>=<span class="text-slate-300">agent</span>, <span class="text-slate-300">tools</span>=<span class="text-slate-300">tools</span>)
+
+<span class="text-slate-300">result</span> = <span class="text-slate-300">executor</span>.<span class="text-yellow-400">invoke</span>(&#123;
+  <span class="text-green-400">"input"</span>: <span class="text-green-400">"Is Acme Corp eligible for premium SLA?"</span>
+&#125;)
+<span class="text-slate-500"># Agent reasons over verified facts, not LLM memory.</span>
+<span class="text-slate-500"># Answer is provable. Traceable. Consistent.</span></code></pre>
+        </div>
+      </div>
+
+      <!-- Right: What the infrastructure provides -->
+      <div class="rounded-xl overflow-hidden bg-[#020617] border border-white/10 shadow-2xl">
+        <div class="flex items-center justify-between px-4 py-3 bg-white/5 border-b border-white/5">
+          <span class="text-xs font-mono text-slate-400">What the infrastructure provides</span>
+          <span class="text-xs font-mono text-emerald-400/60">provable · consistent · durable</span>
+        </div>
+        <div class="p-6 font-mono text-sm overflow-x-auto space-y-4">
+          <div>
+            <div class="text-slate-500 text-xs mb-1">// 1. Hexastore returns the fact in &lt;100ms</div>
+            <div class="text-emerald-400 text-xs">customer_tier(acme, enterprise) → TRUE</div>
+          </div>
+          <div>
+            <div class="text-slate-500 text-xs mb-1">// 2. Inference engine derives eligibility via rule</div>
+            <div class="text-emerald-400 text-xs">eligible_for_sla(acme) → DERIVED</div>
+            <div class="text-slate-500 text-xs pl-2">via: eligible_for_sla(?c) :- customer_tier(?c, enterprise)</div>
+          </div>
+          <div>
+            <div class="text-slate-500 text-xs mb-1">// 3. Full proof trace returned to agent</div>
+            <div class="text-slate-400 text-xs">&#123; "result": true,</div>
+            <div class="text-slate-400 text-xs pl-4">"proof": [</div>
+            <div class="text-slate-400 text-xs pl-6">"customer_tier(acme, enterprise)",</div>
+            <div class="text-slate-400 text-xs pl-6">"rule: eligible_for_sla(?c) :- ..."</div>
+            <div class="text-slate-400 text-xs pl-4">] &#125;</div>
+          </div>
+          <div class="pt-2 border-t border-white/5">
+            <div class="text-emerald-400 text-xs">// Agent answers from infrastructure, not from</div>
+            <div class="text-emerald-400 text-xs">// statistical weights. Correct every time. ✓</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9 MCP Tools with Lucide icons -->
+    <div class="mt-12 max-w-4xl mx-auto">
+      <p class="text-center text-slate-600 text-xs mb-4 font-mono uppercase tracking-wider">9 MCP tools, all backed by the logic engine</p>
+      <div class="grid grid-cols-3 md:grid-cols-9 gap-2">
+        {mcpTools.map(({ Icon, name }) => (
+          <div class="text-center p-3 rounded-lg bg-white/5 border border-white/10 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-all group">
+            <div class="flex justify-center mb-1.5">
+              <Icon class="w-5 h-5 text-slate-500 group-hover:text-cyan-400 transition-colors" />
+            </div>
+            <div class="text-[10px] font-mono text-slate-500 group-hover:text-cyan-400 transition-colors">{name}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<style>
+  .bg-white\/3 { background-color: rgba(255,255,255,0.03); }
+  .border-white\/8 { border-color: rgba(255,255,255,0.08); }
+</style>

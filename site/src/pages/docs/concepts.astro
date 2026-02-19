@@ -1,0 +1,186 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+
+<DocsLayout title="Core Concepts">
+    <h1>Core Concepts</h1>
+    <p class="lead text-xl text-slate-400">
+        How Nocturnus.AI represents knowledge and reasons about it.
+    </p>
+
+    <hr />
+
+    <h2 id="facts">Facts</h2>
+    <p>A <strong>fact</strong> is the fundamental unit of knowledge: a predicate applied to arguments.</p>
+    <pre><code class="language-prolog">parent(alice, bob)          # alice is bob's parent
+likes(bob, pizza)           # bob likes pizza
+NOT allergic(alice, cats)   # alice is not allergic to cats</code></pre>
+    
+    <p>Facts are stored as typed <code>Atom</code> objects in a <strong>Hexastore</strong> — a 6-way indexed data structure that makes any query pattern fast regardless of which arguments you're searching by.</p>
+
+    <h3>Temporal Metadata</h3>
+    <p>Every fact can carry time-related fields:</p>
+    <ul>
+        <li><code>validFrom</code> — epoch ms when this fact becomes valid</li>
+        <li><code>validUntil</code> — epoch ms when this fact expires</li>
+        <li><code>ttl</code> — auto-expire after this many milliseconds</li>
+        <li><code>createdAt</code> — when the fact was stored (set automatically)</li>
+    </ul>
+    <p>These enable <strong>temporal queries</strong> — ask "what was true at 3pm yesterday?" via <code>POST /memory/query/temporal</code>.</p>
+
+    <h3>Negation</h3>
+    <p>Set <code>truthVal: false</code> (or <code>negated: true</code> via MCP) to store explicit negation. This is different from absence — "we don't know if X" vs. "we know X is false."</p>
+
+    <hr />
+
+    <h2 id="rules">Rules</h2>
+    <p>A <strong>rule</strong> is a Horn clause: a head (conclusion) that is derived when all body conditions are satisfied.</p>
+    <pre><code class="language-prolog">grandparent(?x, ?z) :- parent(?x, ?y), parent(?y, ?z)</code></pre>
+    <p>Variables use the <code>?</code> prefix: <code>?x</code>, <code>?who</code>, <code>?name</code>. When Nocturnus evaluates a rule, it finds all variable bindings that satisfy every body atom, then derives the head with those bindings.</p>
+
+    <h3>Multi-Body Rules</h3>
+    <p>Rules can have multiple conditions:</p>
+    <pre><code class="language-prolog">eligible_discount(?customer) :-
+    subscription_tier(?customer, enterprise),
+    location(?customer, ?city),
+    partner_city(?city)</code></pre>
+    <p>All three conditions must be satisfied for the discount to apply.</p>
+
+    <hr />
+
+    <h2 id="inference">Inference</h2>
+    <p>Nocturnus.AI has two inference engines:</p>
+    
+    <h3>Backward Chaining (Primary)</h3>
+    <p>Prolog-style <strong>SLD resolution</strong>. Given a goal like <code>grandparent(?who, charlie)</code>, the engine works <em>backward</em>: it finds rules whose heads match the goal, then recursively proves each body atom. This is efficient for answering specific questions.</p>
+    
+    <h3>Forward Chaining (Rete Engine)</h3>
+    <p>When a new fact is asserted, the <strong>Rete engine</strong> automatically fires any matching rules and derives new conclusions. This is useful for reactive patterns — "whenever X happens, derive Y."</p>
+
+    <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-purple-500 text-slate-300">
+        <strong>Key difference from LLMs:</strong> Inference here is <em>deterministic</em>. Given the same facts and rules, you always get the same results. There's no temperature, no randomness, no "maybe." A fact either follows from the rules or it doesn't.
+    </div>
+
+    <hr />
+
+    <h2 id="scopes">Scopes</h2>
+    <p>Facts and rules can be isolated into <strong>scopes</strong> using a string label. A query in a scope sees both scoped facts and unscoped (global) facts. This is different from <a href="/docs/multi-tenancy">multi-tenancy</a> — scopes operate <em>within</em> a tenant for logical isolation.</p>
+    
+    <p>Common use cases:</p>
+    <ul>
+        <li><strong>Per-document knowledge</strong> — scope facts to a specific document ID</li>
+        <li><strong>External system linking</strong> — scope facts to an external record ID</li>
+        <li><strong>Hypothetical reasoning</strong> — test rule outcomes without affecting production data</li>
+        <li><strong>Session isolation</strong> — each user session gets its own scope</li>
+        <li><strong>A/B testing</strong> — different scopes hold different rule sets</li>
+    </ul>
+
+    <h3>Example: Scope as a Document ID</h3>
+    <p>Store facts about a specific document and query them in isolation:</p>
+    <pre><code class="language-bash"># Store facts scoped to a specific invoice
+curl -X POST http://localhost:9300/tell \
+  -H "Content-Type: application/json" \
+  -d '&#123;
+    "predicate": "line_item",
+    "args": ["widget_a", "500"],
+    "scope": "doc_invoice_2024_001"
+  &#125;'
+
+curl -X POST http://localhost:9300/tell \
+  -H "Content-Type: application/json" \
+  -d '&#123;
+    "predicate": "vendor",
+    "args": ["acme_corp"],
+    "scope": "doc_invoice_2024_001"
+  &#125;'
+
+# Query only facts about this invoice
+curl -X POST http://localhost:9300/ask \
+  -H "Content-Type: application/json" \
+  -d '&#123;
+    "predicate": "vendor",
+    "args": ["?who"],
+    "scope": "doc_invoice_2024_001"
+  &#125;'
+
+# Returns: &#123; "results": ["vendor(acme_corp)"] &#125;</code></pre>
+
+    <h3>Example: Scope as an External ID</h3>
+    <p>Link knowledge to records in external systems (CRM, JIRA, Salesforce):</p>
+    <pre><code class="language-bash"># Store facts linked to a Salesforce lead
+curl -X POST http://localhost:9300/tell \
+  -H "Content-Type: application/json" \
+  -d '&#123;
+    "predicate": "lead_status",
+    "args": ["qualified"],
+    "scope": "ext_salesforce_lead_42"
+  &#125;'
+
+curl -X POST http://localhost:9300/tell \
+  -H "Content-Type: application/json" \
+  -d '&#123;
+    "predicate": "contact_name",
+    "args": ["jane_doe"],
+    "scope": "ext_salesforce_lead_42"
+  &#125;'
+
+# Query all facts about this lead
+curl -X POST http://localhost:9300/ask \
+  -H "Content-Type: application/json" \
+  -d '&#123;
+    "predicate": "lead_status",
+    "args": ["?status"],
+    "scope": "ext_salesforce_lead_42"
+  &#125;'</code></pre>
+
+    <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-purple-500 text-slate-300">
+        <strong>Tip:</strong> Scopes compose with global facts. If you teach a rule <em>without</em> a scope, it applies everywhere — but scoped facts are only visible when querying within that scope. This lets you define global rules that reason over document-specific or session-specific data.
+    </div>
+
+    <hr />
+
+    <h2 id="truth-maintenance">Truth Maintenance</h2>
+    <p>When a fact is retracted, the <strong>Truth Maintenance System (TMS)</strong> automatically cascade-retracts any facts that were derived from it. The <code>ProvenanceTracker</code> maintains a dependency graph of which facts support which derived conclusions.</p>
+    
+    <p>Example: if you retract <code>parent(alice, bob)</code>, then <code>grandparent(alice, charlie)</code> — which was derived from it — is also automatically retracted. No manual cleanup needed.</p>
+
+    <hr />
+
+    <h2 id="salience">Salience & Memory</h2>
+    <p>In long-running agent sessions, facts accumulate fast. Nocturnus scores every fact with a <strong>salience</strong> value, combining three signals:</p>
+    <ul>
+        <li><strong>Recency</strong> — how recently the fact was accessed</li>
+        <li><strong>Frequency</strong> — how often it's been queried</li>
+        <li><strong>Priority</strong> — explicit importance weight</li>
+    </ul>
+    <p>The <code>/memory/context</code> endpoint returns the top-K most salient facts — this is your agent's "working memory." Low-salience facts can be automatically evicted via <code>/memory/decay</code>, and repetitive patterns can be compressed into summaries via <code>/memory/consolidate</code>.</p>
+
+    <hr />
+
+    <h2 id="memory-lifecycle">Memory Lifecycle</h2>
+    <p>For long-running agents, Nocturnus manages memory automatically through four stages:</p>
+
+    <h3>1. Salience Scoring</h3>
+    <p>Every fact gets a composite salience score: <code>recency × frequency × priority</code>. Facts that are accessed often and recently score higher.</p>
+
+    <h3>2. Context Window</h3>
+    <p>The <code>/memory/context</code> endpoint returns the top-K most salient facts — effectively your agent's "working memory."</p>
+
+    <h3>3. Consolidation</h3>
+    <p>After many interactions, call <code>/memory/consolidate</code> to detect episodic patterns (e.g., "user asked about X five times") and compress them into semantic summaries.</p>
+
+    <h3>4. Decay</h3>
+    <p>Call <code>/memory/decay</code> to evict expired facts (past TTL) and low-salience facts (below threshold). Keeps memory lean without manual curation.</p>
+
+    <pre><code class="language-bash"># Get agent's context window (top 50 most relevant facts)
+curl http://localhost:9300/memory/context?maxFacts=50
+
+# Compress episodic patterns into semantic summaries
+curl -X POST http://localhost:9300/memory/consolidate
+
+# Evict stale facts
+curl -X POST http://localhost:9300/memory/decay \
+  -H "Content-Type: application/json" \
+  -d '&#123;"threshold": 0.05&#125;'</code></pre>
+
+</DocsLayout>

@@ -1,0 +1,40 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="border-t border-white/5 bg-[#020617] pt-16 pb-12 relative z-10">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="flex flex-col md:flex-row justify-between items-center gap-8">
+      <!-- Brand -->
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-purple-500 flex items-center justify-center text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 4.5 L6.5 1.5"/>
+            <path d="M16 4.5 L17.5 1.5"/>
+            <circle cx="12" cy="12" r="9"/>
+            <circle cx="8.5" cy="11" r="3"/>
+            <circle cx="8.5" cy="11" r="1.2" fill="currentColor" stroke="none"/>
+            <circle cx="15.5" cy="11" r="3"/>
+            <circle cx="15.5" cy="11" r="1.2" fill="currentColor" stroke="none"/>
+            <path d="M10.5 15 L12 17 L13.5 15"/>
+          </svg>
+        </div>
+        <span class="font-bold text-slate-200">Nocturnus.AI</span>
+      </div>
+
+      <!-- Links -->
+      <div class="flex flex-wrap justify-center gap-8 text-sm text-slate-400">
+        <a href="/docs" class="hover:text-cyan-400 transition-colors">Documentation</a>
+        <a href="/docs/api" class="hover:text-cyan-400 transition-colors">API Reference</a>
+        <a href="/features" class="hover:text-cyan-400 transition-colors">Features</a>
+        <a href="https://github.com/essaouirallc/logic-server" class="hover:text-cyan-400 transition-colors">GitHub</a>
+        <a href="https://github.com/essaouirallc/logic-server/issues" class="hover:text-cyan-400 transition-colors">Support</a>
+      </div>
+    </div>
+
+    <!-- Copyright -->
+    <div class="mt-12 text-center text-xs text-slate-600">
+      &copy; {year} Nocturnus.AI &bull; The Logic Engine for Agentic AI
+    </div>
+  </div>
+</footer>

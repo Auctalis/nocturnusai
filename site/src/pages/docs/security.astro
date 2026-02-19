@@ -1,0 +1,153 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+
+<DocsLayout title="Security & Auth">
+    <h1>Security & Auth</h1>
+    <p class="lead text-xl text-slate-400">
+        API key management, role-based access control, encryption, and TLS.
+    </p>
+
+    <div class="callout callout-info">
+        <strong>Local development?</strong> Auth is <strong>disabled by default</strong> for frictionless local development. Enable it when you're ready for staging or production.
+    </div>
+
+    <hr />
+
+    <h2 id="auth-modes">Auth Modes</h2>
+    <p>Set the auth mode via environment variable:</p>
+    <pre><code class="language-bash"># .env
+AUTH_MODE=managed   # Options: disabled, legacy, managed</code></pre>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Mode</th>
+                    <th class="py-2">Description</th>
+                    <th class="py-2">Use Case</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">disabled</td>
+                    <td class="py-2">No authentication required</td>
+                    <td class="py-2">Local development, testing</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">legacy</td>
+                    <td class="py-2">Single shared API key</td>
+                    <td class="py-2">Simple deployments</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">managed</td>
+                    <td class="py-2">Full key management with roles, scoping, rotation</td>
+                    <td class="py-2">Production, multi-tenant</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr />
+
+    <h2 id="bootstrap">Bootstrap Your First Key</h2>
+    <p>On first run with auth enabled, create your admin key via the bootstrap endpoint:</p>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/auth/bootstrap \
+  -H "Content-Type: application/json" \
+  -d '&#123;"description": "Admin key"&#125;'</code></pre>
+
+    <pre><code class="language-json">&#123;
+  "apiKey": "noc_a1b2c3d4...",
+  "role": "admin",
+  "description": "Admin key"
+&#125;</code></pre>
+
+    <div class="callout callout-warning">
+        <strong>⚠️ One-time only.</strong> The bootstrap endpoint works only once. After your first admin key is created, use it to manage all subsequent keys.
+    </div>
+
+    <hr />
+
+    <h2 id="key-management">API Key Management</h2>
+    <p>Use the admin API to create, rotate, and revoke keys:</p>
+    <pre><code class="language-bash"># Create a scoped read-only key
+curl -X POST http://localhost:9300/auth/keys \
+  -H "Authorization: Bearer $ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '&#123;
+    "role": "reader",
+    "databases": ["production"],
+    "tenants": ["tenant_a"],
+    "description": "Read-only for tenant A"
+  &#125;'
+
+# Rotate a key
+curl -X POST http://localhost:9300/auth/keys/$KEY_ID/rotate \
+  -H "Authorization: Bearer $ADMIN_KEY"
+
+# Revoke a key
+curl -X DELETE http://localhost:9300/auth/keys/$KEY_ID \
+  -H "Authorization: Bearer $ADMIN_KEY"</code></pre>
+
+    <hr />
+
+    <h2 id="roles">Roles</h2>
+    <p>Keys are scoped to one of three roles:</p>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Role</th>
+                    <th class="py-2">Permissions</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">reader</td>
+                    <td class="py-2">Query, infer, context window (read-only)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">writer</td>
+                    <td class="py-2">All reader permissions + assert, retract, extract</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">admin</td>
+                    <td class="py-2">All permissions + key management, database creation</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p>Keys can also be scoped to specific <strong>databases</strong> and <strong>tenants</strong>, providing fine-grained access control for multi-tenant deployments. See <a href="/docs/multi-tenancy">Multi-Tenancy</a>.</p>
+
+    <hr />
+
+    <h2 id="using-keys">Using API Keys</h2>
+    <p>Pass your key in the <code>Authorization</code> header:</p>
+    <pre><code class="language-bash"># All requests include the bearer token
+curl -X POST http://localhost:9300/tell \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer noc_a1b2c3d4..." \
+  -d '&#123;"predicate": "plan", "args": ["enterprise"]&#125;'</code></pre>
+
+    <hr />
+
+    <h2 id="encryption">Encryption at Rest</h2>
+    <p>Enable AES-256 encryption for WAL files and snapshots:</p>
+    <pre><code class="language-bash"># .env
+ENCRYPTION_KEY=your-256-bit-key-here</code></pre>
+
+    <hr />
+
+    <h2 id="tls">TLS</h2>
+    <p>Enable TLS for encrypted transport:</p>
+    <pre><code class="language-bash"># .env
+TLS_ENABLED=true
+TLS_KEYSTORE_PATH=/path/to/keystore.p12
+TLS_KEYSTORE_PASSWORD=your-password</code></pre>
+
+    <div class="callout callout-tip">
+        <strong>💡 MCP with Auth.</strong> When using MCP with auth enabled, add the bearer token to your MCP client config headers. See <a href="/docs/mcp#quickstart">MCP Integration</a> for details.
+    </div>
+
+</DocsLayout>

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4"/>
+      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="grad2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4" stop-opacity="0.8"/>
+      <stop offset="100%" style="stop-color:#8b5cf6" stop-opacity="0.8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Left ear tuft -->
+  <path d="M42 28 L33 8" stroke="url(#grad)" stroke-width="8" stroke-linecap="round"/>
+  <path d="M50 26 L44 6" stroke="url(#grad)" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Right ear tuft -->
+  <path d="M86 28 L95 8" stroke="url(#grad)" stroke-width="8" stroke-linecap="round"/>
+  <path d="M78 26 L84 6" stroke="url(#grad)" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Head — large circle dominating the frame -->
+  <circle cx="64" cy="68" r="52" stroke="url(#grad)" stroke-width="6" fill="none"/>
+
+  <!-- Left eye outer ring — very prominent -->
+  <circle cx="44" cy="62" r="16" stroke="url(#grad)" stroke-width="6" fill="none"/>
+  <!-- Left eye mid ring (depth) -->
+  <circle cx="44" cy="62" r="10" stroke="url(#grad2)" stroke-width="2.5" fill="none" opacity="0.5"/>
+  <!-- Left pupil — bold filled dot -->
+  <circle cx="44" cy="62" r="6" fill="url(#grad)"/>
+  <!-- Left eye gleam -->
+  <circle cx="49" cy="57" r="2.5" fill="white" opacity="0.85"/>
+
+  <!-- Right eye outer ring — very prominent -->
+  <circle cx="84" cy="62" r="16" stroke="url(#grad)" stroke-width="6" fill="none"/>
+  <!-- Right eye mid ring -->
+  <circle cx="84" cy="62" r="10" stroke="url(#grad2)" stroke-width="2.5" fill="none" opacity="0.5"/>
+  <!-- Right pupil -->
+  <circle cx="84" cy="62" r="6" fill="url(#grad)"/>
+  <!-- Right eye gleam -->
+  <circle cx="89" cy="57" r="2.5" fill="white" opacity="0.85"/>
+
+  <!-- Beak — clear V shape -->
+  <path d="M54 84 L64 98 L74 84" stroke="url(#grad)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Facial disc — subtle arc above eyes connecting tufts to face -->
+  <path d="M20 52 Q30 38 44 44" stroke="url(#grad)" stroke-width="3.5" stroke-linecap="round" fill="none" opacity="0.4"/>
+  <path d="M108 52 Q98 38 84 44" stroke="url(#grad)" stroke-width="3.5" stroke-linecap="round" fill="none" opacity="0.4"/>
+
+  <style>
+    @media (prefers-color-scheme: light) { svg { opacity: 1; } }
+  </style>
+</svg>

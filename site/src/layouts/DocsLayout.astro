@@ -1,0 +1,172 @@
+---
+import '../styles/global.css';
+import Navbar from '../components/Navbar.astro';
+import Footer from '../components/Footer.astro';
+
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+
+const navItems = [
+    { title: "Getting Started", links: [
+        { text: "Quickstart", href: "/docs" },
+        { text: "Start Server", href: "/docs#install" },
+        { text: "Natural Language", href: "/docs#natural-language" },
+        { text: "MCP Connect", href: "/docs#mcp" },
+        { text: "Direct API", href: "/docs#direct-api" },
+        { text: "Build an Agent", href: "/docs#connect" },
+        { text: "Troubleshooting", href: "/docs#troubleshooting" },
+        { text: "From Source", href: "/docs#from-source" },
+        { text: "Env Vars", href: "/docs#env-vars" },
+    ]},
+    { title: "MCP Integration", links: [
+        { text: "What is MCP?", href: "/docs/mcp" },
+        { text: "Connect in 30s", href: "/docs/mcp#quickstart" },
+        { text: "Available Tools", href: "/docs/mcp#tools" },
+        { text: "SSE Streaming", href: "/docs/mcp#sse" },
+        { text: "Agent Discovery", href: "/docs/mcp#a2a" },
+    ]},
+    { title: "SDKs & Agents", links: [
+        { text: "Python", href: "/docs/sdks" },
+        { text: "LangChain", href: "/docs/sdks#langchain" },
+        { text: "TypeScript", href: "/docs/sdks#typescript" },
+    ]},
+    { title: "CLI", links: [
+        { text: "Installation", href: "/docs/cli" },
+        { text: "Connecting", href: "/docs/cli#connecting" },
+        { text: "Interactive REPL", href: "/docs/cli#repl" },
+        { text: "Knowledge", href: "/docs/cli#knowledge" },
+        { text: "Inspect & Export", href: "/docs/cli#inspect" },
+        { text: "Memory", href: "/docs/cli#memory" },
+        { text: "Admin", href: "/docs/cli#admin" },
+        { text: "Auth", href: "/docs/cli#auth" },
+        { text: "Scripting", href: "/docs/cli#scripting" },
+        { text: "Command Reference", href: "/docs/cli#reference" },
+    ]},
+    { title: "Security & Auth", links: [
+        { text: "Auth Modes", href: "/docs/security" },
+        { text: "Bootstrap", href: "/docs/security#bootstrap" },
+        { text: "API Key Management", href: "/docs/security#key-management" },
+        { text: "Roles", href: "/docs/security#roles" },
+        { text: "Encryption & TLS", href: "/docs/security#encryption" },
+    ]},
+    { title: "Multi-Tenancy", links: [
+        { text: "How It Works", href: "/docs/multi-tenancy" },
+        { text: "Using Tenants", href: "/docs/multi-tenancy#using-tenants" },
+        { text: "Common Patterns", href: "/docs/multi-tenancy#patterns" },
+        { text: "MCP with Tenants", href: "/docs/multi-tenancy#mcp-tenancy" },
+        { text: "Scoped API Keys", href: "/docs/multi-tenancy#scoped-keys" },
+    ]},
+    { title: "API Reference", links: [
+        { text: "Headers", href: "/docs/api" },
+        { text: "Simplified API", href: "/docs/api#simplified" },
+        { text: "Assert / Query", href: "/docs/api#assert-fact" },
+        { text: "Transactions", href: "/docs/api#transactions" },
+        { text: "Extract / Synthesize", href: "/docs/api#extract" },
+        { text: "Memory", href: "/docs/api#memory" },
+        { text: "Admin", href: "/docs/api#admin" },
+    ]},
+    { title: "LLM Integration", links: [
+        { text: "Providers", href: "/docs/llm" },
+        { text: "Fact Extraction", href: "/docs/llm#extract" },
+        { text: "Answer Synthesis", href: "/docs/llm#synthesize" },
+        { text: "Configuration", href: "/docs/llm#config" },
+    ]},
+    { title: "Core Concepts", links: [
+        { text: "Facts", href: "/docs/concepts" },
+        { text: "Rules", href: "/docs/concepts#rules" },
+        { text: "Inference", href: "/docs/concepts#inference" },
+        { text: "Scopes", href: "/docs/concepts#scopes" },
+        { text: "Truth Maintenance", href: "/docs/concepts#truth-maintenance" },
+        { text: "Salience & Memory", href: "/docs/concepts#salience" },
+        { text: "Memory Lifecycle", href: "/docs/concepts#memory-lifecycle" },
+    ]},
+    { title: "Operations", links: [
+        { text: "Monitoring", href: "/docs/operations" },
+        { text: "Logging", href: "/docs/operations#logging" },
+        { text: "Persistence", href: "/docs/operations#persistence" },
+        { text: "Replication", href: "/docs/operations#replication" },
+        { text: "Kubernetes", href: "/docs/operations#kubernetes" },
+    ]},
+];
+---
+
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="description" content="Nocturnus.AI Developer Documentation" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+		<meta name="generator" content={Astro.generator} />
+		<title>{title} | Nocturnus.AI Docs</title>
+	</head>
+	<body class="bg-[#020617] text-slate-300 font-sans antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+        <Navbar />
+        
+        <div class="max-w-[90rem] mx-auto px-6 lg:px-10 pt-28 pb-16 min-h-screen flex gap-16">
+            <!-- Sidebar -->
+            <aside class="w-56 hidden lg:block shrink-0 sticky top-28 h-[calc(100vh-8rem)] overflow-y-auto pr-4">
+                <nav class="space-y-7">
+                    {navItems.map(section => (
+                        <div>
+                            <h3 class="text-[0.7rem] font-bold text-slate-500 uppercase tracking-[0.12em] mb-3">{section.title}</h3>
+                            <ul class="space-y-1 border-l border-white/5">
+                                {section.links.map(link => (
+                                    <li>
+                                        <a href={link.href} class="block pl-4 py-1 text-[0.82rem] text-slate-400 hover:text-cyan-400 hover:border-l-2 hover:border-cyan-400 -ml-[1px] transition-all">
+                                            {link.text}
+                                        </a>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="docs-content flex-1 min-w-0 max-w-3xl">
+                <slot />
+            </main>
+
+            <!-- Right spacer for symmetry -->
+            <div class="w-56 hidden xl:block shrink-0"></div>
+        </div>
+
+        <Footer />
+
+        <script>
+          document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.docs-content pre').forEach(pre => {
+              const btn = document.createElement('button');
+              btn.className = 'copy-btn';
+              btn.textContent = 'copy';
+              btn.addEventListener('click', async () => {
+                const code = pre.querySelector('code');
+                const text = (code ?? pre).innerText;
+                try {
+                  await navigator.clipboard.writeText(text);
+                } catch {
+                  const ta = document.createElement('textarea');
+                  ta.value = text;
+                  document.body.appendChild(ta);
+                  ta.select();
+                  document.execCommand('copy');
+                  ta.remove();
+                }
+                btn.textContent = 'copied!';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 2000);
+              });
+              pre.appendChild(btn);
+            });
+          });
+        </script>
+	</body>
+</html>

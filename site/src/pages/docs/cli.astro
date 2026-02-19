@@ -1,0 +1,541 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+
+<DocsLayout title="CLI">
+    <h1>CLI Reference</h1>
+    <p class="lead text-xl text-slate-400">
+        A full-featured terminal client for managing knowledge, running queries, and administering your Nocturnus.AI server — interactively or from scripts.
+    </p>
+
+    <div class="callout callout-tip">
+        <strong>Two modes.</strong> Use the CLI as an <strong>interactive REPL</strong> for exploration, or pass <code>-e</code> to run a single command for scripting and automation.
+    </div>
+
+    <hr />
+
+    <!-- ============ INSTALLATION ============ -->
+    <h2 id="install">Installation</h2>
+
+    <h3>Build from Source</h3>
+    <p>The CLI is a Kotlin application in the <code>nocturnusai-cli</code> module. Build and run with Gradle:</p>
+
+    <pre data-lang="bash"><code><span class="syn-comment"># Build the distribution</span>
+<span class="syn-var">$</span> ./gradlew :nocturnusai-cli:installDist
+
+<span class="syn-comment"># Run it</span>
+<span class="syn-var">$</span> ./nocturnusai-cli/bin/nocturnusai-cli</code></pre>
+
+    <h3>Via Docker</h3>
+    <p>If you're running the server with Docker Compose, you can exec into it:</p>
+    <pre data-lang="bash"><code><span class="syn-var">$</span> docker compose exec server nocturnusai-cli</code></pre>
+
+    <h3>Quick Alias</h3>
+    <p>Add to your shell profile for convenience:</p>
+    <pre data-lang="bash"><code><span class="syn-comment"># ~/.zshrc or ~/.bashrc</span>
+<span class="syn-keyword">alias</span> nai="./nocturnusai-cli/bin/nocturnusai-cli"</code></pre>
+
+    <hr />
+
+    <!-- ============ CONNECTING ============ -->
+    <h2 id="connecting">Connecting to a Server</h2>
+    <p>Control which server, database, tenant, and API key to use via command-line flags:</p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Flag</th>
+                    <th class="py-2">Short</th>
+                    <th class="py-2">Default</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">--server</td>
+                    <td class="py-2 font-mono">-s</td>
+                    <td class="py-2 font-mono">http://localhost:9300</td>
+                    <td class="py-2">Server URL</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">--db</td>
+                    <td class="py-2 font-mono">-d</td>
+                    <td class="py-2 font-mono">default</td>
+                    <td class="py-2">Database name</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">--api-key</td>
+                    <td class="py-2 font-mono">-k</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">API key for authentication</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">--tenant</td>
+                    <td class="py-2 font-mono">-t</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">Tenant ID for multi-tenant databases</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">--exec</td>
+                    <td class="py-2 font-mono">-e</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">Run a single command and exit</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <pre data-lang="bash"><code><span class="syn-comment"># Connect to a remote server with specific database and API key</span>
+<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-s</span> https://api.example.com <span class="syn-flag">-d</span> production <span class="syn-flag">-k</span> nai_abc123
+
+<span class="syn-comment"># Connect to a specific tenant</span>
+<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-t</span> tenant_acme</code></pre>
+
+    <hr />
+
+    <!-- ============ REPL ============ -->
+    <h2 id="repl">Interactive REPL</h2>
+    <p>Launch the CLI without <code>-e</code> to enter interactive mode. You'll see a connection banner and a prompt showing the active database:</p>
+
+    <pre data-lang="bash"><code><span class="syn-var">$</span> nocturnusai-cli
+
+<span class="syn-ok">NocturnusAI CLI — logic server for agentic AI
+Server:   http://localhost:9300
+Database: default
+Connected.</span>
+
+<span class="syn-comment">Type 'help' for commands, 'status' for details, 'setup' to configure LLM.</span>
+
+default&gt; _</code></pre>
+
+    <p>The prompt shows your current database. Type commands directly — no need for prefixes or wrappers.</p>
+
+    <div class="callout callout-info">
+        <strong>Switch databases on the fly.</strong> Use <code>use &lt;database&gt;</code> to change the active database without reconnecting. Your prompt updates to reflect the change.
+    </div>
+
+    <pre data-lang="bash"><code>default&gt; use production
+<span class="syn-ok">Switched to production</span>
+
+production&gt; _</code></pre>
+
+    <hr />
+
+    <!-- ============ KNOWLEDGE MANAGEMENT ============ -->
+    <h2 id="knowledge">Knowledge Management</h2>
+
+    <h3 id="tell">tell — Store a Fact</h3>
+    <p>Store a structured fact using predicate syntax, or pass natural language to auto-extract facts via LLM:</p>
+
+    <pre data-lang="bash"><code><span class="syn-comment"># Structured fact</span>
+default&gt; tell human(socrates)
+<span class="syn-ok">OK Fact stored</span>
+
+<span class="syn-comment"># Natural language (requires LLM configured on server)</span>
+default&gt; tell the president met with the prime minister yesterday
+<span class="syn-ok">+ met_with(president, prime_minister)   95%
++ time(meeting, yesterday)               90%
+2 facts, 0 rules — asserted</span></code></pre>
+    <p>Shortcut: <code>+</code></p>
+
+    <h3 id="ask">ask — Query Knowledge</h3>
+    <p>Ask queries in predicate syntax (with <code>?</code> variables) or natural language. The CLI auto-detects the format:</p>
+
+    <pre data-lang="bash"><code><span class="syn-comment"># Structured query — variables start with ?</span>
+default&gt; ask mortal(?who)
+  who = socrates
+<span class="syn-ok">1 result(s)</span>
+
+<span class="syn-comment"># Natural language question (routed to /synthesize)</span>
+default&gt; ask who is mortal?
+<span class="syn-ok">  Socrates is mortal.
+
+Derivation:
+  fact  human(socrates)
+  rule  mortal(?x) :- human(?x)  via mortal_rule
+Confidence: 95%  anthropic/claude-sonnet-4-20250514</span></code></pre>
+    <p>Shortcut: <code>?</code></p>
+
+    <h3 id="teach">teach — Define a Rule</h3>
+    <p>Rules use <code>:-</code> syntax. Variables (prefixed with <code>?</code>) are automatically unified:</p>
+
+    <pre data-lang="bash"><code>default&gt; teach mortal(?x) :- human(?x)
+<span class="syn-ok">OK Rule added</span>
+
+<span class="syn-comment"># Multi-body rules</span>
+default&gt; teach grandparent(?x, ?z) :- parent(?x, ?y), parent(?y, ?z)
+<span class="syn-ok">OK Rule added</span></code></pre>
+    <p>Shortcut: <code>++</code></p>
+
+    <h3 id="forget">forget — Retract a Fact</h3>
+    <p>Remove a fact from the knowledge base:</p>
+    <pre data-lang="bash"><code>default&gt; forget human(socrates)
+<span class="syn-ok">OK Retracted</span></code></pre>
+    <p>Shortcut: <code>-</code></p>
+
+    <h3 id="ingest">ingest — Extract Knowledge from Text</h3>
+    <p>Feed plain text — the server's LLM automatically extracts facts and rules and asserts them:</p>
+
+    <pre data-lang="bash"><code><span class="syn-comment"># Inline text</span>
+default&gt; ingest Alice is Bob's mother. Bob has three children.
+<span class="syn-ok">  + mother(alice, bob)        92%
+  + has_children(bob, three)  88%
+2 facts, 0 rules — asserted  via anthropic/claude-sonnet-4-20250514</span>
+
+<span class="syn-comment"># From a file</span>
+default&gt; ingest -f article.txt
+<span class="syn-ok">  + founded(elon_musk, spacex)  95%
+  + ...
+12 facts, 2 rules — asserted</span></code></pre>
+
+    <hr />
+
+    <!-- ============ INSPECTION & EXPORT ============ -->
+    <h2 id="inspect">Inspection &amp; Export</h2>
+
+    <h3>inspect — Browse All Knowledge</h3>
+    <p>List all facts and rules in the current database. Optionally filter by a search term:</p>
+
+    <pre data-lang="bash"><code>default&gt; inspect
+<span class="syn-ok">  fact  human(socrates)
+  fact  parent(alice, bob)
+  rule  mortal(?x) :- human(?x)
+3 item(s)</span>
+
+<span class="syn-comment"># Filter results</span>
+default&gt; inspect parent
+<span class="syn-ok">  fact  parent(alice, bob)
+  fact  parent(bob, charlie)
+2 item(s)</span></code></pre>
+    <p>Shortcut: <code>ls</code></p>
+
+    <h3 id="export">export — Dump Knowledge to File</h3>
+    <p>Export all facts and rules in a loadable text format:</p>
+    <pre data-lang="bash"><code><span class="syn-comment"># Print to stdout</span>
+default&gt; export
+
+<span class="syn-comment"># Save to file</span>
+default&gt; export knowledge.ab
+<span class="syn-ok">Exported — 5 facts, 2 rules → knowledge.ab</span></code></pre>
+    <p>Shortcut: <code>dump</code></p>
+
+    <h3 id="import">import — Load Knowledge from File</h3>
+    <p>Import facts and rules from an <code>.ab</code> file. Lines starting with <code>#</code> are treated as comments:</p>
+    <pre data-lang="bash"><code>default&gt; import knowledge.ab
+<span class="syn-ok">Imported — 5 facts, 2 rules</span></code></pre>
+    <p>Shortcut: <code>load</code></p>
+
+    <div class="callout callout-tip">
+        <strong>File format.</strong> Each line is either a fact (<code>predicate(arg1, arg2)</code>) or a rule (<code>head(?x) :- body(?x)</code>). Comments start with <code>#</code>. This is the same format that <code>export</code> produces.
+    </div>
+
+    <hr />
+
+    <!-- ============ MEMORY OPERATIONS ============ -->
+    <h2 id="memory">Memory Operations</h2>
+    <p>Nocturnus has a built-in salience model. These commands let you manage it:</p>
+
+    <h3>context — Salience-Ranked Context Window</h3>
+    <p>See the most relevant facts, ranked by salience score:</p>
+    <pre data-lang="bash"><code>default&gt; context 10
+<span class="syn-ok">Context Window — 10 of 42 facts (by salience)
+  [0.950]  subscription_tier(acme_corp, enterprise)
+  [0.880]  location(acme_corp, austin)
+  [0.720]  parent(alice, bob)
+  ...</span></code></pre>
+    <p>Shortcut: <code>ctx</code></p>
+
+    <h3>compress — Consolidate Episodic Patterns</h3>
+    <p>Merge repeated or related facts into summary facts:</p>
+    <pre data-lang="bash"><code>default&gt; compress
+<span class="syn-ok">Compressed — 8 consolidated, 2 new summary facts</span></code></pre>
+
+    <h3>cleanup — Evict Low-Salience Facts</h3>
+    <p>Remove expired and low-salience facts below a threshold:</p>
+    <pre data-lang="bash"><code><span class="syn-comment"># Default threshold: 0.05</span>
+default&gt; cleanup
+
+<span class="syn-comment"># Custom threshold</span>
+default&gt; cleanup 0.1
+<span class="syn-ok">Cleanup — 3 expired, 5 evicted (threshold=0.1)</span></code></pre>
+
+    <hr />
+
+    <!-- ============ ADMIN ============ -->
+    <h2 id="admin">Administration</h2>
+
+    <h3>dbs — List Databases</h3>
+    <p>Show all databases on the server. An arrow marks the active one:</p>
+    <pre data-lang="bash"><code>default&gt; dbs
+<span class="syn-ok">  default &lt;-
+  production
+  staging</span></code></pre>
+
+    <h3>health — Server Health Check</h3>
+    <pre data-lang="bash"><code>default&gt; health
+<span class="syn-ok">healthy
+  pass  database  Connected
+  pass  memory    128 MB free</span></code></pre>
+
+    <h3>status — Full Server Status</h3>
+    <p>A dashboard view showing health, LLM configuration, databases, auth mode, and knowledge stats:</p>
+    <pre data-lang="bash"><code>default&gt; status
+<span class="syn-ok">NocturnusAI Status
+Server: http://localhost:9300
+Database: default
+
+  Health:     healthy
+  LLM:        anthropic/claude-sonnet-4-20250514
+  Extraction: enabled
+  Databases:  3
+  Auth:       RBAC (2 keys)
+  Knowledge:  42 facts, 5 rules (in default)</span></code></pre>
+
+    <h3 id="setup">setup — Configure LLM Provider</h3>
+    <p>Interactive wizard to configure which LLM provider powers natural language features:</p>
+    <pre data-lang="bash"><code>default&gt; setup
+
+<span class="syn-ok">NocturnusAI Setup
+Configure your LLM provider for natural language features.
+
+  1) Ollama (local, free, private)
+  2) Anthropic Claude
+  3) OpenAI GPT
+  4) Google Gemini
+  5) Custom (any OpenAI-compatible endpoint)
+  q) Cancel
+
+Choice [1]:</span> 1
+
+<span class="syn-ok">Ollama selected.
+Make sure Ollama is running: ollama serve</span>
+Model [llama3.2]: _</code></pre>
+    <p>The wizard writes the configuration to your <code>.env</code> file after confirmation.</p>
+
+    <hr />
+
+    <!-- ============ AUTH ============ -->
+    <h2 id="auth">Authentication</h2>
+    <p>Manage RBAC-based API keys directly from the CLI.</p>
+
+    <h3>login — Bootstrap or Check Auth</h3>
+    <p>If auth is enabled but no keys exist yet, <code>login</code> guides you through creating the first admin key:</p>
+    <pre data-lang="bash"><code>default&gt; login
+
+<span class="syn-ok">NocturnusAI Auth
+  Mode: rbac
+RBAC auth enabled — no keys yet.
+Let's create your first admin key.
+
+Admin username [admin]:</span> admin
+<span class="syn-ok">Admin password:</span> ********
+<span class="syn-ok">Key name [admin]:</span> admin
+
+<span class="syn-ok">Admin key created!
+
+  API Key:  nai_abc123...xyz789
+  Prefix:   nai_abc1
+  ID:       550e8400-e29b-41d4-a716-446655440000
+
+Save this key — it won't be shown again.
+Use it with: --api-key nai_abc123...xyz789</span></code></pre>
+
+    <h3>whoami — Show Current Identity</h3>
+    <pre data-lang="bash"><code>default&gt; whoami
+<span class="syn-ok">  Mode:     rbac
+  Name:     admin
+  Role:     admin
+  DBs:      all
+  Tenants:  all
+  Perms:    read, write, admin, keys</span></code></pre>
+
+    <h3>keys — Manage API Keys</h3>
+    <pre data-lang="bash"><code><span class="syn-comment"># List all keys</span>
+default&gt; keys list
+<span class="syn-ok">API Keys:
+  nai_abc1...  admin  admin     550e8400-...
+  nai_def2...  writer agent-1   661f9500-...</span>
+
+<span class="syn-comment"># Create a new key (roles: admin, writer, reader)</span>
+default&gt; keys create my-agent writer
+<span class="syn-ok">Key created:
+  Key:    nai_xyz789...
+  Prefix: nai_xyz7
+  Role:   writer
+Save this key — it won't be shown again.</span>
+
+<span class="syn-comment"># Revoke a key by ID</span>
+default&gt; keys revoke 661f9500-e29b-41d4-a716-446655440000
+<span class="syn-ok">Key revoked.</span></code></pre>
+
+    <hr />
+
+    <!-- ============ SCRIPTING ============ -->
+    <h2 id="scripting">Single-Command Mode &amp; Scripting</h2>
+    <p>Pass <code>-e</code> to run a single command and exit — perfect for shell scripts, CI/CD, and automation:</p>
+
+    <pre data-lang="bash"><code><span class="syn-comment"># Store a fact</span>
+<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"tell human(socrates)"</span>
+
+<span class="syn-comment"># Query</span>
+<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"ask mortal(?who)"</span>
+
+<span class="syn-comment"># Export a database</span>
+<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"export backup.ab"</span>
+
+<span class="syn-comment"># Import into a database</span>
+<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"import knowledge.ab"</span>
+
+<span class="syn-comment"># Health check in CI</span>
+<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-e</span> <span class="syn-string">"health"</span></code></pre>
+
+    <h3>Shell Scripting Examples</h3>
+    <pre data-lang="bash"><code><span class="syn-comment">#!/bin/bash</span>
+<span class="syn-comment"># Seed a database with a knowledge file</span>
+CLI="./nocturnusai-cli/bin/nocturnusai-cli"
+
+<span class="syn-var">$</span>CLI <span class="syn-flag">-d</span> production <span class="syn-flag">-e</span> <span class="syn-string">"import seed_data.ab"</span>
+<span class="syn-var">$</span>CLI <span class="syn-flag">-d</span> production <span class="syn-flag">-e</span> <span class="syn-string">"inspect"</span>
+
+<span class="syn-comment"># Backup all databases</span>
+<span class="syn-keyword">for</span> db <span class="syn-keyword">in</span> default production staging; <span class="syn-keyword">do</span>
+    <span class="syn-var">$</span>CLI <span class="syn-flag">-d</span> <span class="syn-var">$</span>db <span class="syn-flag">-e</span> <span class="syn-string">"export backups/backup.ab"</span>
+<span class="syn-keyword">done</span></code></pre>
+
+    <h3>Raw DSL Mode</h3>
+    <p>For advanced use, the <code>dsl</code> command passes raw Logiql DSL directly to the server:</p>
+    <pre data-lang="bash"><code>default&gt; dsl ASSERT human(socrates).
+default&gt; dsl QUERY mortal(?who).</code></pre>
+    <p>Shortcut: <code>exec</code></p>
+
+    <hr />
+
+    <!-- ============ COMMAND REFERENCE ============ -->
+    <h2 id="reference">Command Reference</h2>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Command</th>
+                    <th class="py-2">Shortcut</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">tell &lt;fact&gt;</td>
+                    <td class="py-2 font-mono">+</td>
+                    <td class="py-2">Store a fact (structured or natural language)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">ask &lt;query&gt;</td>
+                    <td class="py-2 font-mono">?</td>
+                    <td class="py-2">Query with inference (structured or NL)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">teach &lt;rule&gt;</td>
+                    <td class="py-2 font-mono">++</td>
+                    <td class="py-2">Define a logical rule</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">forget &lt;fact&gt;</td>
+                    <td class="py-2 font-mono">-</td>
+                    <td class="py-2">Retract a fact</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">ingest &lt;text | -f file&gt;</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">Extract knowledge from text via LLM</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">inspect [filter]</td>
+                    <td class="py-2 font-mono">ls</td>
+                    <td class="py-2">Browse all facts and rules</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">context [max]</td>
+                    <td class="py-2 font-mono">ctx</td>
+                    <td class="py-2">Salience-ranked context window</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">compress</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">Consolidate episodic patterns</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">cleanup [threshold]</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">Evict expired/low-salience facts</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">dsl &lt;command&gt;</td>
+                    <td class="py-2 font-mono">exec</td>
+                    <td class="py-2">Raw Logiql DSL passthrough</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">import &lt;file&gt;</td>
+                    <td class="py-2 font-mono">load</td>
+                    <td class="py-2">Load facts &amp; rules from file</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">export [file]</td>
+                    <td class="py-2 font-mono">dump</td>
+                    <td class="py-2">Dump knowledge to file or stdout</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">use &lt;database&gt;</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">Switch active database</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">dbs</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">List all databases</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">health</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">Server health check</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">status</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">Full server status dashboard</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">setup</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">Interactive LLM provider configuration</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">login</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">Bootstrap auth or check auth status</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">whoami</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">Show current key identity &amp; permissions</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">keys &lt;list|create|revoke&gt;</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">API key management</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">help</td>
+                    <td class="py-2 font-mono">h</td>
+                    <td class="py-2">Show all commands</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">exit</td>
+                    <td class="py-2 font-mono">q</td>
+                    <td class="py-2">Quit the REPL</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</DocsLayout>

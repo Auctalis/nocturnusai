@@ -1,0 +1,258 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+
+<DocsLayout title="API Reference">
+    <h1>API Reference</h1>
+    <p class="lead text-xl text-slate-400">
+        Every endpoint on the Nocturnus.AI HTTP server. Base URL: <code>http://localhost:9300</code>
+    </p>
+
+    <hr />
+
+    <h2 id="headers">Common Headers</h2>
+    <ul>
+        <li><code>Content-Type: application/json</code> — required for all POST requests</li>
+        <li><code>X-Database: default</code> — selects the logical database (optional, defaults to "default")</li>
+        <li><code>X-Tenant-ID: default</code> — selects the tenant within that database (optional)</li>
+        <li><code>Authorization: Bearer &lt;key&gt;</code> — required when auth is enabled</li>
+    </ul>
+
+    <hr />
+
+    <h2 id="simplified">Simplified API</h2>
+    <p>Developer-friendly aliases for the most common operations. These are the endpoints shown in the quickstart.</p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Endpoint</th>
+                    <th class="py-2">Full Form</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /tell</td>
+                    <td class="py-2 font-mono">POST /assert/fact</td>
+                    <td class="py-2">Store a fact</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /ask</td>
+                    <td class="py-2 font-mono">POST /infer</td>
+                    <td class="py-2">Query with inference (backward chaining)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /teach</td>
+                    <td class="py-2 font-mono">POST /assert/rule</td>
+                    <td class="py-2">Define a logical rule</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /forget</td>
+                    <td class="py-2 font-mono">POST /retract</td>
+                    <td class="py-2">Remove a fact (cascading)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr />
+
+    <h2 id="assert-fact">POST /assert/fact (or /tell)</h2>
+    <p>Assert a fact into the knowledge base.</p>
+    <h3>Request</h3>
+    <pre><code class="language-json">&#123;
+  "predicate": "parent",
+  "args": ["alice", "bob"],
+  "truthVal": true,
+  "scope": null,
+  "ttl": null,
+  "validUntil": null,
+  "metadata": &#123;&#125;
+&#125;</code></pre>
+    <p>Only <code>predicate</code> and <code>args</code> are required. All other fields are optional.</p>
+
+    <h3>Response</h3>
+    <pre><code class="language-json">&#123; "status": "ok", "atom": "parent(alice, bob)" &#125;</code></pre>
+
+    <hr />
+
+    <h2 id="assert-rule">POST /assert/rule (or /teach)</h2>
+    <p>Define a logical rule for inference.</p>
+    <h3>Request</h3>
+    <pre><code class="language-json">&#123;
+  "head": &#123; "predicate": "grandparent", "args": ["?x", "?z"] &#125;,
+  "body": [
+    &#123; "predicate": "parent", "args": ["?x", "?y"] &#125;,
+    &#123; "predicate": "parent", "args": ["?y", "?z"] &#125;
+  ],
+  "scope": null
+&#125;</code></pre>
+
+    <hr />
+
+    <h2 id="infer">POST /infer (or /ask)</h2>
+    <p>Run backward-chaining inference. Use <code>?</code>-prefixed variables for unknowns.</p>
+    <h3>Request</h3>
+    <pre><code class="language-json">&#123;
+  "predicate": "grandparent",
+  "args": ["?who", "charlie"],
+  "scope": null,
+  "withProof": false
+&#125;</code></pre>
+    <p>Set <code>withProof: true</code> to get the full derivation chain showing how each result was derived.</p>
+
+    <h3>Response</h3>
+    <pre><code class="language-json">&#123; "results": ["grandparent(alice, charlie)"] &#125;</code></pre>
+
+    <hr />
+
+    <h2 id="query">POST /query</h2>
+    <p>Direct pattern matching without inference (no rule application). Faster than <code>/infer</code> when you only need stored facts.</p>
+    <h3>Request</h3>
+    <pre><code class="language-json">&#123;
+  "predicate": "parent",
+  "args": ["?who", "bob"],
+  "scope": null
+&#125;</code></pre>
+
+    <hr />
+
+    <h2 id="retract">POST /retract (or /forget)</h2>
+    <p>Remove a fact. The TMS automatically cascade-retracts any derived conclusions that depended on it.</p>
+    <h3>Request</h3>
+    <pre><code class="language-json">&#123;
+  "predicate": "parent",
+  "args": ["alice", "bob"]
+&#125;</code></pre>
+
+    <hr />
+
+    <h2 id="transactions">ACID Transactions</h2>
+    <p>Group multiple operations into an atomic unit. If any operation fails, the entire transaction rolls back — ensuring consistency when multiple agents write simultaneously.</p>
+    <pre><code class="language-bash"># 1. Begin transaction
+TX_ID=$(curl -s -X POST http://localhost:9300/tx/begin | jq -r '.id')
+
+# 2. Assert facts within the transaction
+curl -X POST http://localhost:9300/assert/fact \
+  -H "Content-Type: application/json" \
+  -H "X-Transaction-ID: $TX_ID" \
+  -d '&#123;"predicate":"balance","args":["alice","500"]&#125;'
+
+curl -X POST http://localhost:9300/assert/fact \
+  -H "Content-Type: application/json" \
+  -H "X-Transaction-ID: $TX_ID" \
+  -d '&#123;"predicate":"balance","args":["bob","300"]&#125;'
+
+# 3. Commit (or rollback)
+curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
+# curl -X POST "http://localhost:9300/tx/rollback/$TX_ID"</code></pre>
+
+    <hr />
+
+    <h2 id="extract">POST /extract</h2>
+    <p>LLM-powered fact extraction from natural language text. See <a href="/docs/llm">LLM Integration</a> for details.</p>
+    <h3>Request</h3>
+    <pre><code class="language-json">&#123;
+  "text": "Acme Corp is on the enterprise plan.",
+  "assert": true,
+  "rules": false,
+  "scope": null,
+  "context": null
+&#125;</code></pre>
+
+    <hr />
+
+    <h2 id="synthesize">POST /synthesize</h2>
+    <p>LLM-powered natural language question answering grounded in facts. See <a href="/docs/llm">LLM Integration</a>.</p>
+    <h3>Request</h3>
+    <pre><code class="language-json">&#123;
+  "question": "What plan is Acme Corp on?",
+  "scope": null
+&#125;</code></pre>
+
+    <h3>Response</h3>
+    <pre><code class="language-json">&#123;
+  "answer": "Acme Corp is on the enterprise plan.",
+  "derivation": [&#123; "fact": "subscription_tier(acme_corp, enterprise)", "type": "fact_match" &#125;],
+  "confidence": 0.95,
+  "queriesExecuted": ["subscription_tier(acme_corp, ?tier)"],
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-20250514"
+&#125;</code></pre>
+
+    <hr />
+
+    <h2 id="memory">Memory Endpoints</h2>
+
+    <h3>GET /memory/context</h3>
+    <p>Get the top-K most salient facts for the agent's context window.</p>
+    <pre><code class="language-json">&#123;
+  "maxFacts": 100,
+  "minSalience": 0.0,
+  "predicates": null,
+  "scope": null
+&#125;</code></pre>
+
+    <h3>POST /memory/consolidate</h3>
+    <p>Compress repetitive episodic patterns into semantic summaries.</p>
+
+    <h3>POST /memory/decay</h3>
+    <p>Evict expired and low-salience facts.</p>
+    <pre><code class="language-json">&#123; "threshold": 0.05 &#125;</code></pre>
+
+    <hr />
+
+    <h2 id="admin">Admin Endpoints</h2>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Endpoint</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">GET /health</td>
+                    <td class="py-2">Health check (Kubernetes liveness)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">GET /health/ready</td>
+                    <td class="py-2">Readiness check</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">GET /predicates</td>
+                    <td class="py-2">Discover knowledge base schema</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">GET /databases</td>
+                    <td class="py-2">List all databases</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /databases</td>
+                    <td class="py-2">Create a new database</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">GET /metrics</td>
+                    <td class="py-2">Prometheus metrics</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /tx/begin</td>
+                    <td class="py-2">Begin ACID transaction</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /tx/commit/:id</td>
+                    <td class="py-2">Commit transaction</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /tx/rollback/:id</td>
+                    <td class="py-2">Rollback transaction</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</DocsLayout>

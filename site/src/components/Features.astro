@@ -1,0 +1,137 @@
+---
+import { MessageSquare, Search, Sparkles, Brain, Clock, GitMerge, Zap, Shield, Network } from 'lucide-astro';
+
+// Agent-first features — NL and agent usability first, then infrastructure depth
+const agentFeatures = [
+  {
+    Icon: MessageSquare,
+    title: "Plain English In, Verified Facts Out",
+    desc: "POST /extract with any text. NocturnusAI calls your LLM to pull out structured facts and stores them automatically. No schema design, no parsing code, no mapping logic — your agent just feeds it context.",
+    tag: "Natural language",
+    highlight: true,
+  },
+  {
+    Icon: Search,
+    title: "Ask Questions, Get Grounded Answers",
+    desc: "POST /synthesize with a natural language question. NocturnusAI queries its fact store, runs inference, and returns a sourced answer with a derivation trail — not a hallucinated guess from token probabilities.",
+    tag: "Q&A",
+    highlight: true,
+  },
+  {
+    Icon: Sparkles,
+    title: "9 MCP Tools, Zero Integration Work",
+    desc: "Connect any MCP-compatible agent, IDE, or framework with a two-line config. tell, ask, teach, forget, recall, context — your agent gets a complete reasoning toolkit without writing any integration code.",
+    tag: "MCP native",
+    highlight: true,
+  },
+];
+
+const infraFeatures = [
+  {
+    Icon: Brain,
+    title: "Salience-Ranked Memory",
+    desc: "Composite scoring keeps the most relevant facts surfaced for your agent's context window. Episodic patterns consolidate into semantic summaries. Low-relevance facts decay automatically.",
+    tag: "Memory lifecycle"
+  },
+  {
+    Icon: GitMerge,
+    title: "Truth Maintenance System",
+    desc: "Retract a fact and every conclusion that depended on it disappears automatically. No stale inferences, no manual cleanup — the knowledge base stays consistent by design.",
+    tag: "Consistency"
+  },
+  {
+    Icon: Clock,
+    title: "Temporal Atoms",
+    desc: "Every fact carries validFrom, validUntil, and TTL fields. Facts auto-expire. Query what was true at any point in time. Agents reason over history, not just the present snapshot.",
+    tag: "Time-aware"
+  },
+  {
+    Icon: Zap,
+    title: "ACID Transactions",
+    desc: "Multi-agent systems write concurrently. Transactions ensure atomic commits with contradiction detection — agents can explore hypotheticals without polluting shared state.",
+    tag: "Transactional"
+  },
+  {
+    Icon: Shield,
+    title: "Production Durability",
+    desc: "WAL + snapshots for crash recovery. Leader/follower replication for read scaling. Prometheus metrics. Kubernetes-ready health probes. Self-hosted, your data, your infrastructure.",
+    tag: "Ops-ready"
+  },
+  {
+    Icon: Network,
+    title: "Universal Protocol Support",
+    desc: "MCP, REST, Python SDK, TypeScript SDK, A2A agent discovery. Whatever your stack, NocturnusAI plugs in. New protocols don't require rewriting your knowledge layer.",
+    tag: "Interoperable"
+  },
+];
+---
+
+<section id="features" class="py-24 relative z-10">
+  <div class="max-w-7xl mx-auto px-6">
+
+    <!-- Agent-first headline -->
+    <div class="text-center mb-12">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm font-mono mb-6">
+        Built for agentic developers
+      </div>
+      <h2 class="text-3xl md:text-4xl font-bold mb-4">
+        <span class="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">
+          Your Agent Asks. NocturnusAI Knows.
+        </span>
+      </h2>
+      <p class="text-slate-400 max-w-2xl mx-auto">
+        Start with natural language — feed it text, ask it questions, connect via MCP. The logic engine, inference, and memory management all happen beneath the surface.
+      </p>
+    </div>
+
+    <!-- Agent-first tier — 3 highlighted cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      {agentFeatures.map(({ Icon, title, desc, tag }) => (
+        <div class="relative p-8 rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-purple-500/5 group hover:-translate-y-2 transition-transform duration-300 overflow-hidden">
+          <!-- Subtle glow -->
+          <div class="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-500/0 to-purple-500/0 group-hover:from-cyan-500/8 group-hover:to-purple-500/8 transition-all duration-300 pointer-events-none"></div>
+          <div class="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-mono text-cyan-500">
+            {tag}
+          </div>
+          <div class="w-12 h-12 rounded-lg bg-cyan-500/15 flex items-center justify-center mb-6 group-hover:bg-cyan-500/25 transition-colors">
+            <Icon class="w-6 h-6 text-cyan-400" />
+          </div>
+          <h3 class="text-xl font-bold text-white mb-3 pr-12">{title}</h3>
+          <p class="text-slate-400 text-sm leading-relaxed relative z-10">{desc}</p>
+        </div>
+      ))}
+    </div>
+
+    <!-- Infrastructure divider -->
+    <div class="flex items-center gap-4 mb-6 mt-14">
+      <div class="flex-1 h-px bg-white/5"></div>
+      <span class="text-xs font-mono text-slate-600 uppercase tracking-widest">What happens underneath</span>
+      <div class="flex-1 h-px bg-white/5"></div>
+    </div>
+
+    <!-- Infrastructure tier — 6 cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {infraFeatures.map(({ Icon, title, desc, tag }) => (
+        <div class="glass p-6 rounded-xl group hover:-translate-y-1 transition-transform duration-300 relative overflow-hidden">
+          <div class="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono text-slate-600 group-hover:text-slate-400 transition-colors">
+            {tag}
+          </div>
+          <div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4 group-hover:bg-purple-500/15 transition-colors">
+            <Icon class="w-5 h-5 text-slate-500 group-hover:text-purple-400 transition-colors" />
+          </div>
+          <h3 class="text-base font-bold text-slate-200 mb-2 group-hover:text-white transition-colors pr-10">{title}</h3>
+          <p class="text-slate-500 text-sm leading-relaxed">{desc}</p>
+        </div>
+      ))}
+    </div>
+
+    <div class="mt-12 text-center">
+      <a href="/features" class="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 font-medium transition-colors group">
+        Deep dive into every feature
+        <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+        </svg>
+      </a>
+    </div>
+  </div>
+</section>

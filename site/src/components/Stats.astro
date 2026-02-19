@@ -1,0 +1,37 @@
+---
+import { Gauge, Database, HardDrive, Network } from 'lucide-astro';
+
+const stats = [
+  { Icon: Gauge, value: "< 100ms", label: "Fact Retrieval", sub: "6-way Hexastore indexing" },
+  { Icon: Database, value: "ACID", label: "Transactional Truth", sub: "Commit or rollback atomically" },
+  { Icon: HardDrive, value: "WAL", label: "Crash Recovery", sub: "Write-ahead log + snapshots" },
+  { Icon: Network, value: "MCP", label: "Protocol Native", sub: "9 tools, any agent framework" },
+];
+---
+
+<section class="py-24 relative z-10">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="text-center mb-16">
+      <p class="text-slate-500 text-sm uppercase tracking-widest font-medium">Built for production from day one</p>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+      {stats.map(({ Icon, value, label, sub }) => (
+        <div class="text-center group glass rounded-2xl p-6 hover:-translate-y-1 transition-all duration-300">
+          <div class="flex justify-center mb-3">
+            <Icon class="w-6 h-6 text-slate-600 group-hover:text-cyan-400 transition-colors" />
+          </div>
+          <div class="text-4xl md:text-5xl font-black bg-clip-text text-transparent bg-gradient-to-br from-white to-slate-500 mb-2 group-hover:from-cyan-400 group-hover:to-purple-500 transition-all duration-300">
+            {value}
+          </div>
+          <div class="text-sm font-bold text-slate-300 mb-1 group-hover:text-white transition-colors">
+            {label}
+          </div>
+          <div class="text-xs text-slate-600 group-hover:text-slate-500 transition-colors">
+            {sub}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

@@ -1,0 +1,193 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+
+<DocsLayout title="LLM Integration">
+    <h1>LLM Integration</h1>
+    <p class="lead text-xl text-slate-400">
+        Use LLMs to extract facts from natural language and synthesize grounded answers.
+    </p>
+
+    <div class="not-prose my-8 p-6 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-200">
+        <strong>How it works:</strong> The LLM layer is <em>optional</em>. Core fact storage, rules, and inference work without any LLM. When enabled, the LLM handles translation between natural language and structured predicates — but all retrieval and reasoning remains deterministic.
+    </div>
+
+    <hr />
+
+    <h2 id="providers">Supported Providers</h2>
+    <p>Nocturnus supports 5 LLM providers. Set one environment variable to enable:</p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Provider</th>
+                    <th class="py-2">Environment Variable</th>
+                    <th class="py-2">Models</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">Anthropic</td>
+                    <td class="py-2 font-mono">ANTHROPIC_API_KEY</td>
+                    <td class="py-2">Claude Sonnet, Haiku, Opus</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">OpenAI</td>
+                    <td class="py-2 font-mono">OPENAI_API_KEY</td>
+                    <td class="py-2">GPT-4o, GPT-4, GPT-3.5</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">Google</td>
+                    <td class="py-2 font-mono">GOOGLE_API_KEY</td>
+                    <td class="py-2">Gemini Pro, Flash</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">Ollama</td>
+                    <td class="py-2 font-mono">OLLAMA_BASE_URL</td>
+                    <td class="py-2">Any local model (Llama, Mistral, etc.)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">OpenAI-Compatible</td>
+                    <td class="py-2 font-mono">OPENAI_COMPATIBLE_BASE_URL + OPENAI_COMPATIBLE_API_KEY</td>
+                    <td class="py-2">Groq, Mistral, DeepSeek, etc.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p>Nocturnus checks for keys in the order listed above and uses the first one found.</p>
+
+    <hr />
+
+    <h2 id="extract">Fact Extraction — POST /extract</h2>
+    <p>Feed Nocturnus plain English text and the LLM extracts structured facts (and optionally rules). With <code>assert: true</code>, extracted facts are automatically stored in the knowledge base.</p>
+
+    <h3>Request</h3>
+    <pre><code class="language-json">&#123;
+  "text": "Acme Corp is on the enterprise plan and has been a customer since 2019. They are based in Austin, Texas.",
+  "assert": true,
+  "rules": false,
+  "scope": null,
+  "context": null
+&#125;</code></pre>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Field</th>
+                    <th class="py-2">Type</th>
+                    <th class="py-2">Default</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">text</td>
+                    <td class="py-2">string</td>
+                    <td class="py-2">(required)</td>
+                    <td class="py-2">Plain text to extract facts from</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">assert</td>
+                    <td class="py-2">boolean</td>
+                    <td class="py-2">false</td>
+                    <td class="py-2">Auto-store extracted facts in the KB</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">rules</td>
+                    <td class="py-2">boolean</td>
+                    <td class="py-2">false</td>
+                    <td class="py-2">Also extract logical rules from the text</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">scope</td>
+                    <td class="py-2">string?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Scope for asserted facts</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">context</td>
+                    <td class="py-2">string?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Additional context to help the LLM interpret the text</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Response</h3>
+    <pre><code class="language-json">&#123;
+  "facts": [
+    &#123; "predicate": "subscription_tier", "args": ["acme_corp", "enterprise"] &#125;,
+    &#123; "predicate": "customer_since", "args": ["acme_corp", "2019"] &#125;,
+    &#123; "predicate": "location", "args": ["acme_corp", "austin_texas"] &#125;
+  ],
+  "rules": [],
+  "asserted": true,
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-20250514"
+&#125;</code></pre>
+
+    <h3>Batch Extraction</h3>
+    <p>Process multiple texts in one call with <code>POST /extract/batch</code>:</p>
+    <pre><code class="language-json">&#123;
+  "texts": [
+    "Alice is a senior engineer at Acme.",
+    "Bob manages the sales team."
+  ],
+  "assert": true
+&#125;</code></pre>
+
+    <hr />
+
+    <h2 id="synthesize">Answer Synthesis — POST /synthesize</h2>
+    <p>Ask a natural language question. Nocturnus translates it into logic queries, finds matching facts, and uses the LLM to synthesize a grounded answer — with full derivation showing which facts were used.</p>
+
+    <h3>Request</h3>
+    <pre><code class="language-json">&#123;
+  "question": "What plan is Acme Corp on and where are they located?",
+  "scope": null
+&#125;</code></pre>
+
+    <h3>Response</h3>
+    <pre><code class="language-json">&#123;
+  "answer": "Acme Corp is on the enterprise plan and is based in Austin, Texas.",
+  "derivation": [
+    &#123; "fact": "subscription_tier(acme_corp, enterprise)", "type": "fact_match" &#125;,
+    &#123; "fact": "location(acme_corp, austin_texas)", "type": "fact_match" &#125;
+  ],
+  "missingContext": "",
+  "confidence": 0.95,
+  "queriesExecuted": [
+    "subscription_tier(acme_corp, ?tier)",
+    "location(acme_corp, ?loc)"
+  ],
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-20250514"
+&#125;</code></pre>
+
+    <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-emerald-500 text-slate-300">
+        <strong>Grounded, not hallucinated.</strong> The <code>derivation</code> field shows exactly which stored facts supported the answer. If no facts match, the <code>missingContext</code> field explains what's missing — the LLM won't make up an answer.
+    </div>
+
+    <h3>How Synthesis Works</h3>
+    <ol>
+        <li><strong>Schema discovery</strong> — Nocturnus finds all predicates in the KB</li>
+        <li><strong>Query translation</strong> — the LLM maps the question to logical query patterns</li>
+        <li><strong>Fact retrieval</strong> — queries are executed via direct lookup and backward chaining</li>
+        <li><strong>Answer synthesis</strong> — the LLM composes a natural language answer from the matched facts</li>
+    </ol>
+
+    <hr />
+
+    <h2 id="config">Configuration</h2>
+    <p>Additional env vars for tuning LLM behavior:</p>
+    <ul>
+        <li><code>EXTRACTION_ENABLED=true</code> — enable <code>/extract</code> and <code>/synthesize</code></li>
+        <li><code>LLM_MODEL=claude-sonnet-4-20250514</code> — override the default model</li>
+        <li><code>LLM_TEMPERATURE=0.1</code> — lower = more deterministic extraction</li>
+    </ul>
+
+</DocsLayout>

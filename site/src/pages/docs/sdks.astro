@@ -1,0 +1,173 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+
+<DocsLayout title="SDKs">
+    <h1>SDKs & Agents</h1>
+    <p class="lead text-xl text-slate-400">
+        Official client libraries for Python and TypeScript — plus LangChain integration.
+    </p>
+
+    <hr />
+
+    <h2 id="python">Python SDK</h2>
+    <p>Full async and sync clients with LangChain tool wrappers. Published on <a href="https://pypi.org/project/nocturnusai/" target="_blank">PyPI</a> — no source build needed.</p>
+
+    <h3>Installation</h3>
+    <pre><code class="language-bash">pip install nocturnusai
+
+# With LangChain integration
+pip install nocturnusai[langchain]</code></pre>
+
+    <h3>Sync Client</h3>
+    <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
+
+with SyncNocturnusAIClient("http://localhost:9300") as client:
+    # Store facts
+    client.assert_fact("parent", ["alice", "bob"])
+    client.assert_fact("parent", ["bob", "charlie"])
+
+    # Teach a rule
+    client.assert_rule(
+        head=&#123;"predicate": "grandparent", "args": ["?x", "?z"]&#125;,
+        body=[
+            &#123;"predicate": "parent", "args": ["?x", "?y"]&#125;,
+            &#123;"predicate": "parent", "args": ["?y", "?z"]&#125;,
+        ]
+    )
+
+    # Infer
+    results = client.infer("grandparent", ["?who", "charlie"])
+    print(results)  # [grandparent(alice, charlie)]</code></pre>
+
+    <h3>Async Client</h3>
+    <pre><code class="language-python">from nocturnusai import NocturnusAIClient
+
+async with NocturnusAIClient("http://localhost:9300") as client:
+    await client.assert_fact("human", ["socrates"])
+    results = await client.infer("mortal", ["?who"])
+    print(results)</code></pre>
+
+    <hr />
+
+    <h2 id="langchain">LangChain Integration</h2>
+    <p>Drop Nocturnus into any LangChain agent in one line. Four pre-built tools map directly to the core API:</p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Tool Name</th>
+                    <th class="py-2">Maps To</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">nocturnusai_assert</td>
+                    <td class="py-2 font-mono">/tell</td>
+                    <td class="py-2">Store a fact</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">nocturnusai_query</td>
+                    <td class="py-2 font-mono">/query</td>
+                    <td class="py-2">Pattern match stored facts</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">nocturnusai_infer</td>
+                    <td class="py-2 font-mono">/ask</td>
+                    <td class="py-2">Run logical inference</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">nocturnusai_context</td>
+                    <td class="py-2 font-mono">/memory/context</td>
+                    <td class="py-2">Get salience-ranked context window</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Quick Start</h3>
+    <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
+from nocturnusai.langchain import get_nocturnusai_tools
+
+client = SyncNocturnusAIClient("http://localhost:9300")
+tools = get_nocturnusai_tools(client)</code></pre>
+
+    <h3>With a LangChain Agent</h3>
+    <pre><code class="language-python">from langchain_anthropic import ChatAnthropic
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate
+
+llm = ChatAnthropic(model="claude-sonnet-4-6")
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are an assistant with access to a verified knowledge base."),
+    ("human", "&#123;input&#125;"),
+    ("placeholder", "&#123;agent_scratchpad&#125;"),
+])
+
+agent = create_tool_calling_agent(llm, tools, prompt)
+executor = AgentExecutor(agent=agent, tools=tools)
+
+result = executor.invoke(&#123;
+    "input": "Alice is Bob's parent. Bob is Charlie's parent. Who is Charlie's grandparent?"
+&#125;)
+print(result["output"])
+# "Alice is Charlie's grandparent."</code></pre>
+
+    <hr />
+
+    <h2 id="typescript">TypeScript SDK</h2>
+    <p>Zero-dependency typed client. Works in Node.js 18+ and modern browsers. Published on <a href="https://www.npmjs.com/package/@nocturnusai/sdk" target="_blank">npm</a>.</p>
+
+    <h3>Installation</h3>
+    <pre><code class="language-bash">npm install @nocturnusai/sdk</code></pre>
+
+    <h3>Usage</h3>
+    <pre><code class="language-typescript">import &#123; NocturnusAIClient &#125; from '@nocturnusai/sdk';
+
+const client = new NocturnusAIClient(&#123;
+  baseUrl: 'http://localhost:9300',
+  database: 'mydb',
+  tenantId: 'default',
+&#125;);
+
+// Assert facts
+await client.assertFact('parent', ['alice', 'bob']);
+await client.assertFact('parent', ['bob', 'charlie']);
+
+// Assert a rule
+await client.assertRule(
+  &#123; predicate: 'grandparent', args: ['?x', '?z'] &#125;,
+  [
+    &#123; predicate: 'parent', args: ['?x', '?y'] &#125;,
+    &#123; predicate: 'parent', args: ['?y', '?z'] &#125;,
+  ]
+);
+
+// Infer
+const results = await client.infer('grandparent', ['?who', 'charlie']);
+console.log(results);</code></pre>
+
+    <h3>MCP Client</h3>
+    <p>The SDK also includes an MCP client for JSON-RPC 2.0 tool calls:</p>
+    <pre><code class="language-typescript">import &#123; NocturnusAIMCPClient &#125; from '@nocturnusai/sdk';
+
+const mcp = new NocturnusAIMCPClient(&#123;
+  baseUrl: 'http://localhost:9300'
+&#125;);
+
+// Initialize MCP session
+await mcp.initialize();
+
+// Discover available tools
+const tools = await mcp.listTools();
+
+// Call a tool
+const result = await mcp.callTool('ask', &#123;
+  predicate: 'grandparent',
+  args: ['?who', 'charlie']
+&#125;);</code></pre>
+
+</DocsLayout>

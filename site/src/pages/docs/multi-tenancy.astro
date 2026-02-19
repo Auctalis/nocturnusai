@@ -1,0 +1,133 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+
+<DocsLayout title="Multi-Tenancy">
+    <h1>Multi-Tenancy</h1>
+    <p class="lead text-xl text-slate-400">
+        Isolate data across organizations, teams, and environments with two layers of separation.
+    </p>
+
+    <hr />
+
+    <h2 id="how-it-works">How It Works</h2>
+    <p>Nocturnus provides two levels of data isolation via HTTP headers:</p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Header</th>
+                    <th class="py-2">Purpose</th>
+                    <th class="py-2">Default</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">X-Database</td>
+                    <td class="py-2">Selects the logical database — completely separate Hexastore instances with independent rules and facts</td>
+                    <td class="py-2 font-mono">"default"</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">X-Tenant-ID</td>
+                    <td class="py-2">Selects the tenant within a database — data-level isolation sharing the same rules engine</td>
+                    <td class="py-2 font-mono">"default"</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-purple-500 text-slate-300">
+        <strong>When to use which?</strong> Use <strong>databases</strong> to separate completely independent knowledge domains (e.g., "production" vs "staging"). Use <strong>tenants</strong> to isolate customer data within the same domain (e.g., "acme_corp" vs "globex_inc" within "production").
+    </div>
+
+    <hr />
+
+    <h2 id="create-database">Creating a Database</h2>
+    <p>Create a new logical database:</p>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/databases \
+  -H "Content-Type: application/json" \
+  -d '&#123;"name": "production"&#125;'</code></pre>
+
+    <p>List all databases:</p>
+    <pre><code class="language-bash">curl http://localhost:9300/databases</code></pre>
+
+    <hr />
+
+    <h2 id="using-tenants">Using Tenants</h2>
+    <p>Pass the tenant and database headers with every request:</p>
+    <pre><code class="language-bash"># Assert a fact for Acme Corp in the production database
+curl -X POST http://localhost:9300/tell \
+  -H "Content-Type: application/json" \
+  -H "X-Database: production" \
+  -H "X-Tenant-ID: acme_corp" \
+  -d '&#123;"predicate": "plan", "args": ["enterprise"]&#125;'
+
+# Query facts for a different tenant — sees only its own data
+curl -X POST http://localhost:9300/ask \
+  -H "Content-Type: application/json" \
+  -H "X-Database: production" \
+  -H "X-Tenant-ID: globex_inc" \
+  -d '&#123;"predicate": "plan", "args": ["?tier"]&#125;'
+
+# Returns empty — Globex has no facts yet
+&#123; "results": [] &#125;</code></pre>
+
+    <hr />
+
+    <h2 id="patterns">Common Patterns</h2>
+
+    <h3>SaaS Multi-Tenant</h3>
+    <p>One database, one tenant per customer:</p>
+    <pre><code class="language-bash"># Each customer gets isolated data
+X-Database: production
+X-Tenant-ID: customer_123   # Customer A
+X-Tenant-ID: customer_456   # Customer B</code></pre>
+
+    <h3>Environment Separation</h3>
+    <p>Separate databases per environment:</p>
+    <pre><code class="language-bash"># Completely independent knowledge bases
+X-Database: development
+X-Database: staging
+X-Database: production</code></pre>
+
+    <h3>Per-Agent Isolation</h3>
+    <p>Each agent gets its own tenant so knowledge doesn't leak:</p>
+    <pre><code class="language-bash"># Agent-specific knowledge stores
+X-Database: agents
+X-Tenant-ID: agent_support_bot
+X-Tenant-ID: agent_sales_assistant</code></pre>
+
+    <hr />
+
+    <h2 id="mcp-tenancy">Multi-Tenancy with MCP</h2>
+    <p>When using MCP, the database and tenant can be configured via headers in the MCP client config:</p>
+    <pre><code class="language-json">&#123;
+  "mcpServers": &#123;
+    "nocturnus": &#123;
+      "url": "http://localhost:9300/mcp/sse",
+      "transport": "sse",
+      "headers": &#123;
+        "X-Database": "production",
+        "X-Tenant-ID": "acme_corp"
+      &#125;
+    &#125;
+  &#125;
+&#125;</code></pre>
+
+    <hr />
+
+    <h2 id="scoped-keys">Scoped API Keys</h2>
+    <p>Combine multi-tenancy with <a href="/docs/security">Security & Auth</a> to create API keys restricted to specific databases and tenants:</p>
+    <pre><code class="language-bash"># Create a key that can only access Acme Corp's data
+curl -X POST http://localhost:9300/auth/keys \
+  -H "Authorization: Bearer $ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '&#123;
+    "role": "writer",
+    "databases": ["production"],
+    "tenants": ["acme_corp"],
+    "description": "Acme Corp writer key"
+  &#125;'</code></pre>
+
+</DocsLayout>

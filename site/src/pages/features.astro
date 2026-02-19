@@ -1,0 +1,519 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Navbar from '../components/Navbar.astro';
+import Footer from '../components/Footer.astro';
+import { Layers, Workflow, GitMerge, Clock, Brain, Zap, Shield, Network, Building, Link, Code, Sparkles } from 'lucide-astro';
+---
+
+<Layout title="Features — Nocturnus.AI Logic Engine for Agentic AI">
+  <Navbar />
+  <main class="pt-16">
+
+    <!-- Hero -->
+    <section class="relative py-24 overflow-hidden">
+      <div class="absolute inset-0 pointer-events-none">
+        <div class="absolute top-0 left-1/3 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-0 right-1/3 w-64 h-64 bg-cyan-600/15 rounded-full blur-3xl"></div>
+      </div>
+      <div class="max-w-4xl mx-auto px-6 text-center relative z-10">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm font-mono mb-8">
+          <Sparkles class="w-4 h-4" /> Built for agentic developers
+        </div>
+        <h1 class="text-4xl md:text-6xl font-black tracking-tight mb-6">
+          Ask. Tell. Done.<br />
+          <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-cyan-400">
+            The Engine Handles the Rest
+          </span>
+        </h1>
+        <p class="text-lg text-slate-400 max-w-2xl mx-auto mb-4">
+          Your agent feeds NocturnusAI text and asks it questions. No logic programming, no schemas, no query language to learn. Everything underneath — inference, memory, consistency — is automatic.
+        </p>
+        <p class="text-base text-slate-500 max-w-xl mx-auto">
+          But if you want to understand what's under the hood, it's serious infrastructure. Here's the full picture.
+        </p>
+      </div>
+    </section>
+
+    <!-- Problem Overview -->
+    <section class="py-16 relative z-10">
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-20">
+          {[
+            { problem: "Hallucination", desc: "LLMs generate plausible text from statistical patterns. They cannot distinguish between what they've been trained on and what's actually true in your system right now." },
+            { problem: "No memory lifecycle", desc: "Agents accumulate context until the window fills. There's no concept of which facts are still relevant, which have expired, or which should be compressed into summaries." },
+            { problem: "Reasoning isn't sound", desc: "Vector similarity is not logical inference. RAG retrieves text that looks related — it doesn't derive what must be true given what you know. These are fundamentally different operations." },
+            { problem: "Facts don't have time", desc: "Your data changes. A customer upgrades their plan. A system goes offline. Without temporal awareness, your agent reasons over stale facts with no way to know they've expired." },
+            { problem: "No consistency guarantees", desc: "Multi-agent systems share state. Without transactional semantics, two agents making simultaneous updates can corrupt your knowledge base in ways that are invisible and hard to debug." },
+            { problem: "Zero provenance", desc: "When an agent gives a wrong answer, you can't trace why. There's no audit trail showing which facts were used, which rules fired, or which inference path led to the conclusion." },
+          ].map(item => (
+            <div class="p-6 rounded-xl bg-red-500/5 border border-red-500/10 hover:border-red-500/20 transition-colors group">
+              <div class="flex items-start gap-3">
+                <span class="text-red-500/60 text-lg mt-0.5">✗</span>
+                <div>
+                  <h3 class="font-bold text-slate-200 mb-2 group-hover:text-red-400 transition-colors">{item.problem}</h3>
+                  <p class="text-slate-500 text-sm leading-relaxed">{item.desc}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div class="text-center mb-6">
+          <div class="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-white/10 text-slate-300 font-medium">
+            <span class="text-2xl">↓</span>
+            These aren't prompt engineering problems. They're infrastructure problems.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Divider -->
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+    </div>
+
+    <!-- Feature Deep Dives -->
+    <section class="py-20 relative z-10">
+      <div class="max-w-6xl mx-auto px-6 space-y-32">
+
+        <!-- 1. Hexastore -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-mono mb-6"><Layers class="w-3.5 h-3.5" /> Storage Layer</div>
+            <h2 class="text-3xl md:text-4xl font-black text-white mb-4">Hexastore: Six Indexes, One Query</h2>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              Traditional databases make you think about indexes. Nocturnus doesn't. The Hexastore maintains six simultaneous index permutations — SPO, SOP, PSO, POS, OSP, OPS — over every fact in your knowledge base.
+            </p>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              Whatever pattern your query presents — whether the subject, predicate, or object is bound or variable — it hits a direct index lookup. No table scans. No query planner guessing wrong. Sub-100ms retrieval regardless of which terms you specify.
+            </p>
+            <div class="space-y-3">
+              {[
+                "All pattern queries (S??, ?P?, ??O, SP?, S?O, ?PO) hit an index",
+                "Thread-safe via ReentrantReadWriteLock — concurrent reads, exclusive writes",
+                "Non-binary predicates stored in an optimised fallback map",
+                "Scope-aware — queries can be tenant-scoped or global",
+              ].map(point => (
+                <div class="flex items-start gap-3">
+                  <span class="text-cyan-400 mt-1 shrink-0">✓</span>
+                  <span class="text-slate-400 text-sm">{point}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div class="rounded-xl overflow-hidden bg-[#080e1a] border border-cyan-500/10 shadow-2xl">
+            <div class="px-4 py-3 bg-cyan-500/5 border-b border-cyan-500/10 flex items-center justify-between">
+              <span class="text-xs font-mono text-cyan-400/70">hexastore — 6 index permutations</span>
+            </div>
+            <div class="p-6 font-mono text-sm space-y-2">
+              <div class="text-slate-500"># Fact: likes(alice, bob)</div>
+              <div class="text-slate-500"># Indexed as:</div>
+              <div class="grid grid-cols-2 gap-x-6 gap-y-1 mt-3">
+                {[
+                  ["SPO", "likes · alice · bob"],
+                  ["SOP", "likes · alice · bob"],
+                  ["PSO", "likes · alice · bob"],
+                  ["POS", "likes · bob · alice"],
+                  ["OSP", "bob · alice · likes"],
+                  ["OPS", "bob · likes · alice"],
+                ].map(([idx, val]) => (
+                  <div class="flex items-center gap-2">
+                    <span class="text-purple-400 w-8 shrink-0">{idx}</span>
+                    <span class="text-slate-400 text-xs">{val}</span>
+                  </div>
+                ))}
+              </div>
+              <div class="mt-4 pt-4 border-t border-white/5">
+                <div class="text-slate-500"># Any query pattern → direct index hit</div>
+                <div class="mt-2 text-emerald-400 text-xs">
+                  likes(?who, bob) → OPS lookup → O(log n)
+                </div>
+                <div class="text-emerald-400 text-xs">
+                  likes(alice, ?who) → SPO lookup → O(log n)
+                </div>
+                <div class="text-emerald-400 text-xs">
+                  ?pred(alice, bob) → SPO lookup → O(log n)
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Inference Engines -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div class="order-2 lg:order-1 rounded-xl overflow-hidden bg-[#080e1a] border border-purple-500/10 shadow-2xl">
+            <div class="px-4 py-3 bg-purple-500/5 border-b border-purple-500/10 flex items-center justify-between">
+              <span class="text-xs font-mono text-purple-400/70">inference — backward + forward chaining</span>
+            </div>
+            <div class="p-6 font-mono text-sm space-y-4">
+              <div>
+                <div class="text-slate-500 mb-2"># Backward chaining — goal-driven</div>
+                <div class="text-slate-300">POST /ask</div>
+                <div class="text-slate-400 text-xs mt-1">&#123; "predicate": "grandparent", "args": ["alice", "?who"], "withProof": true &#125;</div>
+                <div class="mt-2 text-emerald-400 text-xs">→ grandparent(alice, charlie)</div>
+                <div class="text-slate-500 text-xs mt-1">proof: parent(alice,bob) ∧ parent(bob,charlie)</div>
+                <div class="text-slate-500 text-xs">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;via rule: grandparent(?x,?z) :- parent(?x,?y), parent(?y,?z)</div>
+              </div>
+              <div class="pt-3 border-t border-white/5">
+                <div class="text-slate-500 mb-2"># Forward chaining — reactive (Rete engine)</div>
+                <div class="text-slate-300">POST /tell</div>
+                <div class="text-slate-400 text-xs mt-1">&#123; "predicate": "parent", "args": ["bob", "carol"] &#125;</div>
+                <div class="mt-2 text-emerald-400 text-xs">✓ parent(bob, carol) asserted</div>
+                <div class="text-emerald-400 text-xs">✓ grandparent(alice, carol) derived automatically</div>
+                <div class="text-slate-500 text-xs mt-1">Rete fired 1 rule match</div>
+              </div>
+            </div>
+          </div>
+          <div class="order-1 lg:order-2">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-mono mb-6"><Workflow class="w-3.5 h-3.5" /> Reasoning Layer</div>
+            <h2 class="text-3xl md:text-4xl font-black text-white mb-4">Two Engines. One Coherent Truth.</h2>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              Nocturnus runs two inference engines simultaneously. Backward chaining handles goal-driven queries: you ask a question, the SLD resolver works backwards through your rules to find if and how the answer can be proved. It returns the full derivation chain.
+            </p>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              Forward chaining via the Rete network handles reactive inference: the moment you assert a new fact, the engine immediately computes all new conclusions that follow from your rules. Your knowledge base is always in a consistent, fully-derived state.
+            </p>
+            <p class="text-slate-400 leading-relaxed">
+              Both engines operate deterministically. The same facts and rules always produce the same conclusions. There is no inference drift, no probabilistic variance, no randomness.
+            </p>
+          </div>
+        </div>
+
+        <!-- 3. Truth Maintenance System -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono mb-6"><GitMerge class="w-3.5 h-3.5" /> Consistency Layer</div>
+            <h2 class="text-3xl md:text-4xl font-black text-white mb-4">Truth Maintenance: Consistency Without the Bookkeeping</h2>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              When you retract a fact, everything that was derived from it — directly or transitively — is automatically removed from the knowledge base. No manual cleanup. No stale conclusions. No ghost data that leads agents astray.
+            </p>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              The <code class="text-cyan-400 bg-cyan-500/10 px-1 rounded text-sm">ProvenanceTracker</code> maintains a full dependency graph of every inference. When a premise disappears, it walks the graph and retracts every conclusion that depended on it. The operation is atomic.
+            </p>
+            <p class="text-slate-400 leading-relaxed">
+              This is the difference between a database and a reasoning system. Databases let you delete a row and leave referential integrity to you. Nocturnus maintains logical integrity automatically.
+            </p>
+          </div>
+          <div class="rounded-xl overflow-hidden bg-[#080e1a] border border-emerald-500/10 shadow-2xl">
+            <div class="px-4 py-3 bg-emerald-500/5 border-b border-emerald-500/10">
+              <span class="text-xs font-mono text-emerald-400/70">truth maintenance — cascade retraction</span>
+            </div>
+            <div class="p-6 font-mono text-sm space-y-3">
+              <div class="text-slate-500"># KB state: 4 facts, 1 derived</div>
+              <div class="text-slate-400 text-xs">parent(alice, bob)     <span class="text-slate-600">← asserted</span></div>
+              <div class="text-slate-400 text-xs">parent(bob, charlie)   <span class="text-slate-600">← asserted</span></div>
+              <div class="text-slate-400 text-xs">grandparent(alice, charlie) <span class="text-purple-400">← derived</span></div>
+
+              <div class="pt-3 border-t border-white/5">
+                <div class="text-slate-500"># Retract one fact</div>
+                <div class="text-slate-300 mt-1">POST /forget</div>
+                <div class="text-slate-400 text-xs mt-1">&#123; "predicate": "parent", "args": ["alice", "bob"] &#125;</div>
+              </div>
+
+              <div class="pt-3 border-t border-white/5">
+                <div class="text-slate-500"># KB state: TMS auto-cleaned</div>
+                <div class="text-red-400/70 text-xs line-through">parent(alice, bob)</div>
+                <div class="text-slate-400 text-xs">parent(bob, charlie)</div>
+                <div class="text-red-400/70 text-xs line-through">grandparent(alice, charlie) <span class="text-slate-600 no-underline">← cascade removed</span></div>
+                <div class="text-emerald-400 text-xs mt-2">✓ KB is consistent. Zero stale inferences.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Temporal Atoms -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div class="order-2 lg:order-1 rounded-xl overflow-hidden bg-[#080e1a] border border-amber-500/10 shadow-2xl">
+            <div class="px-4 py-3 bg-amber-500/5 border-b border-amber-500/10">
+              <span class="text-xs font-mono text-amber-400/70">temporal — time-aware facts</span>
+            </div>
+            <div class="p-6 font-mono text-sm space-y-3">
+              <div class="text-slate-500"># Fact with TTL — auto-expires</div>
+              <div class="text-slate-300">POST /tell</div>
+              <div class="text-slate-400 text-xs mt-1">&#123;</div>
+              <div class="text-slate-400 text-xs pl-4">"predicate": "session_active",</div>
+              <div class="text-slate-400 text-xs pl-4">"args": ["user_123"],</div>
+              <div class="text-amber-400 text-xs pl-4">"ttl": 3600  <span class="text-slate-600">// expires in 1 hour</span></div>
+              <div class="text-slate-400 text-xs">&#125;</div>
+
+              <div class="pt-3 border-t border-white/5">
+                <div class="text-slate-500"># Point-in-time query</div>
+                <div class="text-slate-300 mt-1">POST /memory/query/temporal</div>
+                <div class="text-slate-400 text-xs mt-1">&#123; "at": "2025-01-15T14:00:00Z" &#125;</div>
+                <div class="text-emerald-400 text-xs mt-2">→ Returns all facts valid at that instant</div>
+              </div>
+
+              <div class="pt-3 border-t border-white/5">
+                <div class="text-slate-500"># Bounded validity</div>
+                <div class="text-slate-400 text-xs">"validFrom": "2025-Q1-start"</div>
+                <div class="text-slate-400 text-xs">"validUntil": "2025-Q1-end"</div>
+                <div class="text-emerald-400 text-xs mt-1">Fact only true within its window</div>
+              </div>
+            </div>
+          </div>
+          <div class="order-1 lg:order-2">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-mono mb-6"><Clock class="w-3.5 h-3.5" /> Temporal Layer</div>
+            <h2 class="text-3xl md:text-4xl font-black text-white mb-4">Facts That Know When They're True</h2>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              The real world is not a static snapshot. Subscriptions expire. Sessions end. Prices change. Regulations take effect on specific dates. Every fact in Nocturnus carries <code class="text-cyan-400 bg-cyan-500/10 px-1 rounded text-sm">validFrom</code>, <code class="text-cyan-400 bg-cyan-500/10 px-1 rounded text-sm">validUntil</code>, <code class="text-cyan-400 bg-cyan-500/10 px-1 rounded text-sm">createdAt</code>, and <code class="text-cyan-400 bg-cyan-500/10 px-1 rounded text-sm">ttl</code> fields.
+            </p>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              Set a TTL and the fact auto-expires. Define validity windows for seasonal rules. Query what was true at any arbitrary point in time. Build audit trails where you can reconstruct exactly what your agent knew at the moment it made a decision.
+            </p>
+            <p class="text-slate-400 leading-relaxed">
+              Temporal awareness isn't a feature layer added on top — it's woven into the atom data model, which means every query, every inference, and every export respects time automatically.
+            </p>
+          </div>
+        </div>
+
+        <!-- 5. Salience & Memory Lifecycle -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 text-pink-400 text-xs font-mono mb-6"><Brain class="w-3.5 h-3.5" /> Memory Layer</div>
+            <h2 class="text-3xl md:text-4xl font-black text-white mb-4">Memory That Manages Itself</h2>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              Agent context windows are finite. What goes in matters enormously. Nocturnus computes a composite <strong class="text-slate-300">salience score</strong> for every fact — combining recency, access frequency, and explicit priority — and uses it to determine what deserves space in your agent's context window.
+            </p>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              <code class="text-cyan-400 bg-cyan-500/10 px-1 rounded text-sm">/memory/context</code> returns the top-K most salient facts, ranked. <code class="text-cyan-400 bg-cyan-500/10 px-1 rounded text-sm">/memory/consolidate</code> compresses repeated episodic patterns into compact semantic summaries — the difference between "the agent remembered 47 similar login events" and "the agent remembers the login pattern." <code class="text-cyan-400 bg-cyan-500/10 px-1 rounded text-sm">/memory/decay</code> evicts facts that have fallen below relevance thresholds.
+            </p>
+            <p class="text-slate-400 leading-relaxed">
+              Real-time memory change events stream via SSE at <code class="text-cyan-400 bg-cyan-500/10 px-1 rounded text-sm">GET /memory/events</code> — so your orchestration layer can react the moment anything significant changes.
+            </p>
+          </div>
+          <div class="rounded-xl overflow-hidden bg-[#080e1a] border border-pink-500/10 shadow-2xl">
+            <div class="px-4 py-3 bg-pink-500/5 border-b border-pink-500/10">
+              <span class="text-xs font-mono text-pink-400/70">memory — salience lifecycle</span>
+            </div>
+            <div class="p-6 font-mono text-sm space-y-3">
+              <div class="text-slate-500"># Get top-K salient facts for agent context</div>
+              <div class="text-slate-300">GET /memory/context?limit=10</div>
+              <div class="mt-2 space-y-1">
+                {[
+                  ["0.94", "customer_tier(acme, enterprise)"],
+                  ["0.87", "sla_enabled(acme)"],
+                  ["0.71", "last_contacted(acme, 2025-01-14)"],
+                  ["0.43", "location(acme, austin)"],
+                ].map(([score, fact]) => (
+                  <div class="flex items-center gap-3">
+                    <span class="text-pink-400 w-10 text-xs shrink-0">{score}</span>
+                    <span class="text-slate-400 text-xs">{fact}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div class="pt-3 border-t border-white/5">
+                <div class="text-slate-500"># Consolidate episodic → semantic</div>
+                <div class="text-slate-300 mt-1">POST /memory/consolidate</div>
+                <div class="text-emerald-400 text-xs mt-2">✓ 47 login_event atoms → 1 semantic summary</div>
+                <div class="text-emerald-400 text-xs">✓ Context window: 47 tokens → 3 tokens</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. ACID Transactions -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div class="order-2 lg:order-1 rounded-xl overflow-hidden bg-[#080e1a] border border-cyan-500/10 shadow-2xl">
+            <div class="px-4 py-3 bg-cyan-500/5 border-b border-cyan-500/10">
+              <span class="text-xs font-mono text-cyan-400/70">transactions — ACID reasoning</span>
+            </div>
+            <div class="p-6 font-mono text-sm space-y-3">
+              <div class="text-slate-500"># Begin a transaction</div>
+              <div class="text-slate-300">POST /tx/begin → TX_ID: "tx_a3f9"</div>
+
+              <div class="pt-2 border-t border-white/5">
+                <div class="text-slate-500"># Assert facts within the transaction</div>
+                <div class="text-slate-300">POST /tell  <span class="text-cyan-400">X-Transaction-ID: tx_a3f9</span></div>
+                <div class="text-slate-400 text-xs">&#123; "predicate": "approved", "args": ["order_99"] &#125;</div>
+                <div class="text-slate-300 mt-1">POST /tell  <span class="text-cyan-400">X-Transaction-ID: tx_a3f9</span></div>
+                <div class="text-slate-400 text-xs">&#123; "predicate": "shipped", "args": ["order_99"] &#125;</div>
+              </div>
+
+              <div class="pt-2 border-t border-white/5">
+                <div class="text-slate-500"># Commit or rollback atomically</div>
+                <div class="text-slate-300">POST /tx/commit/tx_a3f9</div>
+                <div class="text-emerald-400 text-xs mt-1">✓ Both facts committed. Contradiction check passed.</div>
+              </div>
+
+              <div class="pt-2 border-t border-white/5 text-slate-500">
+                # Or rollback — nothing is visible to other agents
+              </div>
+              <div class="text-slate-300">POST /tx/rollback/tx_a3f9</div>
+              <div class="text-amber-400 text-xs mt-1">✓ Transaction aborted. KB unchanged.</div>
+            </div>
+          </div>
+          <div class="order-1 lg:order-2">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-mono mb-6"><Zap class="w-3.5 h-3.5" /> Transaction Layer</div>
+            <h2 class="text-3xl md:text-4xl font-black text-white mb-4">Atomic Reasoning for Multi-Agent Systems</h2>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              In a multi-agent system, agents read and write shared state concurrently. Without transactional guarantees, two agents updating the same knowledge simultaneously can leave your KB in an inconsistent state that's invisible until something breaks.
+            </p>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              Nocturnus gives you full ACID transactions. Begin a transaction, assert multiple facts, and they're invisible to all other agents until you commit. On commit, a contradiction detector runs — if your assertions conflict with existing rules or constraints, the transaction is rejected and nothing changes.
+            </p>
+            <p class="text-slate-400 leading-relaxed">
+              This also enables hypothetical reasoning: open a transaction, explore a set of conclusions, then rollback without affecting shared state. Your agent can reason "what would be true if X were the case" safely.
+            </p>
+          </div>
+        </div>
+
+        <!-- 7. Production Durability -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-500/20 border border-slate-500/30 text-slate-400 text-xs font-mono mb-6"><Shield class="w-3.5 h-3.5" /> Operations Layer</div>
+            <h2 class="text-3xl md:text-4xl font-black text-white mb-4">Production-Grade From the Start</h2>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              Nocturnus is not a prototype or a research engine. It's designed for production deployment. Every mutation is appended to a <strong class="text-slate-300">Write-Ahead Log</strong> before it's applied to the in-memory store — so a crash at any point leaves you with a recoverable state. Periodic full-state snapshots keep recovery fast.
+            </p>
+            <p class="text-slate-400 leading-relaxed mb-6">
+              Leader/follower replication streams the WAL to read replicas, letting you scale query throughput horizontally. Prometheus metrics at <code class="text-cyan-400 bg-cyan-500/10 px-1 rounded text-sm">/metrics</code> cover 20+ signals — fact operations, inference latency, MCP tool call rates, memory pressure, LLM extraction calls. Grafana dashboards included.
+            </p>
+            <div class="grid grid-cols-2 gap-3">
+              {[
+                ["WAL + Snapshots", "Crash recovery"],
+                ["Leader/Follower", "Read scaling"],
+                ["Prometheus metrics", "20+ signals"],
+                ["Kubernetes-ready", "YAML included"],
+                ["/health + /health/ready", "Probe endpoints"],
+                ["AES-256 at rest", "Optional encryption"],
+              ].map(([feature, desc]) => (
+                <div class="p-3 rounded-lg bg-white/3 border border-white/8">
+                  <div class="text-xs font-bold text-slate-300">{feature}</div>
+                  <div class="text-xs text-slate-600 mt-0.5">{desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div class="rounded-xl overflow-hidden bg-[#080e1a] border border-slate-500/10 shadow-2xl">
+            <div class="px-4 py-3 bg-white/3 border-b border-white/5">
+              <span class="text-xs font-mono text-slate-500">deployment — production stack</span>
+            </div>
+            <div class="p-6 font-mono text-sm space-y-3">
+              <div class="text-slate-500"># Docker Compose — up in 30 seconds</div>
+              <div class="text-slate-300">docker compose up -d</div>
+              <div class="text-emerald-400 text-xs mt-1">✓ Server live on :9300</div>
+              <div class="text-emerald-400 text-xs">✓ WAL initialised at ./data/wal</div>
+              <div class="text-emerald-400 text-xs">✓ Prometheus at :9300/metrics</div>
+
+              <div class="pt-3 border-t border-white/5">
+                <div class="text-slate-500"># With monitoring stack</div>
+                <div class="text-slate-300">docker compose --profile monitoring up -d</div>
+                <div class="text-emerald-400 text-xs mt-1">✓ Grafana at :3000 (dashboards pre-loaded)</div>
+                <div class="text-emerald-400 text-xs">✓ Prometheus scraping :9300/metrics</div>
+              </div>
+
+              <div class="pt-3 border-t border-white/5">
+                <div class="text-slate-500"># Kubernetes liveness + readiness</div>
+                <div class="text-slate-400 text-xs">livenessProbe:  GET /health</div>
+                <div class="text-slate-400 text-xs">readinessProbe: GET /health/ready</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Protocol / Integration Section -->
+    <section class="py-20 relative z-10 border-t border-white/5">
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="text-center mb-16">
+          <h2 class="text-3xl md:text-4xl font-black text-white mb-4">Connects to Everything in the Agent Ecosystem</h2>
+          <p class="text-slate-400 max-w-2xl mx-auto">One running server. Every protocol. Your agents don't need to change — they just point to Nocturnus.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[
+            {
+              title: "MCP (Model Context Protocol)",
+              tag: "2025-11-25 spec",
+              desc: "HTTP + SSE transport. 9 tools exposed. Any MCP-compatible agent, IDE, or framework connects with a two-line JSON config. Cursor, Windsurf, Claude Desktop, your custom agent — all the same connection.",
+              code: `// .cursor/mcp.json
+{
+  "mcpServers": {
+    "nocturnus": {
+      "url": "http://localhost:9300/mcp/sse"
+    }
+  }
+}`,
+            },
+            {
+              title: "A2A (Agent-to-Agent Protocol)",
+              tag: "Discovery",
+              desc: "Nocturnus publishes an A2A Agent Card at /.well-known/agent.json describing its capabilities. Other agents in your ecosystem can discover and interact with it automatically — no manual coordination.",
+              code: `GET /.well-known/agent.json
+→ Agent Card: capabilities, endpoints,
+  supported protocols, authentication`,
+            },
+            {
+              title: "Python SDK + LangChain",
+              tag: "pip install nocturnusai",
+              desc: "Async and sync clients. Four pre-built LangChain tools (assert, query, infer, context) ready to drop into any agent executor. Full Pydantic models for every DTO.",
+              code: `from nocturnusai.langchain import (
+    get_nocturnusai_tools
+)
+
+tools = get_nocturnusai_tools(client)
+# → tell, ask, teach, forget,
+#   recall, context (6 tools)`,
+            },
+          ].map(item => (
+            <div class="glass rounded-2xl overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+              <div class="p-6 border-b border-white/5">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                  <h3 class="font-bold text-slate-100 group-hover:text-cyan-400 transition-colors">{item.title}</h3>
+                  <span class="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono text-slate-500 shrink-0">{item.tag}</span>
+                </div>
+                <p class="text-slate-400 text-sm leading-relaxed">{item.desc}</p>
+              </div>
+              <div class="p-4 bg-[#080e1a]">
+                <pre class="text-xs font-mono text-slate-400 leading-relaxed overflow-x-auto whitespace-pre">{item.code}</pre>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="py-24 relative z-10">
+      <div class="max-w-4xl mx-auto px-6 text-center">
+        <div class="glass rounded-3xl p-12 relative overflow-hidden">
+          <div class="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5 pointer-events-none rounded-3xl"></div>
+          <h2 class="text-3xl md:text-4xl font-black text-white mb-4 relative z-10">
+            Your agents are ready for better infrastructure.
+          </h2>
+          <p class="text-slate-400 max-w-xl mx-auto mb-8 relative z-10">
+            Start with <code class="text-cyan-400 bg-cyan-500/10 px-1 rounded">docker compose up</code> and have your first fact stored in under a minute. No schemas, no migrations, no infra team required.
+          </p>
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
+            <a href="/docs" class="px-8 py-4 rounded-full bg-gradient-to-r from-cyan-600 to-purple-600 text-white font-bold hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] transition-all hover:-translate-y-1 transform">
+              Read the Docs →
+            </a>
+            <a href="/docs/api" class="px-8 py-4 rounded-full bg-white/5 border border-white/10 text-slate-300 font-medium hover:bg-white/10 transition-all hover:-translate-y-1 transform">
+              API Reference
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  .glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .bg-white\/3 {
+    background-color: rgba(255, 255, 255, 0.03);
+  }
+  .border-white\/8 {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+</style>
