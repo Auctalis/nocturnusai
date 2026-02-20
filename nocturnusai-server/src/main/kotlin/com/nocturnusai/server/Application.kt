@@ -89,6 +89,21 @@ fun Application.module() {
         json()
     }
 
+    // ── Request body size limit ──────────────────────────────────────────
+    // Reject oversized payloads before reading them into memory.
+    // Default: 10 MB. Override with MAX_REQUEST_BODY_BYTES env var.
+    val maxBodyBytes = System.getenv("MAX_REQUEST_BODY_BYTES")?.toLongOrNull() ?: (10L * 1024 * 1024)
+    intercept(ApplicationCallPipeline.Plugins) {
+        val contentLength = call.request.header(HttpHeaders.ContentLength)?.toLongOrNull()
+        if (contentLength != null && contentLength > maxBodyBytes) {
+            call.respond(
+                HttpStatusCode.PayloadTooLarge,
+                ErrorResponse("PAYLOAD_TOO_LARGE", "Request body exceeds ${maxBodyBytes / 1024 / 1024} MB limit")
+            )
+            return@intercept finish()
+        }
+    }
+
     install(StatusPages) {
         exception<TenantNotFoundException> { call, cause ->
             call.respond(HttpStatusCode.NotFound, ErrorResponse("TENANT_NOT_FOUND", cause.message ?: "Tenant not found"))
@@ -231,6 +246,17 @@ fun Application.module() {
         null
     }
     AuthInterceptor.install(this, keyManager)
+
+    // ── Production readiness warnings ────────────────────────────────────
+    if (!ServerConfig.tlsEnabled && ServerConfig.host != "127.0.0.1" && ServerConfig.host != "localhost") {
+        environment.log.warn("⚠️  TLS is disabled and server is bound to ${ServerConfig.host}. " +
+            "Traffic is unencrypted. Set TLS_ENABLED=true for production.")
+    }
+    if (ServerConfig.encryptionKey == null) {
+        environment.log.warn("⚠️  Encryption at rest is disabled. " +
+            "Set ENCRYPTION_KEY (64 hex chars) to protect stored data. " +
+            "Generate with: openssl rand -hex 32")
+    }
 
     // Graceful shutdown: close all databases when application stops
     environment.monitor.subscribe(ApplicationStopping) {

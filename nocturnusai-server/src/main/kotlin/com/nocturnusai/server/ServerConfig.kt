@@ -42,6 +42,11 @@ object ServerConfig {
     val usingDefaultAdminCredentials: Boolean
         get() = System.getenv("NOCTURNUSAI_ADMIN_USER") == null || System.getenv("NOCTURNUSAI_ADMIN_PASS") == null
 
+    // Default expiry for newly-created API keys (days). null = no expiry.
+    // Applies to /auth/bootstrap and /auth/keys unless the caller provides expiresInDays.
+    // Recommended: 365 for production.
+    val defaultKeyExpiryDays: Int? = System.getenv("API_KEY_DEFAULT_EXPIRY_DAYS")?.toIntOrNull()
+
     // Encryption at Rest
     val encryptionKey: String? = System.getenv("ENCRYPTION_KEY") // 64 hex chars = 32 bytes AES-256
 
