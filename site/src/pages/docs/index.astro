@@ -26,16 +26,15 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
     <div class="step-card" id="install">
         <div style="position:absolute; top:-12px; left:24px; font-size:0.65rem; font-weight:700; font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; padding:4px 14px; border-radius:20px; color:white; background:linear-gradient(135deg,#06b6d4,#8b5cf6);">STEP 1 · INSTALL</div>
         <h3>Start the Server</h3>
-        <p>Two commands and you're live:</p>
+        <p>One command. Installs Docker Compose stack, waits for healthy, and installs the native CLI binary:</p>
 
-        <pre data-lang="bash"><code><span class="syn-var">$</span> git clone https://github.com/Auctalis/nocturnusai.git
-<span class="syn-var">$</span> <span class="syn-keyword">cd</span> nocturnusai
+        <pre data-lang="bash"><code><span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 
-<span class="syn-comment"># With LLM support (enables /extract and /synthesize in Steps 2–3):</span>
-<span class="syn-var">$</span> <span class="syn-type">ANTHROPIC_API_KEY</span>=sk-ant-... docker compose up -d
+<span class="syn-comment"># With an API key for LLM features (enables /extract and /synthesize in Steps 2–3):</span>
+<span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --key sk-ant-...
 
-<span class="syn-comment"># Without an LLM key (direct API only — Steps 4–5 still fully work):</span>
-<span class="syn-var">$</span> docker compose up -d</code></pre>
+<span class="syn-comment"># With local Ollama (no API key needed):</span>
+<span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama</code></pre>
 
         <p>Verify it's running:</p>
         <pre data-lang="bash"><code><span class="syn-var">$</span> curl http://localhost:9300/health
@@ -44,6 +43,9 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
 
         <div class="callout callout-tip" style="margin-top:1.5rem;">
             <strong>Data persistence</strong> — Facts survive container restarts. Docker Compose mounts a <code>./data</code> directory for WAL logs and snapshots. Delete that folder to wipe the knowledge base and start fresh.
+        </div>
+        <div class="callout callout-info" style="margin-top:1rem;">
+            <strong>CLI installed.</strong> The installer places the <code>nocturnusai</code> native binary on your PATH. Run <code>nocturnusai</code> for an interactive REPL, or use <code>nocturnusai -e "tell ..."</code> in scripts.
         </div>
     </div>
 

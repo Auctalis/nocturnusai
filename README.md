@@ -15,13 +15,22 @@ NocturnusAI is a logic server: an in-memory reasoning engine with a Hexastore, b
 ## Quick start
 
 ```bash
-docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 ```
 
-With LLM fact extraction (Anthropic, OpenAI, or Google key):
+That's it. Checks for Docker, downloads the compose config, starts the server, waits for healthy, installs the native CLI binary, and prints ready.
+
+Options:
 
 ```bash
-docker run -p 9300:9300 -e ANTHROPIC_API_KEY=sk-ant-... ghcr.io/auctalis/nocturnusai:latest
+# With local LLM (Ollama — no API key needed)
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama
+
+# With your own API key
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --key sk-ant-your-key
+
+# With Prometheus + Grafana monitoring
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --monitoring
 ```
 
 Verify:
@@ -29,6 +38,12 @@ Verify:
 ```bash
 curl http://localhost:9300/health
 # {"status":"healthy"}
+```
+
+**Docker only (no wizard):**
+
+```bash
+docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
 ```
 
 ---
@@ -139,13 +154,33 @@ docker compose --profile ollama up -d
 
 ---
 
+## CLI (native binary)
+
+The installer downloads a native binary — no JVM required, instant startup:
+
+```bash
+nocturnusai                          # Interactive REPL
+nocturnusai --server http://host:9300 --db mydb
+nocturnusai -e "tell human(socrates)"   # Single command
+
+# Install manually
+# macOS (Apple Silicon)
+curl -fsSL https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-macos-arm64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
+
+# Linux (x86_64)
+curl -fsSL https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-linux-x86_64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
+```
+
+---
+
 ## Build from source
 
 Requires JDK 17+.
 
 ```bash
 ./gradlew :nocturnusai-server:run   # HTTP server on :9300
-./gradlew :nocturnusai-cli:run      # Interactive REPL
+./gradlew :nocturnusai-cli:run      # Interactive REPL (JVM)
+./gradlew :nocturnusai-cli:nativeCompile  # Build native binary
 ./gradlew test                       # All tests
 ```
 

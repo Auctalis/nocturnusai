@@ -17,23 +17,45 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
     <!-- ============ INSTALLATION ============ -->
     <h2 id="install">Installation</h2>
 
+    <div class="callout callout-tip">
+        <strong>Recommended.</strong> The native binary is a single self-contained executable — no JVM, no Docker, instant startup. Install it with the one-liner installer or download directly from GitHub Releases.
+    </div>
+
+    <h3>One-liner installer (recommended)</h3>
+    <p>The standard install script automatically downloads and installs the native CLI binary for your platform:</p>
+
+    <pre data-lang="bash"><code><span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</code></pre>
+
+    <p>The CLI is placed at <code>/usr/local/bin/nocturnusai</code> (or <code>~/.local/bin/nocturnusai</code> if that isn't writable) and added to your PATH automatically.</p>
+
+    <h3>Download directly from GitHub Releases</h3>
+    <p>Download the pre-built binary for your platform from the <a href="https://github.com/Auctalis/nocturnusai/releases/latest">latest release</a>:</p>
+
+    <pre data-lang="bash"><code><span class="syn-comment"># macOS (Apple Silicon)</span>
+<span class="syn-var">$</span> curl -fsSL https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-macos-arm64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
+
+<span class="syn-comment"># macOS (Intel)</span>
+<span class="syn-var">$</span> curl -fsSL https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-macos-x86_64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
+
+<span class="syn-comment"># Linux (x86_64)</span>
+<span class="syn-var">$</span> curl -fsSL https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-linux-x86_64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
+
+<span class="syn-comment"># Linux (ARM64)</span>
+<span class="syn-var">$</span> curl -fsSL https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-linux-arm64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai</code></pre>
+
     <h3>Build from Source</h3>
-    <p>The CLI is a Kotlin application in the <code>nocturnusai-cli</code> module. Build and run with Gradle:</p>
+    <p>Requires JDK 17+ and GraalVM for native compilation:</p>
 
-    <pre data-lang="bash"><code><span class="syn-comment"># Build the distribution</span>
-<span class="syn-var">$</span> ./gradlew :nocturnusai-cli:installDist
+    <pre data-lang="bash"><code><span class="syn-comment"># Run via Gradle (JVM — no native build needed)</span>
+<span class="syn-var">$</span> ./gradlew :nocturnusai-cli:run
 
-<span class="syn-comment"># Run it</span>
-<span class="syn-var">$</span> ./nocturnusai-cli/bin/nocturnusai-cli</code></pre>
+<span class="syn-comment"># Build a native binary</span>
+<span class="syn-var">$</span> ./gradlew :nocturnusai-cli:nativeCompile
+<span class="syn-var">$</span> ./nocturnusai-cli/build/native/nativeCompile/nocturnusai</code></pre>
 
     <h3>Via Docker</h3>
     <p>If you're running the server with Docker Compose, you can exec into it:</p>
-    <pre data-lang="bash"><code><span class="syn-var">$</span> docker compose exec server nocturnusai-cli</code></pre>
-
-    <h3>Quick Alias</h3>
-    <p>Add to your shell profile for convenience:</p>
-    <pre data-lang="bash"><code><span class="syn-comment"># ~/.zshrc or ~/.bashrc</span>
-<span class="syn-keyword">alias</span> nai="./nocturnusai-cli/bin/nocturnusai-cli"</code></pre>
+    <pre data-lang="bash"><code><span class="syn-var">$</span> docker compose exec server nocturnusai</code></pre>
 
     <hr />
 
@@ -87,10 +109,10 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
     </div>
 
     <pre data-lang="bash"><code><span class="syn-comment"># Connect to a remote server with specific database and API key</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-s</span> https://api.example.com <span class="syn-flag">-d</span> production <span class="syn-flag">-k</span> nai_abc123
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-s</span> https://api.example.com <span class="syn-flag">-d</span> production <span class="syn-flag">-k</span> nai_abc123
 
 <span class="syn-comment"># Connect to a specific tenant</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-t</span> tenant_acme</code></pre>
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-d</span> mydb <span class="syn-flag">-t</span> tenant_acme</code></pre>
 
     <hr />
 
@@ -98,7 +120,7 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
     <h2 id="repl">Interactive REPL</h2>
     <p>Launch the CLI without <code>-e</code> to enter interactive mode. You'll see a connection banner and a prompt showing the active database:</p>
 
-    <pre data-lang="bash"><code><span class="syn-var">$</span> nocturnusai-cli
+    <pre data-lang="bash"><code><span class="syn-var">$</span> nocturnusai
 
 <span class="syn-ok">NocturnusAI CLI — logic server for agentic AI
 Server:   http://localhost:9300
@@ -376,31 +398,29 @@ default&gt; keys revoke 661f9500-e29b-41d4-a716-446655440000
     <p>Pass <code>-e</code> to run a single command and exit — perfect for shell scripts, CI/CD, and automation:</p>
 
     <pre data-lang="bash"><code><span class="syn-comment"># Store a fact</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"tell human(socrates)"</span>
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"tell human(socrates)"</span>
 
 <span class="syn-comment"># Query</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"ask mortal(?who)"</span>
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"ask mortal(?who)"</span>
 
 <span class="syn-comment"># Export a database</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"export backup.ab"</span>
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"export backup.ab"</span>
 
 <span class="syn-comment"># Import into a database</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"import knowledge.ab"</span>
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"import knowledge.ab"</span>
 
 <span class="syn-comment"># Health check in CI</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-e</span> <span class="syn-string">"health"</span></code></pre>
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-e</span> <span class="syn-string">"health"</span></code></pre>
 
     <h3>Shell Scripting Examples</h3>
     <pre data-lang="bash"><code><span class="syn-comment">#!/bin/bash</span>
 <span class="syn-comment"># Seed a database with a knowledge file</span>
-CLI="./nocturnusai-cli/bin/nocturnusai-cli"
-
-<span class="syn-var">$</span>CLI <span class="syn-flag">-d</span> production <span class="syn-flag">-e</span> <span class="syn-string">"import seed_data.ab"</span>
-<span class="syn-var">$</span>CLI <span class="syn-flag">-d</span> production <span class="syn-flag">-e</span> <span class="syn-string">"inspect"</span>
+nocturnusai <span class="syn-flag">-d</span> production <span class="syn-flag">-e</span> <span class="syn-string">"import seed_data.ab"</span>
+nocturnusai <span class="syn-flag">-d</span> production <span class="syn-flag">-e</span> <span class="syn-string">"inspect"</span>
 
 <span class="syn-comment"># Backup all databases</span>
 <span class="syn-keyword">for</span> db <span class="syn-keyword">in</span> default production staging; <span class="syn-keyword">do</span>
-    <span class="syn-var">$</span>CLI <span class="syn-flag">-d</span> <span class="syn-var">$</span>db <span class="syn-flag">-e</span> <span class="syn-string">"export backups/backup.ab"</span>
+    nocturnusai <span class="syn-flag">-d</span> <span class="syn-var">$</span>db <span class="syn-flag">-e</span> <span class="syn-string">"export backups/backup.ab"</span>
 <span class="syn-keyword">done</span></code></pre>
 
     <h3>Raw DSL Mode</h3>
