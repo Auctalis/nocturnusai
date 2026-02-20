@@ -26,7 +26,8 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
         try {
             val (db, tenantId) = call.getContext(dbManager)
             val request = call.receive<ExecuteRequest>()
-            call.application.environment.log.info("Endpoint /execute hit. Tenant: $tenantId, Request: $request")
+            // Log command length only — avoid logging potentially sensitive DSL content
+            call.application.environment.log.info("Endpoint /execute hit. Tenant: $tenantId, commandLength=${request.command.length}")
             val result = db.execute(request.command, tenantId)
             call.respond(ExecuteResponse(result))
         } catch (e: ValidationException) {
@@ -34,7 +35,8 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
         } catch (e: DatabaseNotFoundException) {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
         } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, ErrorResponse("BAD_REQUEST", e.message ?: "Error"))
+            call.application.environment.log.error("Execute error", e)
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("BAD_REQUEST", "Invalid command"))
         }
     }
 
@@ -74,9 +76,10 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
         } catch (e: IllegalArgumentException) {
             call.respond(HttpStatusCode.Conflict, ErrorResponse("CONFLICT", e.message ?: "Contradiction"))
         } catch (e: IllegalStateException) {
-            call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("TOO_MANY_REQUESTS", e.message ?: "Too many requests"))
+            call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("TOO_MANY_REQUESTS", "Too many requests"))
         } catch (e: Exception) {
-            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", e.message ?: "Error"))
+            call.application.environment.log.error("Assert fact error", e)
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", "Internal server error"))
         }
     }
 

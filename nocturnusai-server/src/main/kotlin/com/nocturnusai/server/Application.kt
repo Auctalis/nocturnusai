@@ -123,7 +123,16 @@ fun Application.module() {
     }
 
     install(CORS) {
-        anyHost()
+        // Configure allowed origins via CORS_ALLOWED_ORIGINS env var (comma-separated).
+        // Default: localhost origins only. Set to "*" only if you understand the risks.
+        val corsOrigins = System.getenv("CORS_ALLOWED_ORIGINS")
+        if (corsOrigins == "*") {
+            anyHost()
+        } else {
+            val origins = corsOrigins?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
+                ?: listOf("http://localhost:3000", "http://localhost:5173", "http://localhost:8080")
+            origins.forEach { allowHost(it.removePrefix("http://").removePrefix("https://"), schemes = listOf("http", "https")) }
+        }
         allowHeader(HttpHeaders.ContentType)
         allowHeader("X-Transaction-ID")
         allowHeader("Authorization")
@@ -193,6 +202,16 @@ fun Application.module() {
         }
     }
 
+    // ── Security headers ─────────────────────────────────────────────────
+    intercept(ApplicationCallPipeline.Call) {
+        call.response.header("X-Content-Type-Options", "nosniff")
+        call.response.header("X-Frame-Options", "DENY")
+        call.response.header("X-XSS-Protection", "1; mode=block")
+        if (ServerConfig.tlsEnabled) {
+            call.response.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        }
+    }
+
     // ── Authentication & Authorization ──────────────────────────────────
     val keyManager = if (ServerConfig.authMode == AuthMode.RBAC) {
         val km = ApiKeyManager(ServerConfig.storageDir)
@@ -200,9 +219,15 @@ fun Application.module() {
         if (!km.hasKeys()) {
             environment.log.warn("No API keys found — POST /auth/bootstrap to create the first admin key")
         }
+        if (ServerConfig.usingDefaultAdminCredentials) {
+            environment.log.warn("⚠️  Using default admin credentials. Set NOCTURNUSAI_ADMIN_USER and NOCTURNUSAI_ADMIN_PASS before exposing this server.")
+        }
         km
     } else {
         environment.log.info("Auth mode: ${ServerConfig.authMode.name}")
+        if (ServerConfig.authMode == AuthMode.DISABLED) {
+            environment.log.warn("⚠️  Authentication is DISABLED. Set AUTH_ENABLED=true or API_KEY for production use.")
+        }
         null
     }
     AuthInterceptor.install(this, keyManager)

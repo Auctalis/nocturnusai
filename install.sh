@@ -137,12 +137,28 @@ gum_spin() {
 
 bootstrap_gum
 
+# ── Safe .env writer ─────────────────────────────────────────────────────────
+# Writes KEY=VALUE to .env safely — avoids sed injection from special chars
+# (/, &, \) that can appear in API keys.
+set_env_key() {
+    local key="$1" value="$2" file="${3:-.env}"
+    # Remove any existing line (commented or not) for this key
+    grep -v "^[#[:space:]]*${key}=" "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+    # Append new value using printf to avoid any interpretation of special chars
+    printf '%s=%s\n' "$key" "$value" >> "$file"
+}
+
 # ── Parse args ───────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case $1 in
         --ollama)      USE_OLLAMA=true; shift ;;
         --monitoring)  USE_MONITORING=true; shift ;;
-        --dir)         INSTALL_DIR="$2"; shift 2 ;;
+        --dir)
+            # Reject paths with null bytes or shell metacharacters
+            if [[ "$2" =~ [[:cntrl:]\;\|\&\`\$] ]]; then
+                echo -e "${RED}Invalid install directory: $2${NC}"; exit 1
+            fi
+            INSTALL_DIR="$2"; shift 2 ;;
         --port)        PORT="$2"; shift 2 ;;
         --key)         LLM_KEY="$2"; shift 2 ;;
         --help|-h)
@@ -255,33 +271,28 @@ curl -fsSL "$REPO_RAW/.env.example" -o .env.example
 cp .env.example .env
 
 # ── Configure .env ───────────────────────────────────────────────────────────
-# Set port
-sed -i.bak "s/^PORT=.*/PORT=$PORT/" .env && rm -f .env.bak
+# Validate port is a number before writing
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
+    echo -e "${RED}Invalid port: $PORT${NC}"
+    exit 1
+fi
+set_env_key "PORT" "$PORT"
 
 # Configure LLM provider
 if [ -n "$LLM_KEY" ]; then
     # Auto-detect provider from key format
     if [[ "$LLM_KEY" == sk-ant-* ]]; then
         echo -e "${GREEN}Detected:${NC} Anthropic Claude"
-        sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
-        sed -i.bak "s/^LLM_MODEL=.*/# LLM_MODEL=llama3.2/" .env && rm -f .env.bak
-        sed -i.bak "s/^LLM_BASE_URL=.*/# LLM_BASE_URL=http:\/\/ollama:11434\/v1/" .env && rm -f .env.bak
-        sed -i.bak "s/^# ANTHROPIC_API_KEY=.*/ANTHROPIC_API_KEY=$LLM_KEY/" .env && rm -f .env.bak
+        set_env_key "ANTHROPIC_API_KEY" "$LLM_KEY"
     elif [[ "$LLM_KEY" == sk-* ]]; then
         echo -e "${GREEN}Detected:${NC} OpenAI"
-        sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
-        sed -i.bak "s/^LLM_MODEL=.*/# LLM_MODEL=llama3.2/" .env && rm -f .env.bak
-        sed -i.bak "s/^LLM_BASE_URL=.*/# LLM_BASE_URL=http:\/\/ollama:11434\/v1/" .env && rm -f .env.bak
-        sed -i.bak "s/^# OPENAI_API_KEY=.*/OPENAI_API_KEY=$LLM_KEY/" .env && rm -f .env.bak
+        set_env_key "OPENAI_API_KEY" "$LLM_KEY"
     elif [[ "$LLM_KEY" == AIza* ]]; then
         echo -e "${GREEN}Detected:${NC} Google Gemini"
-        sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
-        sed -i.bak "s/^LLM_MODEL=.*/# LLM_MODEL=llama3.2/" .env && rm -f .env.bak
-        sed -i.bak "s/^LLM_BASE_URL=.*/# LLM_BASE_URL=http:\/\/ollama:11434\/v1/" .env && rm -f .env.bak
-        sed -i.bak "s/^# GOOGLE_API_KEY=.*/GOOGLE_API_KEY=$LLM_KEY/" .env && rm -f .env.bak
+        set_env_key "GOOGLE_API_KEY" "$LLM_KEY"
     else
         echo -e "${YELLOW}Unknown key format — setting as generic LLM_API_KEY.${NC}"
-        echo "LLM_API_KEY=$LLM_KEY" >> .env
+        set_env_key "LLM_API_KEY" "$LLM_KEY"
     fi
     USE_OLLAMA=false  # cloud provider, no need for Ollama
 elif $USE_OLLAMA; then
@@ -304,30 +315,15 @@ elif [ -t 0 ]; then
             ;;
         Anthropic*)
             read -rp "Anthropic API key (sk-ant-...): " KEY
-            if [ -n "$KEY" ]; then
-                sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
-                sed -i.bak "s/^LLM_MODEL=.*/# LLM_MODEL=llama3.2/" .env && rm -f .env.bak
-                sed -i.bak "s/^LLM_BASE_URL=.*/# LLM_BASE_URL=http:\/\/ollama:11434\/v1/" .env && rm -f .env.bak
-                sed -i.bak "s/^# ANTHROPIC_API_KEY=.*/ANTHROPIC_API_KEY=$KEY/" .env && rm -f .env.bak
-            fi
+            [ -n "$KEY" ] && set_env_key "ANTHROPIC_API_KEY" "$KEY"
             ;;
         OpenAI*)
             read -rp "OpenAI API key (sk-...): " KEY
-            if [ -n "$KEY" ]; then
-                sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
-                sed -i.bak "s/^LLM_MODEL=.*/# LLM_MODEL=llama3.2/" .env && rm -f .env.bak
-                sed -i.bak "s/^LLM_BASE_URL=.*/# LLM_BASE_URL=http:\/\/ollama:11434\/v1/" .env && rm -f .env.bak
-                sed -i.bak "s/^# OPENAI_API_KEY=.*/OPENAI_API_KEY=$KEY/" .env && rm -f .env.bak
-            fi
+            [ -n "$KEY" ] && set_env_key "OPENAI_API_KEY" "$KEY"
             ;;
         Google*)
             read -rp "Google API key (AIza...): " KEY
-            if [ -n "$KEY" ]; then
-                sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
-                sed -i.bak "s/^LLM_MODEL=.*/# LLM_MODEL=llama3.2/" .env && rm -f .env.bak
-                sed -i.bak "s/^LLM_BASE_URL=.*/# LLM_BASE_URL=http:\/\/ollama:11434\/v1/" .env && rm -f .env.bak
-                sed -i.bak "s/^# GOOGLE_API_KEY=.*/GOOGLE_API_KEY=$KEY/" .env && rm -f .env.bak
-            fi
+            [ -n "$KEY" ] && set_env_key "GOOGLE_API_KEY" "$KEY"
             ;;
         Skip*)
             echo -e "${YELLOW}Skipped. Edit .env later to configure LLM provider.${NC}"

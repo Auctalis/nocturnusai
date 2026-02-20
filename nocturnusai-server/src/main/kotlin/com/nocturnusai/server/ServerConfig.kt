@@ -36,8 +36,11 @@ object ServerConfig {
         }
 
     // Admin credentials for bootstrap (used when AUTH_ENABLED=true and no keys exist yet)
+    // Change these via environment variables before exposing the server to any network.
     val adminUser: String = System.getenv("NOCTURNUSAI_ADMIN_USER") ?: "admin"
     val adminPass: String = System.getenv("NOCTURNUSAI_ADMIN_PASS") ?: "nocturnusai"
+    val usingDefaultAdminCredentials: Boolean
+        get() = System.getenv("NOCTURNUSAI_ADMIN_USER") == null || System.getenv("NOCTURNUSAI_ADMIN_PASS") == null
 
     // Encryption at Rest
     val encryptionKey: String? = System.getenv("ENCRYPTION_KEY") // 64 hex chars = 32 bytes AES-256
