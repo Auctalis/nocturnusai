@@ -170,7 +170,14 @@ Args: `--server`, `--db`, `--api-key`, `--tenant`.
 |----------|---------|---------|
 | `PORT` | `9300` | Server port |
 | `HOST` | `0.0.0.0` | Bind address |
-| `API_KEY` | _(none)_ | Optional auth key |
+| `API_KEY` | _(none)_ | Legacy single-key auth |
+| `AUTH_ENABLED` | `false` | Enable full RBAC mode |
+| `NOCTURNUSAI_ADMIN_USER` | `admin` | Bootstrap admin username |
+| `NOCTURNUSAI_ADMIN_PASS` | `nocturnusai` | Bootstrap admin password |
+| `API_KEY_DEFAULT_EXPIRY_DAYS` | _(none)_ | Default key expiry in days |
+| `CORS_ALLOWED_ORIGINS` | localhost:3000,5173,8080 | Comma-separated allowed origins |
+| `MAX_REQUEST_BODY_BYTES` | `10485760` | Max request body size (10 MB) |
 | `STORAGE_DIR` | `./data` | WAL/snapshot directory |
+| `ENCRYPTION_KEY` | _(none)_ | 64 hex-char AES-256 key |
 | `REPLICATION_MODE` | `LEADER` | `LEADER` or `FOLLOWER` |
 | `LEADER_URL` | _(none)_ | Leader URL (follower mode) |

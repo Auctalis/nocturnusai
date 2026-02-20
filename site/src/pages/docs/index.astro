@@ -244,7 +244,17 @@ result = executor.<span class="syn-fn">invoke</span>(&#123;
                 <tr>
                     <td><code>API_KEY</code></td>
                     <td><em>none</em></td>
-                    <td>Enable bearer token auth — all requests require <code>Authorization: Bearer &lt;key&gt;</code></td>
+                    <td>Legacy single-key auth. Set this <em>or</em> use <code>AUTH_ENABLED=true</code> for full RBAC.</td>
+                </tr>
+                <tr>
+                    <td><code>CORS_ALLOWED_ORIGINS</code></td>
+                    <td><em>localhost:3000, 5173, 8080</em></td>
+                    <td>Comma-separated allowed origins. Set to <code>*</code> only for fully public read-only APIs.</td>
+                </tr>
+                <tr>
+                    <td><code>MAX_REQUEST_BODY_BYTES</code></td>
+                    <td><code>10485760</code> (10 MB)</td>
+                    <td>Maximum allowed request body size. Requests exceeding this return 413.</td>
                 </tr>
                 <tr>
                     <td><code>STORAGE_DIR</code></td>
@@ -294,12 +304,17 @@ result = executor.<span class="syn-fn">invoke</span>(&#123;
                 <tr>
                     <td><code>NOCTURNUSAI_ADMIN_USER</code></td>
                     <td><code>admin</code></td>
-                    <td>Admin username (only used when <code>AUTH_ENABLED=true</code>)</td>
+                    <td>Bootstrap admin username — change before exposing to any network</td>
                 </tr>
                 <tr>
                     <td><code>NOCTURNUSAI_ADMIN_PASS</code></td>
                     <td><code>nocturnusai</code></td>
-                    <td>Admin password — change this in production</td>
+                    <td>Bootstrap admin password — change before exposing to any network</td>
+                </tr>
+                <tr>
+                    <td><code>API_KEY_DEFAULT_EXPIRY_DAYS</code></td>
+                    <td><em>none</em> (no expiry)</td>
+                    <td>Default expiry for new API keys in days. Recommended: <code>365</code> for production.</td>
                 </tr>
                 <tr>
                     <td><code>ENCRYPTION_KEY</code></td>
