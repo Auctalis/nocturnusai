@@ -184,7 +184,10 @@ Isolate your implementation plans or different user sessions.
   "truthVal": "Boolean",
   "negated": "Boolean",
   "scope": "String",
-  "metadata": "LinkedHashMap"
+  "metadata": "LinkedHashMap",
+  "validFrom": "Number",
+  "validUntil": "Number",
+  "ttl": "Number"
 }
 ```
 ### `RuleRequest`
@@ -240,6 +243,10 @@ Isolate your implementation plans or different user sessions.
 
 #### `DELETE /admin/databases/{name}`
 
+#### `DELETE /auth/keys/{id}`
+
+#### `GET /.well-known/agent.json`
+
 #### `GET /admin/databases/{name}/facts`
 
 #### `GET /admin/databases/{name}/rules`
@@ -247,6 +254,14 @@ Isolate your implementation plans or different user sessions.
 #### `GET /admin/databases/{name}/tenants`
 
 #### `GET /admin/databases`
+
+#### `GET /auth/keys/{id}`
+
+#### `GET /auth/keys`
+
+#### `GET /auth/status`
+
+#### `GET /auth/whoami`
 
 #### `GET /health/live`
 
@@ -256,11 +271,21 @@ Isolate your implementation plans or different user sessions.
 
 #### `GET /llm.txt`
 
+#### `GET /mcp/sse`
+
+#### `GET /memory/events`
+
+#### `GET /memory/stream`
+
 #### `GET /metrics`
+
+#### `GET /predicates`
 
 #### `GET /replication/wal`
 
 #### `GET /userguide`
+
+#### `PATCH /auth/keys/{id}`
 
 #### `POST /admin/backups`
 
@@ -272,11 +297,17 @@ Isolate your implementation plans or different user sessions.
 
 #### `POST /admin/databases`
 
+#### `POST /ask`
+
 #### `POST /assert/fact`
 
 #### `POST /assert/rule`
 
 #### `POST /assert/template`
+
+#### `POST /auth/bootstrap`
+
+#### `POST /auth/keys`
 
 #### `POST /execute`
 
@@ -284,11 +315,39 @@ Isolate your implementation plans or different user sessions.
 
 #### `POST /extract`
 
+#### `POST /forget`
+
 #### `POST /infer`
+
+#### `POST /mcp`
+
+#### `POST /memory/cleanup`
+
+#### `POST /memory/compress`
+
+#### `POST /memory/consolidate`
+
+#### `POST /memory/context`
+
+#### `POST /memory/decay`
+
+#### `POST /memory/prioritize`
+
+#### `POST /memory/priority`
+
+#### `POST /memory/query/salient`
+
+#### `POST /memory/query/temporal`
+
+#### `POST /memory/recall`
 
 #### `POST /retract`
 
 #### `POST /synthesize`
+
+#### `POST /teach`
+
+#### `POST /tell`
 
 #### `POST /test`
 
