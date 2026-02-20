@@ -1,0 +1,41 @@
+[
+  {
+    "name": "com.nocturnusai.cli.MainKt",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "com.nocturnusai.cli.Client",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.nocturnusai.cli.Repl",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.ktor.client.engine.cio.CIO",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.ktor.client.engine.cio.CIOEngineConfig",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "kotlinx.serialization.json.Json",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "kotlinx.coroutines.internal.MainDispatcherFactory",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  }
+]

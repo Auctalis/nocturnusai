@@ -4,10 +4,10 @@
 # Works everywhere. Installs everything. You're welcome. 🦞
 #
 # Usage:
-#   curl -fsSL https://openclaw.ai/install.sh | bash
-#   curl -fsSL https://openclaw.ai/install.sh | bash -s -- --ollama
-#   curl -fsSL https://openclaw.ai/install.sh | bash -s -- --key sk-ant-...
-#   curl -fsSL https://openclaw.ai/install.sh | bash -s -- --port 8080
+#   curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama
+#   curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --key sk-ant-...
+#   curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --port 8080
 #
 # Options:
 #   --ollama    Include local Ollama (no API key needed)
@@ -34,6 +34,109 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
+# ── Gum (styled terminal UI) ─────────────────────────────────────────────────
+GUM=""
+GUM_VERSION="0.14.5"
+
+bootstrap_gum() {
+    # Already have it?
+    if command -v gum &>/dev/null; then
+        GUM="$(command -v gum)"
+        return
+    fi
+
+    # Only try to install if we have a real terminal
+    [ -t 0 ] || return
+
+    local os arch
+    os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    arch="$(uname -m)"
+    [[ "$arch" == "x86_64" ]] && arch="x86_64"
+    [[ "$arch" == "arm64" || "$arch" == "aarch64" ]] && arch="arm64"
+
+    local tmp
+    tmp="$(mktemp -d)"
+    local url="https://github.com/charmbracelet/gum/releases/download/v${GUM_VERSION}/gum_${GUM_VERSION}_${os}_${arch}.tar.gz"
+
+    if curl -fsSL "$url" -o "$tmp/gum.tar.gz" 2>/dev/null; then
+        tar -xzf "$tmp/gum.tar.gz" -C "$tmp" 2>/dev/null
+        GUM="$tmp/gum"
+        chmod +x "$GUM"
+    fi
+    rm -rf "$tmp/gum.tar.gz" 2>/dev/null || true
+}
+
+# Wrappers — fall back gracefully if gum not available
+gum_style() {
+    if [ -n "$GUM" ]; then
+        "$GUM" style "$@"
+    else
+        # Strip flags, just print text
+        local text=""
+        while [[ $# -gt 0 ]]; do
+            case $1 in
+                --*) shift; [[ $# -gt 0 && "$1" != --* ]] && shift ;;
+                *) text="$1"; shift ;;
+            esac
+        done
+        echo -e "${BOLD}${text}${NC}"
+    fi
+}
+
+gum_choose() {
+    if [ -n "$GUM" ]; then
+        "$GUM" choose "$@"
+    else
+        # Plain numbered list fallback
+        local header=""
+        local -a items=()
+        while [[ $# -gt 0 ]]; do
+            case $1 in
+                --header) header="$2"; shift 2 ;;
+                --*) shift; [[ $# -gt 0 && "$1" != --* ]] && shift ;;
+                *) items+=("$1"); shift ;;
+            esac
+        done
+        [ -n "$header" ] && echo -e "\n${BOLD}${header}${NC}\n"
+        for i in "${!items[@]}"; do
+            echo "  $((i+1))) ${items[$i]}"
+        done
+        echo ""
+        read -rp "Choice [1]: " idx
+        idx="${idx:-1}"
+        echo "${items[$((idx-1))]}"
+    fi
+}
+
+gum_spin() {
+    # gum spin --spinner dot --title "..." -- command
+    if [ -n "$GUM" ]; then
+        "$GUM" spin "$@"
+    else
+        # Extract title and command after --
+        local title="Working..."
+        local -a cmd=()
+        local past_sep=false
+        while [[ $# -gt 0 ]]; do
+            if $past_sep; then
+                cmd+=("$1")
+            elif [[ "$1" == "--" ]]; then
+                past_sep=true
+            elif [[ "$1" == "--title" ]]; then
+                title="$2"; shift
+            fi
+            shift
+        done
+        echo -n "$title "
+        "${cmd[@]}" &>/dev/null &
+        local pid=$!
+        while kill -0 "$pid" 2>/dev/null; do echo -n "."; sleep 1; done
+        echo ""
+    fi
+}
+
+bootstrap_gum
+
 # ── Parse args ───────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -43,7 +146,7 @@ while [[ $# -gt 0 ]]; do
         --port)        PORT="$2"; shift 2 ;;
         --key)         LLM_KEY="$2"; shift 2 ;;
         --help|-h)
-            echo "Usage: curl -fsSL https://openclaw.ai/install.sh | bash -s -- [OPTIONS]"
+            echo "Usage: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- [OPTIONS]"
             echo ""
             echo "Options:"
             echo "  --ollama       Include local Ollama LLM (no API key needed)"
@@ -60,16 +163,29 @@ done
 
 # ── Banner ───────────────────────────────────────────────────────────────────
 echo ""
-echo -e "${CYAN}${BOLD}"
+if [ -n "$GUM" ]; then
+    "$GUM" style \
+        --foreground "#7c3aed" --bold \
+        --border double --border-foreground "#7c3aed" \
+        --padding "1 4" --margin "0 2" \
+" _   _            _                                 _    ___
+| \\ | | ___   ___| |_ _   _ _ __ _ __  _   _ ___   / \\  |_ _|
+|  \\| |/ _ \\ / __| __| | | | '__| '_ \\| | | / __| / _ \\  | |
+| |\\  | (_) | (__| |_| |_| | |  | | | | |_| \\__ \\/ ___ \\ | |
+|_| \\_|\\___/ \\___|\__|\__,_|_|  |_| |_|\\__,_|___/_/   \\_\\___|"
+    "$GUM" style --foreground "#a78bfa" --faint "  Logic server for Agentic AI"
+else
+    echo -e "${CYAN}${BOLD}"
 cat << 'BANNER'
-     _          _                 ____
-    / \   __  _(_) ___  _ __ ___ | __ )  __ _ ___  ___
-   / _ \  \ \/ / |/ _ \| '_ ` _ \|  _ \ / _` / __|/ _ \
-  / ___ \  >  <| | (_) | | | | | | |_) | (_| \__ \  __/
- /_/   \_\/_/\_\_|\___/|_| |_| |_|____/ \__,_|___/\___|
+ _   _            _                                 _    ___
+| \ | | ___   ___| |_ _   _ _ __ _ __  _   _ ___   / \  |_ _|
+|  \| |/ _ \ / __| __| | | | '__| '_ \| | | / __| / _ \  | |
+| |\  | (_) | (__| |_| |_| | |  | | | | |_| \__ \/ ___ \ | |
+|_| \_|\___/ \___|\__|\__,_|_|  |_| |_|\__,_|___/_/   \_\___|
 BANNER
-echo -e "${NC}"
-echo -e "${DIM}Logic server for Agentic AI${NC}"
+    echo -e "${NC}"
+    echo -e "${DIM}Logic server for Agentic AI${NC}"
+fi
 echo ""
 
 # ── Check prerequisites ─────────────────────────────────────────────────────
@@ -120,7 +236,7 @@ cd "$INSTALL_DIR"
 echo -e "${GREEN}Installing to:${NC} $(pwd)"
 
 # ── Download compose file and .env ───────────────────────────────────────────
-REPO_RAW="https://raw.githubusercontent.com/essaouirallc/logic-server/main"
+REPO_RAW="https://raw.githubusercontent.com/Auctalis/nocturnusai/main"
 
 echo -e "${DIM}Downloading configuration...${NC}"
 
@@ -171,25 +287,22 @@ if [ -n "$LLM_KEY" ]; then
 elif $USE_OLLAMA; then
     echo -e "${GREEN}Using:${NC} Ollama (local LLM — no API key needed)"
 elif [ -t 0 ]; then
-    # Interactive terminal — ask the user
+    # Interactive terminal — wizard
     echo ""
-    echo -e "${BOLD}Choose your LLM provider:${NC}"
-    echo ""
-    echo "  1) Ollama (local, free, private — recommended to start)"
-    echo "  2) Anthropic Claude"
-    echo "  3) OpenAI GPT"
-    echo "  4) Google Gemini"
-    echo "  5) Skip (configure later in .env)"
-    echo ""
-    read -rp "Choice [1]: " CHOICE
-    CHOICE="${CHOICE:-1}"
+    CHOICE=$(gum_choose \
+        --header "Choose your LLM provider:" \
+        "Ollama  (local, free, private — recommended)" \
+        "Anthropic Claude" \
+        "OpenAI GPT" \
+        "Google Gemini" \
+        "Skip  (configure later in .env)")
 
-    case $CHOICE in
-        1)
+    case "$CHOICE" in
+        Ollama*)
             USE_OLLAMA=true
             echo -e "${GREEN}Using Ollama.${NC} Model will download on first start (~2GB)."
             ;;
-        2)
+        Anthropic*)
             read -rp "Anthropic API key (sk-ant-...): " KEY
             if [ -n "$KEY" ]; then
                 sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
@@ -198,7 +311,7 @@ elif [ -t 0 ]; then
                 sed -i.bak "s/^# ANTHROPIC_API_KEY=.*/ANTHROPIC_API_KEY=$KEY/" .env && rm -f .env.bak
             fi
             ;;
-        3)
+        OpenAI*)
             read -rp "OpenAI API key (sk-...): " KEY
             if [ -n "$KEY" ]; then
                 sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
@@ -207,7 +320,7 @@ elif [ -t 0 ]; then
                 sed -i.bak "s/^# OPENAI_API_KEY=.*/OPENAI_API_KEY=$KEY/" .env && rm -f .env.bak
             fi
             ;;
-        4)
+        Google*)
             read -rp "Google API key (AIza...): " KEY
             if [ -n "$KEY" ]; then
                 sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
@@ -216,7 +329,7 @@ elif [ -t 0 ]; then
                 sed -i.bak "s/^# GOOGLE_API_KEY=.*/GOOGLE_API_KEY=$KEY/" .env && rm -f .env.bak
             fi
             ;;
-        5)
+        Skip*)
             echo -e "${YELLOW}Skipped. Edit .env later to configure LLM provider.${NC}"
             ;;
     esac
@@ -242,23 +355,105 @@ $COMPOSE_CMD $PROFILE_FLAGS up -d
 
 # ── Wait for healthy ─────────────────────────────────────────────────────────
 echo ""
-echo -n "Waiting for server"
 HEALTHY=false
-for i in $(seq 1 30); do
-    if curl -sf "http://localhost:$PORT/health" &>/dev/null; then
-        echo ""
+
+wait_for_health() {
+    for i in $(seq 1 30); do
+        if curl -sf "http://localhost:$PORT/health" &>/dev/null; then
+            return 0
+        fi
+        sleep 2
+    done
+    return 1
+}
+
+if [ -n "$GUM" ]; then
+    if "$GUM" spin --spinner dot --title "Waiting for server to be ready..." -- bash -c "$(declare -f wait_for_health); wait_for_health"; then
         HEALTHY=true
-        break
     fi
-    echo -n "."
-    sleep 2
-done
+else
+    echo -n "Waiting for server"
+    if wait_for_health; then
+        HEALTHY=true
+        echo ""
+    fi
+fi
 
 if $HEALTHY; then
     echo -e "${GREEN}${BOLD}Ready!${NC}"
 else
     echo ""
     echo -e "${YELLOW}Server still starting — check logs:${NC} $COMPOSE_CMD logs -f nocturnusai"
+fi
+
+# ── Install CLI binary ────────────────────────────────────────────────────────
+CLI_INSTALLED=false
+CLI_PATH=""
+
+install_cli() {
+    local os arch binary release_url install_dir install_path
+
+    os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    arch="$(uname -m)"
+    [[ "$arch" == "x86_64" ]]            && arch="x86_64"
+    [[ "$arch" == "arm64" || "$arch" == "aarch64" ]] && arch="arm64"
+
+    binary="nocturnusai-${os}-${arch}"
+    release_url="https://github.com/Auctalis/nocturnusai/releases/latest/download/${binary}"
+
+    # Resolve install location — prefer /usr/local/bin, fall back to ~/.local/bin
+    if [ -w "/usr/local/bin" ]; then
+        install_path="/usr/local/bin/nocturnusai"
+    elif sudo -n true 2>/dev/null; then
+        install_path="/usr/local/bin/nocturnusai"
+    else
+        install_dir="$HOME/.local/bin"
+        mkdir -p "$install_dir"
+        install_path="$install_dir/nocturnusai"
+    fi
+
+    # Download
+    if ! curl -fsSL "$release_url" -o "$install_path" 2>/dev/null; then
+        return 1
+    fi
+    chmod +x "$install_path"
+
+    # Verify it runs
+    "$install_path" --help &>/dev/null || return 1
+
+    CLI_PATH="$install_path"
+    return 0
+}
+
+echo ""
+if [ -n "$GUM" ]; then
+    if "$GUM" spin --spinner dot --title "Installing nocturnusai CLI..." -- bash -c "$(declare -f install_cli); install_cli"; then
+        CLI_INSTALLED=true
+    fi
+else
+    echo -n "Installing CLI"
+    if install_cli; then
+        CLI_INSTALLED=true
+        echo ""
+    fi
+fi
+
+if $CLI_INSTALLED; then
+    echo -e "${GREEN}CLI installed:${NC} $CLI_PATH"
+
+    # Add ~/.local/bin to PATH if it's not already there
+    if [[ "$CLI_PATH" == "$HOME/.local/bin/nocturnusai" ]]; then
+        for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+            if [ -f "$rc" ] && ! grep -q '\.local/bin' "$rc"; then
+                echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
+                echo -e "${DIM}  Added ~/.local/bin to PATH in $rc${NC}"
+            fi
+        done
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
+else
+    echo -e "${YELLOW}CLI not installed${NC} — binary not available for this platform yet."
+    echo -e "${DIM}  You can still use the HTTP API directly.${NC}"
 fi
 
 # ── Success banner ───────────────────────────────────────────────────────────
@@ -282,6 +477,15 @@ fi
 echo ""
 echo -e "  ${BOLD}Try it:${NC}"
 echo ""
+if $CLI_INSTALLED; then
+echo -e "    ${CYAN}# Interactive REPL (recommended)${NC}"
+echo "    nocturnusai"
+echo ""
+echo -e "    ${CYAN}# One-liners${NC}"
+echo "    nocturnusai -e \"tell human(socrates)\""
+echo "    nocturnusai -e \"teach mortal(?x) :- human(?x)\""
+echo "    nocturnusai -e \"ask mortal(?who)\""
+else
 echo -e "    ${CYAN}# Store a fact${NC}"
 echo "    curl -sX POST http://localhost:$PORT/tell \\"
 echo "      -H 'Content-Type: application/json' \\"
@@ -296,6 +500,7 @@ echo -e "    ${CYAN}# Ask a question${NC}"
 echo "    curl -sX POST http://localhost:$PORT/ask \\"
 echo "      -H 'Content-Type: application/json' \\"
 echo "      -d '{\"predicate\":\"mortal\",\"args\":[\"?who\"]}'"
+fi
 echo ""
 echo -e "  ${BOLD}Manage:${NC}"
 echo -e "    cd $(pwd)"
@@ -315,5 +520,5 @@ echo "      }"
 echo "    }"
 echo ""
 echo -e "  ${DIM}Config: $(pwd)/.env${NC}"
-echo -e "  ${DIM}Docs:   https://github.com/essaouirallc/logic-server${NC}"
+echo -e "  ${DIM}Docs:   https://github.com/Auctalis/nocturnusai${NC}"
 echo ""
