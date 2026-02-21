@@ -15,6 +15,11 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation:2.3.13")
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.13")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+    // GraalVM native image: Ktor/coroutines classes that the metadata repository
+    // marks as build-time-initialized call LoggerFactory.getLogger() in their static
+    // initializers. slf4j-nop provides a concrete no-op SLF4J binding so that
+    // LoggerFactory can initialize cleanly at build time (all loggers → NOP).
+    runtimeOnly("org.slf4j:slf4j-nop:1.7.36")
 }
 
 graalvmNative {
@@ -24,14 +29,14 @@ graalvmNative {
             mainClass.set("com.nocturnusai.cli.MainKt")
 
             buildArgs.addAll(
-                // --no-fallback: fail the build if native image cannot be fully compiled
-                // (rather than silently falling back to JVM mode)
                 "--no-fallback",
                 "--enable-url-protocols=http,https",
-                // All initialization config (kotlin, ktor, coroutines, serialization, slf4j)
-                // is handled by the GraalVM Reachability Metadata Repository below.
-                // Adding manual --initialize-at-build-time flags causes transitive SLF4J
-                // initialization errors with GraalVM 21 and is therefore omitted.
+                // SLF4J is called by Ktor/coroutines static initializers that the GraalVM
+                // metadata repository marks as build-time-initialized. We must explicitly
+                // allow SLF4J itself to initialize at build time too. With slf4j-nop on the
+                // classpath (see dependencies above), the build-time LoggerFactory safely
+                // binds to NOP — correct for a CLI tool that needs no application logging.
+                "--initialize-at-build-time=org.slf4j",
             )
 
             // Reduce binary size in production; strip debug info
