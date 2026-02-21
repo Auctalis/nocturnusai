@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "nocturnusai": {
+      "url": "https://YOUR_HOST/mcp/sse",
+      "transport": "sse",
+      "headers": {
+        "X-Database": "YOUR_DATABASE",
+        "X-Tenant-ID": "YOUR_TENANT",
+        "X-API-Key": "YOUR_API_KEY_HERE"
+      }
+    }
+  }
+}

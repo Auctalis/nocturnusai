@@ -1,8 +1,8 @@
 {
-  "mcpServers": {
+  "servers": {
     "nocturnusai": {
       "url": "http://localhost:9300/mcp/sse",
-      "transport": "sse",
+      "type": "sse",
       "headers": {
         "X-Database": "default",
         "X-Tenant-ID": "default"

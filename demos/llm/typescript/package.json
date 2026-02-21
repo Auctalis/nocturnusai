@@ -1,0 +1,20 @@
+{
+  "name": "nocturnusai-llm-demos-ts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LLM & agent integration demos for NocturnusAI (TypeScript)",
+  "scripts": {
+    "mcp":    "ts-node 01_mcp_client.ts",
+    "openai": "ts-node 02_openai_tools.ts",
+    "agent":  "ts-node 03_agent_memory.ts"
+  },
+  "dependencies": {
+    "@nocturnusai/sdk": "file:../../../sdks/typescript"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0",
+    "openai": "^4.0.0"
+  }
+}

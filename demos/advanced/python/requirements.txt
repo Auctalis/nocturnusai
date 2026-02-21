@@ -1,0 +1,9 @@
+# Install the SDK from PyPI:
+nocturnusai
+
+# Or install directly from source (recommended during development):
+# pip install -e ../../sdks/python
+
+# Optional — only needed for 07_langchain_tools.py:
+# langchain
+# langchain-openai
