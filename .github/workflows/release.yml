@@ -122,16 +122,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── Python SDK → PyPI (Trusted Publisher — no API key needed) ──────────────
+  # ── Python SDK → PyPI ───────────────────────────────────────────────────────
   python-sdk:
     name: Python SDK → PyPI
     needs: test
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/nocturnusai
-    permissions:
-      id-token: write   # required for OIDC trusted publishing
     steps:
       - uses: actions/checkout@v4
 
@@ -151,6 +146,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: sdks/python/dist/
+          password: ${{ secrets.PYPI_API_KEY }}
 
   # ── TypeScript SDK → npm ────────────────────────────────────────────────────
   typescript-sdk:
