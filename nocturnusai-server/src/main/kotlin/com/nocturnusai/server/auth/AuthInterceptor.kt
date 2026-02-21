@@ -174,7 +174,7 @@ object AuthInterceptor {
                     }
 
                     // Check rate limit before any key work
-                    val clientIp = call.request.origin.remoteHost
+                    val clientIp = call.request.local.remoteHost
                     when (val rate = authRateLimiter.check(clientIp)) {
                         is RateLimiter.Result.LockedOut -> {
                             log.warn("Auth rate limit exceeded from $clientIp — locked out for ${rate.retryAfterSeconds}s")

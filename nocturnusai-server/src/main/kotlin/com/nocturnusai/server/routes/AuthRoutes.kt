@@ -51,7 +51,7 @@ fun Route.authRoutes(keyManager: ApiKeyManager?) {
         }
 
         // Rate-limit by client IP to prevent credential brute-force
-        val clientIp = call.request.origin.remoteHost
+        val clientIp = call.request.local.remoteHost
         when (val rate = bootstrapRateLimiter.check(clientIp)) {
             is RateLimiter.Result.LockedOut -> {
                 log.warn("Bootstrap rate limit exceeded from $clientIp — locked out for ${rate.retryAfterSeconds}s")
