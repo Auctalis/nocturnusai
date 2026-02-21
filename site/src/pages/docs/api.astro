@@ -1,5 +1,6 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="API Reference">
@@ -161,7 +162,7 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
     <hr />
 
     <h2 id="extract">POST /extract</h2>
-    <p>LLM-powered fact extraction from natural language text. See <a href="/docs/llm">LLM Integration</a> for details.</p>
+    <p>LLM-powered fact extraction from natural language text. See <a href={`${base}/docs/llm`}>LLM Integration</a> for details.</p>
     <h3>Request</h3>
     <pre><code class="language-json">&#123;
   "text": "Acme Corp is on the enterprise plan.",
@@ -174,7 +175,7 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
     <hr />
 
     <h2 id="synthesize">POST /synthesize</h2>
-    <p>LLM-powered natural language question answering grounded in facts. See <a href="/docs/llm">LLM Integration</a>.</p>
+    <p>LLM-powered natural language question answering grounded in facts. See <a href={`${base}/docs/llm`}>LLM Integration</a>.</p>
     <h3>Request</h3>
     <pre><code class="language-json">&#123;
   "question": "What plan is Acme Corp on?",

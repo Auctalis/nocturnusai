@@ -1,5 +1,6 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="Quickstart">
@@ -150,7 +151,7 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
 <span class="syn-ok">&#123; "results": ["customer_tier(acme_corp, enterprise)"] &#125;</span></code></pre>
 
         <div class="callout callout-tip">
-            <strong>Going deeper?</strong> Teach rules and watch the inference engine derive new facts automatically. See <a href="/docs/concepts">Core Concepts →</a> for the full picture on reasoning, scopes, and truth maintenance.
+            <strong>Going deeper?</strong> Teach rules and watch the inference engine derive new facts automatically. See <a href={`${base}/docs/concepts`}>Core Concepts →</a> for the full picture on reasoning, scopes, and truth maintenance.
         </div>
     </div>
 
@@ -392,35 +393,35 @@ result = executor.<span class="syn-fn">invoke</span>(&#123;
     <p>You've got an agent connected to verified knowledge. Here's where to go from here:</p>
 
     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1.5rem;">
-        <a href="/docs/mcp" class="next-card">
+        <a href={`${base}/docs/mcp`} class="next-card">
             <h4>MCP Integration →</h4>
             <p>All 9 MCP tools, SSE streaming, A2A discovery</p>
         </a>
-        <a href="/docs/sdks" class="next-card">
+        <a href={`${base}/docs/sdks`} class="next-card">
             <h4>SDKs & Agents →</h4>
             <p>Python, TypeScript, and LangChain integration</p>
         </a>
-        <a href="/docs/llm" class="next-card">
+        <a href={`${base}/docs/llm`} class="next-card">
             <h4>LLM Integration →</h4>
             <p>Fact extraction, answer synthesis, provider configuration</p>
         </a>
-        <a href="/docs/concepts" class="next-card">
+        <a href={`${base}/docs/concepts`} class="next-card">
             <h4>Core Concepts →</h4>
             <p>Inference engines, truth maintenance, temporal facts, salience scoring</p>
         </a>
-        <a href="/docs/api" class="next-card">
+        <a href={`${base}/docs/api`} class="next-card">
             <h4>API Reference →</h4>
             <p>Every endpoint with full request/response shapes</p>
         </a>
-        <a href="/docs/security" class="next-card">
+        <a href={`${base}/docs/security`} class="next-card">
             <h4>Security & Auth →</h4>
             <p>API keys, roles, encryption, and TLS</p>
         </a>
-        <a href="/docs/multi-tenancy" class="next-card">
+        <a href={`${base}/docs/multi-tenancy`} class="next-card">
             <h4>Multi-Tenancy →</h4>
             <p>Isolate data across organizations and environments</p>
         </a>
-        <a href="/docs/cli" class="next-card">
+        <a href={`${base}/docs/cli`} class="next-card">
             <h4>CLI Reference →</h4>
             <p>Interactive REPL, scripting, and administration from your terminal</p>
         </a>

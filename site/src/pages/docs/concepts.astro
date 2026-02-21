@@ -1,5 +1,6 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="Core Concepts">
@@ -64,7 +65,7 @@ NOT allergic(alice, cats)   # alice is not allergic to cats</code></pre>
     <hr />
 
     <h2 id="scopes">Scopes</h2>
-    <p>Facts and rules can be isolated into <strong>scopes</strong> using a string label. A query in a scope sees both scoped facts and unscoped (global) facts. This is different from <a href="/docs/multi-tenancy">multi-tenancy</a> — scopes operate <em>within</em> a tenant for logical isolation.</p>
+    <p>Facts and rules can be isolated into <strong>scopes</strong> using a string label. A query in a scope sees both scoped facts and unscoped (global) facts. This is different from <a href={`${base}/docs/multi-tenancy`}>multi-tenancy</a> — scopes operate <em>within</em> a tenant for logical isolation.</p>
     
     <p>Common use cases:</p>
     <ul>

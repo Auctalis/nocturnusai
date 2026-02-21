@@ -1,5 +1,6 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="Multi-Tenancy">
@@ -118,7 +119,7 @@ X-Tenant-ID: agent_sales_assistant</code></pre>
     <hr />
 
     <h2 id="scoped-keys">Scoped API Keys</h2>
-    <p>Combine multi-tenancy with <a href="/docs/security">Security & Auth</a> to create API keys restricted to specific databases and tenants:</p>
+    <p>Combine multi-tenancy with <a href={`${base}/docs/security`}>Security & Auth</a> to create API keys restricted to specific databases and tenants:</p>
     <pre><code class="language-bash"># Create a key that can only access Acme Corp's data
 curl -X POST http://localhost:9300/auth/keys \
   -H "Authorization: Bearer $ADMIN_KEY" \
