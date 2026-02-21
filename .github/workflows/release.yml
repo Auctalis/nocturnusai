@@ -247,7 +247,7 @@ jobs:
 
             **TypeScript / Node**
             ```bash
-            npm install @nocturnusai/sdk@${{ github.ref_name }}
+            npm install nocturnusai-sdk@${{ github.ref_name }}
             ```
 
             ---

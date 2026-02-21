@@ -119,13 +119,13 @@ print(result["output"])
     <hr />
 
     <h2 id="typescript">TypeScript SDK</h2>
-    <p>Zero-dependency typed client. Works in Node.js 18+ and modern browsers. Published on <a href="https://www.npmjs.com/package/@nocturnusai/sdk" target="_blank">npm</a>.</p>
+    <p>Zero-dependency typed client. Works in Node.js 18+ and modern browsers. Published on <a href="https://www.npmjs.com/package/nocturnusai-sdk" target="_blank">npm</a>.</p>
 
     <h3>Installation</h3>
-    <pre><code class="language-bash">npm install @nocturnusai/sdk</code></pre>
+    <pre><code class="language-bash">npm install nocturnusai-sdk</code></pre>
 
     <h3>Usage</h3>
-    <pre><code class="language-typescript">import &#123; NocturnusAIClient &#125; from '@nocturnusai/sdk';
+    <pre><code class="language-typescript">import &#123; NocturnusAIClient &#125; from 'nocturnusai-sdk';
 
 const client = new NocturnusAIClient(&#123;
   baseUrl: 'http://localhost:9300',
@@ -152,7 +152,7 @@ console.log(results);</code></pre>
 
     <h3>MCP Client</h3>
     <p>The SDK also includes an MCP client for JSON-RPC 2.0 tool calls:</p>
-    <pre><code class="language-typescript">import &#123; NocturnusAIMCPClient &#125; from '@nocturnusai/sdk';
+    <pre><code class="language-typescript">import &#123; NocturnusAIMCPClient &#125; from 'nocturnusai-sdk';
 
 const mcp = new NocturnusAIMCPClient(&#123;
   baseUrl: 'http://localhost:9300'

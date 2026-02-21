@@ -12,7 +12,7 @@
  * NOTE: Set AUTH_ENABLED=true on the server for full enforcement.
  */
 
-import { NocturnusAIClient, NocturnusAIRequestError } from "@nocturnusai/sdk";
+import { NocturnusAIClient, NocturnusAIRequestError } from "nocturnusai-sdk";
 
 const SERVER = "http://localhost:9300";
 

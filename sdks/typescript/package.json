@@ -1,5 +1,5 @@
 {
-  "name": "@nocturnusai/sdk",
+  "name": "nocturnusai-sdk",
   "version": "0.1.0",
   "description": "TypeScript SDK for NocturnusAI — a logic-based inference engine and knowledge database",
   "main": "dist/index.js",

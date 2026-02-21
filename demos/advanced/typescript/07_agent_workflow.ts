@@ -12,7 +12,7 @@
  *   8. Subscribes to real-time events during the session
  */
 
-import { NocturnusAIClient, KnowledgeEvent } from "@nocturnusai/sdk";
+import { NocturnusAIClient, KnowledgeEvent } from "nocturnusai-sdk";
 
 const SERVER = "http://localhost:9300";
 const DB = "demo-agent-ts";

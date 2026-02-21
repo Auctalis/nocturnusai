@@ -125,7 +125,7 @@ Args: `--server`, `--db`, `--api-key`, `--tenant`.
 - LangChain tool wrappers (`nocturnusai.langchain`) — `NocturnusAIAssertTool`, `NocturnusAIQueryTool`, `NocturnusAIInferTool`, `NocturnusAIContextTool`
 - MCP client helper (`nocturnusai.mcp`) for JSON-RPC 2.0 communication
 
-### sdks/typescript — TypeScript SDK (`@nocturnusai/sdk` on npm)
+### sdks/typescript — TypeScript SDK (`nocturnusai-sdk` on npm)
 - `NocturnusAIClient` with full API coverage using standard fetch
 - SSE event subscription support
 - MCP client helper (`NocturnusAIMCPClient`)

@@ -8,7 +8,7 @@
  *   - Passing transactionId to assertFact / retract
  */
 
-import { NocturnusAIClient } from "@nocturnusai/sdk";
+import { NocturnusAIClient } from "nocturnusai-sdk";
 
 const SERVER = "http://localhost:9300";
 

@@ -10,7 +10,7 @@
  *   - TTL-based expiry
  */
 
-import { NocturnusAIClient } from "@nocturnusai/sdk";
+import { NocturnusAIClient } from "nocturnusai-sdk";
 
 const SERVER = "http://localhost:9300";
 

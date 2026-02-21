@@ -13,7 +13,7 @@
  *   - A simulated LLM tool-selection loop
  */
 
-import { NocturnusAIMCPClient } from "@nocturnusai/sdk";
+import { NocturnusAIMCPClient } from "nocturnusai-sdk";
 
 const SERVER = "http://localhost:9300";
 const DB = "mcp-demo-ts";

@@ -13,7 +13,7 @@
     "agent":           "ts-node 07_agent_workflow.ts"
   },
   "dependencies": {
-    "@nocturnusai/sdk": "file:../../sdks/typescript"
+    "nocturnusai-sdk": "file:../../sdks/typescript"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

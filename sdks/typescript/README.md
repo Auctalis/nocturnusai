@@ -1,17 +1,17 @@
-# @nocturnusai/sdk
+# nocturnusai-sdk
 
 TypeScript/JavaScript SDK for [NocturnusAI](https://github.com/Auctalis/nocturnusai) — a logic-based inference engine and knowledge database for agentic AI systems.
 
 ## Install
 
 ```bash
-npm install @nocturnusai/sdk
+npm install nocturnusai-sdk
 ```
 
 ## Quick start
 
 ```typescript
-import { NocturnusAIClient } from "@nocturnusai/sdk";
+import { NocturnusAIClient } from "nocturnusai-sdk";
 
 const client = new NocturnusAIClient("http://localhost:9300");
 
@@ -43,7 +43,7 @@ const client = new NocturnusAIClient("http://localhost:9300", {
 ## MCP (Model Context Protocol)
 
 ```typescript
-import { NocturnusAIMCPClient } from "@nocturnusai/sdk";
+import { NocturnusAIMCPClient } from "nocturnusai-sdk";
 
 const mcp = new NocturnusAIMCPClient("http://localhost:9300");
 await mcp.initialize();
@@ -58,7 +58,7 @@ Or configure via `mcp-config.json` for Claude Desktop, Cursor, Windsurf, and VS 
 
 ```typescript
 import OpenAI from "openai";
-import { NocturnusAIClient } from "@nocturnusai/sdk";
+import { NocturnusAIClient } from "nocturnusai-sdk";
 
 const client = new NocturnusAIClient("http://localhost:9300");
 const openai = new OpenAI();

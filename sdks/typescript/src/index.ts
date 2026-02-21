@@ -1,5 +1,5 @@
 /**
- * @module @nocturnusai/sdk
+ * @module nocturnusai-sdk
  *
  * TypeScript SDK for NocturnusAI — a logic-based inference engine and knowledge database.
  *
@@ -19,7 +19,7 @@
  *
  * @example
  * ```ts
- * import { NocturnusAIClient } from '@nocturnusai/sdk';
+ * import { NocturnusAIClient } from 'nocturnusai-sdk';
  *
  * const client = new NocturnusAIClient({
  *   baseUrl: 'http://localhost:9300',

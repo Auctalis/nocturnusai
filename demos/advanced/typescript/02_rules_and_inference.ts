@@ -8,7 +8,7 @@
  *   - Multi-hop reasoning and transitive closure
  */
 
-import { NocturnusAIClient, ProofTree } from "@nocturnusai/sdk";
+import { NocturnusAIClient, ProofTree } from "nocturnusai-sdk";
 
 const SERVER = "http://localhost:9300";
 

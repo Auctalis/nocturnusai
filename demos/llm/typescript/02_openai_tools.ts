@@ -12,11 +12,11 @@
  *   4. Feed results back and get the final answer
  *
  * Requirements:
- *   npm install openai @nocturnusai/sdk
+ *   npm install openai nocturnusai-sdk
  *   export OPENAI_API_KEY=sk-...
  */
 
-import { NocturnusAIClient } from "@nocturnusai/sdk";
+import { NocturnusAIClient } from "nocturnusai-sdk";
 
 const SERVER = "http://localhost:9300";
 const DB = "openai-demo-ts";

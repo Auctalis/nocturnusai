@@ -9,7 +9,7 @@
     "agent":  "ts-node 03_agent_memory.ts"
   },
   "dependencies": {
-    "@nocturnusai/sdk": "file:../../../sdks/typescript"
+    "nocturnusai-sdk": "file:../../../sdks/typescript"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

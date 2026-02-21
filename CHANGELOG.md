@@ -45,7 +45,7 @@ Initial public release.
 - Async client (`NocturnusAIClient`) and sync wrapper (`SyncNocturnusAIClient`)
 - LangChain tool wrappers: assert, query, infer, context
 
-### TypeScript SDK (`@nocturnusai/sdk` on npm)
+### TypeScript SDK (`nocturnusai-sdk` on npm)
 - `NocturnusAIClient` — zero runtime dependencies
 - `NocturnusAIMCPClient` — MCP JSON-RPC 2.0 client
 - SSE event subscription

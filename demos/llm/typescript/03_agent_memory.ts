@@ -20,7 +20,7 @@
  *   Session 3 — Review:        agent retrieves context, handles temporal queries
  */
 
-import { NocturnusAIClient, ScoredAtom } from "@nocturnusai/sdk";
+import { NocturnusAIClient, ScoredAtom } from "nocturnusai-sdk";
 
 const SERVER = "http://localhost:9300";
 const DB = "agent-memory-demo-ts";

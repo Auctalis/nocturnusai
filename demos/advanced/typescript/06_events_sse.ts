@@ -7,7 +7,7 @@
  *   - Filtering events by predicate
  */
 
-import { NocturnusAIClient, KnowledgeEvent } from "@nocturnusai/sdk";
+import { NocturnusAIClient, KnowledgeEvent } from "nocturnusai-sdk";
 
 const SERVER = "http://localhost:9300";
 

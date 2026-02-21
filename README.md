@@ -3,7 +3,7 @@
 [![CI](https://github.com/Auctalis/nocturnusai/actions/workflows/ci.yml/badge.svg)](https://github.com/Auctalis/nocturnusai/actions/workflows/ci.yml)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2FAuctalis%2Fnocturnusai-blue?logo=docker)](https://github.com/Auctalis/nocturnusai/pkgs/container/nocturnusai)
 [![PyPI](https://img.shields.io/pypi/v/nocturnusai?logo=python&logoColor=white)](https://pypi.org/project/nocturnusai/)
-[![npm](https://img.shields.io/npm/v/@nocturnusai/sdk?logo=npm&logoColor=white)](https://www.npmjs.com/package/@nocturnusai/sdk)
+[![npm](https://img.shields.io/npm/v/nocturnusai-sdk?logo=npm&logoColor=white)](https://www.npmjs.com/package/nocturnusai-sdk)
 [![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-orange.svg)](LICENSE)
 
 **Verified knowledge for AI agents.** Store facts, define rules, and ask questions — get deterministic answers with proof, not LLM guesses.
@@ -116,7 +116,7 @@ pip install nocturnusai[langchain]   # with LangChain tools
 
 **TypeScript / Node.js** (zero runtime dependencies):
 ```bash
-npm install @nocturnusai/sdk
+npm install nocturnusai-sdk
 ```
 
 ---
