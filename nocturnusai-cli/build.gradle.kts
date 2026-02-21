@@ -27,8 +27,12 @@ graalvmNative {
                 "--no-fallback",
                 "--initialize-at-build-time=kotlin",
                 "--initialize-at-build-time=kotlinx.coroutines",
-                "--initialize-at-build-time=io.ktor",
+                // Note: io.ktor is NOT listed here — the GraalVM Reachability Metadata
+                // Repository (enabled below) handles Ktor's initialization config.
+                // Adding --initialize-at-build-time=io.ktor causes SLF4J LoggerFactory to
+                // be initialized at image-build time, which GraalVM 21 rejects.
                 "--initialize-at-build-time=kotlinx.serialization",
+                "--initialize-at-run-time=org.slf4j",
                 "--enable-url-protocols=http,https",
                 "-H:+InstallExitHandlers",
                 "-H:+ReportUnsupportedElementsAtRuntime",
