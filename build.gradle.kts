@@ -3,6 +3,7 @@ plugins {
     kotlin("plugin.serialization") version "1.9.21" apply false
     id("io.ktor.plugin") version "2.3.13" apply false
     id("org.owasp.dependencycheck") version "12.1.0" apply false
+    id("org.graalvm.buildtools.native") version "0.10.3" apply false
 }
 
 allprojects {

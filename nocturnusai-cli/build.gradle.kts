@@ -24,22 +24,14 @@ graalvmNative {
             mainClass.set("com.nocturnusai.cli.MainKt")
 
             buildArgs.addAll(
+                // --no-fallback: fail the build if native image cannot be fully compiled
+                // (rather than silently falling back to JVM mode)
                 "--no-fallback",
-                "--initialize-at-build-time=kotlin",
-                "--initialize-at-build-time=kotlinx.coroutines",
-                // Note: io.ktor is NOT listed here — the GraalVM Reachability Metadata
-                // Repository (enabled below) handles Ktor's initialization config.
-                // Adding --initialize-at-build-time=io.ktor causes SLF4J LoggerFactory to
-                // be initialized at image-build time, which GraalVM 21 rejects.
-                "--initialize-at-build-time=kotlinx.serialization",
-                "--initialize-at-run-time=org.slf4j",
                 "--enable-url-protocols=http,https",
-                "-H:+InstallExitHandlers",
-                "-H:+ReportUnsupportedElementsAtRuntime",
-                // Reduces binary size — we don't need the Truffle/polyglot stack
-                "-H:-IncludeAllTimeZones",
-                // Allow missing reflection registrations to degrade gracefully in dev
-                "-H:+PrintClassInitialization",
+                // All initialization config (kotlin, ktor, coroutines, serialization, slf4j)
+                // is handled by the GraalVM Reachability Metadata Repository below.
+                // Adding manual --initialize-at-build-time flags causes transitive SLF4J
+                // initialization errors with GraalVM 21 and is therefore omitted.
             )
 
             // Reduce binary size in production; strip debug info
