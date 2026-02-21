@@ -226,7 +226,12 @@ jobs:
 
       - name: Publish
         working-directory: sdks/typescript
-        run: npm publish --access public
+        run: |
+          output=$(npm publish --access public 2>&1) && echo "$output" || {
+            echo "$output"
+            echo "$output" | grep -q "previously published versions" && echo "Already published — skipping." && exit 0
+            exit 1
+          }
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
