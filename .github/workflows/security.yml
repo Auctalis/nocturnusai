@@ -38,6 +38,9 @@ jobs:
       - name: Upload to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         if: always()
+        # Requires GitHub Advanced Security (free on public repos, paid on private).
+        # continue-on-error so the workflow doesn't fail while the repo is private.
+        continue-on-error: true
         with:
           sarif_file: trivy-results.sarif
 

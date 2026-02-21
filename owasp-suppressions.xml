@@ -37,4 +37,26 @@
         <cve>CVE-2002-1178</cve>
     </suppress>
 
+
+    <!--
+        CVE-2025-55163 / CVE-2025-58056 / CVE-2025-58057 — Netty 4.1.x HTTP/2 CVEs.
+        These are 2025 CVEs with NO fix available in the Netty 4.1.x branch.
+        We force Netty to 4.1.121.Final (latest available), which is still affected.
+        A fix requires Netty 4.2.x or higher, which is a major version change that
+        Ktor 2.x does not support. Tracked for resolution via Ktor 3.x migration.
+        NVD status: awaiting analysis / no fix version published as of 2026-02.
+    -->
+    <suppress>
+        <notes>No fix in Netty 4.1.x — requires Netty 4.2.x (blocked by Ktor 2.x). Tracked for Ktor 3.x migration.</notes>
+        <cve>CVE-2025-55163</cve>
+    </suppress>
+    <suppress>
+        <notes>No fix in Netty 4.1.x — requires Netty 4.2.x (blocked by Ktor 2.x). Tracked for Ktor 3.x migration.</notes>
+        <cve>CVE-2025-58056</cve>
+    </suppress>
+    <suppress>
+        <notes>No fix in Netty 4.1.x — requires Netty 4.2.x (blocked by Ktor 2.x). Tracked for Ktor 3.x migration.</notes>
+        <cve>CVE-2025-58057</cve>
+    </suppress>
+
 </suppressions>
