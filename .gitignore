@@ -47,3 +47,8 @@ client.py
 reproduce_logic.py
 verify_*.py
 generate_llm_txt.py
+
+# Dev scratch / generated artefacts
+hexastore_debug.log
+database_analysis.md
+legal_logic.logiql
