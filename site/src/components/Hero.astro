@@ -39,12 +39,16 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       The logic engine at the foundation of every serious AI agent.
     </p>
 
+    <!-- Install Command — Full Width -->
+    <div class="w-full max-w-4xl mx-auto mb-8 animate-fade-in-up delay-300">
+      <div class="flex items-center gap-4 px-6 py-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm font-mono text-sm sm:text-base">
+        <span class="text-cyan-400 shrink-0">$</span>
+        <span class="text-slate-200 break-all">curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</span>
+      </div>
+    </div>
+
     <!-- CTAs -->
     <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 animate-fade-in-up delay-300">
-      <div class="flex items-center gap-4 px-6 py-4 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm">
-        <span class="font-mono text-cyan-400">$</span>
-        <span class="font-mono text-slate-200 text-sm">curl -fsSL nocturnus.ai/install | bash</span>
-      </div>
       <a href={`${base}/docs`} class="px-8 py-4 rounded-full bg-gradient-to-r from-cyan-600 to-purple-600 text-white font-bold hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] transition-all hover:-translate-y-1 transform">
         Start Building →
       </a>
