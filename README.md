@@ -6,6 +6,15 @@
 [![npm](https://img.shields.io/npm/v/nocturnusai-sdk?logo=npm&logoColor=white)](https://www.npmjs.com/package/nocturnusai-sdk)
 [![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-orange.svg)](LICENSE)
 
+> **IMPORTANT: LEGAL & SAFETY NOTICE**
+>
+> NocturnusAI is a deterministic reasoning engine, but **its output is only as reliable as the facts provided to it.**
+>
+> 1. **No Warranty of Truth.** "Verified" refers to *logical consistency* of inference, not *accuracy* of real-world claims. If you assert false facts, the engine will derive false but logically consistent conclusions.
+> 2. **Not for Autonomous High-Stakes Decisions.** Do not use this engine for unsupervised medical, financial, legal, or physical-safety decisions without an independent human-in-the-loop verification step.
+> 3. **Logic Layer Only.** NocturnusAI provides information and inference; it does not execute actions. Any agent layer that acts upon NocturnusAI output is a separate system for which the authors of NocturnusAI bear no responsibility.
+> 4. **No Liability.** Under no circumstances shall the authors or contributors be liable for damages arising from decisions made using engine output. See [DISCLAIMER.md](DISCLAIMER.md) and [LICENSE](LICENSE).
+
 **Verified knowledge for AI agents.** Store facts, define rules, and ask questions — get deterministic answers with proof, not LLM guesses.
 
 NocturnusAI is a logic server: an in-memory reasoning engine with a Hexastore, backward and forward chaining, a Truth Maintenance System, and salience-based agent memory. Connect agents via MCP, Python SDK, TypeScript SDK, or plain HTTP.
