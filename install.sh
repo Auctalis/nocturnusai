@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # NocturnusAI Installer
-# Works everywhere. Installs everything. You're welcome. 🦞
+# Works everywhere. Installs everything. You're welcome.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
@@ -16,14 +16,7 @@
 #   --port PORT Server port (default: 9300)
 #   --key KEY   LLM API key (Anthropic/OpenAI/Google — auto-detected)
 # ─────────────────────────────────────────────────────────────────────────────
-set -e
-
-VERSION="latest"
-INSTALL_DIR="./nocturnusai"
-PORT=9300
-USE_OLLAMA=false
-USE_MONITORING=false
-LLM_KEY=""
+set -eo pipefail
 
 # Colors
 GREEN='\033[0;32m'
@@ -33,6 +26,16 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
+
+# ── Error trap — never fail silently ────────────────────────────────────────
+trap 'echo ""; echo -e "${RED}${BOLD}Install failed at line $LINENO${NC}"; echo -e "${DIM}Run with:  bash -x <(curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh) to debug${NC}"; exit 1' ERR
+
+VERSION="latest"
+INSTALL_DIR="./nocturnusai"
+export PORT=9300
+USE_OLLAMA=false
+USE_MONITORING=false
+LLM_KEY=""
 
 # ── Gum (styled terminal UI) ─────────────────────────────────────────────────
 GUM=""
@@ -46,7 +49,7 @@ bootstrap_gum() {
     fi
 
     # Only try to install if we have a real terminal
-    [ -t 0 ] || return
+    [ -t 0 ] || return 0
 
     local os arch
     os="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -59,9 +62,11 @@ bootstrap_gum() {
     local url="https://github.com/charmbracelet/gum/releases/download/v${GUM_VERSION}/gum_${GUM_VERSION}_${os}_${arch}.tar.gz"
 
     if curl -fsSL "$url" -o "$tmp/gum.tar.gz" 2>/dev/null; then
-        tar -xzf "$tmp/gum.tar.gz" -C "$tmp" 2>/dev/null
-        GUM="$tmp/gum"
-        chmod +x "$GUM"
+        tar -xzf "$tmp/gum.tar.gz" -C "$tmp" 2>/dev/null || true
+        if [ -f "$tmp/gum" ]; then
+            GUM="$tmp/gum"
+            chmod +x "$GUM"
+        fi
     fi
     rm -rf "$tmp/gum.tar.gz" 2>/dev/null || true
 }
@@ -131,6 +136,7 @@ gum_spin() {
         "${cmd[@]}" &>/dev/null &
         local pid=$!
         while kill -0 "$pid" 2>/dev/null; do echo -n "."; sleep 1; done
+        wait "$pid" 2>/dev/null || true
         echo ""
     fi
 }
@@ -143,7 +149,9 @@ bootstrap_gum
 set_env_key() {
     local key="$1" value="$2" file="${3:-.env}"
     # Remove any existing line (commented or not) for this key
-    grep -v "^[#[:space:]]*${key}=" "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+    # || true prevents grep from returning exit 1 when all lines match
+    grep -v "^[#[:space:]]*${key}=" "$file" > "${file}.tmp" || true
+    mv "${file}.tmp" "$file"
     # Append new value using printf to avoid any interpretation of special chars
     printf '%s=%s\n' "$key" "$value" >> "$file"
 }
@@ -206,10 +214,7 @@ echo ""
 
 # ── Check prerequisites ─────────────────────────────────────────────────────
 check_cmd() {
-    if ! command -v "$1" &>/dev/null; then
-        return 1
-    fi
-    return 0
+    command -v "$1" &>/dev/null
 }
 
 HAS_DOCKER=false
@@ -235,7 +240,7 @@ if ! $HAS_COMPOSE && check_cmd podman-compose; then
 fi
 
 if ! $HAS_COMPOSE; then
-    echo -e "${RED}Docker (with compose) is required.${NC}"
+    echo -e "${RED}${BOLD}Docker (with compose) is required.${NC}"
     echo ""
     echo "Install Docker:"
     echo "  macOS:   brew install --cask docker"
@@ -246,29 +251,55 @@ fi
 
 echo -e "${GREEN}Found:${NC} $COMPOSE_CMD"
 
-# ── Create install directory ─────────────────────────────────────────────────
+# ── Download config or clone repo ────────────────────────────────────────────
+REPO_URL="https://github.com/Auctalis/nocturnusai.git"
+REPO_RAW="https://raw.githubusercontent.com/Auctalis/nocturnusai/main"
+NEED_BUILD=false
+
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 echo -e "${GREEN}Installing to:${NC} $(pwd)"
 
-# ── Download compose file and .env ───────────────────────────────────────────
-REPO_RAW="https://raw.githubusercontent.com/Auctalis/nocturnusai/main"
+# Try to pull the published image first (fast path — no source needed)
+echo -e "${DIM}Checking for published Docker image...${NC}"
+if docker pull ghcr.io/auctalis/nocturnusai:latest &>/dev/null; then
+    echo -e "${GREEN}Found published image${NC} — skipping build"
+    # Just need docker-compose.yml and .env
+    curl -fsSL "$REPO_RAW/docker-compose.yml" -o docker-compose.yml
+    curl -fsSL "$REPO_RAW/.env.example" -o .env.example
+else
+    # No published image — need to clone and build from source
+    echo -e "${YELLOW}No published image yet${NC} — building from source"
+    NEED_BUILD=true
 
-echo -e "${DIM}Downloading configuration...${NC}"
-
-# docker-compose.yml
-curl -fsSL "$REPO_RAW/docker-compose.yml" -o docker-compose.yml
-
-# monitoring config (if requested)
-if $USE_MONITORING; then
-    mkdir -p monitoring/prometheus monitoring/grafana/provisioning/datasources monitoring/grafana/dashboards
-    curl -fsSL "$REPO_RAW/monitoring/prometheus/prometheus.yml" -o monitoring/prometheus/prometheus.yml 2>/dev/null || true
-    curl -fsSL "$REPO_RAW/monitoring/grafana/provisioning/datasources/datasource.yml" -o monitoring/grafana/provisioning/datasources/datasource.yml 2>/dev/null || true
+    if [ -d ".git" ]; then
+        echo -e "${DIM}Updating existing source...${NC}"
+        git pull --ff-only 2>/dev/null || true
+    elif [ -f "Dockerfile" ]; then
+        echo -e "${DIM}Existing source found, reusing...${NC}"
+    else
+        echo -e "${DIM}Downloading NocturnusAI source...${NC}"
+        cd ..
+        rm -rf "$INSTALL_DIR"
+        if check_cmd git; then
+            git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
+        else
+            mkdir -p "$INSTALL_DIR"
+            curl -fsSL "https://github.com/Auctalis/nocturnusai/archive/refs/heads/main.tar.gz" \
+                | tar -xz --strip-components=1 -C "$INSTALL_DIR"
+        fi
+        cd "$INSTALL_DIR"
+    fi
 fi
 
-# .env.example → .env
-curl -fsSL "$REPO_RAW/.env.example" -o .env.example
-cp .env.example .env
+# ── Set up .env ──────────────────────────────────────────────────────────────
+if [ ! -f .env ]; then
+    if [ -f .env.example ]; then
+        cp .env.example .env
+    else
+        touch .env
+    fi
+fi
 
 # ── Configure .env ───────────────────────────────────────────────────────────
 # Validate port is a number before writing
@@ -335,9 +366,8 @@ else
     USE_OLLAMA=true
 fi
 
-# ── Launch ───────────────────────────────────────────────────────────────────
+# ── Build & Launch ────────────────────────────────────────────────────────────
 echo ""
-echo -e "${BOLD}Starting NocturnusAI...${NC}"
 
 PROFILE_FLAGS=""
 if $USE_OLLAMA; then
@@ -347,6 +377,14 @@ if $USE_MONITORING; then
     PROFILE_FLAGS="$PROFILE_FLAGS --profile monitoring"
 fi
 
+if $NEED_BUILD; then
+    echo -e "${BOLD}Building NocturnusAI Docker image from source...${NC}"
+    echo -e "${DIM}(first build takes 2-3 minutes — subsequent starts are instant)${NC}"
+    $COMPOSE_CMD build nocturnusai
+fi
+
+echo ""
+echo -e "${BOLD}Starting NocturnusAI...${NC}"
 $COMPOSE_CMD $PROFILE_FLAGS up -d
 
 # ── Wait for healthy ─────────────────────────────────────────────────────────
@@ -355,7 +393,7 @@ HEALTHY=false
 
 wait_for_health() {
     for i in $(seq 1 30); do
-        if curl -sf "http://localhost:$PORT/health" &>/dev/null; then
+        if curl -sf "http://localhost:${PORT}/health" &>/dev/null; then
             return 0
         fi
         sleep 2
@@ -364,15 +402,20 @@ wait_for_health() {
 }
 
 if [ -n "$GUM" ]; then
-    if "$GUM" spin --spinner dot --title "Waiting for server to be ready..." -- bash -c "$(declare -f wait_for_health); wait_for_health"; then
+    if "$GUM" spin --spinner dot --title "Waiting for server to be ready..." -- bash -c "PORT=$PORT; $(declare -f wait_for_health); wait_for_health"; then
         HEALTHY=true
     fi
 else
     echo -n "Waiting for server"
-    if wait_for_health; then
-        HEALTHY=true
-        echo ""
-    fi
+    for i in $(seq 1 30); do
+        if curl -sf "http://localhost:${PORT}/health" &>/dev/null; then
+            HEALTHY=true
+            break
+        fi
+        echo -n "."
+        sleep 2
+    done
+    echo ""
 fi
 
 if $HEALTHY; then
@@ -422,16 +465,12 @@ install_cli() {
 }
 
 echo ""
-if [ -n "$GUM" ]; then
-    if "$GUM" spin --spinner dot --title "Installing nocturnusai CLI..." -- bash -c "$(declare -f install_cli); install_cli"; then
-        CLI_INSTALLED=true
-    fi
+echo -n "Installing CLI..."
+if install_cli; then
+    CLI_INSTALLED=true
+    echo ""
 else
-    echo -n "Installing CLI"
-    if install_cli; then
-        CLI_INSTALLED=true
-        echo ""
-    fi
+    echo ""
 fi
 
 if $CLI_INSTALLED; then
@@ -455,7 +494,7 @@ fi
 # ── Success banner ───────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}${BOLD}  NocturnusAI is running! 🦞${NC}"
+echo -e "${GREEN}${BOLD}  NocturnusAI is running!${NC}"
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  ${BOLD}API${NC}        http://localhost:$PORT"

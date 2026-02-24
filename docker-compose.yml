@@ -15,7 +15,7 @@
 services:
   # ── NocturnusAI Logic Server ─────────────────────────────────────────────────
   nocturnusai:
-    image: nocturnusai:latest
+    image: ghcr.io/auctalis/nocturnusai:latest
     build:
       context: .
       dockerfile: Dockerfile
