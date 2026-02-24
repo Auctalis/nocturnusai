@@ -188,6 +188,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Inject version from git tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" sdks/python/pyproject.toml
+          echo "Set Python SDK version to ${VERSION}"
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
@@ -213,6 +219,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Inject version from git tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd sdks/typescript
+          npm version "${VERSION}" --no-git-tag-version --allow-same-version
+          echo "Set TypeScript SDK version to ${VERSION}"
 
       - name: Set up Node 20
         uses: actions/setup-node@v4
