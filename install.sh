@@ -218,38 +218,58 @@ check_cmd() {
 }
 
 HAS_DOCKER=false
+HAS_PODMAN=false
 HAS_COMPOSE=false
 COMPOSE_CMD=""
+CONTAINER_CMD=""   # docker or podman — used for pull/inspect
 
-if check_cmd docker; then
+# Detect container engines first
+if check_cmd docker && docker info &>/dev/null; then
     HAS_DOCKER=true
+    CONTAINER_CMD="docker"
+fi
+
+if check_cmd podman && podman info &>/dev/null; then
+    HAS_PODMAN=true
+    [ -z "$CONTAINER_CMD" ] && CONTAINER_CMD="podman"
+fi
+
+# Detect compose — prefer docker compose (V2 plugin), then docker-compose, then podman-compose
+if $HAS_DOCKER; then
     if docker compose version &>/dev/null 2>&1; then
         HAS_COMPOSE=true
         COMPOSE_CMD="docker compose"
+    elif check_cmd docker-compose; then
+        # docker-compose standalone requires a working Docker daemon
+        HAS_COMPOSE=true
+        COMPOSE_CMD="docker-compose"
     fi
 fi
 
-if ! $HAS_COMPOSE && check_cmd docker-compose; then
-    HAS_COMPOSE=true
-    COMPOSE_CMD="docker-compose"
-fi
-
-if ! $HAS_COMPOSE && check_cmd podman-compose; then
-    HAS_COMPOSE=true
-    COMPOSE_CMD="podman-compose"
+if ! $HAS_COMPOSE && $HAS_PODMAN; then
+    if check_cmd podman-compose; then
+        HAS_COMPOSE=true
+        COMPOSE_CMD="podman-compose"
+        CONTAINER_CMD="podman"
+    fi
 fi
 
 if ! $HAS_COMPOSE; then
-    echo -e "${RED}${BOLD}Docker (with compose) is required.${NC}"
+    echo -e "${RED}${BOLD}A container runtime with compose is required.${NC}"
     echo ""
     echo "Install Docker:"
     echo "  macOS:   brew install --cask docker"
     echo "  Ubuntu:  curl -fsSL https://get.docker.com | sh"
     echo "  Windows: https://docs.docker.com/desktop/install/windows-install/"
+    echo ""
+    echo "Or install Podman:"
+    echo "  macOS:   brew install podman podman-compose"
+    echo "  Ubuntu:  sudo apt install podman podman-compose"
+    echo "  Fedora:  sudo dnf install podman podman-compose"
     exit 1
 fi
 
-echo -e "${GREEN}Found:${NC} $COMPOSE_CMD"
+echo -e "${GREEN}Found:${NC} $COMPOSE_CMD ($CONTAINER_CMD)"
 
 # ── Download config or clone repo ────────────────────────────────────────────
 REPO_URL="https://github.com/Auctalis/nocturnusai.git"
@@ -261,8 +281,8 @@ cd "$INSTALL_DIR"
 echo -e "${GREEN}Installing to:${NC} $(pwd)"
 
 # Try to pull the published image first (fast path — no source needed)
-echo -e "${DIM}Checking for published Docker image...${NC}"
-if docker pull ghcr.io/auctalis/nocturnusai:latest &>/dev/null; then
+echo -e "${DIM}Checking for published container image...${NC}"
+if $CONTAINER_CMD pull ghcr.io/auctalis/nocturnusai:latest &>/dev/null; then
     echo -e "${GREEN}Found published image${NC} — skipping build"
     # Just need docker-compose.yml and .env
     curl -fsSL "$REPO_RAW/docker-compose.yml" -o docker-compose.yml
@@ -557,3 +577,158 @@ echo ""
 echo -e "  ${DIM}Config: $(pwd)/.env${NC}"
 echo -e "  ${DIM}Docs:   https://github.com/Auctalis/nocturnusai${NC}"
 echo ""
+
+# ── Post-install dialogue (interactive only) ─────────────────────────────────
+if [ -t 0 ]; then
+
+    # ── CLI retry if it failed ──────────────────────────────────────────────
+    if ! $CLI_INSTALLED; then
+        echo -e "${YELLOW}${BOLD}The CLI binary could not be installed automatically.${NC}"
+        echo -e "${DIM}This usually means there is no pre-built binary for your platform yet.${NC}"
+        echo ""
+
+        CLI_CHOICE=$(gum_choose \
+            --header "Would you like to try again?" \
+            "Skip — I'll use the HTTP API" \
+            "Retry with sudo" \
+            "Install to ~/.local/bin")
+
+        case "$CLI_CHOICE" in
+            *sudo*)
+                echo -e "${DIM}Retrying with sudo...${NC}"
+                if curl -fsSL "https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" -o /tmp/nocturnusai 2>/dev/null; then
+                    chmod +x /tmp/nocturnusai
+                    if /tmp/nocturnusai --help &>/dev/null; then
+                        sudo mv /tmp/nocturnusai /usr/local/bin/nocturnusai
+                        CLI_INSTALLED=true
+                        CLI_PATH="/usr/local/bin/nocturnusai"
+                        echo -e "${GREEN}CLI installed:${NC} $CLI_PATH"
+                    else
+                        rm -f /tmp/nocturnusai
+                        echo -e "${RED}Binary not compatible with this platform.${NC}"
+                    fi
+                else
+                    echo -e "${RED}Download failed — binary not available for this platform yet.${NC}"
+                fi
+                ;;
+            *local*)
+                echo -e "${DIM}Retrying to ~/.local/bin...${NC}"
+                mkdir -p "$HOME/.local/bin"
+                if curl -fsSL "https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" -o "$HOME/.local/bin/nocturnusai" 2>/dev/null; then
+                    chmod +x "$HOME/.local/bin/nocturnusai"
+                    if "$HOME/.local/bin/nocturnusai" --help &>/dev/null; then
+                        CLI_INSTALLED=true
+                        CLI_PATH="$HOME/.local/bin/nocturnusai"
+                        echo -e "${GREEN}CLI installed:${NC} $CLI_PATH"
+                        # Ensure ~/.local/bin is on PATH
+                        for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+                            if [ -f "$rc" ] && ! grep -q '\.local/bin' "$rc"; then
+                                echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
+                                echo -e "${DIM}  Added ~/.local/bin to PATH in $rc${NC}"
+                            fi
+                        done
+                        export PATH="$HOME/.local/bin:$PATH"
+                    else
+                        rm -f "$HOME/.local/bin/nocturnusai"
+                        echo -e "${RED}Binary not compatible with this platform.${NC}"
+                    fi
+                else
+                    echo -e "${RED}Download failed — binary not available for this platform yet.${NC}"
+                fi
+                ;;
+            *)
+                echo -e "${DIM}Skipped. You can install the CLI later from:${NC}"
+                echo -e "${DIM}  https://github.com/Auctalis/nocturnusai/releases${NC}"
+                ;;
+        esac
+        echo ""
+    fi
+
+    # ── LLM API key configuration ──────────────────────────────────────────
+    # Only offer if no key was set during initial setup and no Ollama
+    HAS_LLM_KEY=false
+    if [ -f .env ]; then
+        grep -qE '^(ANTHROPIC_API_KEY|OPENAI_API_KEY|GOOGLE_API_KEY|LLM_API_KEY)=' .env 2>/dev/null && HAS_LLM_KEY=true
+    fi
+
+    if ! $HAS_LLM_KEY && ! $USE_OLLAMA; then
+        echo -e "${BOLD}Configure an LLM provider?${NC}"
+        echo -e "${DIM}The core logic engine works without one, but an LLM enables natural language features.${NC}"
+        echo ""
+
+        KEY_CHOICE=$(gum_choose \
+            --header "Add an API key now?" \
+            "Skip — I'll configure later in .env" \
+            "Anthropic Claude  (sk-ant-...)" \
+            "OpenAI GPT        (sk-...)" \
+            "Google Gemini     (AIza...)")
+
+        case "$KEY_CHOICE" in
+            Anthropic*)
+                read -rp "Anthropic API key: " KEY
+                if [ -n "$KEY" ]; then
+                    set_env_key "ANTHROPIC_API_KEY" "$KEY"
+                    echo -e "${GREEN}Saved.${NC} Restart to apply: $COMPOSE_CMD $PROFILE_FLAGS restart"
+                fi
+                ;;
+            OpenAI*)
+                read -rp "OpenAI API key: " KEY
+                if [ -n "$KEY" ]; then
+                    set_env_key "OPENAI_API_KEY" "$KEY"
+                    echo -e "${GREEN}Saved.${NC} Restart to apply: $COMPOSE_CMD $PROFILE_FLAGS restart"
+                fi
+                ;;
+            Google*)
+                read -rp "Google API key: " KEY
+                if [ -n "$KEY" ]; then
+                    set_env_key "GOOGLE_API_KEY" "$KEY"
+                    echo -e "${GREEN}Saved.${NC} Restart to apply: $COMPOSE_CMD $PROFILE_FLAGS restart"
+                fi
+                ;;
+            *)
+                echo -e "${DIM}Skipped. Edit $(pwd)/.env to add a key later.${NC}"
+                ;;
+        esac
+        echo ""
+    fi
+
+    # ── NocturnusAI API key (server auth) ───────────────────────────────────
+    HAS_AUTH_KEY=false
+    if [ -f .env ]; then
+        grep -qE '^API_KEY=' .env 2>/dev/null && HAS_AUTH_KEY=true
+    fi
+
+    if ! $HAS_AUTH_KEY; then
+        echo -e "${BOLD}Secure your server?${NC}"
+        echo -e "${DIM}Set an API key to require authentication on all requests.${NC}"
+        echo ""
+
+        AUTH_CHOICE=$(gum_choose \
+            --header "Set a NocturnusAI API key?" \
+            "Skip — leave open (localhost only)" \
+            "Generate a random key" \
+            "Enter my own key")
+
+        case "$AUTH_CHOICE" in
+            *random*)
+                GEN_KEY="nai-$(openssl rand -hex 20 2>/dev/null || head -c 40 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+                set_env_key "API_KEY" "$GEN_KEY"
+                echo -e "${GREEN}API key set:${NC} $GEN_KEY"
+                echo -e "${DIM}Use header:  X-API-Key: $GEN_KEY${NC}"
+                echo -e "${GREEN}Restart to apply:${NC} $COMPOSE_CMD $PROFILE_FLAGS restart"
+                ;;
+            *own*)
+                read -rp "API key: " AUTH_KEY
+                if [ -n "$AUTH_KEY" ]; then
+                    set_env_key "API_KEY" "$AUTH_KEY"
+                    echo -e "${GREEN}Saved.${NC} Restart to apply: $COMPOSE_CMD $PROFILE_FLAGS restart"
+                fi
+                ;;
+            *)
+                echo -e "${DIM}Skipped. The server is open — fine for localhost development.${NC}"
+                ;;
+        esac
+        echo ""
+    fi
+
+fi
