@@ -255,16 +255,14 @@ jobs:
   # ── GitHub Release with CLI binaries + auto-generated notes ─────────────────
   github-release:
     name: GitHub Release
-    needs: [docker, python-sdk, typescript-sdk, cli-native]
+    needs: [docker, python-sdk, typescript-sdk]
     # Proceed as long as Docker and SDK publishes succeeded.
-    # CLI binaries use fail-fast:false + continue-on-error per platform, so
-    # cli-native only fails if ALL platforms failed (which would be unusual).
+    # CLI binaries are downloaded best-effort — missing platforms are OK.
     if: |
       always() &&
       needs.docker.result == 'success' &&
       needs.python-sdk.result == 'success' &&
-      needs.typescript-sdk.result == 'success' &&
-      (needs.cli-native.result == 'success' || needs.cli-native.result == 'failure')
+      needs.typescript-sdk.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
