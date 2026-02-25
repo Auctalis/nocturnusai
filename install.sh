@@ -284,9 +284,35 @@ echo -e "${GREEN}Installing to:${NC} $(pwd)"
 echo -e "${DIM}Checking for published container image...${NC}"
 if $CONTAINER_CMD pull ghcr.io/auctalis/nocturnusai:latest &>/dev/null; then
     echo -e "${GREEN}Found published image${NC} — skipping build"
-    # Just need docker-compose.yml and .env
-    curl -fsSL "$REPO_RAW/docker-compose.yml" -o docker-compose.yml
-    curl -fsSL "$REPO_RAW/.env.example" -o .env.example
+    # Generate a minimal compose file — avoids podman-compose incompatibilities
+    # with profiles, optional depends_on, and eager env var evaluation
+    cat > docker-compose.yml <<'COMPOSEFILE'
+services:
+  nocturnusai:
+    image: ghcr.io/auctalis/nocturnusai:latest
+    container_name: nocturnusai
+    restart: unless-stopped
+    ports:
+      - "${PORT:-9300}:${PORT:-9300}"
+    volumes:
+      - nocturnusai-data:/data
+    environment:
+      - PORT=${PORT:-9300}
+      - HOST=0.0.0.0
+      - STORAGE_DIR=/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  nocturnusai-data:
+    driver: local
+COMPOSEFILE
+    # Grab .env.example for reference
+    curl -fsSL "$REPO_RAW/.env.example" -o .env.example 2>/dev/null || true
 else
     # No published image — need to clone and build from source
     echo -e "${YELLOW}No published image yet${NC} — building from source"
