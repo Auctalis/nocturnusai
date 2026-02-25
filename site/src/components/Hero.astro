@@ -40,11 +40,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     </p>
 
     <!-- Install Command — Full Width -->
-    <div class="w-full mx-auto mb-8 animate-fade-in-up delay-300">
+    <div class="w-full mx-auto mb-2 animate-fade-in-up delay-300">
       <div class="flex items-center gap-4 px-6 py-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm font-mono text-sm md:text-base whitespace-nowrap overflow-x-auto">
         <span class="text-cyan-400 shrink-0">$</span>
         <span class="text-slate-200">curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</span>
       </div>
+      <p class="text-xs text-slate-500 text-center mt-2">Requires <a href="https://docs.docker.com/get-docker/" class="text-slate-400 underline underline-offset-2 hover:text-white transition-colors">Docker</a> with Compose V2 installed. The installer builds and runs the server via Docker Compose.</p>
     </div>
 
     <!-- CTAs -->
