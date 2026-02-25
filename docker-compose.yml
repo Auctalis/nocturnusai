@@ -42,10 +42,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    depends_on:
-      ollama:
-        condition: service_started
-        required: false
 
   # ── Ollama (local LLM — opt-in via profile) ───────────────────────────────
   # Activated with:  docker compose --profile ollama up -d
