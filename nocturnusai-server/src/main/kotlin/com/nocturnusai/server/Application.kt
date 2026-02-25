@@ -247,6 +247,17 @@ fun Application.module() {
     }
     AuthInterceptor.install(this, keyManager)
 
+    // ── Legal & safety notice ─────────────────────────────────────────────
+    environment.log.info("──────────────────────────────────────────────────────────────────")
+    environment.log.info("NocturnusAI — Logic Server for Agentic AI")
+    environment.log.info("Licensed under BSL 1.1 — (c) 2026 Auctalis LLC")
+    environment.log.info("")
+    environment.log.info("NOTICE: Engine output reflects logical consistency of inference,")
+    environment.log.info("not real-world accuracy. Do not use for autonomous high-stakes")
+    environment.log.info("decisions without human-in-the-loop verification.")
+    environment.log.info("See DISCLAIMER.md — provided AS-IS, no warranty.")
+    environment.log.info("──────────────────────────────────────────────────────────────────")
+
     // ── Production readiness warnings ────────────────────────────────────
     if (!ServerConfig.tlsEnabled && ServerConfig.host != "127.0.0.1" && ServerConfig.host != "localhost") {
         environment.log.warn("⚠️  TLS is disabled and server is bound to ${ServerConfig.host}. " +
