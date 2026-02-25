@@ -544,23 +544,29 @@ echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━�
 echo -e "${GREEN}${BOLD}  NocturnusAI is running!${NC}"
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "  ${BOLD}API${NC}        http://localhost:$PORT"
-echo -e "  ${BOLD}Health${NC}     http://localhost:$PORT/health"
-echo -e "  ${BOLD}API Docs${NC}   http://localhost:$PORT/llm.txt"
-echo -e "  ${BOLD}MCP${NC}        http://localhost:$PORT/mcp"
-echo -e "  ${BOLD}Agent Card${NC} http://localhost:$PORT/.well-known/agent.json"
+echo -e "  ${BOLD}Endpoints${NC}"
+echo -e "    API          http://localhost:$PORT"
+echo -e "    Health       http://localhost:$PORT/health"
+echo -e "    API Docs     http://localhost:$PORT/llm.txt"
+echo -e "    MCP          http://localhost:$PORT/mcp"
+echo -e "    Agent Card   http://localhost:$PORT/.well-known/agent.json"
 if $USE_OLLAMA; then
-echo -e "  ${BOLD}Ollama${NC}     http://localhost:11434"
+echo -e "    Ollama       http://localhost:11434"
 fi
 if $USE_MONITORING; then
-echo -e "  ${BOLD}Grafana${NC}    http://localhost:3000  (admin / nocturnusai)"
-echo -e "  ${BOLD}Prometheus${NC} http://localhost:9090"
+echo -e "    Grafana      http://localhost:3000  (admin / nocturnusai)"
+echo -e "    Prometheus   http://localhost:9090"
 fi
 echo ""
-echo -e "  ${BOLD}Try it:${NC}"
+echo -e "  ${BOLD}Connection defaults${NC}  ${DIM}(use these headers with every request)${NC}"
+echo -e "    X-Tenant-ID: ${CYAN}default${NC}"
+echo -e "    X-Database:  ${CYAN}default${NC}  ${DIM}(optional — this is the default)${NC}"
+echo -e "    Auth:        ${CYAN}none${NC}     ${DIM}(open for localhost dev — configure in .env)${NC}"
+echo ""
+echo -e "  ${BOLD}Try it — logic engine:${NC}"
 echo ""
 if $CLI_INSTALLED; then
-echo -e "    ${CYAN}# Interactive REPL (recommended)${NC}"
+echo -e "    ${CYAN}# Interactive REPL${NC}"
 echo "    nocturnusai"
 echo ""
 echo -e "    ${CYAN}# One-liners${NC}"
@@ -568,26 +574,40 @@ echo "    nocturnusai -e \"tell human(socrates)\""
 echo "    nocturnusai -e \"teach mortal(?x) :- human(?x)\""
 echo "    nocturnusai -e \"ask mortal(?who)\""
 else
-echo -e "    ${CYAN}# Store a fact${NC}"
+echo -e "    ${CYAN}# 1. Store a fact${NC}"
 echo "    curl -s http://localhost:$PORT/tell \\"
 echo "      -H 'Content-Type: application/json' \\"
 echo "      -H 'X-Tenant-ID: default' \\"
 echo "      -d '{\"predicate\":\"human\",\"args\":[\"socrates\"]}'"
 echo ""
-echo -e "    ${CYAN}# Teach a rule${NC}"
+echo -e "    ${CYAN}# 2. Teach a rule${NC}"
 echo "    curl -s http://localhost:$PORT/teach \\"
 echo "      -H 'Content-Type: application/json' \\"
 echo "      -H 'X-Tenant-ID: default' \\"
 echo "      -d '{\"head\":{\"predicate\":\"mortal\",\"args\":[\"?x\"]},\"body\":[{\"predicate\":\"human\",\"args\":[\"?x\"]}]}'"
 echo ""
-echo -e "    ${CYAN}# Ask a question${NC}"
+echo -e "    ${CYAN}# 3. Ask a question (backward chaining inference)${NC}"
 echo "    curl -s http://localhost:$PORT/ask \\"
 echo "      -H 'Content-Type: application/json' \\"
 echo "      -H 'X-Tenant-ID: default' \\"
 echo "      -d '{\"predicate\":\"mortal\",\"args\":[\"?who\"]}'"
 fi
 echo ""
-echo -e "  ${BOLD}Manage:${NC}"
+echo -e "  ${BOLD}Try it — LLM-powered${NC}  ${DIM}(requires API key in .env)${NC}"
+echo ""
+echo -e "    ${CYAN}# Extract facts from natural language${NC}"
+echo "    curl -s http://localhost:$PORT/extract \\"
+echo "      -H 'Content-Type: application/json' \\"
+echo "      -H 'X-Tenant-ID: default' \\"
+echo "      -d '{\"text\":\"Socrates is a human. All humans are mortal.\",\"assert\":true}'"
+echo ""
+echo -e "    ${CYAN}# Ask a question in plain English${NC}"
+echo "    curl -s http://localhost:$PORT/synthesize \\"
+echo "      -H 'Content-Type: application/json' \\"
+echo "      -H 'X-Tenant-ID: default' \\"
+echo "      -d '{\"question\":\"Is Socrates mortal?\"}'"
+echo ""
+echo -e "  ${BOLD}Manage${NC}"
 echo -e "    cd $(pwd)"
 echo -e "    $COMPOSE_CMD logs -f nocturnusai   ${DIM}# tail logs${NC}"
 echo -e "    $COMPOSE_CMD $PROFILE_FLAGS down  ${DIM}# stop${NC}"
@@ -617,47 +637,31 @@ if [ -t 0 ]; then
         echo -e "${DIM}This usually means there is no pre-built binary for your platform yet.${NC}"
         echo ""
 
-        # Build the correct binary URL (same logic as install_cli)
-        _cli_os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-        [[ "$_cli_os" == "darwin" ]] && _cli_os="macos"
-        _cli_arch="$(uname -m)"
-        [[ "$_cli_arch" == "aarch64" ]] && _cli_arch="arm64"
-        _cli_url="https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-${_cli_os}-${_cli_arch}"
-
         CLI_CHOICE=$(gum_choose \
-            --header "Would you like to try again?" \
-            "Skip — I'll use the HTTP API" \
-            "Retry with sudo" \
-            "Install to ~/.local/bin")
+            --header "Try installing the CLI again?" \
+            "Yes" \
+            "No")
 
-        case "$CLI_CHOICE" in
-            *sudo*)
-                echo -e "${DIM}Retrying with sudo...${NC}"
-                if curl -fsSL "$_cli_url" -o /tmp/nocturnusai 2>/dev/null; then
-                    chmod +x /tmp/nocturnusai
-                    if /tmp/nocturnusai --help &>/dev/null; then
-                        sudo mv /tmp/nocturnusai /usr/local/bin/nocturnusai
+        if [[ "$CLI_CHOICE" == "Yes" ]]; then
+            _cli_os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+            [[ "$_cli_os" == "darwin" ]] && _cli_os="macos"
+            _cli_arch="$(uname -m)"
+            [[ "$_cli_arch" == "aarch64" ]] && _cli_arch="arm64"
+            _cli_url="https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-${_cli_os}-${_cli_arch}"
+
+            echo -e "${DIM}Downloading CLI...${NC}"
+            if curl -fsSL "$_cli_url" -o /tmp/nocturnusai 2>/dev/null; then
+                chmod +x /tmp/nocturnusai
+                if /tmp/nocturnusai --help &>/dev/null; then
+                    # Try /usr/local/bin first, fall back to ~/.local/bin
+                    if sudo mv /tmp/nocturnusai /usr/local/bin/nocturnusai 2>/dev/null; then
                         CLI_INSTALLED=true
                         CLI_PATH="/usr/local/bin/nocturnusai"
-                        echo -e "${GREEN}CLI installed:${NC} $CLI_PATH"
                     else
-                        rm -f /tmp/nocturnusai
-                        echo -e "${RED}Binary not compatible with this platform.${NC}"
-                    fi
-                else
-                    echo -e "${RED}Download failed — binary not available for this platform yet.${NC}"
-                fi
-                ;;
-            *local*)
-                echo -e "${DIM}Retrying to ~/.local/bin...${NC}"
-                mkdir -p "$HOME/.local/bin"
-                if curl -fsSL "$_cli_url" -o "$HOME/.local/bin/nocturnusai" 2>/dev/null; then
-                    chmod +x "$HOME/.local/bin/nocturnusai"
-                    if "$HOME/.local/bin/nocturnusai" --help &>/dev/null; then
+                        mkdir -p "$HOME/.local/bin"
+                        mv /tmp/nocturnusai "$HOME/.local/bin/nocturnusai"
                         CLI_INSTALLED=true
                         CLI_PATH="$HOME/.local/bin/nocturnusai"
-                        echo -e "${GREEN}CLI installed:${NC} $CLI_PATH"
-                        # Ensure ~/.local/bin is on PATH
                         for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
                             if [ -f "$rc" ] && ! grep -q '\.local/bin' "$rc"; then
                                 echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
@@ -665,19 +669,19 @@ if [ -t 0 ]; then
                             fi
                         done
                         export PATH="$HOME/.local/bin:$PATH"
-                    else
-                        rm -f "$HOME/.local/bin/nocturnusai"
-                        echo -e "${RED}Binary not compatible with this platform.${NC}"
                     fi
+                    echo -e "${GREEN}CLI installed:${NC} $CLI_PATH"
                 else
-                    echo -e "${RED}Download failed — binary not available for this platform yet.${NC}"
+                    rm -f /tmp/nocturnusai
+                    echo -e "${RED}Binary not compatible with this platform.${NC}"
                 fi
-                ;;
-            *)
-                echo -e "${DIM}Skipped. You can install the CLI later from:${NC}"
-                echo -e "${DIM}  https://github.com/Auctalis/nocturnusai/releases${NC}"
-                ;;
-        esac
+            else
+                echo -e "${RED}Download failed — binary not available for this platform yet.${NC}"
+            fi
+        else
+            echo -e "${DIM}Skipped. You can install the CLI later from:${NC}"
+            echo -e "${DIM}  https://github.com/Auctalis/nocturnusai/releases${NC}"
+        fi
         echo ""
     fi
 
