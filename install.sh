@@ -284,33 +284,6 @@ echo -e "${GREEN}Installing to:${NC} $(pwd)"
 echo -e "${DIM}Checking for published container image...${NC}"
 if $CONTAINER_CMD pull ghcr.io/auctalis/nocturnusai:latest &>/dev/null; then
     echo -e "${GREEN}Found published image${NC} — skipping build"
-    # Generate a minimal compose file — avoids podman-compose incompatibilities
-    # with profiles, optional depends_on, and eager env var evaluation
-    cat > docker-compose.yml <<'COMPOSEFILE'
-services:
-  nocturnusai:
-    image: ghcr.io/auctalis/nocturnusai:latest
-    container_name: nocturnusai
-    restart: unless-stopped
-    ports:
-      - "${PORT:-9300}:${PORT:-9300}"
-    volumes:
-      - nocturnusai-data:/data
-    environment:
-      - PORT=${PORT:-9300}
-      - HOST=0.0.0.0
-      - STORAGE_DIR=/data
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-volumes:
-  nocturnusai-data:
-    driver: local
-COMPOSEFILE
     # Grab .env.example for reference
     curl -fsSL "$REPO_RAW/.env.example" -o .env.example 2>/dev/null || true
 else
@@ -373,6 +346,8 @@ if [ -n "$LLM_KEY" ]; then
     fi
     USE_OLLAMA=false  # cloud provider, no need for Ollama
 elif $USE_OLLAMA; then
+    set_env_key "LLM_PROVIDER" "ollama"
+    set_env_key "LLM_MODEL" "llama3.2"
     echo -e "${GREEN}Using:${NC} Ollama (local LLM — no API key needed)"
 elif [ -t 0 ]; then
     # Interactive terminal — wizard
@@ -388,6 +363,8 @@ elif [ -t 0 ]; then
     case "$CHOICE" in
         Ollama*)
             USE_OLLAMA=true
+            set_env_key "LLM_PROVIDER" "ollama"
+            set_env_key "LLM_MODEL" "llama3.2"
             echo -e "${GREEN}Using Ollama.${NC} Model will download on first start (~2GB)."
             ;;
         Anthropic*)
@@ -412,15 +389,155 @@ else
     echo -e "${DIM}  Add --ollama for a local LLM, or --key <api-key> for a cloud provider${NC}"
 fi
 
+# ── Server authentication ─────────────────────────────────────────────────────
+AUTH_CONFIGURED=false
+if [ -f .env ] && grep -qE '^API_KEY=' .env 2>/dev/null; then
+    AUTH_CONFIGURED=true
+fi
+
+if [ -t 0 ] && ! $AUTH_CONFIGURED; then
+    echo ""
+    echo -e "${BOLD}Secure your server?${NC}"
+    echo -e "${DIM}Set an API key to require authentication on all requests.${NC}"
+    echo ""
+
+    AUTH_CHOICE=$(gum_choose \
+        --header "Set a NocturnusAI API key?" \
+        "Skip — leave open (localhost only)" \
+        "Generate a random key" \
+        "Enter my own key")
+
+    case "$AUTH_CHOICE" in
+        *random*)
+            GEN_KEY="nai-$(openssl rand -hex 20 2>/dev/null || head -c 40 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+            set_env_key "API_KEY" "$GEN_KEY"
+            AUTH_CONFIGURED=true
+            echo -e "${GREEN}API key set:${NC} $GEN_KEY"
+            echo -e "${DIM}Use header:  X-API-Key: $GEN_KEY${NC}"
+            ;;
+        *own*)
+            read -rp "API key: " AUTH_KEY
+            if [ -n "$AUTH_KEY" ]; then
+                set_env_key "API_KEY" "$AUTH_KEY"
+                AUTH_CONFIGURED=true
+                echo -e "${GREEN}Saved.${NC}"
+            fi
+            ;;
+        *)
+            echo -e "${DIM}Skipped. The server is open — fine for localhost development.${NC}"
+            ;;
+    esac
+fi
+
+# ── Detect configured LLM for banner ──────────────────────────────────────────
+LLM_CONFIGURED=false
+LLM_PROVIDER_LABEL="none"
+if [ -f .env ]; then
+    if grep -qE '^ANTHROPIC_API_KEY=' .env 2>/dev/null; then
+        LLM_CONFIGURED=true; LLM_PROVIDER_LABEL="Anthropic Claude"
+    elif grep -qE '^OPENAI_API_KEY=' .env 2>/dev/null; then
+        LLM_CONFIGURED=true; LLM_PROVIDER_LABEL="OpenAI GPT"
+    elif grep -qE '^GOOGLE_API_KEY=' .env 2>/dev/null; then
+        LLM_CONFIGURED=true; LLM_PROVIDER_LABEL="Google Gemini"
+    elif grep -qE '^LLM_API_KEY=' .env 2>/dev/null; then
+        LLM_CONFIGURED=true; LLM_PROVIDER_LABEL="Custom LLM"
+    fi
+fi
+if $USE_OLLAMA; then
+    LLM_CONFIGURED=true; LLM_PROVIDER_LABEL="Ollama (local)"
+fi
+
+# ── Generate compose file (fast path only) ────────────────────────────────────
+# Generated AFTER config so Ollama choice and env vars are reflected.
+# Uses env_file to pass all .env vars (LLM keys, auth, etc.) to the container.
+if ! $NEED_BUILD; then
+    if $USE_OLLAMA; then
+        cat > docker-compose.yml <<'COMPOSEFILE'
+services:
+  nocturnusai:
+    image: ghcr.io/auctalis/nocturnusai:latest
+    container_name: nocturnusai
+    restart: unless-stopped
+    ports:
+      - "${PORT:-9300}:${PORT:-9300}"
+    volumes:
+      - nocturnusai-data:/data
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - STORAGE_DIR=/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nocturnusai-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+volumes:
+  nocturnusai-data:
+    driver: local
+  ollama-models:
+    driver: local
+COMPOSEFILE
+    else
+        cat > docker-compose.yml <<'COMPOSEFILE'
+services:
+  nocturnusai:
+    image: ghcr.io/auctalis/nocturnusai:latest
+    container_name: nocturnusai
+    restart: unless-stopped
+    ports:
+      - "${PORT:-9300}:${PORT:-9300}"
+    volumes:
+      - nocturnusai-data:/data
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - STORAGE_DIR=/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  nocturnusai-data:
+    driver: local
+COMPOSEFILE
+    fi
+fi
+
 # ── Build & Launch ────────────────────────────────────────────────────────────
 echo ""
 
+# Profile flags only apply to the full compose (build path) — minimal compose
+# includes services directly without profiles.
 PROFILE_FLAGS=""
-if $USE_OLLAMA; then
-    PROFILE_FLAGS="--profile ollama"
-fi
-if $USE_MONITORING; then
-    PROFILE_FLAGS="$PROFILE_FLAGS --profile monitoring"
+if $NEED_BUILD; then
+    if $USE_OLLAMA; then
+        PROFILE_FLAGS="--profile ollama"
+    fi
+    if $USE_MONITORING; then
+        PROFILE_FLAGS="$PROFILE_FLAGS --profile monitoring"
+    fi
 fi
 
 if $NEED_BUILD; then
@@ -469,6 +586,21 @@ if $HEALTHY; then
 else
     echo ""
     echo -e "${YELLOW}Server still starting — check logs:${NC} $COMPOSE_CMD logs -f nocturnusai"
+fi
+
+# ── Pull Ollama model (background) ───────────────────────────────────────────
+if $USE_OLLAMA && $HEALTHY; then
+    OLLAMA_READY=false
+    for i in $(seq 1 15); do
+        if curl -sf http://localhost:11434/api/tags &>/dev/null; then
+            OLLAMA_READY=true; break
+        fi
+        sleep 2
+    done
+    if $OLLAMA_READY; then
+        echo -e "${DIM}Pulling Ollama model (llama3.2)... this runs in the background.${NC}"
+        curl -sf http://localhost:11434/api/pull -d '{"name":"llama3.2"}' > /dev/null 2>&1 &
+    fi
 fi
 
 # ── Install CLI binary ────────────────────────────────────────────────────────
@@ -544,32 +676,41 @@ echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━�
 echo -e "${GREEN}${BOLD}  NocturnusAI is running!${NC}"
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "  ${BOLD}Endpoints${NC}"
-echo -e "    API          http://localhost:$PORT"
-echo -e "    Health       http://localhost:$PORT/health"
-echo -e "    API Docs     http://localhost:$PORT/llm.txt"
-echo -e "    MCP          http://localhost:$PORT/mcp"
-echo -e "    Agent Card   http://localhost:$PORT/.well-known/agent.json"
+
+# ── Status summary ──
+echo -e "  ${BOLD}Server${NC}       http://localhost:$PORT"
+if $LLM_CONFIGURED; then
+echo -e "  ${BOLD}LLM${NC}          ${GREEN}$LLM_PROVIDER_LABEL${NC}"
+else
+echo -e "  ${BOLD}LLM${NC}          ${DIM}none — add a key to .env and restart${NC}"
+fi
+if $AUTH_CONFIGURED; then
+echo -e "  ${BOLD}Auth${NC}         ${GREEN}API key required${NC}  ${DIM}(X-API-Key header)${NC}"
+else
+echo -e "  ${BOLD}Auth${NC}         ${DIM}open (localhost dev)${NC}"
+fi
+if $CLI_INSTALLED; then
+echo -e "  ${BOLD}CLI${NC}          ${GREEN}$CLI_PATH${NC}"
+else
+echo -e "  ${BOLD}CLI${NC}          ${DIM}not installed — use curl examples below${NC}"
+fi
 if $USE_OLLAMA; then
-echo -e "    Ollama       http://localhost:11434"
+echo -e "  ${BOLD}Ollama${NC}       http://localhost:11434"
 fi
 if $USE_MONITORING; then
-echo -e "    Grafana      http://localhost:3000  (admin / nocturnusai)"
-echo -e "    Prometheus   http://localhost:9090"
+echo -e "  ${BOLD}Grafana${NC}      http://localhost:3000  ${DIM}(admin / nocturnusai)${NC}"
+echo -e "  ${BOLD}Prometheus${NC}   http://localhost:9090"
 fi
 echo ""
-echo -e "  ${BOLD}Connection defaults${NC}  ${DIM}(use these headers with every request)${NC}"
-echo -e "    X-Tenant-ID: ${CYAN}default${NC}"
-echo -e "    X-Database:  ${CYAN}default${NC}  ${DIM}(optional — this is the default)${NC}"
-echo -e "    Auth:        ${CYAN}none${NC}     ${DIM}(open for localhost dev — configure in .env)${NC}"
-echo ""
-echo -e "  ${BOLD}Try it — logic engine:${NC}"
+
+# ── Quick start ──
+echo -e "  ${BOLD}Quick start${NC}"
 echo ""
 if $CLI_INSTALLED; then
-echo -e "    ${CYAN}# Interactive REPL${NC}"
+echo -e "    ${CYAN}# Start the REPL — just type and go${NC}"
 echo "    nocturnusai"
 echo ""
-echo -e "    ${CYAN}# One-liners${NC}"
+echo -e "    ${CYAN}# Or use one-liners${NC}"
 echo "    nocturnusai -e \"tell human(socrates)\""
 echo "    nocturnusai -e \"teach mortal(?x) :- human(?x)\""
 echo "    nocturnusai -e \"ask mortal(?who)\""
@@ -593,7 +734,13 @@ echo "      -H 'X-Tenant-ID: default' \\"
 echo "      -d '{\"predicate\":\"mortal\",\"args\":[\"?who\"]}'"
 fi
 echo ""
-echo -e "  ${BOLD}Try it — LLM-powered${NC}  ${DIM}(requires API key in .env)${NC}"
+
+# ── LLM-powered examples ──
+if $LLM_CONFIGURED; then
+echo -e "  ${BOLD}LLM-powered${NC}  ${GREEN}ready to use${NC}"
+else
+echo -e "  ${BOLD}LLM-powered${NC}  ${DIM}(add API key to .env, restart, then try these)${NC}"
+fi
 echo ""
 echo -e "    ${CYAN}# Extract facts from natural language${NC}"
 echo "    curl -s http://localhost:$PORT/extract \\"
@@ -607,6 +754,16 @@ echo "      -H 'Content-Type: application/json' \\"
 echo "      -H 'X-Tenant-ID: default' \\"
 echo "      -d '{\"question\":\"Is Socrates mortal?\"}'"
 echo ""
+
+# ── Other endpoints ──
+echo -e "  ${BOLD}Endpoints${NC}"
+echo -e "    Health       http://localhost:$PORT/health"
+echo -e "    API Docs     http://localhost:$PORT/llm.txt"
+echo -e "    MCP          http://localhost:$PORT/mcp"
+echo -e "    Agent Card   http://localhost:$PORT/.well-known/agent.json"
+echo ""
+
+# ── Manage ──
 echo -e "  ${BOLD}Manage${NC}"
 echo -e "    cd $(pwd)"
 echo -e "    $COMPOSE_CMD logs -f nocturnusai   ${DIM}# tail logs${NC}"
@@ -628,148 +785,56 @@ echo -e "  ${DIM}Config: $(pwd)/.env${NC}"
 echo -e "  ${DIM}Docs:   https://github.com/Auctalis/nocturnusai${NC}"
 echo ""
 
-# ── Post-install dialogue (interactive only) ─────────────────────────────────
-if [ -t 0 ]; then
+# ── Post-install: CLI retry (interactive only) ────────────────────────────────
+if [ -t 0 ] && ! $CLI_INSTALLED; then
+    echo -e "${YELLOW}${BOLD}The CLI binary could not be installed automatically.${NC}"
+    echo -e "${DIM}This usually means there is no pre-built binary for your platform yet.${NC}"
+    echo ""
 
-    # ── CLI retry if it failed ──────────────────────────────────────────────
-    if ! $CLI_INSTALLED; then
-        echo -e "${YELLOW}${BOLD}The CLI binary could not be installed automatically.${NC}"
-        echo -e "${DIM}This usually means there is no pre-built binary for your platform yet.${NC}"
-        echo ""
+    CLI_CHOICE=$(gum_choose \
+        --header "Try installing the CLI again?" \
+        "Yes" \
+        "No")
 
-        CLI_CHOICE=$(gum_choose \
-            --header "Try installing the CLI again?" \
-            "Yes" \
-            "No")
+    if [[ "$CLI_CHOICE" == "Yes" ]]; then
+        _cli_os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        [[ "$_cli_os" == "darwin" ]] && _cli_os="macos"
+        _cli_arch="$(uname -m)"
+        [[ "$_cli_arch" == "aarch64" ]] && _cli_arch="arm64"
+        _cli_url="https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-${_cli_os}-${_cli_arch}"
 
-        if [[ "$CLI_CHOICE" == "Yes" ]]; then
-            _cli_os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-            [[ "$_cli_os" == "darwin" ]] && _cli_os="macos"
-            _cli_arch="$(uname -m)"
-            [[ "$_cli_arch" == "aarch64" ]] && _cli_arch="arm64"
-            _cli_url="https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-${_cli_os}-${_cli_arch}"
-
-            echo -e "${DIM}Downloading CLI...${NC}"
-            if curl -fsSL "$_cli_url" -o /tmp/nocturnusai 2>/dev/null; then
-                chmod +x /tmp/nocturnusai
-                if /tmp/nocturnusai --help &>/dev/null; then
-                    # Try /usr/local/bin first, fall back to ~/.local/bin
-                    if sudo mv /tmp/nocturnusai /usr/local/bin/nocturnusai 2>/dev/null; then
-                        CLI_INSTALLED=true
-                        CLI_PATH="/usr/local/bin/nocturnusai"
-                    else
-                        mkdir -p "$HOME/.local/bin"
-                        mv /tmp/nocturnusai "$HOME/.local/bin/nocturnusai"
-                        CLI_INSTALLED=true
-                        CLI_PATH="$HOME/.local/bin/nocturnusai"
-                        for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
-                            if [ -f "$rc" ] && ! grep -q '\.local/bin' "$rc"; then
-                                echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
-                                echo -e "${DIM}  Added ~/.local/bin to PATH in $rc${NC}"
-                            fi
-                        done
-                        export PATH="$HOME/.local/bin:$PATH"
-                    fi
-                    echo -e "${GREEN}CLI installed:${NC} $CLI_PATH"
+        echo -e "${DIM}Downloading CLI...${NC}"
+        if curl -fsSL "$_cli_url" -o /tmp/nocturnusai 2>/dev/null; then
+            chmod +x /tmp/nocturnusai
+            if /tmp/nocturnusai --help &>/dev/null; then
+                if sudo mv /tmp/nocturnusai /usr/local/bin/nocturnusai 2>/dev/null; then
+                    CLI_INSTALLED=true
+                    CLI_PATH="/usr/local/bin/nocturnusai"
                 else
-                    rm -f /tmp/nocturnusai
-                    echo -e "${RED}Binary not compatible with this platform.${NC}"
+                    mkdir -p "$HOME/.local/bin"
+                    mv /tmp/nocturnusai "$HOME/.local/bin/nocturnusai"
+                    CLI_INSTALLED=true
+                    CLI_PATH="$HOME/.local/bin/nocturnusai"
+                    for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+                        if [ -f "$rc" ] && ! grep -q '\.local/bin' "$rc"; then
+                            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
+                            echo -e "${DIM}  Added ~/.local/bin to PATH in $rc${NC}"
+                        fi
+                    done
+                    export PATH="$HOME/.local/bin:$PATH"
                 fi
+                echo -e "${GREEN}CLI installed:${NC} $CLI_PATH"
+                echo -e "${DIM}Run 'nocturnusai' to start the interactive REPL.${NC}"
             else
-                echo -e "${RED}Download failed — binary not available for this platform yet.${NC}"
+                rm -f /tmp/nocturnusai
+                echo -e "${RED}Binary not compatible with this platform.${NC}"
             fi
         else
-            echo -e "${DIM}Skipped. You can install the CLI later from:${NC}"
-            echo -e "${DIM}  https://github.com/Auctalis/nocturnusai/releases${NC}"
+            echo -e "${RED}Download failed — binary not available for this platform yet.${NC}"
         fi
-        echo ""
+    else
+        echo -e "${DIM}Skipped. You can install the CLI later from:${NC}"
+        echo -e "${DIM}  https://github.com/Auctalis/nocturnusai/releases${NC}"
     fi
-
-    # ── LLM API key configuration ──────────────────────────────────────────
-    # Only offer if no key was set during initial setup and no Ollama
-    HAS_LLM_KEY=false
-    if [ -f .env ]; then
-        grep -qE '^(ANTHROPIC_API_KEY|OPENAI_API_KEY|GOOGLE_API_KEY|LLM_API_KEY)=' .env 2>/dev/null && HAS_LLM_KEY=true
-    fi
-
-    if ! $HAS_LLM_KEY && ! $USE_OLLAMA; then
-        echo -e "${BOLD}Configure an LLM provider?${NC}"
-        echo -e "${DIM}The core logic engine works without one, but an LLM enables natural language features.${NC}"
-        echo ""
-
-        KEY_CHOICE=$(gum_choose \
-            --header "Add an API key now?" \
-            "Skip — I'll configure later in .env" \
-            "Anthropic Claude  (sk-ant-...)" \
-            "OpenAI GPT        (sk-...)" \
-            "Google Gemini     (AIza...)")
-
-        case "$KEY_CHOICE" in
-            Anthropic*)
-                read -rp "Anthropic API key: " KEY
-                if [ -n "$KEY" ]; then
-                    set_env_key "ANTHROPIC_API_KEY" "$KEY"
-                    echo -e "${GREEN}Saved.${NC} Restart to apply: $COMPOSE_CMD $PROFILE_FLAGS restart"
-                fi
-                ;;
-            OpenAI*)
-                read -rp "OpenAI API key: " KEY
-                if [ -n "$KEY" ]; then
-                    set_env_key "OPENAI_API_KEY" "$KEY"
-                    echo -e "${GREEN}Saved.${NC} Restart to apply: $COMPOSE_CMD $PROFILE_FLAGS restart"
-                fi
-                ;;
-            Google*)
-                read -rp "Google API key: " KEY
-                if [ -n "$KEY" ]; then
-                    set_env_key "GOOGLE_API_KEY" "$KEY"
-                    echo -e "${GREEN}Saved.${NC} Restart to apply: $COMPOSE_CMD $PROFILE_FLAGS restart"
-                fi
-                ;;
-            *)
-                echo -e "${DIM}Skipped. Edit $(pwd)/.env to add a key later.${NC}"
-                ;;
-        esac
-        echo ""
-    fi
-
-    # ── NocturnusAI API key (server auth) ───────────────────────────────────
-    HAS_AUTH_KEY=false
-    if [ -f .env ]; then
-        grep -qE '^API_KEY=' .env 2>/dev/null && HAS_AUTH_KEY=true
-    fi
-
-    if ! $HAS_AUTH_KEY; then
-        echo -e "${BOLD}Secure your server?${NC}"
-        echo -e "${DIM}Set an API key to require authentication on all requests.${NC}"
-        echo ""
-
-        AUTH_CHOICE=$(gum_choose \
-            --header "Set a NocturnusAI API key?" \
-            "Skip — leave open (localhost only)" \
-            "Generate a random key" \
-            "Enter my own key")
-
-        case "$AUTH_CHOICE" in
-            *random*)
-                GEN_KEY="nai-$(openssl rand -hex 20 2>/dev/null || head -c 40 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-                set_env_key "API_KEY" "$GEN_KEY"
-                echo -e "${GREEN}API key set:${NC} $GEN_KEY"
-                echo -e "${DIM}Use header:  X-API-Key: $GEN_KEY${NC}"
-                echo -e "${GREEN}Restart to apply:${NC} $COMPOSE_CMD $PROFILE_FLAGS restart"
-                ;;
-            *own*)
-                read -rp "API key: " AUTH_KEY
-                if [ -n "$AUTH_KEY" ]; then
-                    set_env_key "API_KEY" "$AUTH_KEY"
-                    echo -e "${GREEN}Saved.${NC} Restart to apply: $COMPOSE_CMD $PROFILE_FLAGS restart"
-                fi
-                ;;
-            *)
-                echo -e "${DIM}Skipped. The server is open — fine for localhost development.${NC}"
-                ;;
-        esac
-        echo ""
-    fi
-
+    echo ""
 fi
