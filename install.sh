@@ -332,12 +332,12 @@ elif [ -t 0 ]; then
     # Interactive terminal — wizard
     echo ""
     CHOICE=$(gum_choose \
-        --header "Choose your LLM provider:" \
-        "Ollama  (local, free, private — recommended)" \
+        --header "Choose your LLM provider (optional — core API works without one):" \
+        "Skip  (server only — configure LLM later in .env)" \
         "Anthropic Claude" \
         "OpenAI GPT" \
         "Google Gemini" \
-        "Skip  (configure later in .env)")
+        "Ollama  (local, free, private — downloads ~2GB)")
 
     case "$CHOICE" in
         Ollama*)
@@ -361,9 +361,9 @@ elif [ -t 0 ]; then
             ;;
     esac
 else
-    # Non-interactive (piped) and no --key — default to Ollama
-    echo -e "${GREEN}Defaulting to Ollama${NC} (local LLM, no API key needed)"
-    USE_OLLAMA=true
+    # Non-interactive (piped) and no --key — server only, no LLM
+    echo -e "${GREEN}Starting server only${NC} (no LLM — core API works without one)"
+    echo -e "${DIM}  Add --ollama for a local LLM, or --key <api-key> for a cloud provider${NC}"
 fi
 
 # ── Build & Launch ────────────────────────────────────────────────────────────
