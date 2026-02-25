@@ -480,6 +480,7 @@ install_cli() {
 
     os="$(uname -s | tr '[:upper:]' '[:lower:]')"
     arch="$(uname -m)"
+    [[ "$os" == "darwin" ]] && os="macos"
     [[ "$arch" == "x86_64" ]]            && arch="x86_64"
     [[ "$arch" == "arm64" || "$arch" == "aarch64" ]] && arch="arm64"
 
@@ -616,6 +617,13 @@ if [ -t 0 ]; then
         echo -e "${DIM}This usually means there is no pre-built binary for your platform yet.${NC}"
         echo ""
 
+        # Build the correct binary URL (same logic as install_cli)
+        _cli_os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        [[ "$_cli_os" == "darwin" ]] && _cli_os="macos"
+        _cli_arch="$(uname -m)"
+        [[ "$_cli_arch" == "aarch64" ]] && _cli_arch="arm64"
+        _cli_url="https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-${_cli_os}-${_cli_arch}"
+
         CLI_CHOICE=$(gum_choose \
             --header "Would you like to try again?" \
             "Skip — I'll use the HTTP API" \
@@ -625,7 +633,7 @@ if [ -t 0 ]; then
         case "$CLI_CHOICE" in
             *sudo*)
                 echo -e "${DIM}Retrying with sudo...${NC}"
-                if curl -fsSL "https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" -o /tmp/nocturnusai 2>/dev/null; then
+                if curl -fsSL "$_cli_url" -o /tmp/nocturnusai 2>/dev/null; then
                     chmod +x /tmp/nocturnusai
                     if /tmp/nocturnusai --help &>/dev/null; then
                         sudo mv /tmp/nocturnusai /usr/local/bin/nocturnusai
@@ -643,7 +651,7 @@ if [ -t 0 ]; then
             *local*)
                 echo -e "${DIM}Retrying to ~/.local/bin...${NC}"
                 mkdir -p "$HOME/.local/bin"
-                if curl -fsSL "https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" -o "$HOME/.local/bin/nocturnusai" 2>/dev/null; then
+                if curl -fsSL "$_cli_url" -o "$HOME/.local/bin/nocturnusai" 2>/dev/null; then
                     chmod +x "$HOME/.local/bin/nocturnusai"
                     if "$HOME/.local/bin/nocturnusai" --help &>/dev/null; then
                         CLI_INSTALLED=true
