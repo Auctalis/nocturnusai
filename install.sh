@@ -449,7 +449,9 @@ fi
 
 # ── Generate compose file (fast path only) ────────────────────────────────────
 # Generated AFTER config so Ollama choice and env vars are reflected.
-# Uses env_file to pass all .env vars (LLM keys, auth, etc.) to the container.
+# Environment variables are passed explicitly (like PostgreSQL) — compose reads
+# .env automatically for ${VAR} substitution, so only declared vars reach the
+# container. No env_file needed.
 if ! $NEED_BUILD; then
     if $USE_OLLAMA; then
         cat > docker-compose.yml <<'COMPOSEFILE'
@@ -462,11 +464,20 @@ services:
       - "${PORT:-9300}:${PORT:-9300}"
     volumes:
       - nocturnusai-data:/data
-    env_file:
-      - .env
     environment:
+      # Server
+      - PORT=${PORT:-9300}
       - HOST=0.0.0.0
       - STORAGE_DIR=/data
+      # Authentication
+      - API_KEY=${API_KEY:-}
+      # LLM provider (auto-detected from keys, or set LLM_PROVIDER explicitly)
+      - LLM_PROVIDER=${LLM_PROVIDER:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
       interval: 10s
@@ -506,11 +517,20 @@ services:
       - "${PORT:-9300}:${PORT:-9300}"
     volumes:
       - nocturnusai-data:/data
-    env_file:
-      - .env
     environment:
+      # Server
+      - PORT=${PORT:-9300}
       - HOST=0.0.0.0
       - STORAGE_DIR=/data
+      # Authentication
+      - API_KEY=${API_KEY:-}
+      # LLM provider (auto-detected from keys, or set LLM_PROVIDER explicitly)
+      - LLM_PROVIDER=${LLM_PROVIDER:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
       interval: 10s
