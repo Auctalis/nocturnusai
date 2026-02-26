@@ -200,7 +200,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Hatch
-        run: pip install hatch
+        run: pip install hatch virtualenv==20.29.3
 
       - name: Build distribution
         working-directory: sdks/python
