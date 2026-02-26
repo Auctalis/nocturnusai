@@ -187,7 +187,7 @@ fi
 echo -e "Downloading ${BOLD}${binary}${NC}..."
 tmp_path=$(mktemp)
 
-if ! curl -fsSL "$url" -o "$tmp_path" 2>/dev/null; then
+if ! curl -fL --progress-bar "$url" -o "$tmp_path" 2>&1; then
     rm -f "$tmp_path"
     echo -e "${YELLOW}No CLI binary for ${os}/${arch} — falling back to Docker.$NC"
     echo ""
