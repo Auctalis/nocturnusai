@@ -19,16 +19,16 @@ import org.slf4j.LoggerFactory
 object LlmConfig {
     private val logger = LoggerFactory.getLogger(LlmConfig::class.java)
 
-    // Explicit provider selection
-    val provider: String? = System.getenv("LLM_PROVIDER")
-    val model: String? = System.getenv("LLM_MODEL")
-    val apiKey: String? = System.getenv("LLM_API_KEY")
-    val baseUrl: String? = System.getenv("LLM_BASE_URL")
+    // Explicit provider selection (ifBlank guards against Docker Compose empty-string defaults)
+    val provider: String? = System.getenv("LLM_PROVIDER")?.ifBlank { null }
+    val model: String? = System.getenv("LLM_MODEL")?.ifBlank { null }
+    val apiKey: String? = System.getenv("LLM_API_KEY")?.ifBlank { null }
+    val baseUrl: String? = System.getenv("LLM_BASE_URL")?.ifBlank { null }
 
     // Provider-specific keys
-    val openaiApiKey: String? = System.getenv("OPENAI_API_KEY")
-    val anthropicApiKey: String? = System.getenv("ANTHROPIC_API_KEY")
-    val googleApiKey: String? = System.getenv("GOOGLE_API_KEY")
+    val openaiApiKey: String? = System.getenv("OPENAI_API_KEY")?.ifBlank { null }
+    val anthropicApiKey: String? = System.getenv("ANTHROPIC_API_KEY")?.ifBlank { null }
+    val googleApiKey: String? = System.getenv("GOOGLE_API_KEY")?.ifBlank { null }
 
     // Extraction config
     val extractionEnabled: Boolean = System.getenv("EXTRACTION_ENABLED")?.toBoolean() ?: false
