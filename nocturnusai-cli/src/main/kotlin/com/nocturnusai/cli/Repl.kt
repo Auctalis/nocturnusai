@@ -138,8 +138,7 @@ class Repl(private val client: Client) {
             // Check for error
             val errCode = obj["code"]?.jsonPrimitive?.contentOrNull
             if (errCode != null) {
-                val errMsg = obj["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
-                println("${RED}$errCode: $errMsg${RESET}")
+                printError(errCode, obj["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error")
                 return@runBlocking
             }
 
@@ -233,8 +232,7 @@ class Repl(private val client: Client) {
             // Check for error
             val errCode = obj["code"]?.jsonPrimitive?.contentOrNull
             if (errCode != null) {
-                val errMsg = obj["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
-                println("${RED}$errCode: $errMsg${RESET}")
+                printError(errCode, obj["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error")
                 return@runBlocking
             }
 
@@ -904,6 +902,15 @@ class Repl(private val client: Client) {
         try {
             val el = json.parseToJsonElement(raw)
             when (el) {
+                is JsonObject -> {
+                    // Check for error response (e.g. UNAUTHORIZED)
+                    val errCode = el["code"]?.jsonPrimitive?.contentOrNull
+                    if (errCode != null) {
+                        printError(errCode, el["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error")
+                    } else {
+                        println(raw)
+                    }
+                }
                 is JsonArray -> {
                     if (el.isEmpty()) {
                         println("${YELLOW}No results.${RESET}")
@@ -936,10 +943,15 @@ class Repl(private val client: Client) {
     }
 
     private fun printOk(raw: String, defaultMsg: String) {
-        // Check if the response indicates success
         try {
             val el = json.parseToJsonElement(raw)
             if (el is JsonObject) {
+                // Check for error response (e.g. UNAUTHORIZED)
+                val errCode = el["code"]?.jsonPrimitive?.contentOrNull
+                if (errCode != null) {
+                    printError(errCode, el["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error")
+                    return
+                }
                 val msg = el["message"]?.jsonPrimitive?.contentOrNull
                     ?: el["status"]?.jsonPrimitive?.contentOrNull
                 println("${GREEN}OK$RESET ${msg ?: defaultMsg}")
@@ -949,6 +961,20 @@ class Repl(private val client: Client) {
         println("${GREEN}OK$RESET $defaultMsg")
     }
 
+    /** Print error with actionable guidance for UNAUTHORIZED. */
+    private fun printError(code: String, message: String) {
+        println("${RED}$code: $message${RESET}")
+        if (code == "UNAUTHORIZED") {
+            if (!client.hasApiKey) {
+                println("${DIM}No API key configured. Fix with one of:${RESET}")
+                println("${DIM}  nocturnusai setup            # re-run setup wizard${RESET}")
+                println("${DIM}  nocturnusai --api-key <key>  # pass key on command line${RESET}")
+            } else {
+                println("${DIM}API key was sent but rejected. Check your key is correct.${RESET}")
+            }
+        }
+    }
+
     // ── help ──
 
     private fun printBanner() {
@@ -956,6 +982,9 @@ class Repl(private val client: Client) {
         println("${BOLD}NocturnusAI CLI$RESET — logic server for agentic AI")
         println("${DIM}Server:   ${client.server}${RESET}")
         println("${DIM}Database: ${client.database}${RESET}")
+        if (client.hasApiKey) {
+            println("${DIM}Auth:     ${GREEN}API key configured${RESET}")
+        }
 
         // Quick connectivity check
         try {
@@ -967,9 +996,23 @@ class Repl(private val client: Client) {
                 "degraded" -> println("${YELLOW}Connected (degraded).${RESET}")
                 else -> println("${RED}Connected ($status).${RESET}")
             }
+
+            // Check if server requires auth but we have no key
+            if (!client.hasApiKey) {
+                try {
+                    val authResp = runBlocking { client.authStatus() }
+                    val authObj = json.parseToJsonElement(authResp).jsonObject
+                    val authEnabled = authObj["authEnabled"]?.jsonPrimitive?.booleanOrNull ?: false
+                    val legacyKey = authObj["legacyApiKeySet"]?.jsonPrimitive?.booleanOrNull ?: false
+                    if (authEnabled || legacyKey) {
+                        println("${YELLOW}Warning: Server requires authentication but no API key configured.${RESET}")
+                        println("${DIM}Run 'nocturnusai setup' or use --api-key flag.${RESET}")
+                    }
+                } catch (_: Exception) {}
+            }
         } catch (e: Exception) {
             println("${RED}Cannot reach server: ${e.message}${RESET}")
-            println("${DIM}Is the server running? Start with: make up${RESET}")
+            println("${DIM}Is the server running? Start with: nocturnusai setup${RESET}")
         }
 
         println("${DIM}Type 'help' for commands, 'status' for details, 'setup' to configure LLM.${RESET}")

@@ -30,6 +30,7 @@ class Client(
     var tenantId: String? = null,
 ) {
     val server: String get() = serverUrl
+    val hasApiKey: Boolean get() = apiKey != null
 
     private val http = HttpClient(CIO) {
         install(ContentNegotiation) {
