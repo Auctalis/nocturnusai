@@ -187,6 +187,29 @@ class Setup(
         println("  Fedora:  sudo dnf install podman podman-compose")
     }
 
+    // ── Host address resolution (for reaching host Ollama from Docker) ────────
+
+    /**
+     * Determine the address the Docker container can use to reach the host machine.
+     * On Docker Desktop (macOS/Windows), `host.docker.internal` resolves natively.
+     * On Linux Docker Engine, try the Docker bridge gateway IP (typically 172.17.0.1).
+     * Falls back to `host.docker.internal` if detection fails.
+     */
+    private fun detectHostAddress(): String {
+        val os = System.getProperty("os.name", "").lowercase()
+        // Docker Desktop (macOS, Windows) — host.docker.internal works natively
+        if ("mac" in os || "darwin" in os || "windows" in os) {
+            return "host.docker.internal"
+        }
+        // Linux: get the docker bridge gateway IP
+        val bridgeIp = sh("$containerCmd network inspect bridge -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null")
+        if (bridgeIp.success && bridgeIp.output.isNotBlank()) {
+            return bridgeIp.output.trim()
+        }
+        // Fallback: host.docker.internal (works on Docker Engine 20.10+ if configured)
+        return "host.docker.internal"
+    }
+
     // ── Image check ────────────────────────────────────────────────────────────
 
     private fun checkImage() {
@@ -345,9 +368,10 @@ class Setup(
         // Flag: --host-ollama (existing host Ollama)
         if (useHostOllama) {
             ollamaModel = selectOllamaModel("http://localhost:11434")
+            val hostAddr = detectHostAddress()
             setEnvKey(envFile, "LLM_PROVIDER", "ollama")
             setEnvKey(envFile, "LLM_MODEL", ollamaModel)
-            setEnvKey(envFile, "LLM_BASE_URL", "http://host.docker.internal:11434")
+            setEnvKey(envFile, "LLM_BASE_URL", "http://$hostAddr:11434")
             setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
             println("${GREEN}Using:$RESET existing Ollama on host with model ${BOLD}$ollamaModel$RESET")
             return
@@ -417,11 +441,12 @@ class Setup(
                 // Existing host Ollama — query for installed models
                 useHostOllama = true
                 ollamaModel = selectOllamaModel("http://localhost:11434")
+                val hostAddr = detectHostAddress()
                 setEnvKey(envFile, "LLM_PROVIDER", "ollama")
                 setEnvKey(envFile, "LLM_MODEL", ollamaModel)
-                setEnvKey(envFile, "LLM_BASE_URL", "http://host.docker.internal:11434")
+                setEnvKey(envFile, "LLM_BASE_URL", "http://$hostAddr:11434")
                 setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-                println("${GREEN}Using existing Ollama$RESET at host.docker.internal:11434 with model ${BOLD}$ollamaModel$RESET")
+                println("${GREEN}Using existing Ollama$RESET at $hostAddr:11434 with model ${BOLD}$ollamaModel$RESET")
                 println("${DIM}Make sure Ollama is running: ollama serve$RESET")
             }
             else -> {
@@ -869,7 +894,7 @@ class Setup(
         if (useOllama)
             println("  ${BOLD}Ollama$RESET       http://localhost:11434 ${DIM}(Docker)$RESET")
         if (useHostOllama)
-            println("  ${BOLD}Ollama$RESET       ${GREEN}using host Ollama$RESET ${DIM}(host.docker.internal:11434)$RESET")
+            println("  ${BOLD}Ollama$RESET       ${GREEN}using host Ollama$RESET ${DIM}(${detectHostAddress()}:11434)$RESET")
         if (authConfigured)
             println("  ${BOLD}Auth$RESET         ${GREEN}API key set$RESET")
         println()
@@ -999,8 +1024,6 @@ services:
       - "@{PORT:-9300}:@{PORT:-9300}"
     volumes:
       - ./data:/data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     environment:
       - PORT=@{PORT:-9300}
       - HOST=0.0.0.0
@@ -1008,7 +1031,7 @@ services:
       - API_KEY=@{API_KEY:-}
       - LLM_PROVIDER=@{LLM_PROVIDER:-}
       - LLM_MODEL=@{LLM_MODEL:-}
-      - LLM_BASE_URL=@{LLM_BASE_URL:-http://host.docker.internal:11434}
+      - LLM_BASE_URL=@{LLM_BASE_URL:-}
       - ANTHROPIC_API_KEY=@{ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=@{OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=@{GOOGLE_API_KEY:-}
