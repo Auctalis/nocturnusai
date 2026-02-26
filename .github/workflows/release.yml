@@ -255,7 +255,7 @@ jobs:
   # ── GitHub Release with CLI binaries + auto-generated notes ─────────────────
   github-release:
     name: GitHub Release
-    needs: [docker, python-sdk, typescript-sdk]
+    needs: [cli-native, docker, python-sdk, typescript-sdk]
     # Proceed as long as Docker and SDK publishes succeeded.
     # CLI binaries are downloaded best-effort — missing platforms are OK.
     if: |
