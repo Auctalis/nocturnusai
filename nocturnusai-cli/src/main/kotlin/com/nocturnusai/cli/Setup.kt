@@ -43,6 +43,7 @@ class Setup(
     private var llmConfigured = false
     private var llmProviderLabel = "none"
     private var authConfigured = false
+    private var serverApiKey: String? = null  // saved for config file + banner
     private var needBuild = false
     private lateinit var installDir: File
 
@@ -60,7 +61,7 @@ class Setup(
         println("${GREEN}Found:$RESET $composeCmd ($containerCmd)")
 
         // 2. Prepare install directory
-        installDir = File(dir).absoluteFile
+        installDir = File(dir).canonicalFile
         installDir.mkdirs()
         println("${GREEN}Directory:$RESET ${installDir.path}")
 
@@ -74,16 +75,22 @@ class Setup(
         // 5. Configure LLM
         configureLlm(envFile)
 
-        // 6. Configure auth
+        // 6. Select model
+        selectModel(envFile)
+
+        // 7. Configure auth
         configureAuth(envFile)
 
-        // 7. Detect LLM/auth status for banner
+        // 8. Save CLI config (so `nocturnusai` auto-connects)
+        saveCliConfig()
+
+        // 9. Detect LLM/auth status for banner
         detectStatus(envFile)
 
-        // 8. Generate compose file (fast path only — build path uses repo compose)
+        // 10. Generate compose file (fast path only — build path uses repo compose)
         if (!needBuild) generateCompose()
 
-        // 9. Build if needed
+        // 11. Build if needed
         if (needBuild) {
             println()
             println("${BOLD}Building NocturnusAI from source...$RESET")
@@ -94,7 +101,7 @@ class Setup(
             }
         }
 
-        // 10. Handle existing containers, then start server
+        // 12. Handle existing containers, then start server
         println()
         if (!resolveExistingContainers()) return 0
 
@@ -106,14 +113,14 @@ class Setup(
         }
         shVisible(upCmd, installDir)
 
-        // 11. Wait for health
+        // 13. Wait for health
         println()
         val healthy = waitForHealth()
 
-        // 12. Pull Ollama model if needed
+        // 14. Pull Ollama model if needed
         if (useOllama && healthy) pullOllamaModel()
 
-        // 13. Success banner
+        // 15. Success banner
         printSuccessBanner()
         return 0
     }
@@ -239,6 +246,25 @@ class Setup(
 
     private fun envHasKey(file: File, key: String): Boolean =
         file.exists() && file.readLines().any { it.trimStart().startsWith("$key=") }
+
+    private fun getEnvValue(file: File, key: String): String? =
+        if (file.exists()) file.readLines()
+            .firstOrNull { it.trimStart().startsWith("$key=") }
+            ?.substringAfter("=")?.trim()
+        else null
+
+    /** Save CLI config so `nocturnusai` auto-connects without flags. */
+    private fun saveCliConfig() {
+        val configDir = File(System.getProperty("user.home"), ".config/nocturnusai")
+        configDir.mkdirs()
+        val configFile = File(configDir, "config")
+        val content = buildString {
+            append("server=http://localhost:$port\n")
+            if (serverApiKey != null) append("api_key=$serverApiKey\n")
+        }
+        configFile.writeText(content)
+        println("${DIM}CLI config saved: ${configFile.path}$RESET")
+    }
 
     // ── Interactive helpers ─────────────────────────────────────────────────────
 
@@ -376,11 +402,55 @@ class Setup(
         }
     }
 
+    // ── Model selection ────────────────────────────────────────────────────────
+
+    private fun selectModel(envFile: File) {
+        // Skip if Ollama (model is always llama3.2) or non-interactive
+        if (useOllama || useHostOllama || !interactive) return
+
+        // Build model options based on configured providers
+        val hasAnthropic = envHasKey(envFile, "ANTHROPIC_API_KEY")
+        val hasOpenAI = envHasKey(envFile, "OPENAI_API_KEY")
+        val hasGoogle = envHasKey(envFile, "GOOGLE_API_KEY")
+
+        if (!hasAnthropic && !hasOpenAI && !hasGoogle) return
+
+        val models = mutableListOf<Pair<String, String>>() // label to provider:model
+        if (hasAnthropic) {
+            models.add("Anthropic — Claude Sonnet 4.5 (recommended)" to "anthropic:claude-sonnet-4-5-20250514")
+            models.add("Anthropic — Claude Opus 4" to "anthropic:claude-opus-4-20250514")
+            models.add("Anthropic — Claude Haiku 4.5 (fastest)" to "anthropic:claude-haiku-4-5-20251001")
+            models.add("Anthropic — Claude Sonnet 4" to "anthropic:claude-sonnet-4-20250514")
+        }
+        if (hasOpenAI) {
+            models.add("OpenAI — GPT-4.1 (latest)" to "openai:gpt-4.1")
+            models.add("OpenAI — GPT-4.1 mini (fastest)" to "openai:gpt-4.1-mini")
+            models.add("OpenAI — GPT-4.1 nano" to "openai:gpt-4.1-nano")
+            models.add("OpenAI — GPT-4o" to "openai:gpt-4o")
+            models.add("OpenAI — o3" to "openai:o3")
+            models.add("OpenAI — o3 mini" to "openai:o3-mini")
+            models.add("OpenAI — o4 mini (reasoning)" to "openai:o4-mini")
+        }
+        if (hasGoogle) {
+            models.add("Google — Gemini 2.5 Pro (latest)" to "google:gemini-2.5-pro")
+            models.add("Google — Gemini 2.5 Flash (fastest)" to "google:gemini-2.5-flash")
+            models.add("Google — Gemini 2.0 Flash" to "google:gemini-2.0-flash")
+        }
+
+        val labels = models.map { it.first }.toTypedArray()
+        val choice = menu("Select the default LLM model:", *labels)
+        val (provider, model) = models[choice].second.split(":")
+        setEnvKey(envFile, "LLM_PROVIDER", provider)
+        setEnvKey(envFile, "LLM_MODEL", model)
+        println("  ${GREEN}Default model:$RESET ${models[choice].first}")
+    }
+
     // ── Auth configuration ─────────────────────────────────────────────────────
 
     private fun configureAuth(envFile: File) {
         if (envHasKey(envFile, "API_KEY")) {
             authConfigured = true
+            serverApiKey = getEnvValue(envFile, "API_KEY")
             return
         }
         if (!interactive) return
@@ -397,14 +467,15 @@ class Setup(
                 val key = generateApiKey()
                 setEnvKey(envFile, "API_KEY", key)
                 authConfigured = true
+                serverApiKey = key
                 println("${GREEN}API key set:$RESET $key")
-                println("${DIM}Use header:  X-API-Key: $key$RESET")
             }
             2 -> {
                 val key = prompt("API key") ?: return
                 if (key.isNotBlank()) {
                     setEnvKey(envFile, "API_KEY", key)
                     authConfigured = true
+                    serverApiKey = key
                     println("${GREEN}Saved.$RESET")
                 }
             }
@@ -595,41 +666,44 @@ class Setup(
         println()
 
         // ── Quick start ──
+        val apiKeyFlag = if (serverApiKey != null) " -k $serverApiKey" else ""
+        val apiKeyHeader = if (serverApiKey != null) "\n      -H 'X-API-Key: $serverApiKey' \\" else ""
+
         println("  ${BOLD}Quick start$RESET")
         println()
-        println("    ${CYAN}# Start the REPL — just type and go$RESET")
+        println("    ${CYAN}# Start the REPL$RESET")
         println("    nocturnusai")
         println()
-        println("    ${CYAN}# Or use one-liners$RESET")
-        println("    nocturnusai -e \"tell human(socrates)\"")
-        println("    nocturnusai -e \"teach mortal(?x) :- human(?x)\"")
-        println("    nocturnusai -e \"ask mortal(?who)\"")
+        println("    ${CYAN}# One-liners$RESET")
+        println("    nocturnusai$apiKeyFlag -e \"tell human(socrates)\"")
+        println("    nocturnusai$apiKeyFlag -e \"teach mortal(?x) :- human(?x)\"")
+        println("    nocturnusai$apiKeyFlag -e \"ask mortal(?who)\"")
         println()
 
         // ── curl examples ──
-        println("    ${CYAN}# Or use curl directly$RESET")
-        println("    curl -s http://localhost:$port/tell \\")
+        println("    ${CYAN}# Or use curl$RESET")
+        println("    curl -s http://localhost:$port/assert/fact \\")
         println("      -H 'Content-Type: application/json' \\")
-        println("      -H 'X-Tenant-ID: default' \\")
+        println("      -H 'X-Tenant-ID: default' \\$apiKeyHeader")
         println("      -d '{\"predicate\":\"human\",\"args\":[\"socrates\"]}'")
         println()
 
         // ── LLM examples ──
         if (llmConfigured)
-            println("  ${BOLD}LLM-powered$RESET  ${GREEN}ready to use$RESET")
+            println("  ${BOLD}LLM-powered$RESET  ${GREEN}$llmProviderLabel$RESET")
         else
             println("  ${BOLD}LLM-powered$RESET  ${DIM}(add API key to .env, restart, then try these)$RESET")
         println()
         println("    ${CYAN}# Extract facts from natural language$RESET")
         println("    curl -s http://localhost:$port/extract \\")
         println("      -H 'Content-Type: application/json' \\")
-        println("      -H 'X-Tenant-ID: default' \\")
+        println("      -H 'X-Tenant-ID: default' \\$apiKeyHeader")
         println("      -d '{\"text\":\"Socrates is human. All humans are mortal.\",\"assert\":true}'")
         println()
         println("    ${CYAN}# Ask a question in plain English$RESET")
         println("    curl -s http://localhost:$port/synthesize \\")
         println("      -H 'Content-Type: application/json' \\")
-        println("      -H 'X-Tenant-ID: default' \\")
+        println("      -H 'X-Tenant-ID: default' \\$apiKeyHeader")
         println("      -d '{\"question\":\"Is Socrates mortal?\"}'")
         println()
 

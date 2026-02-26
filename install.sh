@@ -172,22 +172,11 @@ binary="nocturnusai-${os}-${arch}"
 url="https://github.com/Auctalis/nocturnusai/releases/latest/download/${binary}"
 
 # ── Determine install location ──────────────────────────────────────────────
+# Prefer /usr/local/bin only if already writable (no sudo prompts).
+# Otherwise use ~/.local/bin — standard user-space location.
 SUDO=""
 if [ -w "/usr/local/bin" ]; then
     install_path="/usr/local/bin/nocturnusai"
-elif sudo -n true 2>/dev/null; then
-    install_path="/usr/local/bin/nocturnusai"
-    SUDO="sudo"
-elif [ -e /dev/tty ]; then
-    # Interactive — ask for sudo to install to /usr/local/bin
-    echo -e "${DIM}/usr/local/bin is not writable. Requesting sudo access...${NC}"
-    if sudo -v 2>/dev/null < /dev/tty; then
-        install_path="/usr/local/bin/nocturnusai"
-        SUDO="sudo"
-    else
-        mkdir -p "$HOME/.local/bin"
-        install_path="$HOME/.local/bin/nocturnusai"
-    fi
 else
     mkdir -p "$HOME/.local/bin"
     install_path="$HOME/.local/bin/nocturnusai"
@@ -226,11 +215,7 @@ else
 fi
 
 # Move to install path
-if [ -n "$SUDO" ]; then
-    $SUDO mv "$tmp_path" "$install_path"
-else
-    mv "$tmp_path" "$install_path"
-fi
+mv "$tmp_path" "$install_path"
 
 echo -e "${GREEN}CLI installed:${NC} $install_path"
 

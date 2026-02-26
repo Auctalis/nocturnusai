@@ -14,10 +14,16 @@
 
 package com.nocturnusai.cli
 
+import java.io.File
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
     // Handle setup subcommand before creating Client (server may not be running)
+    if (args.isNotEmpty() && args[0] == "uninstall") {
+        uninstall()
+        exitProcess(0)
+    }
+
     if (args.isNotEmpty() && args[0] == "setup") {
         val setupArgs = parseSetupArgs(args.drop(1).toTypedArray())
         val code = Setup(
@@ -57,10 +63,26 @@ private data class CliArgs(
     val exec: String? = null,
 )
 
+/** Read defaults from ~/.config/nocturnusai/config (written by `nocturnusai setup`). */
+private fun loadCliConfig(): Map<String, String> {
+    val configFile = File(System.getProperty("user.home"), ".config/nocturnusai/config")
+    if (!configFile.exists()) return emptyMap()
+    return configFile.readLines()
+        .filter { it.contains('=') && !it.trimStart().startsWith("#") }
+        .associate { line ->
+            val key = line.substringBefore('=').trim()
+            val value = line.substringAfter('=').trim()
+            key to value
+        }
+}
+
 private fun parseArgs(args: Array<String>): CliArgs {
-    var server = "http://localhost:9300"
+    val config = loadCliConfig()
+
+    // Defaults: CLI flags > env vars > config file > hardcoded
+    var server = System.getenv("NOCTURNUSAI_SERVER") ?: config["server"] ?: "http://localhost:9300"
     var database = "default"
-    var apiKey: String? = null
+    var apiKey: String? = System.getenv("NOCTURNUSAI_API_KEY") ?: config["api_key"]
     var tenantId: String? = null
     var exec: String? = null
 
@@ -116,6 +138,85 @@ internal fun parseSetupArgs(args: Array<String>): SetupArgs {
     return SetupArgs(dir, port, ollama, hostOllama, keys, nonInteractive)
 }
 
+// ── Uninstall ─────────────────────────────────────────────────────────────
+
+private fun uninstall() {
+    val R = "\u001B[0m"
+    val B = "\u001B[1m"
+    val D = "\u001B[2m"
+    val G = "\u001B[32m"
+    val Y = "\u001B[33m"
+
+    println()
+    println("${B}NocturnusAI Uninstall$R")
+    println()
+
+    // 1. Stop and remove containers
+    val compose = when {
+        Runtime.getRuntime().exec(arrayOf("bash", "-c", "docker compose version >/dev/null 2>&1")).waitFor() == 0 -> "docker compose"
+        Runtime.getRuntime().exec(arrayOf("bash", "-c", "command -v docker-compose >/dev/null 2>&1")).waitFor() == 0 -> "docker-compose"
+        Runtime.getRuntime().exec(arrayOf("bash", "-c", "command -v podman-compose >/dev/null 2>&1")).waitFor() == 0 -> "podman-compose"
+        else -> null
+    }
+
+    // Check common install directories for compose files
+    val installDirs = listOf(
+        File("./nocturnusai"),
+        File(System.getProperty("user.home"), "nocturnusai"),
+    ).filter { File(it, "docker-compose.yml").exists() }
+
+    for (dir in installDirs) {
+        if (compose != null) {
+            println("${D}Stopping containers in ${dir.path}...$R")
+            ProcessBuilder("bash", "-c", "$compose down -v")
+                .directory(dir).inheritIO().start().waitFor()
+        }
+    }
+
+    // 2. Remove containers by name (in case compose file is gone)
+    for (name in listOf("nocturnusai", "nocturnusai-ollama")) {
+        val inspect = ProcessBuilder("bash", "-c", "docker inspect $name >/dev/null 2>&1")
+            .start().waitFor()
+        if (inspect == 0) {
+            println("${D}Removing container: $name$R")
+            ProcessBuilder("bash", "-c", "docker rm -f $name")
+                .inheritIO().start().waitFor()
+        }
+    }
+
+    // 3. Remove CLI binary
+    val binaryPaths = listOf(
+        File("/usr/local/bin/nocturnusai"),
+        File(System.getProperty("user.home"), ".local/bin/nocturnusai"),
+    )
+    for (bin in binaryPaths) {
+        if (bin.exists()) {
+            println("${D}Removing CLI binary: ${bin.path}$R")
+            bin.delete()
+        }
+    }
+
+    // 4. Remove config
+    val configDir = File(System.getProperty("user.home"), ".config/nocturnusai")
+    if (configDir.exists()) {
+        println("${D}Removing CLI config: ${configDir.path}$R")
+        configDir.deleteRecursively()
+    }
+
+    // 5. Summary
+    println()
+    println("${G}NocturnusAI uninstalled.$R")
+    if (installDirs.isNotEmpty()) {
+        println()
+        println("${Y}Note:$R Install directories were not removed (may contain your data):")
+        for (dir in installDirs) {
+            println("  ${dir.canonicalPath}")
+        }
+        println("${D}Remove manually if no longer needed: rm -rf <dir>$R")
+    }
+    println()
+}
+
 // ── Help text ──────────────────────────────────────────────────────────────
 
 private fun printUsage() {
@@ -129,7 +230,8 @@ Usage:
   cat kb.ab | nocturnusai -e "import /dev/stdin"
 
 Subcommands:
-  setup     Install and configure NocturnusAI server
+  setup       Install and configure NocturnusAI server
+  uninstall   Remove NocturnusAI (containers, CLI binary, config)
 
 Options:
   -s, --server <url>      Server URL (default: http://localhost:9300)
