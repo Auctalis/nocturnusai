@@ -17,6 +17,12 @@
     "allDeclaredConstructors": true
   },
   {
+    "name": "com.nocturnusai.cli.Setup",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allDeclaredConstructors": true
+  },
+  {
     "name": "io.ktor.client.engine.cio.CIO",
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true

@@ -14,7 +14,22 @@
 
 package com.nocturnusai.cli
 
+import kotlin.system.exitProcess
+
 fun main(args: Array<String>) {
+    // Handle setup subcommand before creating Client (server may not be running)
+    if (args.isNotEmpty() && args[0] == "setup") {
+        val setupArgs = parseSetupArgs(args.drop(1).toTypedArray())
+        val code = Setup(
+            dir = setupArgs.dir,
+            port = setupArgs.port,
+            ollamaFlag = setupArgs.ollama,
+            llmKey = setupArgs.key,
+            nonInteractive = setupArgs.nonInteractive,
+        ).run()
+        exitProcess(code)
+    }
+
     val parsed = parseArgs(args)
     val client = Client(
         serverUrl = parsed.server,
@@ -30,6 +45,8 @@ fun main(args: Array<String>) {
         Repl(client).run()
     }
 }
+
+// ── CLI arg parsing ────────────────────────────────────────────────────────
 
 private data class CliArgs(
     val server: String = "http://localhost:9300",
@@ -62,14 +79,53 @@ private fun parseArgs(args: Array<String>): CliArgs {
     return CliArgs(server, database, apiKey, tenantId, exec)
 }
 
+// ── Setup arg parsing ──────────────────────────────────────────────────────
+
+internal data class SetupArgs(
+    val dir: String = "./nocturnusai",
+    val port: Int = 9300,
+    val ollama: Boolean = false,
+    val key: String? = null,
+    val nonInteractive: Boolean = false,
+)
+
+internal fun parseSetupArgs(args: Array<String>): SetupArgs {
+    var dir = "./nocturnusai"
+    var port = 9300
+    var ollama = false
+    var key: String? = null
+    var nonInteractive = false
+
+    var i = 0
+    while (i < args.size) {
+        when (args[i]) {
+            "--dir"             -> { dir = args.getOrElse(i + 1) { dir }; i += 2 }
+            "--port"            -> { port = args.getOrElse(i + 1) { "9300" }.toIntOrNull() ?: 9300; i += 2 }
+            "--ollama"          -> { ollama = true; i++ }
+            "--key"             -> { key = args.getOrElse(i + 1) { null }; i += 2 }
+            "--non-interactive" -> { nonInteractive = true; i++ }
+            "--help", "-h"      -> { printSetupUsage(); exitProcess(0) }
+            else                -> { i++ }
+        }
+    }
+
+    return SetupArgs(dir, port, ollama, key, nonInteractive)
+}
+
+// ── Help text ──────────────────────────────────────────────────────────────
+
 private fun printUsage() {
     println("""
 NocturnusAI CLI — logic server for agentic AI
 
 Usage:
-  nocturnusai-cli [options]             Interactive REPL
-  nocturnusai-cli -e "tell likes(a,b)"  Run one command and exit
-  cat kb.ab | nocturnusai-cli -e "import /dev/stdin"
+  nocturnusai                          Interactive REPL
+  nocturnusai setup [options]          Set up & start server (Docker/Podman)
+  nocturnusai -e "tell likes(a,b)"    Run one command and exit
+  cat kb.ab | nocturnusai -e "import /dev/stdin"
+
+Subcommands:
+  setup     Install and configure NocturnusAI server
 
 Options:
   -s, --server <url>      Server URL (default: http://localhost:9300)
@@ -80,10 +136,40 @@ Options:
   -h, --help              Show this help
 
 Examples:
-  nocturnusai-cli
-  nocturnusai-cli -d mydb -e "tell human(socrates)"
-  nocturnusai-cli -d mydb -e "ask mortal(?who)"
-  nocturnusai-cli -d mydb -e "export"
-  nocturnusai-cli -d mydb -e "import knowledge.ab"
+  nocturnusai
+  nocturnusai setup --ollama
+  nocturnusai -d mydb -e "tell human(socrates)"
+  nocturnusai -d mydb -e "ask mortal(?who)"
+  nocturnusai -d mydb -e "export"
+  nocturnusai -d mydb -e "import knowledge.ab"
+    """.trimIndent())
+}
+
+private fun printSetupUsage() {
+    println("""
+nocturnusai setup — Install and configure NocturnusAI
+
+Sets up a NocturnusAI server using Docker or Podman:
+  - Detects Docker/Podman and pulls the container image
+  - Configures LLM provider (Anthropic, OpenAI, Google, or Ollama)
+  - Optionally generates an API key for authentication
+  - Creates docker-compose.yml and .env
+  - Starts the server and waits for it to be ready
+
+Usage: nocturnusai setup [options]
+
+Options:
+  --dir DIR              Install directory (default: ./nocturnusai)
+  --port PORT            Server port (default: 9300)
+  --ollama               Use Ollama for local LLM (no API key needed)
+  --key KEY              LLM API key (auto-detects Anthropic/OpenAI/Google)
+  --non-interactive      Skip interactive prompts, use defaults
+  -h, --help             Show this help
+
+Examples:
+  nocturnusai setup                           # interactive wizard
+  nocturnusai setup --ollama                  # local Ollama, no API key
+  nocturnusai setup --key sk-ant-abc123...    # Anthropic Claude
+  nocturnusai setup --port 8080 --dir ./ai    # custom port and directory
     """.trimIndent())
 }
