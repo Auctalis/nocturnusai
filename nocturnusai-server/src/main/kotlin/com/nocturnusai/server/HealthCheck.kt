@@ -49,18 +49,18 @@ object HealthChecker {
         // 5. Transactions
         checks["transactions"] = checkTransactions(dbManager)
 
-        // 6. LLM provider status
+        // 6. LLM provider status (informational — not having LLM is a valid configuration)
         checks["llm"] = if (llmConfigured) {
             CheckResult("pass", "LLM provider configured (extraction=${if (ServerConfig.extractionEnabled) "on" else "off"})")
         } else {
-            CheckResult("warn", "No LLM provider — NL features unavailable")
+            CheckResult("pass", "No LLM provider (natural language features unavailable)")
         }
 
-        // 7. Auth status
+        // 7. Auth status (informational — dev mode without auth is a valid configuration)
         checks["auth"] = when (ServerConfig.authMode) {
             com.nocturnusai.server.auth.AuthMode.RBAC -> CheckResult("pass", "RBAC auth enabled")
             com.nocturnusai.server.auth.AuthMode.LEGACY -> CheckResult("pass", "Legacy API key auth enabled")
-            com.nocturnusai.server.auth.AuthMode.DISABLED -> CheckResult("warn", "Auth disabled (dev mode)")
+            com.nocturnusai.server.auth.AuthMode.DISABLED -> CheckResult("pass", "Open access (no auth)")
         }
 
         val hasFailure = checks.values.any { it.status == "fail" }
