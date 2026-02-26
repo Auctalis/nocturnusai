@@ -31,11 +31,13 @@ class Setup(
     private val dir: String = "./nocturnusai",
     private val port: Int = 9300,
     private val ollamaFlag: Boolean = false,
+    private val hostOllamaFlag: Boolean = false,
     private val llmKeys: List<String> = emptyList(),
     private val nonInteractive: Boolean = false,
 ) {
     private val interactive = !nonInteractive && System.console() != null
     private var useOllama = ollamaFlag
+    private var useHostOllama = hostOllamaFlag  // true = connect to existing host Ollama (no Docker container)
     private var composeCmd = ""
     private var containerCmd = ""
     private var llmConfigured = false
@@ -292,11 +294,20 @@ class Setup(
             return
         }
 
-        // Flag: --ollama
+        // Flag: --ollama (Docker Ollama)
         if (useOllama) {
             setEnvKey(envFile, "LLM_PROVIDER", "ollama")
             setEnvKey(envFile, "LLM_MODEL", "llama3.2")
-            println("${GREEN}Using:$RESET Ollama (local LLM — no API key needed)")
+            println("${GREEN}Using:$RESET Ollama in Docker (local LLM — no API key needed)")
+            return
+        }
+
+        // Flag: --host-ollama (existing host Ollama)
+        if (useHostOllama) {
+            setEnvKey(envFile, "LLM_PROVIDER", "ollama")
+            setEnvKey(envFile, "LLM_MODEL", "llama3.2")
+            setEnvKey(envFile, "LLM_BASE_URL", "http://host.docker.internal:11434")
+            println("${GREEN}Using:$RESET existing Ollama on host (host.docker.internal:11434)")
             return
         }
 
@@ -340,15 +351,27 @@ class Setup(
             val choice = menu(
                 "No API keys entered. Use Ollama for local LLM?",
                 "Skip (configure later in .env)",
-                "Yes — use Ollama (free, private — downloads ~2GB)",
+                "Install Ollama in Docker (free, private — downloads ~2GB)",
+                "I already have Ollama running locally",
             )
-            if (choice == 1) {
-                useOllama = true
-                setEnvKey(envFile, "LLM_PROVIDER", "ollama")
-                setEnvKey(envFile, "LLM_MODEL", "llama3.2")
-                println("${GREEN}Using Ollama.$RESET Model will download on first start (~2GB).")
-            } else {
-                println("${DIM}Skipped — edit .env later to add LLM provider keys.$RESET")
+            when (choice) {
+                1 -> {
+                    useOllama = true
+                    setEnvKey(envFile, "LLM_PROVIDER", "ollama")
+                    setEnvKey(envFile, "LLM_MODEL", "llama3.2")
+                    println("${GREEN}Using Ollama.$RESET Model will download on first start (~2GB).")
+                }
+                2 -> {
+                    useHostOllama = true
+                    setEnvKey(envFile, "LLM_PROVIDER", "ollama")
+                    setEnvKey(envFile, "LLM_MODEL", "llama3.2")
+                    setEnvKey(envFile, "LLM_BASE_URL", "http://host.docker.internal:11434")
+                    println("${GREEN}Using existing Ollama$RESET at host.docker.internal:11434")
+                    println("${DIM}Make sure Ollama is running: ollama serve$RESET")
+                }
+                else -> {
+                    println("${DIM}Skipped — edit .env later to add LLM provider keys.$RESET")
+                }
             }
         }
     }
@@ -403,7 +426,8 @@ class Setup(
         if (envHasKey(envFile, "OPENAI_API_KEY"))    providers.add("OpenAI GPT")
         if (envHasKey(envFile, "GOOGLE_API_KEY"))    providers.add("Google Gemini")
         if (envHasKey(envFile, "LLM_API_KEY"))       providers.add("Custom LLM")
-        if (useOllama) providers.add("Ollama (local)")
+        if (useOllama) providers.add("Ollama (Docker)")
+        if (useHostOllama) providers.add("Ollama (host)")
         if (providers.isNotEmpty()) {
             llmConfigured = true
             llmProviderLabel = providers.joinToString(", ")
@@ -414,7 +438,11 @@ class Setup(
     // ── Compose generation ─────────────────────────────────────────────────────
 
     private fun generateCompose() {
-        val template = if (useOllama) COMPOSE_WITH_OLLAMA else COMPOSE_BASIC
+        val template = when {
+            useOllama -> COMPOSE_WITH_OLLAMA
+            useHostOllama -> COMPOSE_HOST_OLLAMA
+            else -> COMPOSE_BASIC
+        }
         // @{ is a placeholder for ${ to avoid Kotlin string interpolation
         File(installDir, "docker-compose.yml").writeText(template.replace("@{", "\${"))
     }
@@ -561,7 +589,9 @@ class Setup(
         else
             println("  ${BOLD}Auth$RESET         ${DIM}open (localhost dev)$RESET")
         if (useOllama)
-            println("  ${BOLD}Ollama$RESET       http://localhost:11434")
+            println("  ${BOLD}Ollama$RESET       http://localhost:11434 ${DIM}(Docker)$RESET")
+        if (useHostOllama)
+            println("  ${BOLD}Ollama$RESET       ${GREEN}using host Ollama$RESET ${DIM}(host.docker.internal:11434)$RESET")
         println()
 
         // ── Quick start ──
@@ -670,6 +700,41 @@ services:
       - LLM_PROVIDER=@{LLM_PROVIDER:-}
       - LLM_MODEL=@{LLM_MODEL:-}
       - LLM_BASE_URL=@{LLM_BASE_URL:-}
+      - ANTHROPIC_API_KEY=@{ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=@{OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=@{GOOGLE_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:@{PORT:-9300}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  nocturnusai-data:
+    driver: local
+""".trimIndent() + "\n"
+
+        private val COMPOSE_HOST_OLLAMA = """
+services:
+  nocturnusai:
+    image: ghcr.io/auctalis/nocturnusai:latest
+    container_name: nocturnusai
+    restart: unless-stopped
+    ports:
+      - "@{PORT:-9300}:@{PORT:-9300}"
+    volumes:
+      - nocturnusai-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - PORT=@{PORT:-9300}
+      - HOST=0.0.0.0
+      - STORAGE_DIR=/data
+      - API_KEY=@{API_KEY:-}
+      - LLM_PROVIDER=@{LLM_PROVIDER:-}
+      - LLM_MODEL=@{LLM_MODEL:-}
+      - LLM_BASE_URL=@{LLM_BASE_URL:-http://host.docker.internal:11434}
       - ANTHROPIC_API_KEY=@{ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=@{OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=@{GOOGLE_API_KEY:-}
