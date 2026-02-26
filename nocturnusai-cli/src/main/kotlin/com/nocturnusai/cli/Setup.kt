@@ -371,7 +371,7 @@ class Setup(
             val hostAddr = detectHostAddress()
             setEnvKey(envFile, "LLM_PROVIDER", "ollama")
             setEnvKey(envFile, "LLM_MODEL", ollamaModel)
-            setEnvKey(envFile, "LLM_BASE_URL", "http://$hostAddr:11434")
+            setEnvKey(envFile, "LLM_BASE_URL", "http://$hostAddr:11434/v1")
             setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
             println("${GREEN}Using:$RESET existing Ollama on host with model ${BOLD}$ollamaModel$RESET")
             return
@@ -444,7 +444,7 @@ class Setup(
                 val hostAddr = detectHostAddress()
                 setEnvKey(envFile, "LLM_PROVIDER", "ollama")
                 setEnvKey(envFile, "LLM_MODEL", ollamaModel)
-                setEnvKey(envFile, "LLM_BASE_URL", "http://$hostAddr:11434")
+                setEnvKey(envFile, "LLM_BASE_URL", "http://$hostAddr:11434/v1")
                 setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
                 println("${GREEN}Using existing Ollama$RESET at $hostAddr:11434 with model ${BOLD}$ollamaModel$RESET")
                 println("${DIM}Make sure Ollama is running: ollama serve$RESET")

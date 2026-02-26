@@ -56,12 +56,11 @@ class Repl(private val client: Client) {
         )
     }
 
-    /** Render the colored db:tenant prompt. */
+    /** Render the colored db/tenant prompt. */
     private fun prompt(): String {
         val db = client.database
         val tenant = client.tenantId
-        val tenantPart = if (tenant != "default") ":${MAGENTA}$tenant${RESET}" else ""
-        return "${CYAN}${BOLD}$db${RESET}$tenantPart${DIM}>$RESET "
+        return "${CYAN}${BOLD}$db${RESET}${DIM}/${RESET}${MAGENTA}$tenant${RESET}${DIM}>${RESET} "
     }
 
     /** Execute a single command and exit (for -e flag / scripting) */
@@ -120,6 +119,7 @@ class Repl(private val client: Client) {
                     "import", "load"    -> doImport(rest)
                     "export", "dump"    -> doExport(rest)
                     "use"               -> doUse(rest)
+                    "tenant"            -> doTenant(rest)
                     "dbs"               -> doDbs()
                     "health"            -> doHealth()
                     "status"            -> doStatus()
@@ -494,9 +494,26 @@ class Repl(private val client: Client) {
     }
 
     private fun doUse(name: String) {
-        require(name.isNotBlank()) { "Usage: use <database>" }
-        client.database = name
-        println("${GREEN}Switched to $BOLD$name$RESET")
+        require(name.isNotBlank()) { "Usage: use <database> or use <database>/<tenant>" }
+        if ('/' in name) {
+            val (db, tenant) = name.split("/", limit = 2)
+            client.database = db
+            client.tenantId = tenant.ifBlank { "default" }
+            println("${GREEN}Switched to ${BOLD}${client.database}${RESET}${DIM}/${RESET}${MAGENTA}${client.tenantId}${RESET}")
+        } else {
+            client.database = name
+            println("${GREEN}Switched to ${BOLD}$name${RESET}${DIM}/${RESET}${MAGENTA}${client.tenantId}${RESET}")
+        }
+    }
+
+    private fun doTenant(name: String) {
+        if (name.isBlank()) {
+            println("${DIM}Current tenant:${RESET} ${MAGENTA}${BOLD}${client.tenantId}${RESET}")
+            println("${DIM}Usage: tenant <name>  (e.g., tenant alice)${RESET}")
+            return
+        }
+        client.tenantId = name
+        println("${GREEN}Tenant set to ${MAGENTA}${BOLD}$name${RESET}")
     }
 
     private fun doDbs() = runBlocking {
@@ -1060,11 +1077,8 @@ class Repl(private val client: Client) {
         println("${BOLD}${CYAN}NocturnusAI${RESET} ${DIM}v${BuildInfo.version}${RESET}  ${DIM}logic server for agentic AI${RESET}")
         println(separator())
         println("  ${DIM}Server  ${RESET}  ${client.server}")
-        println("  ${DIM}Database${RESET}  ${CYAN}${BOLD}${client.database}${RESET}")
-        val tenant = client.tenantId
-        if (tenant != "default") {
-            println("  ${DIM}Tenant  ${RESET}  ${MAGENTA}$tenant${RESET}")
-        }
+        println("  ${DIM}Database${RESET}  ${CYAN}${BOLD}${client.database}${RESET}  ${DIM}(use <name> to switch)${RESET}")
+        println("  ${DIM}Tenant  ${RESET}  ${MAGENTA}${BOLD}${client.tenantId}${RESET}  ${DIM}(tenant <name> to switch)${RESET}")
         if (client.hasApiKey) {
             println("  ${DIM}Auth    ${RESET}  ${GREEN}API key configured${RESET}")
         }
@@ -1140,7 +1154,11 @@ ${BOLD}Import / Export:${RESET}
   dsl <statement>                   Execute raw Logiql DSL
 
 ${BOLD}Admin:${RESET}
-  use <db>    dbs    health    status    setup
+  use <db>                            Switch database
+  use <db>/<tenant>                   Switch database and tenant at once
+  tenant <name>                       Switch tenant
+  dbs                                 List databases
+  health    status    setup           Server info & setup wizard
   clear       Clear screen
   history     Show recent command history
 

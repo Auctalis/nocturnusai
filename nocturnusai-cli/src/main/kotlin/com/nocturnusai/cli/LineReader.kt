@@ -526,7 +526,7 @@ class NaiCompletionProvider(
         private val COMMANDS = listOf(
             "ask", "tell", "teach", "forget",
             "inspect", "context", "compress", "cleanup",
-            "ingest", "status", "setup", "use",
+            "ingest", "status", "setup", "use", "tenant",
             "dbs", "health", "help", "export", "import",
             "dsl", "login", "whoami", "keys",
             "clear", "history",
