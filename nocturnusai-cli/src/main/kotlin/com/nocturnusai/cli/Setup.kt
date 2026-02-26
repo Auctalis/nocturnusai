@@ -223,8 +223,9 @@ class Setup(
     private fun setupEnvFile(): File {
         val envFile = File(installDir, ".env")
         if (!envFile.exists()) {
-            val example = File(installDir, ".env.example")
-            if (example.exists()) example.copyTo(envFile) else envFile.createNewFile()
+            // Create a fresh .env — don't copy .env.example which has
+            // active Ollama defaults that would conflict with cloud providers.
+            envFile.createNewFile()
         }
         return envFile
     }
@@ -243,6 +244,12 @@ class Setup(
             append("$key=$value\n")
         }
         file.writeText(content)
+    }
+
+    private fun clearEnvKey(file: File, key: String) {
+        if (!file.exists()) return
+        val lines = file.readLines().filter { !it.trimStart().startsWith("$key=") }
+        file.writeText(lines.joinToString("\n") + if (lines.isNotEmpty()) "\n" else "")
     }
 
     private fun envHasKey(file: File, key: String): Boolean =
@@ -317,6 +324,9 @@ class Setup(
                     }
                 }
             }
+            // Cloud provider — clear any stale Ollama base URL and enable extraction
+            clearEnvKey(envFile, "LLM_BASE_URL")
+            setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
             useOllama = false
             return
         }
@@ -325,6 +335,7 @@ class Setup(
         if (useOllama) {
             setEnvKey(envFile, "LLM_PROVIDER", "ollama")
             setEnvKey(envFile, "LLM_MODEL", "llama3.2")
+            setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
             println("${GREEN}Using:$RESET Ollama in Docker (local LLM — no API key needed)")
             return
         }
@@ -334,6 +345,7 @@ class Setup(
             setEnvKey(envFile, "LLM_PROVIDER", "ollama")
             setEnvKey(envFile, "LLM_MODEL", "llama3.2")
             setEnvKey(envFile, "LLM_BASE_URL", "http://host.docker.internal:11434")
+            setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
             println("${GREEN}Using:$RESET existing Ollama on host (host.docker.internal:11434)")
             return
         }
@@ -372,8 +384,14 @@ class Setup(
             println("  ${GREEN}Google Gemini configured$RESET")
         }
 
-        // Ollama — only if no cloud keys were entered
+        // Enable extraction when any cloud key is entered
         val hasCloudKey = !antKey.isNullOrBlank() || !oaiKey.isNullOrBlank() || !gglKey.isNullOrBlank()
+        if (hasCloudKey) {
+            clearEnvKey(envFile, "LLM_BASE_URL") // clear any stale Ollama URL
+            setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
+        }
+
+        // Ollama — only if no cloud keys were entered
         if (!hasCloudKey) {
             val choice = menu(
                 "No API keys entered. Use Ollama for local LLM?",
@@ -386,6 +404,7 @@ class Setup(
                     useOllama = true
                     setEnvKey(envFile, "LLM_PROVIDER", "ollama")
                     setEnvKey(envFile, "LLM_MODEL", "llama3.2")
+                    setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
                     println("${GREEN}Using Ollama.$RESET Model will download on first start (~2GB).")
                 }
                 2 -> {
@@ -393,6 +412,7 @@ class Setup(
                     setEnvKey(envFile, "LLM_PROVIDER", "ollama")
                     setEnvKey(envFile, "LLM_MODEL", "llama3.2")
                     setEnvKey(envFile, "LLM_BASE_URL", "http://host.docker.internal:11434")
+                    setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
                     println("${GREEN}Using existing Ollama$RESET at host.docker.internal:11434")
                     println("${DIM}Make sure Ollama is running: ollama serve$RESET")
                 }
@@ -886,6 +906,7 @@ services:
       - ANTHROPIC_API_KEY=@{ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=@{OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=@{GOOGLE_API_KEY:-}
+      - EXTRACTION_ENABLED=@{EXTRACTION_ENABLED:-false}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:@{PORT:-9300}/health"]
       interval: 10s
@@ -917,6 +938,7 @@ services:
       - ANTHROPIC_API_KEY=@{ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=@{OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=@{GOOGLE_API_KEY:-}
+      - EXTRACTION_ENABLED=@{EXTRACTION_ENABLED:-false}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:@{PORT:-9300}/health"]
       interval: 10s
@@ -946,6 +968,7 @@ services:
       - ANTHROPIC_API_KEY=@{ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=@{OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=@{GOOGLE_API_KEY:-}
+      - EXTRACTION_ENABLED=@{EXTRACTION_ENABLED:-false}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:@{PORT:-9300}/health"]
       interval: 10s

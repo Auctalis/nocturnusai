@@ -94,6 +94,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - EXTRACTION_ENABLED=${EXTRACTION_ENABLED:-false}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
       interval: 10s
