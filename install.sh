@@ -23,6 +23,140 @@ NC='\033[0m'
 
 trap 'echo ""; echo -e "${RED}${BOLD}Install failed at line $LINENO${NC}"; exit 1' ERR
 
+# ── Docker-only fallback ─────────────────────────────────────────────────────
+# When CLI binary isn't available, pull the Docker image directly and
+# generate a minimal compose file so the user gets a running server.
+docker_fallback() {
+    local port=9300
+    local install_dir="./nocturnusai"
+
+    # Parse --port and --dir from forwarded args
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --port) port="$2"; shift 2 ;;
+            --dir)  install_dir="$2"; shift 2 ;;
+            *)      shift ;;
+        esac
+    done
+
+    # Detect container runtime
+    local compose_cmd="" container_cmd=""
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        if docker compose version >/dev/null 2>&1; then
+            compose_cmd="docker compose"; container_cmd="docker"
+        elif command -v docker-compose >/dev/null 2>&1; then
+            compose_cmd="docker-compose"; container_cmd="docker"
+        fi
+    fi
+    if [ -z "$compose_cmd" ] && command -v podman >/dev/null 2>&1 && podman info >/dev/null 2>&1; then
+        if command -v podman-compose >/dev/null 2>&1; then
+            compose_cmd="podman-compose"; container_cmd="podman"
+        fi
+    fi
+
+    if [ -z "$compose_cmd" ]; then
+        echo -e "${RED}${BOLD}Docker or Podman is required.${NC}"
+        echo ""
+        echo -e "Install Docker:"
+        echo -e "  macOS:   brew install --cask docker"
+        echo -e "  Ubuntu:  curl -fsSL https://get.docker.com | sh"
+        exit 1
+    fi
+
+    echo -e "${GREEN}Found:${NC} $compose_cmd"
+
+    # Pull image
+    echo -e "Pulling ${BOLD}ghcr.io/auctalis/nocturnusai:latest${NC}..."
+    if ! $container_cmd pull ghcr.io/auctalis/nocturnusai:latest; then
+        echo -e "${RED}Failed to pull Docker image.${NC}"
+        exit 1
+    fi
+
+    # Create install directory and compose file
+    mkdir -p "$install_dir"
+    cat > "$install_dir/docker-compose.yml" <<'COMPOSE'
+services:
+  nocturnusai:
+    image: ghcr.io/auctalis/nocturnusai:latest
+    container_name: nocturnusai
+    restart: unless-stopped
+    ports:
+      - "${PORT:-9300}:${PORT:-9300}"
+    volumes:
+      - nocturnusai-data:/data
+    environment:
+      - PORT=${PORT:-9300}
+      - HOST=0.0.0.0
+      - STORAGE_DIR=/data
+      - API_KEY=${API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  nocturnusai-data:
+    driver: local
+COMPOSE
+
+    # Create .env with port
+    if [ ! -f "$install_dir/.env" ]; then
+        echo "PORT=$port" > "$install_dir/.env"
+    fi
+
+    # Start
+    echo ""
+    echo -e "${BOLD}Starting NocturnusAI...$NC"
+    (cd "$install_dir" && $compose_cmd up -d)
+
+    # Wait for health
+    echo ""
+    printf "Waiting for server"
+    for i in $(seq 1 30); do
+        if curl -sf "http://localhost:$port/health" >/dev/null 2>&1; then
+            echo ""
+            echo -e "${GREEN}${BOLD}Ready!${NC}"
+            break
+        fi
+        printf "."
+        sleep 2
+    done
+
+    # Banner
+    echo ""
+    echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}${BOLD}  NocturnusAI is running!${NC}"
+    echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "  ${BOLD}Server${NC}       http://localhost:$port"
+    echo -e "  ${BOLD}Health${NC}       http://localhost:$port/health"
+    echo -e "  ${BOLD}API Docs${NC}     http://localhost:$port/llm.txt"
+    echo -e "  ${BOLD}MCP${NC}          http://localhost:$port/mcp"
+    echo ""
+    echo -e "  ${CYAN}# Quick start${NC}"
+    echo -e "  curl -s http://localhost:$port/assert/fact \\"
+    echo -e "    -H 'Content-Type: application/json' \\"
+    echo -e "    -H 'X-Tenant-ID: default' \\"
+    echo -e "    -d '{\"predicate\":\"human\",\"args\":[\"socrates\"]}'"
+    echo ""
+    echo -e "  ${BOLD}Manage${NC}"
+    echo -e "  cd $(cd "$install_dir" && pwd)"
+    echo -e "  $compose_cmd logs -f nocturnusai   ${DIM}# tail logs${NC}"
+    echo -e "  $compose_cmd down                   ${DIM}# stop${NC}"
+    echo -e "  $compose_cmd up -d                  ${DIM}# restart${NC}"
+    echo ""
+    echo -e "  ${DIM}Config: $(cd "$install_dir" && pwd)/.env${NC}"
+    echo -e "  ${DIM}Note: Install the CLI binary for the full setup wizard with LLM config.${NC}"
+    echo ""
+}
+
 # ── Banner ──────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${CYAN}${BOLD}NocturnusAI${NC} — Logic server for Agentic AI"
@@ -55,12 +189,10 @@ tmp_path=$(mktemp)
 
 if ! curl -fsSL "$url" -o "$tmp_path" 2>/dev/null; then
     rm -f "$tmp_path"
-    echo -e "${RED}${BOLD}Download failed.${NC} No binary for ${os}/${arch}."
+    echo -e "${YELLOW}No CLI binary for ${os}/${arch} — falling back to Docker.$NC"
     echo ""
-    echo -e "Install from source instead:"
-    echo -e "  git clone https://github.com/Auctalis/nocturnusai.git"
-    echo -e "  cd nocturnusai && docker compose up --build -d"
-    exit 1
+    docker_fallback "$@"
+    exit 0
 fi
 
 chmod +x "$tmp_path"
@@ -73,8 +205,10 @@ if ! kill -0 "$_pid" 2>/dev/null; then
     # Process exited — check if it succeeded
     wait "$_pid" 2>/dev/null || {
         rm -f "$tmp_path"
-        echo -e "${RED}Binary not compatible with this platform.${NC}"
-        exit 1
+        echo -e "${YELLOW}Binary not compatible — falling back to Docker.$NC"
+        echo ""
+        docker_fallback "$@"
+        exit 0
     }
 else
     # Still running after 2s (old build with --help bug) — kill it, it's fine
