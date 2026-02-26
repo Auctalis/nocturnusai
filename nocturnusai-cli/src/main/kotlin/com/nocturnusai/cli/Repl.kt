@@ -17,19 +17,52 @@ package com.nocturnusai.cli
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import java.io.File
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 // ANSI colors
-private const val RESET  = "\u001B[0m"
-private const val BOLD   = "\u001B[1m"
-private const val DIM    = "\u001B[2m"
-private const val GREEN  = "\u001B[32m"
-private const val CYAN   = "\u001B[36m"
-private const val YELLOW = "\u001B[33m"
-private const val RED    = "\u001B[31m"
+private const val RESET   = "\u001B[0m"
+private const val BOLD    = "\u001B[1m"
+private const val DIM     = "\u001B[2m"
+private const val GREEN   = "\u001B[32m"
+private const val CYAN    = "\u001B[36m"
+private const val YELLOW  = "\u001B[33m"
+private const val RED     = "\u001B[31m"
+private const val MAGENTA = "\u001B[35m"
+
+/** Short HH:mm:ss timestamp for result headers. */
+private fun timestamp(): String {
+    val fmt = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault())
+    return fmt.format(Instant.now())
+}
+
+/** Horizontal rule sized to content. */
+private fun separator(width: Int = 60) = "${DIM}${"─".repeat(width)}${RESET}"
 
 class Repl(private val client: Client) {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+
+    // Lazy-init so the database-fetcher closure captures the live client.database
+    private val lineReader: LineReader by lazy {
+        LineReader(
+            completionProvider = NaiCompletionProvider {
+                try {
+                    val resp = runBlocking { client.listDatabases() }
+                    tryParseArray(resp).mapNotNull { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull }
+                } catch (_: Exception) { emptyList() }
+            }
+        )
+    }
+
+    /** Render the colored db:tenant prompt. */
+    private fun prompt(): String {
+        val db = client.database
+        val tenant = client.tenantId
+        val tenantPart = if (tenant != "default") ":${MAGENTA}$tenant${RESET}" else ""
+        return "${CYAN}${BOLD}$db${RESET}$tenantPart${DIM}>$RESET "
+    }
 
     /** Execute a single command and exit (for -e flag / scripting) */
     fun execSingle(command: String) {
@@ -68,46 +101,59 @@ class Repl(private val client: Client) {
         printBanner()
 
         while (true) {
-            print("$BOLD${client.database}$RESET$DIM>$RESET ")
-            val line = readlnOrNull()?.trim() ?: break
+            val line = lineReader.readLine(prompt())?.trim() ?: break
             if (line.isBlank()) continue
 
             val (cmd, rest) = splitFirst(line)
             try {
                 when (cmd.lowercase()) {
-                    "ask", "?"        -> doAsk(rest)
-                    "tell", "+"       -> doTell(rest)
-                    "teach", "++"     -> doTeach(rest)
-                    "forget", "-"     -> doForget(rest)
-                    "ingest"          -> doIngest(rest)
-                    "inspect", "ls"   -> doInspect(rest)
-                    "context", "ctx"  -> doContext(rest)
-                    "compress"        -> doCompress()
-                    "cleanup"         -> doCleanup(rest)
-                    "dsl", "exec"     -> doDsl(rest)
-                    "import", "load"  -> doImport(rest)
-                    "export", "dump"  -> doExport(rest)
-                    "use"             -> doUse(rest)
-                    "dbs"             -> doDbs()
-                    "health"          -> doHealth()
-                    "status"          -> doStatus()
-                    "setup"           -> doSetup()
-                    "login"           -> doLogin()
-                    "whoami"          -> doWhoAmI()
-                    "keys"            -> doKeys(rest)
-                    "help", "h"       -> printHelp()
+                    "ask", "?"          -> doAsk(rest)
+                    "tell", "+"         -> doTell(rest)
+                    "teach", "++"       -> doTeach(rest)
+                    "forget", "-"       -> doForget(rest)
+                    "ingest"            -> doIngest(rest)
+                    "inspect", "ls"     -> doInspect(rest)
+                    "context", "ctx"    -> doContext(rest)
+                    "compress"          -> doCompress()
+                    "cleanup"           -> doCleanup(rest)
+                    "dsl", "exec"       -> doDsl(rest)
+                    "import", "load"    -> doImport(rest)
+                    "export", "dump"    -> doExport(rest)
+                    "use"               -> doUse(rest)
+                    "dbs"               -> doDbs()
+                    "health"            -> doHealth()
+                    "status"            -> doStatus()
+                    "setup"             -> doSetup()
+                    "login"             -> doLogin()
+                    "whoami"            -> doWhoAmI()
+                    "keys"              -> doKeys(rest)
+                    "help", "h"         -> printHelp()
+                    "clear"             -> print("\u001B[2J\u001B[H")
+                    "history"           -> printHistory()
                     "exit", "quit", "q" -> { client.close(); return }
-                    else              -> {
-                        println("${RED}Unknown command: $cmd${RESET}")
+                    else                -> {
+                        println("${RED}Unknown command:${RESET} $cmd")
                         println("${DIM}Type 'help' for available commands.${RESET}")
                     }
                 }
             } catch (e: Exception) {
-                println("${RED}Error: ${e.message}${RESET}")
+                println()
+                println("${RED}${BOLD}Error${RESET}  ${e.message}")
+                println(separator())
             }
         }
 
         client.close()
+    }
+
+    /** Show recent history entries. */
+    private fun printHistory() {
+        val hist = LineReader.defaultHistoryFile()
+        if (!hist.exists()) { println("${DIM}No history yet.${RESET}"); return }
+        val lines = hist.readLines().filter { it.isNotBlank() }.takeLast(50)
+        lines.forEachIndexed { i, l ->
+            println("  ${DIM}${(lines.size - lines.size + i + 1).toString().padStart(3)}${RESET}  $l")
+        }
     }
 
     // ── commands ──
@@ -150,33 +196,39 @@ class Repl(private val client: Client) {
             val model = obj["model"]?.jsonPrimitive?.contentOrNull
 
             println()
-            println("  $answer")
+            println("  ${BOLD}$answer${RESET}")
             println()
 
             if (derivation.isNotEmpty()) {
-                println("${DIM}Derivation:${RESET}")
-                for (step in derivation) {
+                println("${DIM}Reasoning chain:${RESET}")
+                for ((idx, step) in derivation.withIndex()) {
                     val fact = step.jsonObject["fact"]?.jsonPrimitive?.contentOrNull ?: ""
                     val type = step.jsonObject["type"]?.jsonPrimitive?.contentOrNull ?: ""
                     val rule = step.jsonObject["rule"]?.jsonPrimitive?.contentOrNull
                     val typeTag = when (type) {
-                        "fact_match" -> "${GREEN}fact${RESET}"
+                        "fact_match"       -> "${GREEN}fact${RESET}"
                         "rule_application" -> "${CYAN}rule${RESET}"
-                        else -> "${DIM}$type${RESET}"
+                        else               -> "${DIM}$type${RESET}"
                     }
-                    print("  $typeTag  $fact")
+                    val idx1 = (idx + 1).toString().padStart(2)
+                    print("  ${DIM}$idx1${RESET}  $typeTag  $fact")
                     if (rule != null) print("  ${DIM}via $rule${RESET}")
                     println()
                 }
             }
 
             if (missing.isNotBlank()) {
-                println("${DIM}Gaps: $missing${RESET}")
+                println("  ${YELLOW}Missing context:${RESET} $missing")
             }
 
             val confStr = String.format("%.0f%%", confidence * 100)
-            val providerStr = if (model != null) "$provider/$model" else ""
-            println("${DIM}Confidence: $confStr  $providerStr${RESET}")
+            val confColor = when {
+                confidence >= 0.8f -> GREEN
+                confidence >= 0.5f -> YELLOW
+                else               -> RED
+            }
+            val providerStr = if (model != null) "  ${DIM}$provider/$model${RESET}" else ""
+            println("  ${DIM}Confidence:${RESET} ${confColor}$confStr${RESET}$providerStr  ${DIM}${timestamp()}${RESET}")
 
         } catch (_: Exception) {
             println(resp)
@@ -283,23 +335,33 @@ class Repl(private val client: Client) {
         val rules = tryParseArray(rulesRaw)
 
         val filterLower = filter.lowercase()
+        val filterLabel = if (filterLower.isBlank()) "" else "  ${DIM}filter: $filterLower${RESET}"
 
-        var count = 0
+        var factCount = 0
+        var ruleCount = 0
+
         for (f in facts) {
             val line = formatAtom(f)
             if (filterLower.isBlank() || line.lowercase().contains(filterLower)) {
-                println("  ${DIM}fact${RESET}  $line")
-                count++
+                println("  ${GREEN}fact${RESET}  $line")
+                factCount++
             }
         }
         for (r in rules) {
             val line = formatRule(r)
             if (filterLower.isBlank() || line.lowercase().contains(filterLower)) {
-                println("  ${DIM}rule${RESET}  $line")
-                count++
+                println("  ${CYAN}rule${RESET}  $line")
+                ruleCount++
             }
         }
-        println("${DIM}$count item(s)${RESET}")
+
+        println()
+        val total = factCount + ruleCount
+        if (total == 0) {
+            println("${DIM}No knowledge stored yet.${RESET}")
+        } else {
+            println("${DIM}$factCount fact(s), $ruleCount rule(s)$filterLabel — ${timestamp()}${RESET}")
+        }
     }
 
     private fun doContext(text: String) = runBlocking {
@@ -312,15 +374,30 @@ class Repl(private val client: Client) {
         }
         val total = obj["totalAvailable"]?.jsonPrimitive?.intOrNull ?: scored.size
 
-        println("${BOLD}Context Window$RESET — ${scored.size} of $total facts (by salience)")
+        println("${BOLD}Context Window${RESET}  ${DIM}${scored.size} of $total (by salience) — ${timestamp()}${RESET}")
+        println(separator())
         for (s in scored) {
             val salience = s.jsonObject["salience"]?.jsonPrimitive?.doubleOrNull ?: 0.0
             val atom = s.jsonObject["atom"]?.jsonObject
             if (atom != null) {
                 val line = formatAtom(atom)
-                println("  ${DIM}[${String.format("%.3f", salience)}]${RESET}  $line")
+                val salienceColor = when {
+                    salience >= 0.7 -> GREEN
+                    salience >= 0.4 -> YELLOW
+                    else            -> DIM
+                }
+                val bar = buildSalienceBar(salience)
+                println("  $salienceColor${String.format("%.3f", salience)}${RESET}  $bar  $line")
             }
         }
+        println(separator())
+    }
+
+    /** Renders a compact 5-char salience bar like [████░] */
+    private fun buildSalienceBar(salience: Double): String {
+        val filled = (salience * 5).toInt().coerceIn(0, 5)
+        val bar = "█".repeat(filled) + "░".repeat(5 - filled)
+        return "${DIM}[$bar]${RESET}"
     }
 
     private fun doCompress() = runBlocking {
@@ -932,7 +1009,8 @@ class Repl(private val client: Client) {
                             else -> println("  $item")
                         }
                     }
-                    println("${DIM}${el.size} result(s)${RESET}")
+                    println()
+                    println("${DIM}${el.size} result(s) — ${timestamp()}${RESET}")
                 }
                 is JsonPrimitive -> println(el.content)
                 else -> println(raw)
@@ -979,12 +1057,18 @@ class Repl(private val client: Client) {
 
     private fun printBanner() {
         println()
-        println("${BOLD}NocturnusAI CLI v${BuildInfo.version}$RESET — logic server for agentic AI")
-        println("${DIM}Server:   ${client.server}${RESET}")
-        println("${DIM}Database: ${client.database}${RESET}")
-        if (client.hasApiKey) {
-            println("${DIM}Auth:     ${GREEN}API key configured${RESET}")
+        println("${BOLD}${CYAN}NocturnusAI${RESET} ${DIM}v${BuildInfo.version}${RESET}  ${DIM}logic server for agentic AI${RESET}")
+        println(separator())
+        println("  ${DIM}Server  ${RESET}  ${client.server}")
+        println("  ${DIM}Database${RESET}  ${CYAN}${BOLD}${client.database}${RESET}")
+        val tenant = client.tenantId
+        if (tenant != "default") {
+            println("  ${DIM}Tenant  ${RESET}  ${MAGENTA}$tenant${RESET}")
         }
+        if (client.hasApiKey) {
+            println("  ${DIM}Auth    ${RESET}  ${GREEN}API key configured${RESET}")
+        }
+        print("  ${DIM}Status  ${RESET}  ")
 
         // Quick connectivity check
         try {
@@ -992,9 +1076,9 @@ class Repl(private val client: Client) {
             val obj = json.parseToJsonElement(resp).jsonObject
             val status = obj["status"]?.jsonPrimitive?.contentOrNull ?: "unknown"
             when (status) {
-                "healthy" -> println("${GREEN}Connected.${RESET}")
-                "degraded" -> println("${YELLOW}Connected (degraded).${RESET}")
-                else -> println("${RED}Connected ($status).${RESET}")
+                "healthy"  -> println("${GREEN}connected${RESET}")
+                "degraded" -> println("${YELLOW}connected (degraded)${RESET}")
+                else       -> println("${RED}$status${RESET}")
             }
 
             // Check if server requires auth but we have no key
@@ -1005,55 +1089,74 @@ class Repl(private val client: Client) {
                     val authEnabled = authObj["authEnabled"]?.jsonPrimitive?.booleanOrNull ?: false
                     val legacyKey = authObj["legacyApiKeySet"]?.jsonPrimitive?.booleanOrNull ?: false
                     if (authEnabled || legacyKey) {
-                        println("${YELLOW}Warning: Server requires authentication but no API key configured.${RESET}")
-                        println("${DIM}Run 'nocturnusai setup' or use --api-key flag.${RESET}")
+                        println()
+                        println("  ${YELLOW}Warning:${RESET} server requires auth but no API key is set.")
+                        println("  ${DIM}Run 'setup' or use --api-key flag.${RESET}")
                     }
                 } catch (_: Exception) {}
             }
         } catch (e: Exception) {
-            println("${RED}Cannot reach server: ${e.message}${RESET}")
-            println("${DIM}Is the server running? Start with: nocturnusai setup${RESET}")
+            println("${RED}unreachable${RESET}  ${DIM}(${e.message})${RESET}")
+            println()
+            println("  ${DIM}Is the server running?  nocturnusai setup${RESET}")
         }
 
-        println("${DIM}Type 'help' for commands, 'status' for details, 'setup' to configure LLM.${RESET}")
+        println(separator())
+        println("  ${DIM}Tab for completion  •  Arrow keys for history  •  type 'help'${RESET}")
         println()
     }
 
     private fun printHelp() {
         println("""
-${BOLD}Try these now:$RESET
+${BOLD}Quick start:${RESET}
   tell human(socrates)              Store a fact
   teach mortal(?x) :- human(?x)    Define a rule
-  ask mortal(?who)                  Query — returns: ?who = socrates
-  inspect                           See all stored knowledge
+  ask mortal(?who)                  Query  →  ?who = socrates
+  inspect                           Browse all stored knowledge
 
-${BOLD}Core commands:$RESET
-  tell  <pred(args)>                Store a fact        ${DIM}shortcut: +$RESET
-  teach <head :- body>              Define a rule       ${DIM}shortcut: ++$RESET
-  ask   <pred(?var)>                Query               ${DIM}shortcut: ?$RESET
-  forget <pred(args)>               Remove a fact       ${DIM}shortcut: -$RESET
+${BOLD}Core commands:${RESET}
+  tell  <pred(args)>                Store a fact              ${DIM}shortcut: +${RESET}
+  teach <head :- body>              Define a rule             ${DIM}shortcut: ++${RESET}
+  ask   <pred(?var)>                Query with unification    ${DIM}shortcut: ?${RESET}
+  forget <pred(args)>               Retract a fact            ${DIM}shortcut: -${RESET}
 
-${BOLD}Explore:$RESET
-  inspect [filter]                  Browse knowledge    ${DIM}shortcut: ls$RESET
-  context [max]                     Salience-ranked     ${DIM}shortcut: ctx$RESET
+${BOLD}Explore knowledge:${RESET}
+  inspect [filter]                  List facts & rules        ${DIM}shortcut: ls${RESET}
+  context [max]                     Salience-ranked context   ${DIM}shortcut: ctx${RESET}
 
-${BOLD}Natural language (requires LLM — run 'status' to check):$RESET
+${BOLD}Natural language  ${DIM}(requires LLM — run 'status' to check)${RESET}${BOLD}:${RESET}
   ingest <text>                     Extract facts from text via LLM
   ingest -f <file>                  Extract from file
-  ask <plain English question>      LLM-powered Q&A
-  tell <plain English statement>    LLM-powered fact extraction
+  ask <plain English question>      LLM-powered Q&A from the knowledge base
+  tell <plain English statement>    LLM-powered extraction + assert
 
-${BOLD}Import / Export:$RESET
+${BOLD}Memory management:${RESET}
+  compress                          Consolidate episodic facts → semantic
+  cleanup [threshold]               Evict expired / low-salience facts
+
+${BOLD}Import / Export:${RESET}
   import <file.ab>                  Load facts & rules from file
   export [file.ab]                  Dump knowledge (to file or stdout)
+  dsl <statement>                   Execute raw Logiql DSL
 
-${BOLD}Admin:$RESET
+${BOLD}Admin:${RESET}
   use <db>    dbs    health    status    setup
+  clear       Clear screen
+  history     Show recent command history
 
-${BOLD}Auth:$RESET
+${BOLD}Auth:${RESET}
   login    whoami    keys list    keys create <name> [role]    keys revoke <id>
 
-  ${DIM}q = exit    exec = raw DSL    help = this message$RESET
+${BOLD}Navigation:${RESET}
+  Tab           Complete command or show hints
+  Up / Down     Browse history
+  Ctrl+A/E      Move to start/end of line
+  Ctrl+U        Clear line
+  Ctrl+W        Delete word
+  Ctrl+R        (coming soon) reverse search
+  q / exit      Quit
+
+  ${DIM}exec / dsl = raw DSL    h / help = this message${RESET}
         """.trimIndent())
     }
 
