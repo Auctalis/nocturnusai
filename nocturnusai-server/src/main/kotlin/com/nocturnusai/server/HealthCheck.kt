@@ -20,6 +20,7 @@ import java.io.File
 @Serializable
 data class HealthStatus(
     val status: String, // "healthy", "degraded", "unhealthy"
+    val version: String = BuildInfo.version,
     val checks: Map<String, CheckResult>
 )
 

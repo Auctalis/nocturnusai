@@ -47,8 +47,24 @@ tasks.named<JavaExec>("run") {
     }
 }
 
+// Generate version.properties from Gradle project version
+tasks.register("generateVersionProperties") {
+    val outputDir = layout.buildDirectory.dir("generated-resources")
+    outputs.dir(outputDir)
+    doLast {
+        val dir = outputDir.get().asFile.resolve("version")
+        dir.mkdirs()
+        dir.resolve("version.properties").writeText("version=${project.version}\n")
+    }
+}
+
 tasks.named<Copy>("processResources") {
     from(rootProject.file("USERGUIDE.md"))
+    dependsOn("generateVersionProperties")
+}
+
+sourceSets.main {
+    resources.srcDir(layout.buildDirectory.dir("generated-resources"))
 }
 
 dependencies {

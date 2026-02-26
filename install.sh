@@ -29,13 +29,15 @@ trap 'echo ""; echo -e "${RED}${BOLD}Install failed at line $LINENO${NC}"; exit 
 docker_fallback() {
     local port=9300
     local install_dir="./nocturnusai"
+    local use_ollama=false
 
-    # Parse --port and --dir from forwarded args
+    # Parse --port, --dir, --ollama from forwarded args
     while [ $# -gt 0 ]; do
         case "$1" in
-            --port) port="$2"; shift 2 ;;
-            --dir)  install_dir="$2"; shift 2 ;;
-            *)      shift ;;
+            --port)   port="$2"; shift 2 ;;
+            --dir)    install_dir="$2"; shift 2 ;;
+            --ollama) use_ollama=true; shift ;;
+            *)        shift ;;
         esac
     done
 
@@ -74,7 +76,51 @@ docker_fallback() {
 
     # Create install directory and compose file
     mkdir -p "$install_dir/data"
-    cat > "$install_dir/docker-compose.yml" <<'COMPOSE'
+
+    if [ "$use_ollama" = true ]; then
+        cat > "$install_dir/docker-compose.yml" <<'COMPOSE'
+services:
+  nocturnusai:
+    image: ghcr.io/auctalis/nocturnusai:latest
+    container_name: nocturnusai
+    restart: unless-stopped
+    ports:
+      - "${PORT:-9300}:${PORT:-9300}"
+    volumes:
+      - ./data:/data
+    environment:
+      - PORT=${PORT:-9300}
+      - HOST=0.0.0.0
+      - STORAGE_DIR=/data
+      - API_KEY=${API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_MODEL=${LLM_MODEL:-llama3.2}
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://ollama:11434/v1}
+      - EXTRACTION_ENABLED=${EXTRACTION_ENABLED:-true}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nocturnusai-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+COMPOSE
+    else
+        cat > "$install_dir/docker-compose.yml" <<'COMPOSE'
 services:
   nocturnusai:
     image: ghcr.io/auctalis/nocturnusai:latest
@@ -91,6 +137,7 @@ services:
       - API_KEY=${API_KEY:-}
       - LLM_PROVIDER=${LLM_PROVIDER:-}
       - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
@@ -102,6 +149,7 @@ services:
       retries: 5
       start_period: 30s
 COMPOSE
+    fi
 
     # Create .env with port
     if [ ! -f "$install_dir/.env" ]; then
@@ -126,6 +174,22 @@ COMPOSE
         sleep 2
     done
 
+    # Pull Ollama model if needed
+    if [ "$use_ollama" = true ]; then
+        echo ""
+        printf "Waiting for Ollama"
+        for i in $(seq 1 15); do
+            if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
+                echo " ready"
+                echo -e "${DIM}Pulling model (llama3.2)... runs in background.${NC}"
+                curl -sf http://localhost:11434/api/pull -d '{"name":"llama3.2"}' >/dev/null 2>&1 &
+                break
+            fi
+            printf "."
+            sleep 2
+        done
+    fi
+
     # Banner
     echo ""
     echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -133,6 +197,9 @@ COMPOSE
     echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
     echo -e "  ${BOLD}Server${NC}       http://localhost:$port"
+    if [ "$use_ollama" = true ]; then
+        echo -e "  ${BOLD}Ollama${NC}       http://localhost:11434 ${DIM}(Docker)${NC}"
+    fi
     echo -e "  ${BOLD}Health${NC}       http://localhost:$port/health"
     echo -e "  ${BOLD}API Docs${NC}     http://localhost:$port/llm.txt"
     echo -e "  ${BOLD}MCP${NC}          http://localhost:$port/mcp"

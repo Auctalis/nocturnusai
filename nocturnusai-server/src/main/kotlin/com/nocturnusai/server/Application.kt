@@ -249,7 +249,7 @@ fun Application.module() {
 
     // ── Legal & safety notice ─────────────────────────────────────────────
     environment.log.info("──────────────────────────────────────────────────────────────────")
-    environment.log.info("NocturnusAI — Logic Server for Agentic AI")
+    environment.log.info("NocturnusAI v${BuildInfo.version} — Logic Server for Agentic AI")
     environment.log.info("Licensed under BSL 1.1 — (c) 2026 Auctalis LLC")
     environment.log.info("")
     environment.log.info("NOTICE: Engine output reflects logical consistency of inference,")

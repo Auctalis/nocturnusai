@@ -63,6 +63,12 @@ jobs:
       - name: Cache Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Inject version from git tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/^    version = \".*\"/    version = \"${VERSION}\"/" build.gradle.kts
+          echo "Set Gradle version to ${VERSION}"
+
       - name: Build native binary
         run: ./gradlew :nocturnusai-cli:nativeCompile -PnativeRelease --no-daemon
         env:
@@ -103,6 +109,12 @@ jobs:
             slug: arm64
     steps:
       - uses: actions/checkout@v4
+
+      - name: Inject version from git tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/^    version = \".*\"/    version = \"${VERSION}\"/" build.gradle.kts
+          echo "Set Gradle version to ${VERSION}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

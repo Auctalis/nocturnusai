@@ -979,7 +979,7 @@ class Repl(private val client: Client) {
 
     private fun printBanner() {
         println()
-        println("${BOLD}NocturnusAI CLI$RESET — logic server for agentic AI")
+        println("${BOLD}NocturnusAI CLI v${BuildInfo.version}$RESET — logic server for agentic AI")
         println("${DIM}Server:   ${client.server}${RESET}")
         println("${DIM}Database: ${client.database}${RESET}")
         if (client.hasApiKey) {
