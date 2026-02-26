@@ -31,7 +31,7 @@ class Setup(
     private val dir: String = "./nocturnusai",
     private val port: Int = 9300,
     private val ollamaFlag: Boolean = false,
-    private val llmKey: String? = null,
+    private val llmKeys: List<String> = emptyList(),
     private val nonInteractive: Boolean = false,
 ) {
     private val interactive = !nonInteractive && System.console() != null
@@ -266,24 +266,26 @@ class Setup(
     // ── LLM configuration ──────────────────────────────────────────────────────
 
     private fun configureLlm(envFile: File) {
-        // Flag: --key
-        if (llmKey != null) {
-            when {
-                llmKey.startsWith("sk-ant-") -> {
-                    println("${GREEN}Detected:$RESET Anthropic Claude")
-                    setEnvKey(envFile, "ANTHROPIC_API_KEY", llmKey)
-                }
-                llmKey.startsWith("sk-") -> {
-                    println("${GREEN}Detected:$RESET OpenAI")
-                    setEnvKey(envFile, "OPENAI_API_KEY", llmKey)
-                }
-                llmKey.startsWith("AIza") -> {
-                    println("${GREEN}Detected:$RESET Google Gemini")
-                    setEnvKey(envFile, "GOOGLE_API_KEY", llmKey)
-                }
-                else -> {
-                    println("${YELLOW}Unknown key format — setting as LLM_API_KEY$RESET")
-                    setEnvKey(envFile, "LLM_API_KEY", llmKey)
+        // Flag: --key (can be passed multiple times via repeated --key args)
+        if (llmKeys.isNotEmpty()) {
+            for (k in llmKeys) {
+                when {
+                    k.startsWith("sk-ant-") -> {
+                        println("${GREEN}Detected:$RESET Anthropic Claude")
+                        setEnvKey(envFile, "ANTHROPIC_API_KEY", k)
+                    }
+                    k.startsWith("sk-") -> {
+                        println("${GREEN}Detected:$RESET OpenAI")
+                        setEnvKey(envFile, "OPENAI_API_KEY", k)
+                    }
+                    k.startsWith("AIza") -> {
+                        println("${GREEN}Detected:$RESET Google Gemini")
+                        setEnvKey(envFile, "GOOGLE_API_KEY", k)
+                    }
+                    else -> {
+                        println("${YELLOW}Unknown key format — setting as LLM_API_KEY$RESET")
+                        setEnvKey(envFile, "LLM_API_KEY", k)
+                    }
                 }
             }
             useOllama = false
@@ -305,35 +307,48 @@ class Setup(
             return
         }
 
-        // Interactive wizard
-        val choice = menu(
-            "Choose your LLM provider (optional — core API works without one):",
-            "Skip (configure later in .env)",
-            "Anthropic Claude",
-            "OpenAI GPT",
-            "Google Gemini",
-            "Ollama (local, free, private — downloads ~2GB)",
-        )
+        // Interactive wizard — configure each provider, allowing multiple
+        println()
+        println("${BOLD}LLM Configuration$RESET ${DIM}(optional — core API works without one)$RESET")
+        println("${DIM}You can configure multiple providers. The server uses whichever key is available.$RESET")
+        println()
 
-        when (choice) {
-            0 -> println("${YELLOW}Skipped.$RESET Edit .env later to add an LLM provider.")
-            1 -> {
-                val key = prompt("Anthropic API key (sk-ant-...)") ?: return
-                if (key.isNotBlank()) setEnvKey(envFile, "ANTHROPIC_API_KEY", key)
-            }
-            2 -> {
-                val key = prompt("OpenAI API key (sk-...)") ?: return
-                if (key.isNotBlank()) setEnvKey(envFile, "OPENAI_API_KEY", key)
-            }
-            3 -> {
-                val key = prompt("Google API key (AIza...)") ?: return
-                if (key.isNotBlank()) setEnvKey(envFile, "GOOGLE_API_KEY", key)
-            }
-            4 -> {
+        // Anthropic
+        val antKey = prompt("Anthropic API key ${DIM}(sk-ant-... or Enter to skip)$RESET")
+        if (!antKey.isNullOrBlank()) {
+            setEnvKey(envFile, "ANTHROPIC_API_KEY", antKey)
+            println("  ${GREEN}Anthropic Claude configured$RESET")
+        }
+
+        // OpenAI
+        val oaiKey = prompt("OpenAI API key ${DIM}(sk-... or Enter to skip)$RESET")
+        if (!oaiKey.isNullOrBlank()) {
+            setEnvKey(envFile, "OPENAI_API_KEY", oaiKey)
+            println("  ${GREEN}OpenAI GPT configured$RESET")
+        }
+
+        // Google
+        val gglKey = prompt("Google API key ${DIM}(AIza... or Enter to skip)$RESET")
+        if (!gglKey.isNullOrBlank()) {
+            setEnvKey(envFile, "GOOGLE_API_KEY", gglKey)
+            println("  ${GREEN}Google Gemini configured$RESET")
+        }
+
+        // Ollama — only if no cloud keys were entered
+        val hasCloudKey = !antKey.isNullOrBlank() || !oaiKey.isNullOrBlank() || !gglKey.isNullOrBlank()
+        if (!hasCloudKey) {
+            val choice = menu(
+                "No API keys entered. Use Ollama for local LLM?",
+                "Skip (configure later in .env)",
+                "Yes — use Ollama (free, private — downloads ~2GB)",
+            )
+            if (choice == 1) {
                 useOllama = true
                 setEnvKey(envFile, "LLM_PROVIDER", "ollama")
                 setEnvKey(envFile, "LLM_MODEL", "llama3.2")
                 println("${GREEN}Using Ollama.$RESET Model will download on first start (~2GB).")
+            } else {
+                println("${DIM}Skipped — edit .env later to add LLM provider keys.$RESET")
             }
         }
     }
@@ -383,13 +398,16 @@ class Setup(
     // ── Status detection ───────────────────────────────────────────────────────
 
     private fun detectStatus(envFile: File) {
-        when {
-            envHasKey(envFile, "ANTHROPIC_API_KEY") -> { llmConfigured = true; llmProviderLabel = "Anthropic Claude" }
-            envHasKey(envFile, "OPENAI_API_KEY")    -> { llmConfigured = true; llmProviderLabel = "OpenAI GPT" }
-            envHasKey(envFile, "GOOGLE_API_KEY")    -> { llmConfigured = true; llmProviderLabel = "Google Gemini" }
-            envHasKey(envFile, "LLM_API_KEY")       -> { llmConfigured = true; llmProviderLabel = "Custom LLM" }
+        val providers = mutableListOf<String>()
+        if (envHasKey(envFile, "ANTHROPIC_API_KEY")) providers.add("Anthropic Claude")
+        if (envHasKey(envFile, "OPENAI_API_KEY"))    providers.add("OpenAI GPT")
+        if (envHasKey(envFile, "GOOGLE_API_KEY"))    providers.add("Google Gemini")
+        if (envHasKey(envFile, "LLM_API_KEY"))       providers.add("Custom LLM")
+        if (useOllama) providers.add("Ollama (local)")
+        if (providers.isNotEmpty()) {
+            llmConfigured = true
+            llmProviderLabel = providers.joinToString(", ")
         }
-        if (useOllama) { llmConfigured = true; llmProviderLabel = "Ollama (local)" }
         authConfigured = envHasKey(envFile, "API_KEY")
     }
 

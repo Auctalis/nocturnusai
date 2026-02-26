@@ -178,6 +178,16 @@ if [ -w "/usr/local/bin" ]; then
 elif sudo -n true 2>/dev/null; then
     install_path="/usr/local/bin/nocturnusai"
     SUDO="sudo"
+elif [ -e /dev/tty ]; then
+    # Interactive — ask for sudo to install to /usr/local/bin
+    echo -e "${DIM}/usr/local/bin is not writable. Requesting sudo access...${NC}"
+    if sudo -v 2>/dev/null < /dev/tty; then
+        install_path="/usr/local/bin/nocturnusai"
+        SUDO="sudo"
+    else
+        mkdir -p "$HOME/.local/bin"
+        install_path="$HOME/.local/bin/nocturnusai"
+    fi
 else
     mkdir -p "$HOME/.local/bin"
     install_path="$HOME/.local/bin/nocturnusai"
@@ -187,7 +197,7 @@ fi
 echo -e "Downloading ${BOLD}${binary}${NC}..."
 tmp_path=$(mktemp)
 
-if ! curl -fL --progress-bar "$url" -o "$tmp_path" 2>&1; then
+if ! curl -fL --progress-bar "$url" -o "$tmp_path"; then
     rm -f "$tmp_path"
     echo -e "${YELLOW}No CLI binary for ${os}/${arch} — falling back to Docker.$NC"
     echo ""
@@ -226,13 +236,17 @@ echo -e "${GREEN}CLI installed:${NC} $install_path"
 
 # ── Add ~/.local/bin to PATH if needed ──────────────────────────────────────
 if [[ "$install_path" == *".local/bin"* ]]; then
+    added_to_rc=false
     for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
         if [ -f "$rc" ] && ! grep -q '\.local/bin' "$rc"; then
             echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
-            echo -e "${DIM}  Added ~/.local/bin to PATH in $rc${NC}"
+            added_to_rc=true
         fi
     done
     export PATH="$HOME/.local/bin:$PATH"
+    if $added_to_rc; then
+        echo -e "${YELLOW}Note:${NC} Installed to ~/.local/bin — run ${BOLD}source ~/.zshrc${NC} or open a new terminal to use ${BOLD}nocturnusai${NC}"
+    fi
 fi
 
 # ── Run setup wizard ────────────────────────────────────────────────────────

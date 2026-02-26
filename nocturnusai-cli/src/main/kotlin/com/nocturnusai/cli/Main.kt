@@ -24,7 +24,7 @@ fun main(args: Array<String>) {
             dir = setupArgs.dir,
             port = setupArgs.port,
             ollamaFlag = setupArgs.ollama,
-            llmKey = setupArgs.key,
+            llmKeys = setupArgs.keys,
             nonInteractive = setupArgs.nonInteractive,
         ).run()
         exitProcess(code)
@@ -85,7 +85,7 @@ internal data class SetupArgs(
     val dir: String = "./nocturnusai",
     val port: Int = 9300,
     val ollama: Boolean = false,
-    val key: String? = null,
+    val keys: List<String> = emptyList(),
     val nonInteractive: Boolean = false,
 )
 
@@ -93,7 +93,7 @@ internal fun parseSetupArgs(args: Array<String>): SetupArgs {
     var dir = "./nocturnusai"
     var port = 9300
     var ollama = false
-    var key: String? = null
+    val keys = mutableListOf<String>()
     var nonInteractive = false
 
     var i = 0
@@ -102,14 +102,14 @@ internal fun parseSetupArgs(args: Array<String>): SetupArgs {
             "--dir"             -> { dir = args.getOrElse(i + 1) { dir }; i += 2 }
             "--port"            -> { port = args.getOrElse(i + 1) { "9300" }.toIntOrNull() ?: 9300; i += 2 }
             "--ollama"          -> { ollama = true; i++ }
-            "--key"             -> { key = args.getOrElse(i + 1) { null }; i += 2 }
+            "--key"             -> { args.getOrElse(i + 1) { null }?.let { keys.add(it) }; i += 2 }
             "--non-interactive" -> { nonInteractive = true; i++ }
             "--help", "-h"      -> { printSetupUsage(); exitProcess(0) }
             else                -> { i++ }
         }
     }
 
-    return SetupArgs(dir, port, ollama, key, nonInteractive)
+    return SetupArgs(dir, port, ollama, keys, nonInteractive)
 }
 
 // ── Help text ──────────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ Options:
   --dir DIR              Install directory (default: ./nocturnusai)
   --port PORT            Server port (default: 9300)
   --ollama               Use Ollama for local LLM (no API key needed)
-  --key KEY              LLM API key (auto-detects Anthropic/OpenAI/Google)
+  --key KEY              LLM API key (repeatable, auto-detects provider)
   --non-interactive      Skip interactive prompts, use defaults
   -h, --help             Show this help
 
@@ -170,6 +170,7 @@ Examples:
   nocturnusai setup                           # interactive wizard
   nocturnusai setup --ollama                  # local Ollama, no API key
   nocturnusai setup --key sk-ant-abc123...    # Anthropic Claude
+  nocturnusai setup --key sk-ant-... --key sk-...  # multiple providers
   nocturnusai setup --port 8080 --dir ./ai    # custom port and directory
     """.trimIndent())
 }
