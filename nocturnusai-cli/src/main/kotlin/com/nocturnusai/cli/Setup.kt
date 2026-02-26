@@ -357,68 +357,69 @@ class Setup(
             return
         }
 
-        // Interactive wizard — configure each provider, allowing multiple
-        println()
-        println("${BOLD}LLM Configuration$RESET ${DIM}(optional — core API works without one)$RESET")
-        println("${DIM}You can configure multiple providers. The server uses whichever key is available.$RESET")
-        println()
+        // Interactive wizard — top-level LLM choice
+        val llmChoice = menu(
+            "LLM Provider ${DIM}(optional — core logic API works without one)$RESET",
+            "Ollama — run locally in Docker (free, private, no API key needed)",
+            "Cloud API key (Anthropic, OpenAI, or Google)",
+            "I already have Ollama running on this machine",
+            "Skip — no LLM (configure later in .env)",
+        )
 
-        // Anthropic
-        val antKey = prompt("Anthropic API key ${DIM}(sk-ant-... or Enter to skip)$RESET")
-        if (!antKey.isNullOrBlank()) {
-            setEnvKey(envFile, "ANTHROPIC_API_KEY", antKey)
-            println("  ${GREEN}Anthropic Claude configured$RESET")
-        }
+        when (llmChoice) {
+            0 -> {
+                // Ollama in Docker
+                useOllama = true
+                setEnvKey(envFile, "LLM_PROVIDER", "ollama")
+                setEnvKey(envFile, "LLM_MODEL", "llama3.2")
+                setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
+                println("${GREEN}Using Ollama in Docker.$RESET Model will download on first start (~2GB).")
+            }
+            1 -> {
+                // Cloud API keys
+                println()
+                println("${DIM}Enter API keys (press Enter to skip a provider).$RESET")
+                println()
 
-        // OpenAI
-        val oaiKey = prompt("OpenAI API key ${DIM}(sk-... or Enter to skip)$RESET")
-        if (!oaiKey.isNullOrBlank()) {
-            setEnvKey(envFile, "OPENAI_API_KEY", oaiKey)
-            println("  ${GREEN}OpenAI GPT configured$RESET")
-        }
+                val antKey = prompt("Anthropic API key ${DIM}(sk-ant-...)$RESET")
+                if (!antKey.isNullOrBlank()) {
+                    setEnvKey(envFile, "ANTHROPIC_API_KEY", antKey)
+                    println("  ${GREEN}Anthropic Claude configured$RESET")
+                }
 
-        // Google
-        val gglKey = prompt("Google API key ${DIM}(AIza... or Enter to skip)$RESET")
-        if (!gglKey.isNullOrBlank()) {
-            setEnvKey(envFile, "GOOGLE_API_KEY", gglKey)
-            println("  ${GREEN}Google Gemini configured$RESET")
-        }
+                val oaiKey = prompt("OpenAI API key ${DIM}(sk-...)$RESET")
+                if (!oaiKey.isNullOrBlank()) {
+                    setEnvKey(envFile, "OPENAI_API_KEY", oaiKey)
+                    println("  ${GREEN}OpenAI GPT configured$RESET")
+                }
 
-        // Enable extraction when any cloud key is entered
-        val hasCloudKey = !antKey.isNullOrBlank() || !oaiKey.isNullOrBlank() || !gglKey.isNullOrBlank()
-        if (hasCloudKey) {
-            clearEnvKey(envFile, "LLM_BASE_URL") // clear any stale Ollama URL
-            setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-        }
+                val gglKey = prompt("Google API key ${DIM}(AIza...)$RESET")
+                if (!gglKey.isNullOrBlank()) {
+                    setEnvKey(envFile, "GOOGLE_API_KEY", gglKey)
+                    println("  ${GREEN}Google Gemini configured$RESET")
+                }
 
-        // Ollama — only if no cloud keys were entered
-        if (!hasCloudKey) {
-            val choice = menu(
-                "No API keys entered. Use Ollama for local LLM?",
-                "Skip (configure later in .env)",
-                "Install Ollama in Docker (free, private — downloads ~2GB)",
-                "I already have Ollama running locally",
-            )
-            when (choice) {
-                1 -> {
-                    useOllama = true
-                    setEnvKey(envFile, "LLM_PROVIDER", "ollama")
-                    setEnvKey(envFile, "LLM_MODEL", "llama3.2")
+                val hasCloudKey = !antKey.isNullOrBlank() || !oaiKey.isNullOrBlank() || !gglKey.isNullOrBlank()
+                if (hasCloudKey) {
+                    clearEnvKey(envFile, "LLM_BASE_URL")
                     setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-                    println("${GREEN}Using Ollama.$RESET Model will download on first start (~2GB).")
+                } else {
+                    println("${YELLOW}No keys entered.$RESET LLM features won't be available.")
+                    println("${DIM}Add keys later in .env to enable natural language features.$RESET")
                 }
-                2 -> {
-                    useHostOllama = true
-                    setEnvKey(envFile, "LLM_PROVIDER", "ollama")
-                    setEnvKey(envFile, "LLM_MODEL", "llama3.2")
-                    setEnvKey(envFile, "LLM_BASE_URL", "http://host.docker.internal:11434")
-                    setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-                    println("${GREEN}Using existing Ollama$RESET at host.docker.internal:11434")
-                    println("${DIM}Make sure Ollama is running: ollama serve$RESET")
-                }
-                else -> {
-                    println("${DIM}Skipped — edit .env later to add LLM provider keys.$RESET")
-                }
+            }
+            2 -> {
+                // Existing host Ollama
+                useHostOllama = true
+                setEnvKey(envFile, "LLM_PROVIDER", "ollama")
+                setEnvKey(envFile, "LLM_MODEL", "llama3.2")
+                setEnvKey(envFile, "LLM_BASE_URL", "http://host.docker.internal:11434")
+                setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
+                println("${GREEN}Using existing Ollama$RESET at host.docker.internal:11434")
+                println("${DIM}Make sure Ollama is running: ollama serve$RESET")
+            }
+            else -> {
+                println("${DIM}Skipped — edit .env later to add LLM provider.$RESET")
             }
         }
     }
