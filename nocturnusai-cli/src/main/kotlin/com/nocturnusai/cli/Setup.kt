@@ -42,6 +42,7 @@ class Setup(
     private var containerCmd = ""
     private var llmConfigured = false
     private var llmProviderLabel = "none"
+    private var ollamaModel = "llama3.2"
     private var authConfigured = false
     private var serverApiKey: String? = null  // saved for config file + banner
     private var needBuild = false
@@ -333,20 +334,22 @@ class Setup(
 
         // Flag: --ollama (Docker Ollama)
         if (useOllama) {
+            ollamaModel = selectOllamaModel(null)
             setEnvKey(envFile, "LLM_PROVIDER", "ollama")
-            setEnvKey(envFile, "LLM_MODEL", "llama3.2")
+            setEnvKey(envFile, "LLM_MODEL", ollamaModel)
             setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-            println("${GREEN}Using:$RESET Ollama in Docker (local LLM — no API key needed)")
+            println("${GREEN}Using:$RESET Ollama in Docker with model ${BOLD}$ollamaModel$RESET")
             return
         }
 
         // Flag: --host-ollama (existing host Ollama)
         if (useHostOllama) {
+            ollamaModel = selectOllamaModel("http://localhost:11434")
             setEnvKey(envFile, "LLM_PROVIDER", "ollama")
-            setEnvKey(envFile, "LLM_MODEL", "llama3.2")
+            setEnvKey(envFile, "LLM_MODEL", ollamaModel)
             setEnvKey(envFile, "LLM_BASE_URL", "http://host.docker.internal:11434")
             setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-            println("${GREEN}Using:$RESET existing Ollama on host (host.docker.internal:11434)")
+            println("${GREEN}Using:$RESET existing Ollama on host with model ${BOLD}$ollamaModel$RESET")
             return
         }
 
@@ -368,12 +371,14 @@ class Setup(
 
         when (llmChoice) {
             0 -> {
-                // Ollama in Docker
+                // Ollama in Docker — offer model selection
                 useOllama = true
+                ollamaModel = selectOllamaModel(null)
                 setEnvKey(envFile, "LLM_PROVIDER", "ollama")
-                setEnvKey(envFile, "LLM_MODEL", "llama3.2")
+                setEnvKey(envFile, "LLM_MODEL", ollamaModel)
                 setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-                println("${GREEN}Using Ollama in Docker.$RESET Model will download on first start (~2GB).")
+                println("${GREEN}Using Ollama in Docker$RESET with model ${BOLD}$ollamaModel$RESET.")
+                println("${DIM}Model will download on first start.$RESET")
             }
             1 -> {
                 // Cloud API keys
@@ -409,13 +414,14 @@ class Setup(
                 }
             }
             2 -> {
-                // Existing host Ollama
+                // Existing host Ollama — query for installed models
                 useHostOllama = true
+                ollamaModel = selectOllamaModel("http://localhost:11434")
                 setEnvKey(envFile, "LLM_PROVIDER", "ollama")
-                setEnvKey(envFile, "LLM_MODEL", "llama3.2")
+                setEnvKey(envFile, "LLM_MODEL", ollamaModel)
                 setEnvKey(envFile, "LLM_BASE_URL", "http://host.docker.internal:11434")
                 setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-                println("${GREEN}Using existing Ollama$RESET at host.docker.internal:11434")
+                println("${GREEN}Using existing Ollama$RESET at host.docker.internal:11434 with model ${BOLD}$ollamaModel$RESET")
                 println("${DIM}Make sure Ollama is running: ollama serve$RESET")
             }
             else -> {
@@ -427,7 +433,7 @@ class Setup(
     // ── Model selection ────────────────────────────────────────────────────────
 
     private fun selectModel(envFile: File) {
-        // Skip if Ollama (model is always llama3.2) or non-interactive
+        // Skip if Ollama (model selected via selectOllamaModel) or non-interactive
         if (useOllama || useHostOllama || !interactive) return
 
         // Build model options based on configured providers
@@ -465,6 +471,73 @@ class Setup(
         setEnvKey(envFile, "LLM_PROVIDER", provider)
         setEnvKey(envFile, "LLM_MODEL", model)
         println("  ${GREEN}Default model:$RESET ${models[choice].first}")
+    }
+
+    // ── Ollama model selection ─────────────────────────────────────────────────
+
+    /** Popular Ollama models offered when no local instance is available to query. */
+    private val OLLAMA_POPULAR_MODELS = listOf(
+        "llama3.2"       to "Llama 3.2 3B (default, small & fast — 2GB)",
+        "llama3.2:1b"    to "Llama 3.2 1B (tiny, fastest — 1.3GB)",
+        "llama3.3"       to "Llama 3.3 70B (large, most capable — 43GB)",
+        "mistral"        to "Mistral 7B (fast, good quality — 4.1GB)",
+        "gemma3"         to "Gemma 3 4B (Google, balanced — 3.3GB)",
+        "qwen3"          to "Qwen 3 8B (Alibaba, strong reasoning — 5.2GB)",
+        "phi4"           to "Phi-4 14B (Microsoft, compact — 9.1GB)",
+        "deepseek-r1"    to "DeepSeek R1 7B (reasoning focused — 4.7GB)",
+    )
+
+    /**
+     * Select an Ollama model. If [ollamaUrl] is provided, query the running
+     * instance for installed models. Otherwise offer the curated list.
+     */
+    private fun selectOllamaModel(ollamaUrl: String?): String {
+        if (!interactive) return "llama3.2"
+
+        // Try to query a running Ollama instance for installed models
+        if (ollamaUrl != null) {
+            val installed = queryOllamaModels(ollamaUrl)
+            if (installed.isNotEmpty()) {
+                val options = installed.map { it }.toMutableList()
+                options.add("Other (enter model name)")
+                val labels = options.toTypedArray()
+                val choice = menu("Installed Ollama models:", *labels)
+                return if (choice < installed.size) {
+                    installed[choice]
+                } else {
+                    prompt("Model name", "llama3.2") ?: "llama3.2"
+                }
+            }
+        }
+
+        // No running Ollama or Docker Ollama — show popular models
+        val labels = OLLAMA_POPULAR_MODELS.map { it.second }.toMutableList()
+        labels.add("Other (enter model name)")
+        val choice = menu("Select Ollama model to download:", *labels.toTypedArray())
+        return if (choice < OLLAMA_POPULAR_MODELS.size) {
+            OLLAMA_POPULAR_MODELS[choice].first
+        } else {
+            prompt("Model name", "llama3.2") ?: "llama3.2"
+        }
+    }
+
+    /** Query a running Ollama instance for installed models via /api/tags. */
+    private fun queryOllamaModels(baseUrl: String): List<String> {
+        return try {
+            val result = sh("curl -sf $baseUrl/api/tags 2>/dev/null")
+            if (!result.success) return emptyList()
+            // Parse JSON: {"models":[{"name":"llama3.2:latest",...},...]}
+            val models = mutableListOf<String>()
+            val regex = """"name"\s*:\s*"([^"]+)"""".toRegex()
+            for (match in regex.findAll(result.output)) {
+                val name = match.groupValues[1]
+                    .removeSuffix(":latest") // clean up display
+                models.add(name)
+            }
+            models
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     // ── Auth configuration ─────────────────────────────────────────────────────
@@ -770,8 +843,8 @@ class Setup(
         for (i in 1..15) {
             if (sh("curl -sf http://localhost:11434/api/tags >/dev/null 2>&1").success) {
                 println(" ready$RESET")
-                println("${DIM}Pulling model (llama3.2)... runs in background.$RESET")
-                sh("curl -sf http://localhost:11434/api/pull -d '{\"name\":\"llama3.2\"}' >/dev/null 2>&1 &")
+                println("${DIM}Pulling model ($ollamaModel)... runs in background.$RESET")
+                sh("curl -sf http://localhost:11434/api/pull -d '{\"name\":\"$ollamaModel\"}' >/dev/null 2>&1 &")
                 return
             }
             Thread.sleep(2000)
