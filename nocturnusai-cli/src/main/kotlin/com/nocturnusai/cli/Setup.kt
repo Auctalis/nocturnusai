@@ -537,57 +537,170 @@ class Setup(
         val conflicts = names.filter { name ->
             sh("$containerCmd inspect $name >/dev/null 2>&1").success
         }
-        if (conflicts.isEmpty()) return true
+        if (conflicts.isEmpty()) {
+            // No containers, but check for existing data directory
+            offerCleanInstall()
+            return true
+        }
 
         // Check if the existing container is already running and healthy
         val running = conflicts.filter { name ->
             sh("$containerCmd inspect -f '{{.State.Running}}' $name 2>/dev/null").output.contains("true")
         }
 
+        // Check for existing data
+        val dataDir = File(installDir, "data")
+        val hasData = dataDir.exists() && dataDir.list()?.isNotEmpty() == true
+
         if (running.isNotEmpty()) {
             println("${YELLOW}Found existing NocturnusAI container(s): ${running.joinToString(", ")}$RESET")
+            if (hasData) {
+                println("${DIM}Data directory: ${dataDir.canonicalPath}/$RESET")
+            }
 
             if (!interactive) {
-                // Non-interactive: replace silently
+                println("${DIM}Non-interactive mode: upgrading (data is preserved on disk).$RESET")
                 removeContainers(conflicts)
                 return true
             }
 
-            val choice = menu(
-                "An existing NocturnusAI server is already running.",
-                "Keep it (skip starting a new one)",
-                "Replace it (stop old, start fresh)",
-                "Stop it and exit",
-            )
+            if (hasData) {
+                val choice = menu(
+                    "An existing NocturnusAI server is running with data on disk.",
+                    "Upgrade (keep data, replace container)",
+                    "Clean install (delete all data, start fresh)",
+                    "Keep existing (skip setup)",
+                    "Stop and exit",
+                )
 
-            return when (choice) {
-                0 -> {
-                    println("${GREEN}Keeping existing server.$RESET")
-                    // Still print the banner — server is running
-                    val healthy = checkHealth()
-                    if (healthy) println("${GREEN}${BOLD}Ready!$RESET")
-                    printSuccessBanner()
-                    false
+                return when (choice) {
+                    0 -> {
+                        println("${DIM}Upgrading (data preserved in ${dataDir.canonicalPath}/)...$RESET")
+                        removeContainers(conflicts)
+                        true
+                    }
+                    1 -> {
+                        confirmCleanInstall(dataDir, conflicts)
+                    }
+                    2 -> {
+                        println("${GREEN}Keeping existing server.$RESET")
+                        val healthy = checkHealth()
+                        if (healthy) println("${GREEN}${BOLD}Ready!$RESET")
+                        printSuccessBanner()
+                        false
+                    }
+                    3 -> {
+                        println("${DIM}Stopping containers...$RESET")
+                        removeContainers(conflicts)
+                        println("${GREEN}Stopped. Data preserved in ${dataDir.canonicalPath}/$RESET")
+                        false
+                    }
+                    else -> false
                 }
-                1 -> {
-                    println("${DIM}Removing old containers...$RESET")
-                    removeContainers(conflicts)
-                    true
+            } else {
+                val choice = menu(
+                    "An existing NocturnusAI server is already running.",
+                    "Replace container and continue",
+                    "Keep existing (skip setup)",
+                    "Stop and exit",
+                )
+
+                return when (choice) {
+                    0 -> {
+                        println("${DIM}Replacing containers...$RESET")
+                        removeContainers(conflicts)
+                        true
+                    }
+                    1 -> {
+                        println("${GREEN}Keeping existing server.$RESET")
+                        val healthy = checkHealth()
+                        if (healthy) println("${GREEN}${BOLD}Ready!$RESET")
+                        printSuccessBanner()
+                        false
+                    }
+                    2 -> {
+                        println("${DIM}Stopping containers...$RESET")
+                        removeContainers(conflicts)
+                        println("${GREEN}Stopped.$RESET")
+                        false
+                    }
+                    else -> false
                 }
-                2 -> {
-                    println("${DIM}Stopping containers...$RESET")
-                    removeContainers(conflicts)
-                    println("${GREEN}Stopped.$RESET")
-                    false
-                }
-                else -> false
             }
         } else {
-            // Containers exist but are stopped — remove them to avoid name conflicts
-            println("${DIM}Removing stopped containers: ${conflicts.joinToString(", ")}$RESET")
+            // Containers exist but are stopped — need to remove to avoid name conflicts
+            println("${YELLOW}Found stopped container(s): ${conflicts.joinToString(", ")}$RESET")
+            if (hasData) {
+                println("${DIM}Data directory: ${dataDir.canonicalPath}/$RESET")
+            }
+
+            if (interactive && hasData) {
+                val choice = menu(
+                    "Stopped containers found. How would you like to proceed?",
+                    "Upgrade (remove old containers, keep data)",
+                    "Clean install (delete all data, start fresh)",
+                    "Cancel setup",
+                )
+                return when (choice) {
+                    0 -> {
+                        println("${DIM}Removing stopped containers (data preserved)...$RESET")
+                        removeContainers(conflicts)
+                        true
+                    }
+                    1 -> {
+                        confirmCleanInstall(dataDir, conflicts)
+                    }
+                    2 -> {
+                        println("${GREEN}Cancelled.$RESET")
+                        false
+                    }
+                    else -> false
+                }
+            }
+
+            println("${DIM}Removing stopped containers...$RESET")
             removeContainers(conflicts)
             return true
         }
+    }
+
+    /** If data/ exists but no containers, offer clean install option. */
+    private fun offerCleanInstall() {
+        val dataDir = File(installDir, "data")
+        val hasData = dataDir.exists() && dataDir.list()?.isNotEmpty() == true
+        if (!hasData || !interactive) return
+
+        println("${YELLOW}Existing data found:$RESET ${dataDir.canonicalPath}/")
+        val choice = menu(
+            "Keep existing data or start fresh?",
+            "Keep data (upgrade)",
+            "Clean install (delete all data)",
+        )
+        if (choice == 1) {
+            confirmCleanInstall(dataDir, emptyList())
+        }
+    }
+
+    /** Double-confirm destructive data deletion, then execute. */
+    private fun confirmCleanInstall(dataDir: File, containers: List<String>): Boolean {
+        println()
+        println("${RED}${BOLD}This will permanently delete all NocturnusAI data:$RESET")
+        println("  ${dataDir.canonicalPath}/")
+        println()
+        print("${BOLD}Type 'delete' to confirm:$RESET ")
+        System.out.flush()
+        val confirm = readlnOrNull()?.trim()?.lowercase()
+        if (confirm != "delete") {
+            println("${DIM}Cancelled — keeping data.$RESET")
+            if (containers.isNotEmpty()) removeContainers(containers)
+            return true
+        }
+        if (containers.isNotEmpty()) removeContainers(containers)
+        println("${DIM}Deleting data...$RESET")
+        dataDir.deleteRecursively()
+        dataDir.mkdirs()
+        println("${GREEN}Clean install — starting fresh.$RESET")
+        return true
     }
 
     private fun removeContainers(names: List<String>) {
