@@ -455,9 +455,14 @@ class Setup(
         }
         if (!interactive) return
 
+        // For localhost, skip auth by default — no friction for dev
+        println()
+        println("  ${DIM}Auth is optional for local development. The server accepts all")
+        println("  requests when no API key is set. Add one later in .env if needed.$RESET")
+
         val choice = menu(
-            "Secure your server with an API key?",
-            "Skip — leave open (localhost only)",
+            "Set up an API key?",
+            "No — open access (recommended for local dev)",
             "Generate a random key",
             "Enter my own key",
         )
@@ -479,7 +484,7 @@ class Setup(
                     println("${GREEN}Saved.$RESET")
                 }
             }
-            else -> println("${DIM}Skipped — fine for localhost development.$RESET")
+            else -> println("${GREEN}No auth — server is open.$RESET ${DIM}Add API_KEY to .env later to secure it.$RESET")
         }
     }
 
