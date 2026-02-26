@@ -71,7 +71,7 @@ private fun parseArgs(args: Array<String>): CliArgs {
             "--api-key", "-k"  -> { apiKey = args.getOrElse(i + 1) { null }; i += 2 }
             "--tenant", "-t"   -> { tenantId = args.getOrElse(i + 1) { null }; i += 2 }
             "-e", "--exec"     -> { exec = args.getOrElse(i + 1) { null }; i += 2 }
-            "--help", "-h"     -> { printUsage(); return CliArgs() }
+            "--help", "-h"     -> { printUsage(); exitProcess(0) }
             else               -> { i++ }
         }
     }

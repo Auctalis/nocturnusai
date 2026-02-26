@@ -65,11 +65,20 @@ fi
 
 chmod +x "$tmp_path"
 
-# Verify binary runs
-if ! "$tmp_path" --help >/dev/null 2>&1; then
-    rm -f "$tmp_path"
-    echo -e "${RED}Binary not compatible with this platform.${NC}"
-    exit 1
+# Verify binary runs (background + kill guards against hangs on older builds)
+"$tmp_path" --help >/dev/null 2>&1 &
+_pid=$!
+sleep 2
+if ! kill -0 "$_pid" 2>/dev/null; then
+    # Process exited — check if it succeeded
+    wait "$_pid" 2>/dev/null || {
+        rm -f "$tmp_path"
+        echo -e "${RED}Binary not compatible with this platform.${NC}"
+        exit 1
+    }
+else
+    # Still running after 2s (old build with --help bug) — kill it, it's fine
+    kill "$_pid" 2>/dev/null; wait "$_pid" 2>/dev/null || true
 fi
 
 # Move to install path
