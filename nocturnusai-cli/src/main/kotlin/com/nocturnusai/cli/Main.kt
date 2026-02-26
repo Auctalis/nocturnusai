@@ -168,7 +168,7 @@ private fun uninstall() {
     for (dir in installDirs) {
         if (compose != null) {
             println("${D}Stopping containers in ${dir.path}...$R")
-            ProcessBuilder("bash", "-c", "$compose down -v")
+            ProcessBuilder("bash", "-c", "$compose down")
                 .directory(dir).inheritIO().start().waitFor()
         }
     }
@@ -208,9 +208,14 @@ private fun uninstall() {
     println("${G}NocturnusAI uninstalled.$R")
     if (installDirs.isNotEmpty()) {
         println()
-        println("${Y}Note:$R Install directories were not removed (may contain your data):")
+        println("${Y}Your data was preserved:$R")
         for (dir in installDirs) {
-            println("  ${dir.canonicalPath}")
+            val dataDir = File(dir, "data")
+            if (dataDir.exists()) {
+                println("  ${dir.canonicalPath}/data/")
+            } else {
+                println("  ${dir.canonicalPath}/")
+            }
         }
         println("${D}Remove manually if no longer needed: rm -rf <dir>$R")
     }

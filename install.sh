@@ -73,7 +73,7 @@ docker_fallback() {
     fi
 
     # Create install directory and compose file
-    mkdir -p "$install_dir"
+    mkdir -p "$install_dir/data"
     cat > "$install_dir/docker-compose.yml" <<'COMPOSE'
 services:
   nocturnusai:
@@ -83,7 +83,7 @@ services:
     ports:
       - "${PORT:-9300}:${PORT:-9300}"
     volumes:
-      - nocturnusai-data:/data
+      - ./data:/data
     environment:
       - PORT=${PORT:-9300}
       - HOST=0.0.0.0
@@ -100,10 +100,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-volumes:
-  nocturnusai-data:
-    driver: local
 COMPOSE
 
     # Create .env with port

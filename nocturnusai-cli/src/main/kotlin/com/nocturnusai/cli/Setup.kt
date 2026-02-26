@@ -60,9 +60,10 @@ class Setup(
         }
         println("${GREEN}Found:$RESET $composeCmd ($containerCmd)")
 
-        // 2. Prepare install directory
+        // 2. Prepare install directory (data/ subdir for bind mount)
         installDir = File(dir).canonicalFile
         installDir.mkdirs()
+        File(installDir, "data").mkdirs()
         println("${GREEN}Directory:$RESET ${installDir.path}")
 
         // 3. Check for published image or source
@@ -760,7 +761,7 @@ services:
     ports:
       - "@{PORT:-9300}:@{PORT:-9300}"
     volumes:
-      - nocturnusai-data:/data
+      - ./data:/data
     environment:
       - PORT=@{PORT:-9300}
       - HOST=0.0.0.0
@@ -778,10 +779,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-volumes:
-  nocturnusai-data:
-    driver: local
 """.trimIndent() + "\n"
 
         private val COMPOSE_HOST_OLLAMA = """
@@ -793,7 +790,7 @@ services:
     ports:
       - "@{PORT:-9300}:@{PORT:-9300}"
     volumes:
-      - nocturnusai-data:/data
+      - ./data:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -813,10 +810,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-volumes:
-  nocturnusai-data:
-    driver: local
 """.trimIndent() + "\n"
 
         private val COMPOSE_WITH_OLLAMA = """
@@ -828,7 +821,7 @@ services:
     ports:
       - "@{PORT:-9300}:@{PORT:-9300}"
     volumes:
-      - nocturnusai-data:/data
+      - ./data:/data
     environment:
       - PORT=@{PORT:-9300}
       - HOST=0.0.0.0
@@ -854,19 +847,13 @@ services:
     ports:
       - "11434:11434"
     volumes:
-      - ollama-models:/root/.ollama
+      - ./ollama-models:/root/.ollama
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 15s
-
-volumes:
-  nocturnusai-data:
-    driver: local
-  ollama-models:
-    driver: local
 """.trimIndent() + "\n"
     }
 }
