@@ -1021,55 +1021,39 @@ class Repl(private val client: Client) {
 
     private fun printHelp() {
         println("""
-${BOLD}Agent commands:$RESET
-  ask   <question or pred(?var)>    Query (NL or predicate syntax)
-  tell  <text or pred(arg, arg)>    Store a fact (NL or structured)
-  teach <head(?x) :- body(?x)>      Define a rule
-  forget <pred(arg, arg)>           Remove a fact
-  ingest <text or -f file>          Extract facts from plain text via LLM
+${BOLD}Try these now:$RESET
+  tell human(socrates)              Store a fact
+  teach mortal(?x) :- human(?x)    Define a rule
+  ask mortal(?who)                  Query — returns: ?who = socrates
+  inspect                           See all stored knowledge
+
+${BOLD}Core commands:$RESET
+  tell  <pred(args)>                Store a fact        ${DIM}shortcut: +$RESET
+  teach <head :- body>              Define a rule       ${DIM}shortcut: ++$RESET
+  ask   <pred(?var)>                Query               ${DIM}shortcut: ?$RESET
+  forget <pred(args)>               Remove a fact       ${DIM}shortcut: -$RESET
 
 ${BOLD}Explore:$RESET
-  inspect [filter]                  Browse all knowledge
-  context [max]                     Salience-ranked context window
+  inspect [filter]                  Browse knowledge    ${DIM}shortcut: ls$RESET
+  context [max]                     Salience-ranked     ${DIM}shortcut: ctx$RESET
 
-${BOLD}Operations:$RESET
-  compress                          Consolidate episodic patterns
-  cleanup [threshold]               Evict expired/low-salience facts
-  dsl <command>                     Raw Logiql DSL
+${BOLD}Natural language (requires LLM — run 'status' to check):$RESET
+  ingest <text>                     Extract facts from text via LLM
+  ingest -f <file>                  Extract from file
+  ask <plain English question>      LLM-powered Q&A
+  tell <plain English statement>    LLM-powered fact extraction
 
 ${BOLD}Import / Export:$RESET
   import <file.ab>                  Load facts & rules from file
   export [file.ab]                  Dump knowledge (to file or stdout)
 
 ${BOLD}Admin:$RESET
-  use <database>                    Switch database
-  dbs                               List databases
-  health                            Server health check
-  status                            Full server status (health, LLM, KB)
-  setup                             Interactive LLM provider configuration
+  use <db>    dbs    health    status    setup
 
 ${BOLD}Auth:$RESET
-  login                             Bootstrap auth or check auth status
-  whoami                            Show current key identity & permissions
-  keys list                         List all API keys
-  keys create <name> [role]         Create a new key (admin/writer/reader)
-  keys revoke <id>                  Revoke a key
+  login    whoami    keys list    keys create <name> [role]    keys revoke <id>
 
-${BOLD}Shortcuts:$RESET
-  ?  = ask    +  = tell    ++ = teach    -  = forget    ls = inspect
-  ctx = context    exec = dsl    load = import    dump = export    q = exit
-
-${BOLD}Examples — structured:$RESET
-  tell human(socrates)
-  teach mortal(?x) :- human(?x)
-  ask mortal(?who)
-
-${BOLD}Examples — natural language (requires LLM configured on server):$RESET
-  ingest Alice is Bob's mother. Bob works at Acme Corp.
-  ingest -f article.txt
-  ask who is Bob's mother?
-  ask what company does Bob work at?
-  tell the president met with the prime minister yesterday
+  ${DIM}q = exit    exec = raw DSL    help = this message$RESET
         """.trimIndent())
     }
 

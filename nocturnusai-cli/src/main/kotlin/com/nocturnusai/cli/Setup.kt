@@ -658,65 +658,68 @@ class Setup(
         println("  ${BOLD}Server$RESET       http://localhost:$port")
         if (llmConfigured)
             println("  ${BOLD}LLM$RESET          ${GREEN}$llmProviderLabel$RESET")
-        else
-            println("  ${BOLD}LLM$RESET          ${DIM}none — add a key to .env and restart$RESET")
-        if (authConfigured)
-            println("  ${BOLD}Auth$RESET         ${GREEN}API key required$RESET  ${DIM}(X-API-Key header)$RESET")
-        else
-            println("  ${BOLD}Auth$RESET         ${DIM}open (localhost dev)$RESET")
         if (useOllama)
             println("  ${BOLD}Ollama$RESET       http://localhost:11434 ${DIM}(Docker)$RESET")
         if (useHostOllama)
             println("  ${BOLD}Ollama$RESET       ${GREEN}using host Ollama$RESET ${DIM}(host.docker.internal:11434)$RESET")
+        if (authConfigured)
+            println("  ${BOLD}Auth$RESET         ${GREEN}API key set$RESET")
         println()
 
-        // ── Quick start ──
-        val apiKeyFlag = if (serverApiKey != null) " -k $serverApiKey" else ""
-        val apiKeyHeader = if (serverApiKey != null) "\n      -H 'X-API-Key: $serverApiKey' \\" else ""
-
-        println("  ${BOLD}Quick start$RESET")
+        // ── Try it now — commands that work immediately ──
+        println("  ${BOLD}Try it now$RESET  ${DIM}(these work immediately — just paste)$RESET")
         println()
-        println("    ${CYAN}# Start the REPL$RESET")
+        println("    ${CYAN}# Start the interactive REPL$RESET")
         println("    nocturnusai")
         println()
-        println("    ${CYAN}# One-liners$RESET")
-        println("    nocturnusai$apiKeyFlag -e \"tell human(socrates)\"")
-        println("    nocturnusai$apiKeyFlag -e \"teach mortal(?x) :- human(?x)\"")
-        println("    nocturnusai$apiKeyFlag -e \"ask mortal(?who)\"")
+        println("    ${CYAN}# Store a fact$RESET")
+        println("    nocturnusai -e \"tell human(socrates)\"")
+        println()
+        println("    ${CYAN}# Define a rule$RESET")
+        println("    nocturnusai -e \"teach mortal(?x) :- human(?x)\"")
+        println()
+        println("    ${CYAN}# Query$RESET")
+        println("    nocturnusai -e \"ask mortal(?who)\"")
         println()
 
-        // ── curl examples ──
-        println("    ${CYAN}# Or use curl$RESET")
-        println("    curl -s http://localhost:$port/assert/fact \\")
-        println("      -H 'Content-Type: application/json' \\")
-        println("      -H 'X-Tenant-ID: default' \\$apiKeyHeader")
-        println("      -d '{\"predicate\":\"human\",\"args\":[\"socrates\"]}'")
+        if (llmConfigured) {
+            println("    ${CYAN}# Natural language (LLM-powered)$RESET")
+            println("    nocturnusai -e 'ingest Alice is a doctor. Bob is a lawyer.'")
+            println("    nocturnusai -e 'ask what is Alice?'")
+            println()
+        }
+
+        // ── MCP config — copy-paste ready ──
+        println("  ${BOLD}Connect your AI agent$RESET  ${DIM}(Claude Desktop, Cursor, Windsurf, etc.)$RESET")
+        println()
+        if (authConfigured) {
+            println("    ${DIM}Add to your MCP config:$RESET")
+            println("    {")
+            println("      \"mcpServers\": {")
+            println("        \"nocturnusai\": {")
+            println("          \"url\": \"http://localhost:$port/mcp/sse\",")
+            println("          \"transport\": \"sse\",")
+            println("          \"headers\": { \"X-API-Key\": \"$serverApiKey\" }")
+            println("        }")
+            println("      }")
+            println("    }")
+        } else {
+            println("    ${DIM}Add to your MCP config:$RESET")
+            println("    {")
+            println("      \"mcpServers\": {")
+            println("        \"nocturnusai\": {")
+            println("          \"url\": \"http://localhost:$port/mcp/sse\",")
+            println("          \"transport\": \"sse\"")
+            println("        }")
+            println("      }")
+            println("    }")
+        }
         println()
 
-        // ── LLM examples ──
-        if (llmConfigured)
-            println("  ${BOLD}LLM-powered$RESET  ${GREEN}$llmProviderLabel$RESET")
-        else
-            println("  ${BOLD}LLM-powered$RESET  ${DIM}(add API key to .env, restart, then try these)$RESET")
-        println()
-        println("    ${CYAN}# Extract facts from natural language$RESET")
-        println("    curl -s http://localhost:$port/extract \\")
-        println("      -H 'Content-Type: application/json' \\")
-        println("      -H 'X-Tenant-ID: default' \\$apiKeyHeader")
-        println("      -d '{\"text\":\"Socrates is human. All humans are mortal.\",\"assert\":true}'")
-        println()
-        println("    ${CYAN}# Ask a question in plain English$RESET")
-        println("    curl -s http://localhost:$port/synthesize \\")
-        println("      -H 'Content-Type: application/json' \\")
-        println("      -H 'X-Tenant-ID: default' \\$apiKeyHeader")
-        println("      -d '{\"question\":\"Is Socrates mortal?\"}'")
-        println()
-
-        // ── Endpoints ──
-        println("  ${BOLD}Endpoints$RESET")
+        // ── REST API ──
+        println("  ${BOLD}REST API$RESET")
         println("    Health       http://localhost:$port/health")
         println("    API Docs     http://localhost:$port/llm.txt")
-        println("    MCP          http://localhost:$port/mcp")
         println("    Agent Card   http://localhost:$port/.well-known/agent.json")
         println()
 
@@ -726,19 +729,6 @@ class Setup(
         println("    $composeCmd logs -f nocturnusai   ${DIM}# tail logs$RESET")
         println("    $composeCmd down                   ${DIM}# stop$RESET")
         println("    $composeCmd up -d                  ${DIM}# restart$RESET")
-        println()
-
-        // ── MCP config ──
-        println("  ${BOLD}MCP config$RESET (Claude Desktop, Cursor, Windsurf, etc.):")
-        println()
-        println("    {")
-        println("      \"mcpServers\": {")
-        println("        \"nocturnusai\": {")
-        println("          \"url\": \"http://localhost:$port/mcp/sse\",")
-        println("          \"transport\": \"sse\"")
-        println("        }")
-        println("      }")
-        println("    }")
         println()
         println("  ${DIM}Config: ${installDir.path}/.env$RESET")
         println("  ${DIM}Docs:   https://github.com/Auctalis/nocturnusai$RESET")
