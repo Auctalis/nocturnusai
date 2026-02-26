@@ -146,12 +146,13 @@ private fun uninstall() {
     val D = "\u001B[2m"
     val G = "\u001B[32m"
     val Y = "\u001B[33m"
+    val RED = "\u001B[31m"
 
     println()
     println("${B}NocturnusAI Uninstall$R")
     println()
 
-    // 1. Stop and remove containers
+    // Detect container runtime
     val compose = when {
         Runtime.getRuntime().exec(arrayOf("bash", "-c", "docker compose version >/dev/null 2>&1")).waitFor() == 0 -> "docker compose"
         Runtime.getRuntime().exec(arrayOf("bash", "-c", "command -v docker-compose >/dev/null 2>&1")).waitFor() == 0 -> "docker-compose"
@@ -159,12 +160,54 @@ private fun uninstall() {
         else -> null
     }
 
-    // Check common install directories for compose files
+    // Find install directories
     val installDirs = listOf(
         File("./nocturnusai"),
         File(System.getProperty("user.home"), "nocturnusai"),
     ).filter { File(it, "docker-compose.yml").exists() }
 
+    // Find data directories
+    val dataDirs = installDirs.map { File(it, "data") }.filter { it.exists() && it.isDirectory }
+    val ollamaDirs = installDirs.map { File(it, "ollama-models") }.filter { it.exists() && it.isDirectory }
+
+    // ── Show what will be removed ──
+    println("${B}This will remove:$R")
+    println("  • NocturnusAI containers")
+    val binaryPaths = listOf(
+        File("/usr/local/bin/nocturnusai"),
+        File(System.getProperty("user.home"), ".local/bin/nocturnusai"),
+    ).filter { it.exists() }
+    for (bin in binaryPaths) {
+        println("  • CLI binary: ${bin.path}")
+    }
+    val configDir = File(System.getProperty("user.home"), ".config/nocturnusai")
+    if (configDir.exists()) {
+        println("  • CLI config: ${configDir.path}")
+    }
+    println()
+
+    if (dataDirs.isNotEmpty() || ollamaDirs.isNotEmpty()) {
+        println("${Y}${B}Data directories found:$R")
+        for (dir in dataDirs) {
+            println("  ${dir.canonicalPath}/")
+        }
+        for (dir in ollamaDirs) {
+            println("  ${dir.canonicalPath}/")
+        }
+        println()
+    }
+
+    // ── Ask for confirmation ──
+    print("${B}Proceed with uninstall? [y/N]:$R ")
+    System.out.flush()
+    val confirm = readlnOrNull()?.trim()?.lowercase()
+    if (confirm != "y" && confirm != "yes") {
+        println("${D}Cancelled.$R")
+        return
+    }
+    println()
+
+    // 1. Stop containers
     for (dir in installDirs) {
         if (compose != null) {
             println("${D}Stopping containers in ${dir.path}...$R")
@@ -185,40 +228,64 @@ private fun uninstall() {
     }
 
     // 3. Remove CLI binary
-    val binaryPaths = listOf(
-        File("/usr/local/bin/nocturnusai"),
-        File(System.getProperty("user.home"), ".local/bin/nocturnusai"),
-    )
     for (bin in binaryPaths) {
-        if (bin.exists()) {
-            println("${D}Removing CLI binary: ${bin.path}$R")
-            bin.delete()
-        }
+        println("${D}Removing: ${bin.path}$R")
+        bin.delete()
     }
 
     // 4. Remove config
-    val configDir = File(System.getProperty("user.home"), ".config/nocturnusai")
     if (configDir.exists()) {
-        println("${D}Removing CLI config: ${configDir.path}$R")
+        println("${D}Removing: ${configDir.path}$R")
         configDir.deleteRecursively()
     }
 
-    // 5. Summary
-    println()
-    println("${G}NocturnusAI uninstalled.$R")
-    if (installDirs.isNotEmpty()) {
+    // 5. Handle data — user decides
+    if (dataDirs.isNotEmpty() || ollamaDirs.isNotEmpty()) {
         println()
-        println("${Y}Your data was preserved:$R")
-        for (dir in installDirs) {
-            val dataDir = File(dir, "data")
-            if (dataDir.exists()) {
-                println("  ${dir.canonicalPath}/data/")
+        println("${Y}${B}What about your data?$R")
+        for (dir in dataDirs) {
+            println("  ${dir.canonicalPath}/")
+        }
+        for (dir in ollamaDirs) {
+            println("  ${dir.canonicalPath}/")
+        }
+        println()
+        println("  ${B}1)$R Keep data (you can reimport later)")
+        println("  ${B}2)$R ${RED}Delete everything permanently$R")
+        println()
+        print("${B}Choose [1]:$R ")
+        System.out.flush()
+        val dataChoice = readlnOrNull()?.trim()
+
+        if (dataChoice == "2") {
+            // Double-confirm destructive action
+            print("${RED}${B}Are you sure? This cannot be undone. Type 'delete' to confirm:$R ")
+            System.out.flush()
+            val deleteConfirm = readlnOrNull()?.trim()?.lowercase()
+            if (deleteConfirm == "delete") {
+                for (dir in installDirs) {
+                    println("${D}Deleting: ${dir.canonicalPath}$R")
+                    dir.deleteRecursively()
+                }
+                println("${G}All data deleted.$R")
             } else {
+                println("${D}Data preserved.$R")
+            }
+        } else {
+            println("${G}Data preserved.$R")
+            for (dir in installDirs) {
                 println("  ${dir.canonicalPath}/")
             }
         }
-        println("${D}Remove manually if no longer needed: rm -rf <dir>$R")
+    } else {
+        // No data dirs, safe to clean up install dirs
+        for (dir in installDirs) {
+            dir.deleteRecursively()
+        }
     }
+
+    println()
+    println("${G}NocturnusAI uninstalled.$R")
     println()
 }
 
