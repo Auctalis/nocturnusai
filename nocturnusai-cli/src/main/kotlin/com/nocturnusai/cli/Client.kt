@@ -27,7 +27,7 @@ class Client(
     private val serverUrl: String,
     var database: String,
     private val apiKey: String?,
-    var tenantId: String? = null,
+    var tenantId: String = "default",
 ) {
     val server: String get() = serverUrl
     val hasApiKey: Boolean get() = apiKey != null
@@ -42,7 +42,7 @@ class Client(
         val resp = http.post("$serverUrl$path") {
             contentType(ContentType.Application.Json)
             header("X-Database", database)
-            tenantId?.let { header("X-Tenant-ID", it) }
+            header("X-Tenant-ID", tenantId)
             apiKey?.let { header("X-API-Key", it) }
             setBody(body)
         }
@@ -52,7 +52,7 @@ class Client(
     private suspend fun get(path: String): String {
         val resp = http.get("$serverUrl$path") {
             header("X-Database", database)
-            tenantId?.let { header("X-Tenant-ID", it) }
+            header("X-Tenant-ID", tenantId)
             apiKey?.let { header("X-API-Key", it) }
         }
         return resp.bodyAsText()

@@ -59,7 +59,7 @@ private data class CliArgs(
     val server: String = "http://localhost:9300",
     val database: String = "default",
     val apiKey: String? = null,
-    val tenantId: String? = null,
+    val tenantId: String = "default",
     val exec: String? = null,
 )
 
@@ -83,7 +83,7 @@ private fun parseArgs(args: Array<String>): CliArgs {
     var server = System.getenv("NOCTURNUSAI_SERVER") ?: config["server"] ?: "http://localhost:9300"
     var database = "default"
     var apiKey: String? = System.getenv("NOCTURNUSAI_API_KEY") ?: config["api_key"]
-    var tenantId: String? = null
+    var tenantId: String = "default"
     var exec: String? = null
 
     var i = 0
@@ -92,7 +92,7 @@ private fun parseArgs(args: Array<String>): CliArgs {
             "--server", "-s"   -> { server = args.getOrElse(i + 1) { server }; i += 2 }
             "--db", "-d"       -> { database = args.getOrElse(i + 1) { database }; i += 2 }
             "--api-key", "-k"  -> { apiKey = args.getOrElse(i + 1) { null }; i += 2 }
-            "--tenant", "-t"   -> { tenantId = args.getOrElse(i + 1) { null }; i += 2 }
+            "--tenant", "-t"   -> { tenantId = args.getOrElse(i + 1) { "default" }; i += 2 }
             "-e", "--exec"     -> { exec = args.getOrElse(i + 1) { null }; i += 2 }
             "--help", "-h"     -> { printUsage(); exitProcess(0) }
             else               -> { i++ }
