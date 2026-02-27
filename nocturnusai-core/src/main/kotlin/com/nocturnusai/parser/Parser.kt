@@ -112,8 +112,14 @@ class Parser(private val tokens: List<Token>) {
     }
     
     private fun parseCondition(): Atom {
-        // Can be Fact | Comparison | Negation
-        // Not supporting Comparison/Negation fully in this pass, mostly structural
+        // Check for NAF: NOT predicate(args)
+        // When NOT appears before an atom in a rule body, it marks a
+        // Negation-as-Failure condition (naf=true), distinct from explicit
+        // negation (truthVal=false) which is an asserted negative fact.
+        if (match(TokenType.NOT)) {
+            val atom = parseAtom()
+            return atom.copy(naf = true)
+        }
         return parseAtom()
     }
 

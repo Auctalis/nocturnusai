@@ -1,0 +1,30 @@
+services:
+  nocturnusai:
+    image: ghcr.io/auctalis/nocturnusai:latest
+    container_name: nocturnusai
+    restart: unless-stopped
+    ports:
+      - "${PORT:-9300}:${PORT:-9300}"
+    volumes:
+      - nocturnusai-data:/data
+    environment:
+      - PORT=${PORT:-9300}
+      - HOST=0.0.0.0
+      - STORAGE_DIR=/data
+      - API_KEY=${API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  nocturnusai-data:
+    driver: local
