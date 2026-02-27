@@ -304,6 +304,36 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
             ),
             required = emptyList()
         ))
+        add(toolSchema(
+            name = "aggregate",
+            description = "Compute COUNT, SUM, MIN, MAX, or AVG over facts matching a pattern. Use COUNT to count matches, or SUM/MIN/MAX/AVG to aggregate a numeric argument at a specific position. Example: COUNT all score(player, ?) facts, or SUM the scores at argIndex=1.",
+            properties = mapOf(
+                "predicate" to propString("The predicate to aggregate over"),
+                "args" to propArray("Pattern arguments. Use ?x, ?who etc. for wildcards, concrete values to constrain"),
+                "operation" to propString("Aggregation operation: COUNT, SUM, MIN, MAX, or AVG"),
+                "argIndex" to propNumber("Argument position (0-based) to aggregate for SUM/MIN/MAX/AVG (ignored for COUNT)"),
+                "scope" to propString("Optional scope filter")
+            ),
+            required = listOf("predicate", "args", "operation")
+        ))
+        add(toolSchema(
+            name = "bulk_assert",
+            description = "Assert multiple facts in a single call. Non-transactional: each fact is attempted independently — contradictions are reported as errors rather than aborting the batch. Returns counts of successful and failed assertions.",
+            properties = mapOf(
+                "facts" to propArray("Array of fact objects, each with 'predicate', 'args', optional 'negated', 'scope', 'ttl', 'validUntil'")
+            ),
+            required = listOf("facts")
+        ))
+        add(toolSchema(
+            name = "retract_pattern",
+            description = "Retract all facts matching a pattern in a single call. Use ?x, ?y etc. as wildcards to retract multiple facts at once. Returns the count and list of retracted facts.",
+            properties = mapOf(
+                "predicate" to propString("The predicate pattern to match for retraction"),
+                "args" to propArray("Arguments. Use ?x, ?who etc. as wildcards to match multiple facts"),
+                "scope" to propString("Optional scope filter")
+            ),
+            required = listOf("predicate", "args")
+        ))
     }
 
     val result = JsonObject(mapOf("tools" to tools))
@@ -333,6 +363,10 @@ private fun handleToolCall(
             "compress" -> callConsolidate(db, tenantId)
             "cleanup" -> callDecay(db, tenantId, arguments)
             "predicates" -> callPredicates(db, tenantId, arguments)
+            // Aggregation and bulk tools
+            "aggregate" -> callAggregate(db, tenantId, arguments)
+            "bulk_assert" -> callBulkAssert(db, tenantId, arguments)
+            "retract_pattern" -> callRetractPattern(db, tenantId, arguments)
             // Legacy names (backward compatible)
             "assert_fact" -> callAssertFact(db, tenantId, arguments)
             "assert_rule" -> callAssertRule(db, tenantId, arguments)
@@ -594,6 +628,92 @@ private fun callPredicates(db: com.nocturnusai.NocturnusAI, tenantId: String, ar
         val hasRules = if (info["hasRules"] == true) " [has rules]" else ""
         sb.append("  $pred/$arity — $count fact(s)$hasRules\n")
     }
+    return sb.toString()
+}
+
+// --- Aggregation & Bulk Tool Implementations ---
+
+private fun callAggregate(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
+    val predicate = args["predicate"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing predicate")
+    val argsList = args["args"]?.jsonArray?.map { it.jsonPrimitive.content } ?: throw IllegalArgumentException("Missing args")
+    val operationStr = args["operation"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing operation")
+    val argIndex = args["argIndex"]?.jsonPrimitive?.intOrNull ?: 0
+    val scope = args["scope"]?.jsonPrimitive?.contentOrNull
+
+    val op = try {
+        com.nocturnusai.storage.AggregateOp.valueOf(operationStr.uppercase())
+    } catch (_: IllegalArgumentException) {
+        throw IllegalArgumentException("Unknown operation '$operationStr'. Allowed: COUNT, SUM, MIN, MAX, AVG")
+    }
+
+    val terms = argsList.map { parseTerm(it) }
+    val pattern = com.nocturnusai.core.Atom(predicate, terms, scope = scope)
+
+    return if (op == com.nocturnusai.storage.AggregateOp.COUNT) {
+        val count = db.countFacts(pattern, tenantId, scope)
+        "COUNT($predicate) = $count"
+    } else {
+        val matchedFacts = db.countFacts(pattern, tenantId, scope)
+        val result = db.aggregateFacts(pattern, argIndex, op, tenantId, scope)
+        if (result == null) {
+            "${op.name}($predicate, argIndex=$argIndex) = null (no numeric values found among $matchedFacts matched facts)"
+        } else {
+            "${op.name}($predicate, argIndex=$argIndex) = $result (over $matchedFacts matched facts)"
+        }
+    }
+}
+
+private fun callBulkAssert(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
+    val factsArray = args["facts"]?.jsonArray ?: throw IllegalArgumentException("Missing facts array")
+
+    val atoms = factsArray.mapIndexed { index, elem ->
+        val obj = elem.jsonObject
+        val predicate = obj["predicate"]?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("facts[$index]: Missing predicate")
+        val argsList = obj["args"]?.jsonArray?.map { it.jsonPrimitive.content }
+            ?: throw IllegalArgumentException("facts[$index]: Missing args")
+        val negated = obj["negated"]?.jsonPrimitive?.booleanOrNull ?: false
+        val scope = obj["scope"]?.jsonPrimitive?.contentOrNull
+        val ttl = obj["ttl"]?.jsonPrimitive?.longOrNull
+        val validUntil = obj["validUntil"]?.jsonPrimitive?.longOrNull
+
+        val terms = argsList.map { parseTerm(it) }
+        com.nocturnusai.core.Atom(
+            predicate = predicate,
+            args = terms,
+            truthVal = !negated,
+            scope = scope,
+            ttl = ttl,
+            validUntil = validUntil
+        )
+    }
+
+    val result = db.bulkAssertFacts(atoms, tenantId)
+
+    val sb = StringBuilder("Bulk assert: ${result.asserted} stored, ${result.failed} failed.\n")
+    if (result.errors.isNotEmpty()) {
+        sb.append("Errors:\n")
+        result.errors.forEach { sb.append("  - $it\n") }
+    }
+    return sb.toString()
+}
+
+private fun callRetractPattern(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
+    val predicate = args["predicate"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing predicate")
+    val argsList = args["args"]?.jsonArray?.map { it.jsonPrimitive.content } ?: throw IllegalArgumentException("Missing args")
+    val scope = args["scope"]?.jsonPrimitive?.contentOrNull
+
+    val terms = argsList.map { parseTerm(it) }
+    val pattern = com.nocturnusai.core.Atom(predicate, terms, scope = scope)
+
+    val result = db.retractByPattern(pattern, tenantId, scope)
+
+    if (result.retracted == 0) {
+        return "No facts matched the pattern $predicate(${argsList.joinToString(", ")})."
+    }
+
+    val sb = StringBuilder("Retracted ${result.retracted} fact(s):\n")
+    result.atoms.forEach { atom -> sb.append("  $atom\n") }
     return sb.toString()
 }
 

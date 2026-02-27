@@ -42,10 +42,24 @@ import com.nocturnusai.extraction.ExtractedRule
 import com.nocturnusai.extraction.FactExtractor
 import com.nocturnusai.extraction.RuleExtractor
 import com.nocturnusai.memory.*
+import com.nocturnusai.storage.AggregateOp
 import com.nocturnusai.testing.TestRunner
 import com.nocturnusai.transaction.TransactionManager
 
 class TenantNotFoundException(val tenantId: String) : RuntimeException("Tenant '$tenantId' not found")
+
+/** Result of a bulk-assert operation. */
+data class BulkResult(
+    val asserted: Int,
+    val failed: Int,
+    val errors: List<String>
+)
+
+/** Result of a pattern-based retract operation. */
+data class RetractResult(
+    val retracted: Int,
+    val atoms: List<Atom>
+)
 
 class NocturnusAI(
     val storageDir: File = File("data"),
@@ -318,6 +332,73 @@ class NocturnusAI(
     fun query(pattern: Atom, tenantId: String? = null, scope: String? = null): Sequence<Atom> {
         val ctx = getContext(tenantId)
         return ctx.store.match(pattern, scope = scope)
+    }
+
+    // --- Aggregation API ---
+
+    /**
+     * Count facts matching [pattern] in [tenantId]'s store, optionally filtered by [scope].
+     */
+    fun countFacts(pattern: Atom, tenantId: String, scope: String? = null): Int {
+        val ctx = getContext(tenantId)
+        return ctx.store.count(pattern, scope)
+    }
+
+    /**
+     * Apply [op] over the numeric value at [argIndex] for all facts matching [pattern]
+     * in [tenantId]'s store, optionally filtered by [scope].
+     */
+    fun aggregateFacts(pattern: Atom, argIndex: Int, op: AggregateOp, tenantId: String, scope: String? = null): Double? {
+        val ctx = getContext(tenantId)
+        return ctx.store.aggregate(pattern, argIndex, op, scope)
+    }
+
+    // --- Bulk Operations API ---
+
+    /**
+     * Assert all [atoms] for [tenantId].  Non-all-or-nothing: each atom is attempted
+     * independently.  Contradictions and constraint violations are collected as errors
+     * rather than aborting the entire batch.
+     */
+    fun bulkAssertFacts(atoms: List<Atom>, tenantId: String): BulkResult {
+        val ctx = getContext(tenantId)
+        val limitTenant = tenantId
+        var asserted = 0
+        var failed = 0
+        val errors = mutableListOf<String>()
+
+        for (atom in atoms) {
+            var finalAtom = atom
+            if (finalAtom.createdAt == null) {
+                finalAtom = finalAtom.copy(createdAt = System.currentTimeMillis())
+            }
+            if (finalAtom.validFrom == null) {
+                finalAtom = finalAtom.copy(validFrom = finalAtom.createdAt)
+            }
+            try {
+                internalAssertFact(ctx, finalAtom, logging = true, tenantId = limitTenant)
+                asserted++
+            } catch (e: Exception) {
+                failed++
+                errors.add("${atom.predicate}(${atom.args.joinToString(",")}): ${e.message}")
+            }
+        }
+
+        return BulkResult(asserted, failed, errors)
+    }
+
+    /**
+     * Retract all facts that match [pattern] in [tenantId]'s store, optionally
+     * filtered by [scope].  Returns the count and list of retracted atoms.
+     */
+    fun retractByPattern(pattern: Atom, tenantId: String, scope: String? = null): RetractResult {
+        val ctx = getContext(tenantId)
+        val limitTenant = tenantId
+        val matches = ctx.store.match(pattern, scope).toList()
+        for (atom in matches) {
+            internalRetractFact(ctx, atom, logging = true, tenantId = limitTenant)
+        }
+        return RetractResult(matches.size, matches)
     }
 
     fun infer(pattern: Atom, tenantId: String? = null): Sequence<Atom> {

@@ -297,9 +297,13 @@ Isolate your implementation plans or different user sessions.
 
 #### `POST /admin/databases`
 
+#### `POST /aggregate`
+
 #### `POST /ask`
 
 #### `POST /assert/fact`
+
+#### `POST /assert/facts`
 
 #### `POST /assert/rule`
 
@@ -342,6 +346,8 @@ Isolate your implementation plans or different user sessions.
 #### `POST /memory/recall`
 
 #### `POST /query`
+
+#### `POST /retract/pattern`
 
 #### `POST /retract`
 
