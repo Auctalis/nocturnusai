@@ -269,6 +269,46 @@ fun Application.module() {
             "Generate with: openssl rand -hex 32")
     }
 
+    // ── Follower write rejection ─────────────────────────────────────────
+    // When this node is a read-only follower, reject all mutating endpoints
+    // so agents are immediately redirected to the leader rather than causing
+    // silent split-brain divergence.
+    if (ServerConfig.replicationMode == ReplicationMode.FOLLOWER) {
+        val writeMethodPrefixes = setOf(
+            "/tell", "/teach", "/forget",
+            "/assert/", "/retract", "/execute",
+            "/tx/", "/memory/consolidate", "/memory/decay", "/memory/priority",
+            "/memory/compress", "/memory/cleanup", "/memory/prioritize"
+        )
+        val writeAdminPaths = setOf("/admin/databases")
+
+        intercept(ApplicationCallPipeline.Plugins) {
+            val method = call.request.httpMethod
+            val path = call.request.uri.substringBefore('?')
+
+            val isWriteMethod = method == HttpMethod.Post || method == HttpMethod.Put ||
+                    method == HttpMethod.Delete || method == HttpMethod.Patch
+
+            val isBlockedPath = isWriteMethod && (
+                writeMethodPrefixes.any { prefix -> path.startsWith(prefix) } ||
+                (writeAdminPaths.any { admin -> path.startsWith(admin) } &&
+                    (method == HttpMethod.Post || method == HttpMethod.Delete))
+            )
+
+            if (isBlockedPath) {
+                call.respond(
+                    HttpStatusCode.Conflict,
+                    ErrorResponse(
+                        code = "FOLLOWER_READ_ONLY",
+                        message = "This server is a read-only follower. Send writes to the leader.",
+                        details = mapOf("leader" to (ServerConfig.leaderUrl ?: "unknown"))
+                    )
+                )
+                return@intercept finish()
+            }
+        }
+    }
+
     // Graceful shutdown: close all databases when application stops
     environment.monitor.subscribe(ApplicationStopping) {
         environment.log.info("Application stopping — closing all databases...")
@@ -300,14 +340,16 @@ fun Application.module() {
     if (ServerConfig.replicationMode == ReplicationMode.FOLLOWER) {
         val leader = ServerConfig.leaderUrl
         if (leader != null) {
-            // Replicate Default DB
-            val db = dbManager.getDatabase("default")
-            if (db != null) {
-                val client = ReplicationClient(db, leader)
-                client.start()
+            val replicationClient = ReplicationClient(dbManager, leader)
+            replicationClient.start()
+
+            // Stop the replication client cleanly when the server shuts down
+            environment.monitor.subscribe(ApplicationStopping) {
+                environment.log.info("Application stopping — stopping replication client...")
+                replicationClient.stop()
             }
         } else {
-            System.err.println("Replication Mode is FOLLOWER but LEADER_URL is missing!")
+            environment.log.error("REPLICATION_MODE=FOLLOWER but LEADER_URL is not set!")
         }
     }
 

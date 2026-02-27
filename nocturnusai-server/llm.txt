@@ -281,6 +281,10 @@ Isolate your implementation plans or different user sessions.
 
 #### `GET /predicates`
 
+#### `GET /replication/snapshot`
+
+#### `GET /replication/wal/databases`
+
 #### `GET /replication/wal`
 
 #### `GET /userguide`
