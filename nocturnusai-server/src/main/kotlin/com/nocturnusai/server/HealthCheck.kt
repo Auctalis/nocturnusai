@@ -14,14 +14,27 @@
 
 package com.nocturnusai.server
 
+import com.nocturnusai.server.observability.Metrics
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
+
+@Serializable
+data class ReplicationInfo(
+    val mode: String,
+    val leaderUrl: String? = null,
+    val lastSyncedWalId: Long? = null,
+    val consecutiveFailures: Int? = null
+)
 
 @Serializable
 data class HealthStatus(
     val status: String, // "healthy", "degraded", "unhealthy"
     val version: String = BuildInfo.version,
-    val checks: Map<String, CheckResult>
+    val checks: Map<String, CheckResult>,
+    val replication: ReplicationInfo? = null
 )
 
 @Serializable
@@ -72,7 +85,22 @@ object HealthChecker {
             else -> "healthy"
         }
 
-        return HealthStatus(status = overallStatus, checks = checks)
+        // Build replication info block
+        val replicationInfo = when (ServerConfig.replicationMode) {
+            ReplicationMode.FOLLOWER -> {
+                // Aggregate across all known databases (use "default" as representative)
+                val dbName = "default"
+                ReplicationInfo(
+                    mode = "FOLLOWER",
+                    leaderUrl = ServerConfig.leaderUrl,
+                    lastSyncedWalId = Metrics.getLastSyncedWalId(dbName),
+                    consecutiveFailures = Metrics.getConsecutiveFailures(dbName)
+                )
+            }
+            ReplicationMode.LEADER -> ReplicationInfo(mode = "LEADER")
+        }
+
+        return HealthStatus(status = overallStatus, checks = checks, replication = replicationInfo)
     }
 
     private fun checkWalWritable(storageDir: File): CheckResult {
