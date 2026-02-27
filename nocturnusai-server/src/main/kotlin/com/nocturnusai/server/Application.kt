@@ -84,7 +84,16 @@ fun main() {
     server.start(wait = true)
 }
 
-fun Application.module() {
+fun Application.module() = moduleWithStorageDir(ServerConfig.storageDir)
+
+/**
+ * Core application module that accepts an explicit storage directory.
+ *
+ * This is the canonical implementation. [module] delegates here using
+ * [ServerConfig.storageDir]. Tests can call this directly with a fresh
+ * temporary directory to guarantee per-test isolation.
+ */
+fun Application.moduleWithStorageDir(storageDir: File) {
     install(ContentNegotiation) {
         json()
     }
@@ -183,7 +192,7 @@ fun Application.module() {
     }
 
     // Database Manager
-    val dbManager = DatabaseManager(ServerConfig.storageDir, factExtractor, ruleExtractor)
+    val dbManager = DatabaseManager(storageDir, factExtractor, ruleExtractor)
     Metrics.activeDatabases.set(dbManager.getDatabaseNames().size)
 
     // ── MDC enrichment — correlation ID + context per request ────────
@@ -229,7 +238,7 @@ fun Application.module() {
 
     // ── Authentication & Authorization ──────────────────────────────────
     val keyManager = if (ServerConfig.authMode == AuthMode.RBAC) {
-        val km = ApiKeyManager(ServerConfig.storageDir)
+        val km = ApiKeyManager(storageDir)
         environment.log.info("Auth mode: RBAC (${km.listKeys().size} keys loaded)")
         if (!km.hasKeys()) {
             environment.log.warn("No API keys found — POST /auth/bootstrap to create the first admin key")
@@ -290,8 +299,9 @@ fun Application.module() {
         transactionRoutes(dbManager)
         testRoutes(dbManager)
         memoryRoutes(dbManager)
+        scopeRoutes(dbManager)
         mcpRoutes(dbManager)
-        observabilityRoutes(appMicrometerRegistry, dbManager, ServerConfig.storageDir, llmProvider != null)
+        observabilityRoutes(appMicrometerRegistry, dbManager, storageDir, llmProvider != null)
         replicationRoutes(dbManager)
         extractionRoutes(dbManager, factExtractor, ruleExtractor, llmProvider)
         synthesisRoutes(dbManager, llmProvider)

@@ -337,6 +337,39 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
             ),
             required = listOf("predicate", "args")
         ))
+        add(toolSchema(
+            name = "fork_scope",
+            description = "Fork a knowledge base scope. Creates an independent copy of all facts in sourceScope under targetScope. Use this to safely explore hypothetical scenarios ('What if Alice moves to London?') without modifying the main knowledge base. sourceScope=null forks from the global (unscoped) partition.",
+            properties = mapOf(
+                "sourceScope" to propString("Scope to copy from. Omit or pass null for the global partition."),
+                "targetScope" to propString("New scope name to copy all facts into.")
+            ),
+            required = listOf("targetScope")
+        ))
+        add(toolSchema(
+            name = "merge_scope",
+            description = "Merge facts from sourceScope back into targetScope (default: global). Useful for committing hypothetical reasoning back into the main knowledge base. Choose a conflict strategy: SOURCE_WINS overwrites, TARGET_WINS keeps existing, KEEP_BOTH retains both, REJECT aborts if conflicts found.",
+            properties = mapOf(
+                "sourceScope" to propString("Scope to merge facts from."),
+                "targetScope" to propString("Destination scope. Omit or pass null for the global partition."),
+                "strategy" to propString("Conflict strategy: SOURCE_WINS | TARGET_WINS | KEEP_BOTH | REJECT (default: SOURCE_WINS)")
+            ),
+            required = listOf("sourceScope")
+        ))
+        add(toolSchema(
+            name = "list_scopes",
+            description = "List all named scopes currently in the knowledge base. Useful for discovering what hypothetical contexts or reasoning branches exist.",
+            properties = emptyMap(),
+            required = emptyList()
+        ))
+        add(toolSchema(
+            name = "delete_scope",
+            description = "Delete a knowledge base scope and all facts within it. Use this to clean up completed or abandoned hypothetical reasoning branches.",
+            properties = mapOf(
+                "scope" to propString("The scope name to delete.")
+            ),
+            required = listOf("scope")
+        ))
     }
 
     val result = JsonObject(mapOf("tools" to tools))
@@ -370,6 +403,11 @@ private fun handleToolCall(
             "aggregate" -> callAggregate(db, tenantId, arguments)
             "bulk_assert" -> callBulkAssert(db, tenantId, arguments)
             "retract_pattern" -> callRetractPattern(db, tenantId, arguments)
+            // Scope management tools
+            "fork_scope" -> callForkScope(db, tenantId, arguments)
+            "merge_scope" -> callMergeScope(db, tenantId, arguments)
+            "list_scopes" -> callListScopes(db, tenantId)
+            "delete_scope" -> callDeleteScope(db, tenantId, arguments)
             // Legacy names (backward compatible)
             "assert_fact" -> callAssertFact(db, tenantId, arguments)
             "assert_rule" -> callAssertRule(db, tenantId, arguments)
@@ -727,6 +765,52 @@ private fun callRetractPattern(db: com.nocturnusai.NocturnusAI, tenantId: String
     val sb = StringBuilder("Retracted ${result.retracted} fact(s):\n")
     result.atoms.forEach { atom -> sb.append("  $atom\n") }
     return sb.toString()
+}
+
+// --- Scope Tool Implementations ---
+
+private fun callForkScope(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
+    val sourceScope = args["sourceScope"]?.jsonPrimitive?.contentOrNull
+    val targetScope = args["targetScope"]?.jsonPrimitive?.content
+        ?: throw IllegalArgumentException("Missing targetScope")
+    if (targetScope.isBlank()) throw IllegalArgumentException("targetScope must not be blank")
+
+    val copied = db.forkScope(sourceScope, targetScope, tenantId)
+    val sourceName = sourceScope ?: "<global>"
+    return "Forked $copied atom(s) from scope '$sourceName' into scope '$targetScope'."
+}
+
+private fun callMergeScope(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
+    val sourceScope = args["sourceScope"]?.jsonPrimitive?.content
+        ?: throw IllegalArgumentException("Missing sourceScope")
+    if (sourceScope.isBlank()) throw IllegalArgumentException("sourceScope must not be blank")
+    val targetScope = args["targetScope"]?.jsonPrimitive?.contentOrNull
+    val strategyStr = args["strategy"]?.jsonPrimitive?.contentOrNull ?: "SOURCE_WINS"
+    val strategy = try {
+        com.nocturnusai.core.MergeStrategy.valueOf(strategyStr)
+    } catch (_: IllegalArgumentException) {
+        throw IllegalArgumentException("Unknown merge strategy '$strategyStr'. Valid values: SOURCE_WINS, TARGET_WINS, KEEP_BOTH, REJECT")
+    }
+
+    val result = db.mergeScope(sourceScope, targetScope, strategy, tenantId)
+    val targetName = targetScope ?: "<global>"
+    return "Merged scope '$sourceScope' into '$targetName': " +
+        "${result.merged} atom(s) merged, ${result.conflictsResolved} conflict(s) resolved (strategy: ${result.strategy})."
+}
+
+private fun callListScopes(db: com.nocturnusai.NocturnusAI, tenantId: String): String {
+    val scopes = db.listScopes(tenantId).sorted()
+    if (scopes.isEmpty()) return "No named scopes found. Only the global (unscoped) partition exists."
+    return "Found ${scopes.size} scope(s): ${scopes.joinToString(", ") { "'$it'" }}"
+}
+
+private fun callDeleteScope(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
+    val scope = args["scope"]?.jsonPrimitive?.content
+        ?: throw IllegalArgumentException("Missing scope")
+    if (scope.isBlank()) throw IllegalArgumentException("scope must not be blank")
+
+    val deleted = db.deleteScope(scope, tenantId)
+    return "Deleted scope '$scope': $deleted atom(s) removed."
 }
 
 // --- Helpers ---
