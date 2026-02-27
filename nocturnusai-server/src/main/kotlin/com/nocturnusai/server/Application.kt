@@ -286,6 +286,7 @@ fun Application.module() {
         // Full routes (advanced / backward-compatible)
         adminRoutes(dbManager)
         logicRoutes(dbManager)
+        aggregateRoutes(dbManager)
         transactionRoutes(dbManager)
         testRoutes(dbManager)
         memoryRoutes(dbManager)

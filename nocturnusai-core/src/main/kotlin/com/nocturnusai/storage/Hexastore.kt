@@ -20,6 +20,13 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.StampedLock
 
 /**
+ * Aggregation operations supported by [Hexastore.aggregate].
+ */
+enum class AggregateOp {
+    COUNT, SUM, MIN, MAX, AVG
+}
+
+/**
  * A Reasoning Store implementation using Hexastore indexing strategy.
  * Optimized for quads: Subject (args[0]), Predicate (predicate), Object (args[1]), Scope.
  *
@@ -297,6 +304,50 @@ class Hexastore {
             return all.asSequence()
         } finally {
             lock.unlockRead(stamp)
+        }
+    }
+
+    /**
+     * Counts atoms matching [pattern], optionally filtered by [scope].
+     * Uses the existing [match] infrastructure — no full materialisation beyond
+     * what match already does.
+     */
+    fun count(pattern: Atom, scope: String? = null): Int {
+        return match(pattern, scope).count()
+    }
+
+    /**
+     * Applies an aggregation [op] over the numeric value at [argIndex] for every
+     * atom matching [pattern].
+     *
+     * - Non-[Term.NumberLit] values at [argIndex] are silently skipped.
+     * - For [AggregateOp.COUNT] the [argIndex] is ignored and the total match
+     *   count is returned as a [Double].
+     * - Returns `null` when no matching atoms exist (or no numeric values for
+     *   SUM/MIN/MAX/AVG after skipping non-numerics), except COUNT which returns 0.0.
+     */
+    fun aggregate(pattern: Atom, argIndex: Int, op: AggregateOp, scope: String? = null): Double? {
+        val matches = match(pattern, scope).toList()
+
+        if (op == AggregateOp.COUNT) {
+            return matches.size.toDouble()
+        }
+
+        if (matches.isEmpty()) return null
+
+        val numbers = matches.mapNotNull { atom ->
+            val term = atom.args.getOrNull(argIndex)
+            (term as? Term.NumberLit)?.value
+        }
+
+        if (numbers.isEmpty()) return null
+
+        return when (op) {
+            AggregateOp.SUM -> numbers.sum()
+            AggregateOp.MIN -> numbers.min()
+            AggregateOp.MAX -> numbers.max()
+            AggregateOp.AVG -> numbers.average()
+            AggregateOp.COUNT -> numbers.size.toDouble() // unreachable — handled above
         }
     }
 }
