@@ -96,6 +96,10 @@ jobs:
         working-directory: sdks/typescript
         run: npm run build
 
+      - name: Test
+        working-directory: sdks/typescript
+        run: npm test
+
   # ── Security: Trivy vulnerability scan ─────────────────────────────────────
   security:
     name: Security (Trivy)
