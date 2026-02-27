@@ -59,6 +59,45 @@ class BackwardChainer(
 
         val currentGoal = Unifier.substitute(goals[index], subst)
 
+        // --- Negation-as-Failure (NAF) handling ---
+        // When the body condition carries naf=true, we attempt to prove the
+        // inner goal (same atom with naf=false).  If no solutions exist the NAF
+        // condition SUCCEEDS and we continue with the remaining goals, passing
+        // the unchanged substitution.  If any solution exists the NAF condition
+        // FAILS and we return an empty sequence for this branch.
+        //
+        // Safety guard: all variables in a NAF condition must be ground by the
+        // time the condition is evaluated.  Unbound variables at NAF evaluation
+        // indicate an unsafe rule and we throw rather than silently accept.
+        if (currentGoal.naf) {
+            // Strip NAF flag to get the positive inner goal
+            val innerGoal = currentGoal.copy(naf = false)
+
+            // Groundness check: no unbound variables allowed in NAF goals
+            val unboundVars = innerGoal.args.filterIsInstance<Term.Variable>()
+            if (unboundVars.isNotEmpty()) {
+                throw IllegalStateException(
+                    "NAF condition '${innerGoal}' contains unbound variable(s) " +
+                    "${unboundVars.map { "?${it.name}" }} — NAF goals must be ground at evaluation time"
+                )
+            }
+
+            // Try to prove the inner goal; NAF uses the same depth counter to
+            // prevent depth budget from being exploited.
+            val innerMemo = HashMap<Atom, List<Atom>>()
+            val hasSolution = solveRecursive(
+                listOf(innerGoal), 0, emptyMap(), depth + 1, rulesByPredicate, innerMemo
+            ).any()
+
+            return if (hasSolution) {
+                // Inner goal IS provable — NAF fails
+                emptySequence()
+            } else {
+                // Inner goal NOT provable — NAF succeeds; continue with current subst
+                solveRecursive(goals, index + 1, subst, depth, rulesByPredicate, memo)
+            }
+        }
+
         // Memoization: normalize goal to use positional variable placeholders as cache key
         val normalizedKey = normalizeForMemo(currentGoal)
         val resolvedAtoms: List<Atom> = memo[normalizedKey] ?: run {
@@ -198,10 +237,11 @@ class BackwardChainer(
         private val varCounter = AtomicLong(0)
     }
 
-    // Simple standardization apart
+    // Simple standardization apart — renames variables to unique names while
+    // preserving all atom properties including the naf flag.
     private fun renameVars(rule: Rule): Rule {
         val suffix = "_${varCounter.incrementAndGet()}"
-        
+
         fun rename(term: Term): Term {
             return when(term) {
                 is Term.Variable -> {
@@ -211,11 +251,12 @@ class BackwardChainer(
                 else -> term
             }
         }
-        
+
+        // copy() preserves naf and all other fields; only args are updated.
         fun renameAtom(atom: Atom): Atom {
             return atom.copy(args = atom.args.map { rename(it) })
         }
-        
+
         return Rule(
             variables = rule.variables.map { Term.Variable(it.name + suffix) },
             head = renameAtom(rule.head),

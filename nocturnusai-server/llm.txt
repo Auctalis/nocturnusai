@@ -205,7 +205,8 @@ Isolate your implementation plans or different user sessions.
   "args": "ArrayList",
   "negated": "Boolean",
   "scope": "String",
-  "metadata": "LinkedHashMap"
+  "metadata": "LinkedHashMap",
+  "naf": "Boolean"
 }
 ```
 ### `TemplateRequest`

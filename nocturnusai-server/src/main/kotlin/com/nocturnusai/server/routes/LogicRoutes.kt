@@ -126,7 +126,13 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
             // Parse Body
             val bodyAtoms = req.body.map { atomReq ->
                 val terms = atomReq.args.map { parseTerm(it) }
-                com.nocturnusai.core.Atom(atomReq.predicate, terms, truthVal = !atomReq.negated, scope = atomReq.scope, metadata = atomReq.metadata)
+                com.nocturnusai.core.Atom(
+                    atomReq.predicate, terms,
+                    truthVal = !atomReq.negated,
+                    scope = atomReq.scope,
+                    metadata = atomReq.metadata,
+                    naf = atomReq.naf
+                )
             }
 
             // Collect Variables (from Head and ALL Body atoms)

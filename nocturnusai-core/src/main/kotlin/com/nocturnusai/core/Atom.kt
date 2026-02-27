@@ -35,7 +35,14 @@ data class Atom(
     val createdAt: Long? = null,
     val validFrom: Long? = null,
     val validUntil: Long? = null,
-    val ttl: Long? = null
+    val ttl: Long? = null,
+    // Negation-as-Failure flag.
+    // When true on a rule body condition, the condition succeeds iff the atom
+    // CANNOT be proven — i.e., the closed-world assumption / Prolog \+.
+    // Distinct from truthVal=false (explicit / classical negation).
+    // naf=true has no meaning on head atoms or asserted facts; it is only
+    // meaningful in rule bodies.
+    val naf: Boolean = false
 ) {
     /** Returns true if this atom is temporally valid at the given timestamp. */
     fun isValidAt(timestamp: Long): Boolean {
@@ -59,7 +66,8 @@ data class Atom(
                args == other.args &&
                truthVal == other.truthVal &&
                source == other.source &&
-               scope == other.scope
+               scope == other.scope &&
+               naf == other.naf
     }
 
     override fun hashCode(): Int {
@@ -68,12 +76,17 @@ data class Atom(
         result = 31 * result + truthVal.hashCode()
         result = 31 * result + source.hashCode()
         result = 31 * result + (scope?.hashCode() ?: 0)
+        result = 31 * result + naf.hashCode()
         return result
     }
 
     override fun toString(): String {
         val argsStr = args.joinToString(", ")
-        val negation = if (truthVal) "" else "NOT "
+        val negation = when {
+            naf -> "NAF "
+            !truthVal -> "NOT "
+            else -> ""
+        }
         val scopeStr = if (scope != null) " @$scope" else ""
         return "$negation$predicate($argsStr)$scopeStr"
     }

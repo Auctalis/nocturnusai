@@ -49,7 +49,11 @@ data class AtomDto(
     val args: List<String>,
     val negated: Boolean = false,
     val scope: String? = null,
-    val metadata: Map<String, JsonElement> = emptyMap()
+    val metadata: Map<String, JsonElement> = emptyMap(),
+    // When true on a rule body atom, this condition uses Negation-as-Failure:
+    // it succeeds iff the atom CANNOT be proven (closed-world assumption).
+    // Distinct from negated=true which is classical explicit negation.
+    val naf: Boolean = false
 )
 
 @Serializable
