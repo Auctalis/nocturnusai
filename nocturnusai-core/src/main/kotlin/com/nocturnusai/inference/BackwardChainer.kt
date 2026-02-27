@@ -29,13 +29,73 @@ class BackwardChainer(
     /**
      * Tries to prove the goal using existing facts AND backward chaining on rules.
      * Returns a sequence of fully unified facts matching the goal.
+     *
+     * Confidence is carried from directly matched store facts to the result atom.
+     * Rule-derived atoms have no confidence (null), since confidence aggregation across
+     * a rule body is out of scope for the base inference engine.
      */
     fun solve(goal: Atom): Sequence<Atom> {
         val rulesByPredicate = rules.groupBy { it.head.predicate }
         val memo = HashMap<Atom, List<Atom>>()
-        return solveRecursive(listOf(goal), 0, emptyMap(), 0, rulesByPredicate, memo)
-             .map { subst -> Unifier.substitute(goal, subst) }
-             .distinct()
+        // We track (substitution, confidence) together so confidence from the matched fact
+        // is available when constructing the result atom.
+        return solveRecursiveWithConfidence(listOf(goal), 0, emptyMap(), null, 0, rulesByPredicate, memo)
+            .map { (subst, confidence) ->
+                val result = Unifier.substitute(goal, subst)
+                if (confidence != null) result.copy(confidence = confidence) else result
+            }
+            .distinctBy { it.args } // distinct by args (structural identity, ignoring metadata)
+    }
+
+    private fun solveRecursiveWithConfidence(
+        goals: List<Atom>,
+        index: Int,
+        subst: Substitution,
+        confidence: Double?,
+        depth: Int,
+        rulesByPredicate: Map<String, List<Rule>>,
+        memo: HashMap<Atom, List<Atom>>
+    ): Sequence<Pair<Substitution, Double?>> {
+        if (depth > maxDepth) return emptySequence()
+        if (index >= goals.size) return sequenceOf(Pair(subst, confidence))
+
+        val currentGoal = Unifier.substitute(goals[index], subst)
+        val normalizedKey = normalizeForMemo(currentGoal)
+        val resolvedAtoms: List<Atom> = memo[normalizedKey] ?: run {
+            memo[normalizedKey] = emptyList()
+            val results = mutableListOf<Atom>()
+            store.match(currentGoal).forEach { fact -> results.add(fact) }
+            val candidateRules = rulesByPredicate[currentGoal.predicate] ?: emptyList()
+            for (rule in candidateRules) {
+                val uniqueRule = renameVars(rule)
+                val headMatch = Unifier.unifyAtoms(currentGoal, uniqueRule.head) ?: continue
+                solveRecursive(uniqueRule.body, 0, headMatch, depth + 1, rulesByPredicate, memo)
+                    .forEach { bodySubst ->
+                        results.add(Unifier.substitute(uniqueRule.head, bodySubst))
+                    }
+            }
+            val distinct = results.distinct()
+            memo[normalizedKey] = distinct
+            distinct
+        }
+
+        return resolvedAtoms.asSequence().mapNotNull { resultAtom ->
+            val matchSubst = Unifier.unifyAtoms(currentGoal, resultAtom) ?: return@mapNotNull null
+            // If this is a direct fact from the store, carry its confidence; rule-derived atoms
+            // return null confidence (no confidence aggregation for derived facts).
+            val atomConfidence = resultAtom.confidence
+            Pair(matchSubst, atomConfidence)
+        }.flatMap { (matchSubst, atomConfidence) ->
+            val nextSubst = subst + matchSubst
+            // Propagate the minimum confidence encountered along the solution path
+            val nextConfidence = when {
+                confidence == null && atomConfidence == null -> null
+                confidence == null -> atomConfidence
+                atomConfidence == null -> confidence
+                else -> minOf(confidence, atomConfidence)
+            }
+            solveRecursiveWithConfidence(goals, index + 1, nextSubst, nextConfidence, depth, rulesByPredicate, memo)
+        }
     }
 
     private fun solveRecursive(

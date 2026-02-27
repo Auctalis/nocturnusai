@@ -222,7 +222,9 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
                 "scope" to propString("Optional isolation scope (e.g., 'session_123', 'hypothesis_a')"),
                 "negated" to propBool("Set true to store the negation of this fact"),
                 "ttl" to propNumber("Auto-expire after this many milliseconds"),
-                "validUntil" to propNumber("Epoch ms when this fact stops being valid")
+                "validUntil" to propNumber("Epoch ms when this fact stops being valid"),
+                "confidence" to propNumber("Optional confidence score 0.0–1.0 (e.g., 0.9 = high confidence from LLM extraction)"),
+                "conflictStrategy" to propString("How to handle contradictions: REJECT (default), NEWEST_WINS, CONFIDENCE, KEEP_BOTH")
             ),
             required = listOf("predicate", "args")
         ))
@@ -246,7 +248,8 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
                 "predicate" to propString("What you're asking about (e.g., 'grandparent')"),
                 "args" to propArray("Use ?x, ?who etc. for unknowns, concrete values to constrain (e.g., ['?who', 'charlie'])"),
                 "scope" to propString("Optional scope filter"),
-                "withProof" to propBool("If true, include the full reasoning chain showing how each answer was derived")
+                "withProof" to propBool("If true, include the full reasoning chain showing how each answer was derived"),
+                "minConfidence" to propNumber("Optional minimum confidence threshold 0.0–1.0. Filters out facts below this confidence.")
             ),
             required = listOf("predicate", "args")
         ))
@@ -399,6 +402,12 @@ private fun callAssertFact(db: com.nocturnusai.NocturnusAI, tenantId: String, ar
     val negated = args["negated"]?.jsonPrimitive?.booleanOrNull ?: false
     val ttl = args["ttl"]?.jsonPrimitive?.longOrNull
     val validUntil = args["validUntil"]?.jsonPrimitive?.longOrNull
+    val confidence = args["confidence"]?.jsonPrimitive?.doubleOrNull
+    val conflictStrategyStr = args["conflictStrategy"]?.jsonPrimitive?.contentOrNull
+    val conflictStrategy = conflictStrategyStr?.let {
+        try { com.nocturnusai.core.ConflictStrategy.valueOf(it) }
+        catch (_: IllegalArgumentException) { throw IllegalArgumentException("Invalid conflictStrategy: $it. Valid values: REJECT, NEWEST_WINS, CONFIDENCE, KEEP_BOTH") }
+    } ?: db.defaultConflictStrategy
 
     val terms = argsList.map { parseTerm(it) }
     val atom = com.nocturnusai.core.Atom(
@@ -407,9 +416,10 @@ private fun callAssertFact(db: com.nocturnusai.NocturnusAI, tenantId: String, ar
         truthVal = !negated,
         scope = scope,
         ttl = ttl,
-        validUntil = validUntil
+        validUntil = validUntil,
+        confidence = confidence
     )
-    db.assertFact(atom, tenantId)
+    db.assertFact(atom, tenantId, conflictStrategy = conflictStrategy)
     return "Stored: $atom"
 }
 
@@ -460,6 +470,7 @@ private fun callInfer(db: com.nocturnusai.NocturnusAI, tenantId: String, args: J
     val argsList = args["args"]?.jsonArray?.map { it.jsonPrimitive.content } ?: throw IllegalArgumentException("Missing args")
     val scope = args["scope"]?.jsonPrimitive?.contentOrNull
     val withProof = args["withProof"]?.jsonPrimitive?.booleanOrNull ?: false
+    val minConfidence = args["minConfidence"]?.jsonPrimitive?.doubleOrNull
 
     val terms = argsList.map { parseTerm(it) }
     val pattern = com.nocturnusai.core.Atom(predicate, terms, scope = scope)
@@ -475,12 +486,13 @@ private fun callInfer(db: com.nocturnusai.NocturnusAI, tenantId: String, args: J
         }
         return sb.toString()
     } else {
-        val results = db.infer(pattern, tenantId).toList()
+        val results = db.infer(pattern, tenantId, minConfidence = minConfidence).toList()
         if (results.isEmpty()) return "No results could be inferred."
 
         val sb = StringBuilder("Inferred ${results.size} result(s):\n")
         for (atom in results) {
-            sb.append("  ${atom}\n")
+            val confStr = if (atom.confidence != null) " [confidence=${String.format("%.2f", atom.confidence)}]" else ""
+            sb.append("  ${atom}$confStr\n")
         }
         return sb.toString()
     }

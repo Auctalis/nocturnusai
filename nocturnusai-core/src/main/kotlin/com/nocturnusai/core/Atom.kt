@@ -35,7 +35,10 @@ data class Atom(
     val createdAt: Long? = null,
     val validFrom: Long? = null,
     val validUntil: Long? = null,
-    val ttl: Long? = null
+    val ttl: Long? = null,
+    // Confidence score — metadata, excluded from equals/hashCode.
+    // Valid range: 0.0 (no confidence) to 1.0 (certainty). null means unknown.
+    val confidence: Double? = null
 ) {
     /** Returns true if this atom is temporally valid at the given timestamp. */
     fun isValidAt(timestamp: Long): Boolean {

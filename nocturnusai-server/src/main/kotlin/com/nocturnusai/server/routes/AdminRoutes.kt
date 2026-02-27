@@ -27,8 +27,8 @@ fun Route.adminRoutes(dbManager: DatabaseManager) {
         try {
             val req = call.receive<CreateDbRequest>()
             Validator.validateDatabaseName(req.name)
-            dbManager.createDatabase(req.name, true)
-            call.respondText("Database '${req.name}' created (MultiTenant=true)")
+            dbManager.createDatabase(req.name, true, defaultConflictStrategy = req.defaultConflictStrategy)
+            call.respondText("Database '${req.name}' created (MultiTenant=true, conflictStrategy=${req.defaultConflictStrategy})")
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: Exception) {

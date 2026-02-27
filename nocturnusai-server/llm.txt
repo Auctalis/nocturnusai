@@ -187,7 +187,9 @@ Isolate your implementation plans or different user sessions.
   "metadata": "LinkedHashMap",
   "validFrom": "Number",
   "validUntil": "Number",
-  "ttl": "Number"
+  "ttl": "Number",
+  "confidence": "Double?",
+  "conflictStrategy": "Enum<com.nocturnusai.core.ConflictStrategy?>"
 }
 ```
 ### `RuleRequest`
@@ -227,7 +229,8 @@ Isolate your implementation plans or different user sessions.
 ```json
 {
   "name": "String",
-  "isMultiTenant": "Boolean"
+  "isMultiTenant": "Boolean",
+  "defaultConflictStrategy": "Enum<com.nocturnusai.core.ConflictStrategy>"
 }
 ```
 ### `CreateTenantRequest`

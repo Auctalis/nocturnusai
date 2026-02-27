@@ -52,10 +52,12 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
 
             val atom = com.nocturnusai.core.Atom(
                 req.predicate, terms, effectiveTruth, scope = req.scope, metadata = req.metadata,
-                validFrom = req.validFrom, validUntil = req.validUntil, ttl = req.ttl
+                validFrom = req.validFrom, validUntil = req.validUntil, ttl = req.ttl,
+                confidence = req.confidence
             )
 
             val txId = call.request.header("X-Transaction-ID")?.toLongOrNull()
+            val strategy = req.conflictStrategy ?: db.defaultConflictStrategy
 
             if (txId != null) {
                 if (effectiveTruth) {
@@ -66,7 +68,7 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
                 }
                 call.respondText("Fact Buffered in Tx $txId: $atom")
             } else {
-                db.assertFact(atom, tenantId)
+                db.assertFact(atom, tenantId, conflictStrategy = strategy)
                 call.respondText("Fact Asserted: $atom")
             }
         } catch (e: ValidationException) {
@@ -239,13 +241,15 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
             val queryAtom = com.nocturnusai.core.Atom(req.predicate, terms, effectiveTruth, scope = req.scope)
 
             val withProof = call.request.queryParameters["proof"]?.toBooleanStrictOrNull() ?: false
+            val minConfidence = call.request.queryParameters["minConfidence"]?.toDoubleOrNull()
+                ?: req.confidence // also support in body
 
             if (withProof) {
                 val proofTrees = db.inferWithProof(queryAtom, tenantId)
                 val response = proofTrees.map { ProofTreeResponse.from(it) }.toList()
                 call.respond(response)
             } else {
-                val results = db.infer(queryAtom, tenantId)
+                val results = db.infer(queryAtom, tenantId, minConfidence = minConfidence)
                 val response = results.map { AtomResponse.from(it) }.toList()
                 call.respond(response)
             }

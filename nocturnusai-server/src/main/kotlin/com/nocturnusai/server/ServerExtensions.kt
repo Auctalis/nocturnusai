@@ -40,7 +40,11 @@ data class FactRequest(
     // Temporal fields for agent memory management
     val validFrom: Long? = null,
     val validUntil: Long? = null,
-    val ttl: Long? = null // time-to-live in milliseconds
+    val ttl: Long? = null, // time-to-live in milliseconds
+    // Optional confidence score (0.0–1.0). null means unknown confidence.
+    val confidence: Double? = null,
+    // Conflict resolution strategy. null means use database default.
+    val conflictStrategy: com.nocturnusai.core.ConflictStrategy? = null
 )
 
 @Serializable
@@ -62,7 +66,8 @@ data class RuleRequest(
 @Serializable
 data class CreateDbRequest(
     val name: String,
-    val isMultiTenant: Boolean = false
+    val isMultiTenant: Boolean = false,
+    val defaultConflictStrategy: com.nocturnusai.core.ConflictStrategy = com.nocturnusai.core.ConflictStrategy.REJECT
 )
 
 @Serializable
@@ -89,7 +94,8 @@ data class AtomResponse(
     val createdAt: Long? = null,
     val validFrom: Long? = null,
     val validUntil: Long? = null,
-    val ttl: Long? = null
+    val ttl: Long? = null,
+    val confidence: Double? = null
 ) {
     companion object {
         fun from(atom: Atom): AtomResponse = AtomResponse(
@@ -101,7 +107,8 @@ data class AtomResponse(
             createdAt = atom.createdAt,
             validFrom = atom.validFrom,
             validUntil = atom.validUntil,
-            ttl = atom.ttl
+            ttl = atom.ttl,
+            confidence = atom.confidence
         )
     }
 }

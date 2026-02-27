@@ -53,7 +53,9 @@ class NocturnusAI(
     val dbName: String = "default",
     val encryption: EncryptionService? = null,
     val factExtractor: FactExtractor? = null,
-    val ruleExtractor: RuleExtractor? = null
+    val ruleExtractor: RuleExtractor? = null,
+    /** Database-level default conflict strategy. Individual requests can override via assertFact(). */
+    val defaultConflictStrategy: com.nocturnusai.core.ConflictStrategy = com.nocturnusai.core.ConflictStrategy.REJECT
 ) {
 
     private val logger = org.slf4j.LoggerFactory.getLogger(NocturnusAI::class.java)
@@ -203,7 +205,12 @@ class NocturnusAI(
 
 
     // Public API
-    fun assertFact(fact: Atom, tenantId: String? = null, scope: String? = null) {
+    fun assertFact(
+        fact: Atom,
+        tenantId: String? = null,
+        scope: String? = null,
+        conflictStrategy: com.nocturnusai.core.ConflictStrategy = defaultConflictStrategy
+    ) {
         val ctx = getContext(tenantId)
         val limitTenant = tenantId ?: "default"
 
@@ -219,31 +226,56 @@ class NocturnusAI(
             finalFact = finalFact.copy(validFrom = finalFact.createdAt)
         }
 
-        internalAssertFact(ctx, finalFact, logging = true, tenantId = limitTenant)
+        internalAssertFact(ctx, finalFact, logging = true, tenantId = limitTenant, conflictStrategy = conflictStrategy)
     }
 
-    private fun internalAssertFact(ctx: LogicContext, fact: Atom, logging: Boolean, tenantId: String?) {
-        // 0. Enforce logical consistency (Layer 6) within context AND scope?
-        // Contradiction: If I assert A in Scope1, and !A exists in Scope1.
+    private fun internalAssertFact(
+        ctx: LogicContext,
+        fact: Atom,
+        logging: Boolean,
+        tenantId: String?,
+        conflictStrategy: com.nocturnusai.core.ConflictStrategy = defaultConflictStrategy
+    ) {
+        // 0. Enforce logical consistency within context AND scope.
+        // Contradiction: asserting A when !A already exists in the same scope (or vice versa).
 
-        // Unified Storage: Check ctx.store for the opposite fact.
-        // We construct the opposite atom (same scope, same args, inverted truthVal)
         val oppositeFact = fact.copy(truthVal = !fact.truthVal)
+        val opposingAtoms = ctx.store.match(oppositeFact, scope = fact.scope)
+            .filter { it.predicate == oppositeFact.predicate && it.args == oppositeFact.args }
+            .toList()
 
-        // Check if opposite exists in the store (Unified Store contains both Pos and Neg)
-        // match(oppositeFact) will look for the effective predicate of the opposite fact.
-        // e.g. if fact is P, opposite is !P. We look for !P.
-        // e.g. if fact is !P, opposite is P. We look for P.
-        val oppositeExists = ctx.store.match(oppositeFact, scope = fact.scope).any {
-            it.predicate == oppositeFact.predicate && it.args == oppositeFact.args
-        }
-
-        if (oppositeExists) {
-            if (!logging) {
-                 // Replay warning
-                 return
+        if (opposingAtoms.isNotEmpty()) {
+            when (conflictStrategy) {
+                com.nocturnusai.core.ConflictStrategy.REJECT -> {
+                    if (!logging) {
+                        // Replay: silently skip contradictions to allow WAL recovery
+                        return
+                    }
+                    throw IllegalArgumentException("Contradiction detected: Cannot assert $fact because its negation exists in the same scope.")
+                }
+                com.nocturnusai.core.ConflictStrategy.NEWEST_WINS -> {
+                    // Retract the existing contradictory fact(s), then assert the new one below
+                    for (old in opposingAtoms) {
+                        internalRetractFact(ctx, old, logging = logging, tenantId = tenantId)
+                    }
+                }
+                com.nocturnusai.core.ConflictStrategy.CONFIDENCE -> {
+                    // Keep the higher-confidence fact; new fact wins on tie or when confidence is null
+                    val existingMaxConfidence = opposingAtoms.mapNotNull { it.confidence }.maxOrNull()
+                    val newConfidence = fact.confidence
+                    if (existingMaxConfidence != null && newConfidence != null && existingMaxConfidence > newConfidence) {
+                        // Existing fact has strictly higher confidence — discard the new one
+                        return
+                    }
+                    // Otherwise new fact wins: retract old, assert new below
+                    for (old in opposingAtoms) {
+                        internalRetractFact(ctx, old, logging = logging, tenantId = tenantId)
+                    }
+                }
+                com.nocturnusai.core.ConflictStrategy.KEEP_BOTH -> {
+                    // Skip contradiction check — fall through and assert both
+                }
             }
-            throw IllegalArgumentException("Contradiction detected: Cannot assert $fact because its negation exists in the same scope.")
         }
 
         // 1. Check external constraints
@@ -315,14 +347,27 @@ class NocturnusAI(
         ctx.memoryManager.onRuleAsserted(rule, tenantId)
     }
 
-    fun query(pattern: Atom, tenantId: String? = null, scope: String? = null): Sequence<Atom> {
+    fun query(
+        pattern: Atom,
+        tenantId: String? = null,
+        scope: String? = null,
+        minConfidence: Double? = null
+    ): Sequence<Atom> {
         val ctx = getContext(tenantId)
-        return ctx.store.match(pattern, scope = scope)
+        val results = ctx.store.match(pattern, scope = scope)
+        return if (minConfidence == null) results
+        else results.filter { it.confidence == null || it.confidence >= minConfidence }
     }
 
-    fun infer(pattern: Atom, tenantId: String? = null): Sequence<Atom> {
+    fun infer(
+        pattern: Atom,
+        tenantId: String? = null,
+        minConfidence: Double? = null
+    ): Sequence<Atom> {
         val ctx = getContext(tenantId)
-        return ctx.backwardChainer.solve(pattern)
+        val results = ctx.backwardChainer.solve(pattern)
+        return if (minConfidence == null) results
+        else results.filter { it.confidence == null || it.confidence >= minConfidence }
     }
 
     fun inferWithProof(pattern: Atom, tenantId: String? = null): Sequence<ProofTree> {
@@ -760,7 +805,7 @@ class NocturnusAI(
                                     output.append("Extracted ${facts.size} facts:\n")
                                     for (f in facts) {
                                         val terms = f.args.map { Term.Identifier(it) }
-                                        val atom = Atom(f.predicate, terms)
+                                        val atom = Atom(f.predicate, terms, confidence = f.confidence.toDouble())
                                         try {
                                             assertFact(atom, tenantId)
                                             output.append("  ASSERTED: ${f.predicate}(${f.args.joinToString(", ")})\n")

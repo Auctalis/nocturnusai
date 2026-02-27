@@ -54,7 +54,11 @@ data class TellRequest(
     val metadata: Map<String, JsonElement> = emptyMap(),
     val validFrom: Long? = null,
     val validUntil: Long? = null,
-    val ttl: Long? = null
+    val ttl: Long? = null,
+    // Optional confidence score (0.0–1.0). null means unknown confidence.
+    val confidence: Double? = null,
+    // Conflict resolution strategy. null means use database default.
+    val conflictStrategy: com.nocturnusai.core.ConflictStrategy? = null
 )
 
 @Serializable
@@ -62,7 +66,9 @@ data class AskRequest(
     val predicate: String,
     val args: List<String>,
     val scope: String? = null,
-    val withProof: Boolean = false
+    val withProof: Boolean = false,
+    // Optional minimum confidence filter (0.0–1.0). Facts with lower confidence are excluded.
+    val minConfidence: Double? = null
 )
 
 @Serializable
@@ -102,10 +108,12 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
 
             val atom = com.nocturnusai.core.Atom(
                 req.predicate, terms, effectiveTruth, scope = req.scope, metadata = req.metadata,
-                validFrom = req.validFrom, validUntil = req.validUntil, ttl = req.ttl
+                validFrom = req.validFrom, validUntil = req.validUntil, ttl = req.ttl,
+                confidence = req.confidence
             )
 
             val txId = call.request.header("X-Transaction-ID")?.toLongOrNull()
+            val strategy = req.conflictStrategy ?: db.defaultConflictStrategy
 
             val dbName = call.request.header("X-Database") ?: "default"
             if (txId != null) {
@@ -117,7 +125,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
                 }
                 call.respondText("Stored in Tx $txId: $atom")
             } else {
-                db.assertFact(atom, tenantId)
+                db.assertFact(atom, tenantId, conflictStrategy = strategy)
                 call.respondText("Stored: $atom")
             }
             Metrics.factAsserted(dbName, tenantId)
@@ -152,7 +160,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
                 Metrics.inferenceCompleted(sample, dbName, response.size)
                 call.respond(response)
             } else {
-                val results = db.infer(queryAtom, tenantId)
+                val results = db.infer(queryAtom, tenantId, minConfidence = req.minConfidence)
                 val response = results.map { AtomResponse.from(it) }.toList()
                 Metrics.inferenceCompleted(sample, dbName, response.size)
                 call.respond(response)

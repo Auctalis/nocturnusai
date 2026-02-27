@@ -79,7 +79,11 @@ fun Route.extractionRoutes(dbManager: DatabaseManager, extractor: FactExtractor?
             if (req.assert && facts.isNotEmpty()) {
                 for (fact in facts) {
                     val terms = fact.args.map { com.nocturnusai.core.Term.Identifier(it) }
-                    val atom = com.nocturnusai.core.Atom(fact.predicate, terms, scope = req.scope)
+                    val atom = com.nocturnusai.core.Atom(
+                        fact.predicate, terms,
+                        scope = req.scope,
+                        confidence = fact.confidence.toDouble()
+                    )
                     try {
                         db.assertFact(atom, tenantId)
                     } catch (e: Exception) {
@@ -198,7 +202,11 @@ fun Route.extractionRoutes(dbManager: DatabaseManager, extractor: FactExtractor?
                 if (req.assert && facts.isNotEmpty()) {
                     for (fact in facts) {
                         val terms = fact.args.map { com.nocturnusai.core.Term.Identifier(it) }
-                        val atom = com.nocturnusai.core.Atom(fact.predicate, terms, scope = req.scope)
+                        val atom = com.nocturnusai.core.Atom(
+                            fact.predicate, terms,
+                            scope = req.scope,
+                            confidence = fact.confidence.toDouble()
+                        )
                         try {
                             db.assertFact(atom, tenantId)
                         } catch (e: Exception) {

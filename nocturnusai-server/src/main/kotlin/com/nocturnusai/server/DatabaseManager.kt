@@ -27,7 +27,8 @@ import kotlinx.serialization.decodeFromString
 
 @Serializable
 data class DatabaseConfig(
-    val isMultiTenant: Boolean = false
+    val isMultiTenant: Boolean = false,
+    val defaultConflictStrategy: com.nocturnusai.core.ConflictStrategy = com.nocturnusai.core.ConflictStrategy.REJECT
 )
 
 class DatabaseManager(
@@ -86,7 +87,11 @@ class DatabaseManager(
         return databases.keys
     }
     
-    fun createDatabase(name: String, @Suppress("UNUSED_PARAMETER") multiTenant: Boolean = true): NocturnusAI {
+    fun createDatabase(
+        name: String,
+        @Suppress("UNUSED_PARAMETER") multiTenant: Boolean = true,
+        defaultConflictStrategy: com.nocturnusai.core.ConflictStrategy = com.nocturnusai.core.ConflictStrategy.REJECT
+    ): NocturnusAI {
         if (databases.containsKey(name)) {
              return databases[name]!! // Already exists
         }
@@ -96,10 +101,14 @@ class DatabaseManager(
 
         // Save config
         val configFile = File(dbDir, "db.config")
-        val config = DatabaseConfig(true)
+        val config = DatabaseConfig(true, defaultConflictStrategy)
         configFile.writeText(Json.encodeToString(config))
-        
-        val db = NocturnusAI(dbDir, true, dbName = name, encryption = encryption, factExtractor = factExtractor, ruleExtractor = ruleExtractor)
+
+        val db = NocturnusAI(
+            dbDir, true, dbName = name, encryption = encryption,
+            factExtractor = factExtractor, ruleExtractor = ruleExtractor,
+            defaultConflictStrategy = defaultConflictStrategy
+        )
         if (!db.getRegisteredTenants().contains("default")) {
             db.createTenant("default")
         }
@@ -132,26 +141,28 @@ class DatabaseManager(
     private fun loadDatabase(name: String) {
         val dbDir = File(rootStorageDir, name)
         val configFile = File(dbDir, "db.config")
-        // var isMultiTenant = false 
-        // Always force true
+        // Always force multi-tenant
         val isMultiTenant = true
-        
-        // We still read config just to migrate or ensure it's valid JSON if needed?
-        // But we ignore the value.
-         if (configFile.exists()) {
+
+        var defaultConflictStrategy = com.nocturnusai.core.ConflictStrategy.REJECT
+        if (configFile.exists()) {
             try {
-                // Just read to validate? Or update?
-                // val config = Json.decodeFromString<DatabaseConfig>(configFile.readText())
+                val config = Json.decodeFromString<DatabaseConfig>(configFile.readText())
+                defaultConflictStrategy = config.defaultConflictStrategy
             } catch (e: Exception) {
                 println("Error loading config for $name: ${e.message}")
             }
         }
-        
-        val db = NocturnusAI(dbDir, isMultiTenant, dbName = name, encryption = encryption, factExtractor = factExtractor, ruleExtractor = ruleExtractor)
+
+        val db = NocturnusAI(
+            dbDir, isMultiTenant, dbName = name, encryption = encryption,
+            factExtractor = factExtractor, ruleExtractor = ruleExtractor,
+            defaultConflictStrategy = defaultConflictStrategy
+        )
         if (isMultiTenant && !db.getRegisteredTenants().contains("default")) {
             db.createTenant("default")
         }
         databases[name] = db
-        println("Loaded database: $name (MT=$isMultiTenant)")
+        println("Loaded database: $name (MT=$isMultiTenant, conflictStrategy=$defaultConflictStrategy)")
     }
 }
