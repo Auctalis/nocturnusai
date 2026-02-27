@@ -138,7 +138,21 @@ class Repl(private val client: Client) {
                 }
             } catch (e: Exception) {
                 println()
-                println("${RED}${BOLD}Error${RESET}  ${e.message}")
+                val msg = e.message ?: "Unknown error"
+                when {
+                    "timeout" in msg.lowercase() || "timed out" in msg.lowercase() -> {
+                        println("${RED}${BOLD}Timeout${RESET}  The request took too long.")
+                        println("${DIM}  If using Ollama, the model may still be loading.${RESET}")
+                        println("${DIM}  Wait a moment and try again — subsequent calls are fast.${RESET}")
+                    }
+                    "refused" in msg.lowercase() || "unreachable" in msg.lowercase() -> {
+                        println("${RED}${BOLD}Connection failed${RESET}  Cannot reach the server.")
+                        println("${DIM}  Is the server running?  nocturnusai setup${RESET}")
+                    }
+                    else -> {
+                        println("${RED}${BOLD}Error${RESET}  $msg")
+                    }
+                }
                 println(separator())
             }
         }
@@ -176,7 +190,7 @@ class Repl(private val client: Client) {
 
     /** NL question → /synthesize → LLM-powered answer from the knowledge base */
     private fun doSynthesize(question: String) = runBlocking {
-        println("${DIM}Querying knowledge base...${RESET}")
+        println("${DIM}Querying knowledge base... (may take a moment on first call)${RESET}")
         val resp = client.synthesize(question)
         try {
             val obj = json.parseToJsonElement(resp).jsonObject
@@ -276,7 +290,7 @@ class Repl(private val client: Client) {
             text
         }
 
-        println("${DIM}Extracting knowledge...${RESET}")
+        println("${DIM}Extracting knowledge... (may take a moment on first call)${RESET}")
         val resp = client.extract(inputText, assert = true, rules = true)
         try {
             val obj = json.parseToJsonElement(resp).jsonObject
@@ -1058,14 +1072,27 @@ class Repl(private val client: Client) {
 
     /** Print error with actionable guidance for UNAUTHORIZED. */
     private fun printError(code: String, message: String) {
-        println("${RED}$code: $message${RESET}")
-        if (code == "UNAUTHORIZED") {
-            if (!client.hasApiKey) {
-                println("${DIM}No API key configured. Fix with one of:${RESET}")
-                println("${DIM}  nocturnusai setup            # re-run setup wizard${RESET}")
-                println("${DIM}  nocturnusai --api-key <key>  # pass key on command line${RESET}")
-            } else {
-                println("${DIM}API key was sent but rejected. Check your key is correct.${RESET}")
+        println("${RED}${BOLD}$code${RESET}  $message")
+        when (code) {
+            "UNAUTHORIZED" -> {
+                if (!client.hasApiKey) {
+                    println("${DIM}  No API key configured. Fix with one of:${RESET}")
+                    println("${DIM}    nocturnusai setup            # re-run setup wizard${RESET}")
+                    println("${DIM}    nocturnusai --api-key <key>  # pass key on command line${RESET}")
+                } else {
+                    println("${DIM}  API key was sent but rejected. Check your key is correct.${RESET}")
+                }
+            }
+            "LLM_TIMEOUT" -> {
+                println("${DIM}  Ollama may still be loading the model into memory.${RESET}")
+                println("${DIM}  Wait a moment and try again — subsequent calls will be fast.${RESET}")
+            }
+            "LLM_UNREACHABLE" -> {
+                println("${DIM}  Is Ollama running?  ollama serve${RESET}")
+                println("${DIM}  Check status:       ollama list${RESET}")
+            }
+            "LLM_NOT_CONFIGURED" -> {
+                println("${DIM}  Run 'setup' to configure an LLM provider, or set env vars in .env${RESET}")
             }
         }
     }

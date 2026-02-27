@@ -20,11 +20,13 @@ import com.nocturnusai.extraction.RuleExtractor
 import com.nocturnusai.server.*
 import com.nocturnusai.server.llm.LlmProvider
 import com.nocturnusai.server.observability.Metrics
+import io.ktor.client.plugins.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import java.net.ConnectException
 
 fun Route.extractionRoutes(dbManager: DatabaseManager, extractor: FactExtractor?, ruleExtractor: RuleExtractor?, provider: LlmProvider?) {
 
@@ -121,8 +123,26 @@ fun Route.extractionRoutes(dbManager: DatabaseManager, extractor: FactExtractor?
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: DatabaseNotFoundException) {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
+        } catch (e: HttpRequestTimeoutException) {
+            call.respond(HttpStatusCode.GatewayTimeout, ErrorResponse(
+                "LLM_TIMEOUT",
+                "LLM request timed out. If using Ollama, the model may still be loading — try again in a moment."
+            ))
+        } catch (e: ConnectException) {
+            call.respond(HttpStatusCode.BadGateway, ErrorResponse(
+                "LLM_UNREACHABLE",
+                "Cannot reach LLM provider. Check that Ollama is running and the LLM_BASE_URL is correct."
+            ))
         } catch (e: Exception) {
-            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("EXTRACTION_ERROR", e.message ?: "Extraction failed"))
+            val msg = e.message ?: "Extraction failed"
+            val hint = when {
+                "timeout" in msg.lowercase() || "timed out" in msg.lowercase() ->
+                    "$msg — If using Ollama, the model may still be loading. Try again shortly."
+                "refused" in msg.lowercase() || "unreachable" in msg.lowercase() ->
+                    "$msg — Check that the LLM provider is running."
+                else -> msg
+            }
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("EXTRACTION_ERROR", "LLM extraction failed: $hint"))
         }
     }
 

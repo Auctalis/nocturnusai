@@ -16,6 +16,7 @@ package com.nocturnusai.cli
 
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -35,6 +36,11 @@ class Client(
     private val http = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true; prettyPrint = true })
+        }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 300_000   // 5 min — Ollama model loading can be slow
+            connectTimeoutMillis = 15_000    // 15s connect
+            socketTimeoutMillis = 300_000    // 5 min socket idle
         }
     }
 

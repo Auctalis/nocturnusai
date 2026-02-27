@@ -43,14 +43,19 @@ class OpenAiCompatibleProvider(
         else -> "openai-compatible"
     }
 
+    // Ollama needs longer timeouts — first call loads the model into memory
+    private val isLocal = baseUrl.contains("localhost") || baseUrl.contains("127.0.0.1")
+            || baseUrl.contains("host.docker.internal") || baseUrl.contains("ollama")
+    private val timeoutMs = if (isLocal) 300_000L else 120_000L   // 5 min local, 2 min cloud
+
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 120_000
-            connectTimeoutMillis = 10_000
-            socketTimeoutMillis = 120_000
+            requestTimeoutMillis = timeoutMs
+            connectTimeoutMillis = if (isLocal) 30_000 else 10_000
+            socketTimeoutMillis = timeoutMs
         }
     }
 
