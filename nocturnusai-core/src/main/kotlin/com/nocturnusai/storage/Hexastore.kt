@@ -15,7 +15,12 @@
 package com.nocturnusai.storage
 
 import com.nocturnusai.core.Atom
+import com.nocturnusai.core.MergeResult
+import com.nocturnusai.core.MergeStrategy
+import com.nocturnusai.core.ScopeConflict
+import com.nocturnusai.core.ScopeDiff
 import com.nocturnusai.core.Term
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.StampedLock
 
@@ -298,5 +303,209 @@ class Hexastore {
         } finally {
             lock.unlockRead(stamp)
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Scope management
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Return all distinct scope values currently present in the store.
+     * Null (global) scope is never included in this set.
+     */
+    fun listScopes(): Set<String> {
+        val stamp = lock.readLock()
+        try {
+            val scopes = HashSet<String>()
+            spo.values.forEach { m1 ->
+                m1.values.forEach { m2 ->
+                    m2.values.forEach { set ->
+                        set.forEach { atom -> atom.scope?.let { scopes.add(it) } }
+                    }
+                }
+            }
+            otherAtoms.values.forEach { set ->
+                set.forEach { atom -> atom.scope?.let { scopes.add(it) } }
+            }
+            return scopes
+        } finally {
+            lock.unlockRead(stamp)
+        }
+    }
+
+    /**
+     * Copy every atom whose scope matches [sourceScope] into [targetScope].
+     *
+     * [sourceScope] == null means the global (unscoped) partition.
+     * Returns the number of atoms copied.
+     *
+     * If [targetScope] already contains atoms for the same logical positions those
+     * existing atoms are overwritten (upsert semantics — identical to [add]).
+     */
+    fun forkScope(sourceScope: String?, targetScope: String): Int {
+        // Collect source atoms under a read lock, then write each copy.
+        val sourceAtoms: List<Atom>
+        val stamp = lock.readLock()
+        try {
+            sourceAtoms = collectByScope(sourceScope)
+        } finally {
+            lock.unlockRead(stamp)
+        }
+
+        var count = 0
+        for (atom in sourceAtoms) {
+            val copy = atom.copy(scope = targetScope)
+            add(copy)
+            count++
+        }
+        return count
+    }
+
+    /**
+     * Compare [scopeA] and [scopeB] and return a [ScopeDiff] describing what
+     * is different between the two.  Null scope means the global partition.
+     */
+    fun diffScopes(scopeA: String?, scopeB: String?): ScopeDiff {
+        val atomsA: List<Atom>
+        val atomsB: List<Atom>
+        val stamp = lock.readLock()
+        try {
+            atomsA = collectByScope(scopeA)
+            atomsB = collectByScope(scopeB)
+        } finally {
+            lock.unlockRead(stamp)
+        }
+
+        // Key = (predicate, args) for position-based comparison
+        data class Key(val predicate: String, val args: List<Term>)
+
+        val mapA = atomsA.associateBy { Key(it.predicate, it.args) }
+        val mapB = atomsB.associateBy { Key(it.predicate, it.args) }
+
+        val onlyInA = mutableListOf<Atom>()
+        val onlyInB = mutableListOf<Atom>()
+        val inBoth  = mutableListOf<Atom>()
+        val conflicts = mutableListOf<ScopeConflict>()
+
+        for ((key, atomA) in mapA) {
+            val atomB = mapB[key]
+            when {
+                atomB == null -> onlyInA.add(atomA)
+                atomA.truthVal == atomB.truthVal -> inBoth.add(atomA)
+                else -> conflicts.add(ScopeConflict(key.predicate, key.args, atomA, atomB))
+            }
+        }
+        for ((key, atomB) in mapB) {
+            if (key !in mapA) onlyInB.add(atomB)
+        }
+
+        return ScopeDiff(onlyInA, onlyInB, inBoth, conflicts)
+    }
+
+    /**
+     * Merge atoms from [sourceScope] into [targetScope] using the given [strategy].
+     *
+     * Returns a [MergeResult] describing the outcome.
+     * Throws [IllegalStateException] when strategy is [MergeStrategy.REJECT] and
+     * any conflicts are detected.
+     */
+    fun mergeScope(
+        sourceScope: String,
+        targetScope: String?,
+        strategy: MergeStrategy = MergeStrategy.SOURCE_WINS
+    ): MergeResult {
+        val diff = diffScopes(sourceScope, targetScope)
+
+        if (strategy == MergeStrategy.REJECT && diff.conflicts.isNotEmpty()) {
+            throw IllegalStateException(
+                "Merge rejected: ${diff.conflicts.size} conflict(s) detected between " +
+                "scope '$sourceScope' and scope '${targetScope ?: "<global>"}'"
+            )
+        }
+
+        var merged = 0
+        var conflictsResolved = 0
+
+        // Copy atoms that only exist in source → they can always be added
+        for (atom in diff.onlyInA) {
+            val copy = atom.copy(scope = targetScope)
+            add(copy)
+            merged++
+        }
+
+        // Handle conflicts
+        for (conflict in diff.conflicts) {
+            when (strategy) {
+                MergeStrategy.SOURCE_WINS -> {
+                    // Remove the target version, then add the source version
+                    val targetAtom = conflict.inB.copy(scope = targetScope)
+                    delete(targetAtom)
+                    val sourceAtom = conflict.inA.copy(scope = targetScope)
+                    add(sourceAtom)
+                    merged++
+                    conflictsResolved++
+                }
+                MergeStrategy.TARGET_WINS -> {
+                    // Keep the target as-is — nothing to do
+                    conflictsResolved++
+                }
+                MergeStrategy.KEEP_BOTH -> {
+                    // Add the source version on top of the existing target version
+                    val sourceAtom = conflict.inA.copy(scope = targetScope)
+                    add(sourceAtom)
+                    merged++
+                    conflictsResolved++
+                }
+                MergeStrategy.REJECT -> {
+                    // Already handled above — should never reach here
+                }
+            }
+        }
+
+        return MergeResult(
+            merged = merged,
+            conflictsResolved = conflictsResolved,
+            strategy = strategy,
+            timestamp = Instant.now().toString()
+        )
+    }
+
+    /**
+     * Delete ALL atoms belonging to [scope].
+     * Returns the number of atoms deleted.
+     */
+    fun deleteScope(scope: String): Int {
+        val toDelete: List<Atom>
+        val stamp = lock.readLock()
+        try {
+            toDelete = collectByScope(scope)
+        } finally {
+            lock.unlockRead(stamp)
+        }
+
+        for (atom in toDelete) {
+            delete(atom)
+        }
+        return toDelete.size
+    }
+
+    // Internal helper: collect all atoms for a given scope (called under read lock).
+    private fun collectByScope(scope: String?): List<Atom> {
+        val result = ArrayList<Atom>()
+        spo.values.forEach { m1 ->
+            m1.values.forEach { m2 ->
+                m2.values.forEach { set ->
+                    set.forEach { atom ->
+                        if (atom.scope == scope) result.add(atom)
+                    }
+                }
+            }
+        }
+        otherAtoms.values.forEach { set ->
+            set.forEach { atom ->
+                if (atom.scope == scope) result.add(atom)
+            }
+        }
+        return result
     }
 }

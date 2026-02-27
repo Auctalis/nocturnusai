@@ -15,6 +15,9 @@
 package com.nocturnusai
 
 import com.nocturnusai.core.*
+import com.nocturnusai.core.MergeResult
+import com.nocturnusai.core.MergeStrategy
+import com.nocturnusai.core.ScopeDiff
 import com.nocturnusai.inference.BackwardChainer
 import com.nocturnusai.inference.ReteEngine
 import com.nocturnusai.inference.Unifier
@@ -666,6 +669,60 @@ class NocturnusAI(
             }
         }
         return schema
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Scope management — delegate to Hexastore with tenant context
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Fork [sourceScope] into [targetScope] for the given tenant.
+     * [sourceScope] == null means the global (unscoped) partition.
+     * Returns the count of atoms copied.
+     */
+    fun forkScope(sourceScope: String?, targetScope: String, tenantId: String): Int {
+        val ctx = getContext(tenantId)
+        return ctx.store.forkScope(sourceScope, targetScope)
+    }
+
+    /**
+     * Compare [scopeA] and [scopeB] for the given tenant and return a [ScopeDiff].
+     */
+    fun diffScopes(scopeA: String?, scopeB: String?, tenantId: String): ScopeDiff {
+        val ctx = getContext(tenantId)
+        return ctx.store.diffScopes(scopeA, scopeB)
+    }
+
+    /**
+     * Merge [sourceScope] into [targetScope] for the given tenant.
+     * Uses [strategy] to handle conflicts.
+     */
+    fun mergeScope(
+        sourceScope: String,
+        targetScope: String?,
+        strategy: MergeStrategy,
+        tenantId: String
+    ): MergeResult {
+        val ctx = getContext(tenantId)
+        return ctx.store.mergeScope(sourceScope, targetScope, strategy)
+    }
+
+    /**
+     * Delete all atoms in [scope] for the given tenant.
+     * Returns the count of atoms deleted.
+     */
+    fun deleteScope(scope: String, tenantId: String): Int {
+        val ctx = getContext(tenantId)
+        return ctx.store.deleteScope(scope)
+    }
+
+    /**
+     * List all named scopes present for the given tenant.
+     * The global (null) scope is never included.
+     */
+    fun listScopes(tenantId: String): Set<String> {
+        val ctx = getContext(tenantId)
+        return ctx.store.listScopes()
     }
 
     // Accessor for default store (legacy/tests)

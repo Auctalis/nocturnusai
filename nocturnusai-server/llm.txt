@@ -245,6 +245,8 @@ Isolate your implementation plans or different user sessions.
 
 #### `DELETE /auth/keys/{id}`
 
+#### `DELETE /scope/{name}`
+
 #### `GET /.well-known/agent.json`
 
 #### `GET /admin/databases/{name}/facts`
@@ -282,6 +284,8 @@ Isolate your implementation plans or different user sessions.
 #### `GET /predicates`
 
 #### `GET /replication/wal`
+
+#### `GET /scopes`
 
 #### `GET /userguide`
 
@@ -344,6 +348,12 @@ Isolate your implementation plans or different user sessions.
 #### `POST /query`
 
 #### `POST /retract`
+
+#### `POST /scope/diff`
+
+#### `POST /scope/fork`
+
+#### `POST /scope/merge`
 
 #### `POST /synthesize`
 
