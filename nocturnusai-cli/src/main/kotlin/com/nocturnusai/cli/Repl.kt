@@ -727,31 +727,132 @@ class Repl(private val client: Client) {
             } else parts[1]
             println("  ${CYAN}${parts[0]}${RESET} = $value")
         }
-        println()
-        println("${DIM}Add these to your server's .env file, then restart the server.${RESET}")
-        println("${DIM}If using Docker: edit .env then run 'docker compose restart'${RESET}")
 
-        // Try to write to .env if it exists in current directory or parent
-        val envFile = listOf(File(".env"), File("../.env"), File(System.getProperty("user.dir", ".") + "/.env"))
-            .firstOrNull { it.exists() }
+        // Find .env file — check common install locations
+        val envFile = listOf(
+            File(".env"),
+            File("../.env"),
+            File(System.getProperty("user.dir", "."), ".env"),
+            File(System.getProperty("user.home", "."), "nocturnusai/.env"),
+            File("./nocturnusai/.env"),
+        ).firstOrNull { it.exists() }
 
-        if (envFile != null) {
+        if (envFile == null) {
             println()
-            print("Write to ${envFile.absolutePath}? [y/N]: ")
-            val confirm = readlnOrNull()?.trim()?.lowercase()
-            if (confirm == "y" || confirm == "yes") {
-                val existing = envFile.readText()
-                val newContent = StringBuilder(existing)
-                if (!existing.endsWith("\n")) newContent.append("\n")
-                newContent.append("\n# Added by 'setup' command\n")
-                for (line in envLines) {
-                    newContent.appendLine(line)
+            println("${YELLOW}Could not find .env file.${RESET}")
+            println("${DIM}Manually add the above to your server's .env, then restart.${RESET}")
+            println()
+            return
+        }
+
+        // Write to .env — update existing keys, append new ones
+        println()
+        println("${DIM}Updating ${envFile.absolutePath}...${RESET}")
+        writeEnvLines(envFile, envLines)
+        println("${GREEN}Saved.${RESET}")
+
+        // Auto-restart Docker/Podman if compose file exists alongside .env
+        val composeDir = envFile.parentFile ?: File(".")
+        val hasCompose = File(composeDir, "docker-compose.yml").exists() ||
+                File(composeDir, "compose.yml").exists()
+
+        if (hasCompose) {
+            val composeCmd = detectComposeCommand()
+            if (composeCmd != null) {
+                println()
+                println("${DIM}Restarting server to apply changes...${RESET}")
+                val result = runCommand(composeCmd, "restart", workDir = composeDir)
+                if (result == 0) {
+                    // Wait for health
+                    print("${DIM}Waiting for server")
+                    System.out.flush()
+                    var healthy = false
+                    for (i in 1..20) {
+                        Thread.sleep(1500)
+                        print(".")
+                        System.out.flush()
+                        try {
+                            val resp = runBlocking { client.health() }
+                            if ("healthy" in resp || "degraded" in resp) {
+                                healthy = true
+                                break
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    println()
+                    if (healthy) {
+                        println("${GREEN}${BOLD}Server restarted with new configuration.${RESET}")
+                    } else {
+                        println("${YELLOW}Server restarting — check 'health' in a moment.${RESET}")
+                    }
+                } else {
+                    println("${YELLOW}Restart failed.${RESET} Run manually: cd ${composeDir.absolutePath} && $composeCmd restart")
                 }
-                envFile.writeText(newContent.toString())
-                println("${GREEN}Written!${RESET} Restart the server for changes to take effect.")
+            } else {
+                println()
+                println("${DIM}Restart your server to apply changes.${RESET}")
             }
+        } else {
+            println()
+            println("${DIM}Restart your server to apply changes.${RESET}")
         }
         println()
+    }
+
+    /** Update or append env lines in a .env file without duplicating keys. */
+    private fun writeEnvLines(envFile: File, lines: List<String>) {
+        val updates = lines.associate {
+            val (k, v) = it.split("=", limit = 2)
+            k to v
+        }
+        val existing = if (envFile.exists()) envFile.readLines().toMutableList() else mutableListOf()
+        val written = mutableSetOf<String>()
+
+        // Update existing lines
+        for (i in existing.indices) {
+            val line = existing[i].trimStart()
+            if (line.startsWith("#") || "=" !in line) continue
+            val key = line.substringBefore("=").trim()
+            if (key in updates) {
+                existing[i] = "$key=${updates[key]}"
+                written.add(key)
+            }
+        }
+
+        // Append new keys
+        for ((key, value) in updates) {
+            if (key !in written) {
+                existing.add("$key=$value")
+            }
+        }
+
+        envFile.writeText(existing.joinToString("\n") + "\n")
+    }
+
+    /** Detect docker compose or podman-compose. */
+    private fun detectComposeCommand(): String? {
+        for (cmd in listOf("docker compose", "docker-compose", "podman-compose")) {
+            try {
+                val parts = cmd.split(" ")
+                val testCmd = parts + listOf("version")
+                val p = ProcessBuilder(testCmd)
+                    .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                    .redirectError(ProcessBuilder.Redirect.PIPE)
+                    .start()
+                if (p.waitFor() == 0) return cmd
+            } catch (_: Exception) {}
+        }
+        return null
+    }
+
+    /** Run a compose command and return exit code. */
+    private fun runCommand(composeCmd: String, subCmd: String, workDir: File): Int {
+        return try {
+            val pb = ProcessBuilder("bash", "-c", "$composeCmd $subCmd")
+            pb.directory(workDir)
+            pb.inheritIO()
+            pb.start().waitFor()
+        } catch (_: Exception) { -1 }
     }
 
     // ── auth commands ──
