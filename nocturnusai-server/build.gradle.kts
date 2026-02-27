@@ -67,6 +67,19 @@ sourceSets.main {
     resources.srcDir(layout.buildDirectory.dir("generated-resources"))
 }
 
+// Point STORAGE_DIR at a per-build temp directory so tests never read stale data
+// written by previous runs and never pollute the working-tree data/ directory.
+// The directory is deleted and recreated at the start of each test run so that
+// every test class gets a completely fresh DatabaseManager with no on-disk state.
+tasks.named<Test>("test") {
+    val tmpDir = layout.buildDirectory.dir("test-data").get().asFile
+    doFirst {
+        tmpDir.deleteRecursively()
+        tmpDir.mkdirs()
+    }
+    environment("STORAGE_DIR", tmpDir.absolutePath)
+}
+
 dependencies {
     implementation(project(":nocturnusai-core"))
     implementation("io.ktor:ktor-server-core:2.3.13")

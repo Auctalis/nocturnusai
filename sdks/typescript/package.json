@@ -11,7 +11,9 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepublishOnly": "tsc"
+    "prepublishOnly": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "nocturnusai",
@@ -32,7 +34,8 @@
     "url": "https://github.com/Auctalis/nocturnusai/issues"
   },
   "devDependencies": {
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vitest": "^2.1.0"
   },
   "engines": {
     "node": ">=18.0.0"

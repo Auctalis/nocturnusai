@@ -1,0 +1,3460 @@
+openapi: 3.1.0
+
+info:
+  title: NocturnusAI API
+  version: 2.0.0
+  description: |
+    NocturnusAI is the logic server for Agentic AI. It provides deterministic multi-step
+    reasoning, truth maintenance, and agent memory lifecycle management via HTTP API.
+
+    Agents use NocturnusAI as their semantic memory and reasoning backend — storing facts,
+    defining rules, running inference, and managing context windows with temporal awareness
+    and salience scoring.
+
+    ## Core Concepts
+
+    **Facts (Atoms)** — The fundamental unit of knowledge: a predicate applied to a list
+    of arguments, with an optional truth value, scope, metadata, and temporal bounds.
+    Example: `parent(alice, bob)` or `NOT authorized(charlie, resource_x)`.
+
+    **Terms** — Arguments to predicates. An argument string is parsed as:
+    - A variable if it starts with `?` (e.g., `?x`, `?who`)
+    - A number literal if it is numeric (e.g., `42`, `3.14`)
+    - An identifier otherwise (e.g., `alice`, `resource_x`)
+
+    **Rules (Horn Clauses)** — An `if-body-then-head` logical rule. The engine uses
+    backward chaining (goal-driven SLD resolution) as its primary inference strategy,
+    supplemented by forward chaining via the Rete engine.
+
+    **Scopes** — A string tag that partitions facts and rules into named namespaces
+    (useful for hypothetical reasoning, versioning, or tenant isolation).
+
+    **Temporal Atoms** — Facts carry `createdAt`, `validFrom`, `validUntil`, and `ttl`
+    (time-to-live in milliseconds) for point-in-time queries and automatic expiration.
+
+    **Salience** — A composite relevance score (recency × frequency × explicit priority,
+    0.0–1.0) that determines which facts are most important for agent context windows.
+
+    ## Multi-Tenancy
+
+    All data operations require the `X-Tenant-ID` header. The `X-Database` header selects
+    which logical database to use (default: `"default"`). This enables full isolation
+    between tenants within a single server instance.
+
+    ## Authentication
+
+    Three auth modes are supported (controlled by the `AUTH_ENABLED` env var):
+
+    - **Disabled** (default dev mode) — no auth required
+    - **Legacy** — single shared `API_KEY` env var; pass as `X-API-Key` header
+    - **RBAC** — full role-based access control; bootstrap via `POST /auth/bootstrap`,
+      then manage keys via `POST /auth/keys`. Three roles: `admin`, `writer`, `reader`.
+
+    ## Simplified vs Full API
+
+    The **Simplified API** (`/tell`, `/ask`, `/teach`, `/forget`) uses intuitive verbs and
+    is the recommended interface for agent integrations. The **Full Logic API**
+    (`/assert/fact`, `/infer`, etc.) provides the same functionality with additional options
+    like `truthVal`. Both sets of endpoints are equivalent in capability.
+
+  contact:
+    name: NocturnusAI Support
+    url: https://github.com/auctalis/nocturnusai
+    email: licensing@nocturnus.ai
+  license:
+    name: Business Source License 1.1
+    url: https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+
+servers:
+  - url: http://localhost:9300
+    description: Local development server (default port)
+  - url: '{scheme}://{host}:{port}'
+    description: Custom deployment
+    variables:
+      scheme:
+        default: http
+        enum: [http, https]
+      host:
+        default: localhost
+      port:
+        default: '9300'
+
+tags:
+  - name: Simplified API
+    description: |
+      Developer-friendly verb-based interface for agents and integrations.
+      Wraps the full logic API with intuitive names: tell, ask, teach, forget.
+      **This is the recommended interface for most use cases.**
+  - name: Logic API
+    description: |
+      Full logic engine API: assert facts, assert rules, run inference, retract facts,
+      execute DSL commands, and discover the knowledge schema.
+  - name: Memory API
+    description: |
+      Agent memory lifecycle management: temporal queries, salience-ranked retrieval,
+      context window construction, priority setting, consolidation, decay, and real-time
+      SSE event streams.
+  - name: Transactions
+    description: |
+      ACID transaction support. Begin a transaction, buffer multiple asserts/retracts
+      within it using the `X-Transaction-ID` header, then commit or rollback atomically.
+  - name: Admin
+    description: |
+      Database and tenant administration. Create/delete databases, list facts and rules,
+      manage tenants, nuke data, and create backups. Requires `admin` role in RBAC mode.
+  - name: Auth
+    description: |
+      API key management for RBAC mode. Bootstrap the first admin key, create scoped keys
+      for writers and readers, list and revoke keys, and inspect the current identity.
+  - name: LLM
+    description: |
+      Natural language features powered by an external LLM provider (OpenAI-compatible,
+      Anthropic, or Google). Extract facts and rules from free text, and synthesize
+      natural language answers from knowledge base queries.
+      Requires `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_API_KEY` to be set.
+  - name: MCP
+    description: |
+      Model Context Protocol (JSON-RPC 2.0) interface for agent frameworks that support
+      MCP. Provides both HTTP POST and SSE streaming transports.
+  - name: Observability
+    description: |
+      Health checks, Prometheus metrics, auto-generated LLM documentation, schema
+      discovery, and the A2A Agent Card for agent discovery.
+  - name: Replication
+    description: |
+      WAL streaming for leader-follower replication and snapshot backup management.
+
+security:
+  - ApiKeyHeader: []
+  - {}
+
+components:
+  securitySchemes:
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        API key for authentication. Required when the server is running in LEGACY or RBAC
+        auth mode. In RBAC mode, create keys via `POST /auth/bootstrap` (first key) or
+        `POST /auth/keys` (subsequent keys).
+
+  parameters:
+    DatabaseHeader:
+      name: X-Database
+      in: header
+      required: false
+      schema:
+        type: string
+        default: default
+        maxLength: 64
+        pattern: '^[a-zA-Z0-9_-]+$'
+      description: |
+        Selects the logical database to operate on. Defaults to `"default"` when omitted.
+        Database names are alphanumeric, dash, or underscore only (max 64 chars).
+
+    TenantHeader:
+      name: X-Tenant-ID
+      in: header
+      required: true
+      schema:
+        type: string
+        maxLength: 128
+        pattern: '^[a-zA-Z0-9_-]+$'
+      description: |
+        Identifies the tenant within the selected database. Required on all data endpoints.
+        Tenant IDs are alphanumeric, dash, or underscore only (max 128 chars).
+
+    TransactionHeader:
+      name: X-Transaction-ID
+      in: header
+      required: false
+      schema:
+        type: integer
+        format: int64
+      description: |
+        When provided, the operation is buffered into the specified transaction instead of
+        being applied immediately. Obtain a transaction ID from `POST /tx/begin`.
+
+    DatabaseNamePath:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+        maxLength: 64
+        pattern: '^[a-zA-Z0-9_-]+$'
+      description: Database name.
+
+  schemas:
+    # ── Core Domain Types ────────────────────────────────────────────────────
+
+    AtomResponse:
+      type: object
+      description: |
+        A fact stored in the knowledge base. Arguments are serialized as strings; the
+        parser reconstructs the term type: `?name` → Variable, numeric → NumberLit,
+        anything else → Identifier.
+      required: [predicate, args]
+      properties:
+        predicate:
+          type: string
+          description: The predicate name (e.g., `parent`, `authorized`, `temperature`).
+          example: parent
+        args:
+          type: array
+          items:
+            type: string
+          description: |
+            Ordered list of argument strings. Variables are prefixed with `?`
+            (e.g., `?x`). Numbers are represented as numeric strings (e.g., `42.0`).
+          example: [alice, bob]
+        negated:
+          type: boolean
+          default: false
+          description: When `true`, this atom represents a negative fact (`NOT predicate(args)`).
+        scope:
+          type: string
+          nullable: true
+          description: Optional scope tag for namespace partitioning.
+          example: hypothesis-1
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Arbitrary JSON metadata attached to the fact.
+          example: { confidence: 0.95, source: "sensor-42" }
+        createdAt:
+          type: integer
+          format: int64
+          nullable: true
+          description: Unix epoch milliseconds when the fact was asserted.
+        validFrom:
+          type: integer
+          format: int64
+          nullable: true
+          description: Unix epoch milliseconds from which the fact is considered valid.
+        validUntil:
+          type: integer
+          format: int64
+          nullable: true
+          description: Unix epoch milliseconds after which the fact expires.
+        ttl:
+          type: integer
+          format: int64
+          nullable: true
+          description: Time-to-live in milliseconds from `createdAt`. Supersedes `validUntil` if both are set.
+
+    AtomDto:
+      type: object
+      description: An atom used in rule heads and bodies when asserting rules.
+      required: [predicate, args]
+      properties:
+        predicate:
+          type: string
+          example: mortal
+        args:
+          type: array
+          items:
+            type: string
+          example: ['?x']
+        negated:
+          type: boolean
+          default: false
+          description: When `true`, this condition is a negation-as-failure check.
+        scope:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    ScoredAtomResponse:
+      allOf:
+        - $ref: '#/components/schemas/AtomResponse'
+        - type: object
+          required: [salience]
+          properties:
+            salience:
+              type: number
+              format: double
+              minimum: 0.0
+              maximum: 1.0
+              description: |
+                Composite salience score derived from recency, access frequency, and
+                explicit priority. Higher values indicate more relevant facts.
+              example: 0.87
+
+    ProofStepResponse:
+      type: object
+      description: A single step in a backward-chaining proof tree.
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [fact_match, rule_application]
+          description: |
+            `fact_match` — the goal was satisfied by a directly stored fact.
+            `rule_application` — the goal was satisfied by applying a rule.
+        fact:
+          $ref: '#/components/schemas/AtomResponse'
+          description: The matching fact (present when `type` is `fact_match`).
+        rule:
+          type: string
+          nullable: true
+          description: |
+            String representation of the applied rule (present when `type` is
+            `rule_application`). Format: `FORALL ?x { head <- body }`.
+          example: "FORALL ?x { mortal(?x) <- human(?x) }"
+        bodyProofs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProofNodeResponse'
+          nullable: true
+          description: Sub-proofs for each body condition (present when `type` is `rule_application`).
+
+    ProofNodeResponse:
+      type: object
+      description: A node in the proof tree, linking a goal atom to the proof step that satisfied it.
+      required: [goal, step]
+      properties:
+        goal:
+          $ref: '#/components/schemas/AtomResponse'
+          description: The goal atom that was proven at this node.
+        step:
+          $ref: '#/components/schemas/ProofStepResponse'
+          description: How the goal was satisfied.
+        substitution:
+          type: object
+          additionalProperties:
+            type: string
+          description: Variable bindings in scope at this node (e.g., `{"x": "alice"}`).
+          example: { x: alice }
+
+    ProofTreeResponse:
+      type: object
+      description: |
+        A complete proof tree for a single result of an inference query. The `result`
+        is the concrete atom (with variables substituted), and `proof` is the tree showing
+        how it was derived.
+      required: [result, proof]
+      properties:
+        result:
+          $ref: '#/components/schemas/AtomResponse'
+          description: The concrete atom with all variables substituted.
+        proof:
+          $ref: '#/components/schemas/ProofNodeResponse'
+          description: Root node of the proof derivation tree.
+
+    ContextWindowResponse:
+      type: object
+      description: |
+        A ranked snapshot of the most relevant facts for the current reasoning context.
+        Designed to be passed directly into an LLM's context window.
+      required: [facts, totalAvailable, windowSize, predicateDistribution, generatedAt]
+      properties:
+        facts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScoredAtomResponse'
+          description: Salience-ranked facts, most relevant first.
+        totalAvailable:
+          type: integer
+          description: Total number of facts available for this tenant before filtering.
+        windowSize:
+          type: integer
+          description: Number of facts returned in this window.
+        predicateDistribution:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Count of facts per predicate in the window.
+          example: { parent: 12, authorized: 5, temperature: 3 }
+        generatedAt:
+          type: integer
+          format: int64
+          description: Unix epoch milliseconds when this context window was generated.
+
+    ConsolidationResponse:
+      type: object
+      description: Result of a memory consolidation run.
+      required: [factsConsolidated, newFacts, timestamp]
+      properties:
+        factsConsolidated:
+          type: integer
+          description: Number of episodic facts compressed into semantic summaries.
+        newFacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AtomResponse'
+          description: The new consolidated (semantic) facts that were created.
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix epoch milliseconds when consolidation ran.
+
+    DecayResponse:
+      type: object
+      description: Result of a memory decay (cleanup) run.
+      required: [expiredCount, evictedCount, removedAtoms, timestamp]
+      properties:
+        expiredCount:
+          type: integer
+          description: Number of facts removed because their TTL or validUntil elapsed.
+        evictedCount:
+          type: integer
+          description: Number of facts removed due to low salience below the eviction threshold.
+        removedAtoms:
+          type: array
+          items:
+            $ref: '#/components/schemas/AtomResponse'
+          description: All atoms removed during this decay run.
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix epoch milliseconds when decay ran.
+
+    TransactionBeginResponse:
+      type: object
+      required: [transactionId]
+      properties:
+        transactionId:
+          type: integer
+          format: int64
+          description: |
+            The transaction ID. Pass this in the `X-Transaction-ID` header on subsequent
+            assert/retract calls to buffer them in this transaction.
+          example: 1704067200000
+
+    DatabaseInfo:
+      type: object
+      description: Metadata about a logical database.
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Database name.
+          example: production
+        factCount:
+          type: integer
+          description: Total number of facts stored across all tenants.
+        ruleCount:
+          type: integer
+          description: Total number of rules stored across all tenants.
+        tenantCount:
+          type: integer
+          description: Number of registered tenants.
+
+    PredicateInfo:
+      type: object
+      description: Schema information for a single predicate.
+      required: [predicate, factCount, ruleCount, arity, hasRules]
+      properties:
+        predicate:
+          type: string
+          description: Predicate name.
+          example: parent
+        factCount:
+          type: integer
+          description: Number of facts with this predicate.
+        ruleCount:
+          type: integer
+          description: Number of rules whose head has this predicate.
+        arity:
+          type: integer
+          description: Number of arguments (inferred from the first known atom or rule head).
+        hasRules:
+          type: boolean
+          description: Whether any inference rules target this predicate.
+
+    SchemaDiscoveryResponse:
+      type: object
+      required: [predicates, totalPredicates, totalFacts, totalRules]
+      properties:
+        predicates:
+          type: array
+          items:
+            $ref: '#/components/schemas/PredicateInfo'
+        totalPredicates:
+          type: integer
+        totalFacts:
+          type: integer
+        totalRules:
+          type: integer
+
+    HealthStatus:
+      type: object
+      description: Overall server health with per-subsystem check results.
+      required: [status, version, checks]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: |
+            `healthy` — all checks pass.
+            `degraded` — one or more checks warn but none fail.
+            `unhealthy` — one or more checks fail (server returns HTTP 503).
+        version:
+          type: string
+          description: Server version string.
+          example: 2.0.0
+        checks:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/CheckResult'
+          description: |
+            Named subsystem checks. Common keys: `wal_writable`, `disk_space`, `memory`,
+            `databases`, `transactions`, `llm`, `auth`.
+
+    CheckResult:
+      type: object
+      required: [status, message]
+      properties:
+        status:
+          type: string
+          enum: [pass, warn, fail]
+        message:
+          type: string
+          example: Memory usage: 42% (512MB / 1024MB)
+
+    # ── Auth Types ────────────────────────────────────────────────────────────
+
+    AuthStatusResponse:
+      type: object
+      required: [mode, bootstrapRequired, keyCount]
+      properties:
+        mode:
+          type: string
+          enum: [disabled, legacy, rbac]
+          description: Current authentication mode.
+        bootstrapRequired:
+          type: boolean
+          description: |
+            When `true`, no keys exist yet and the server is in RBAC mode.
+            Call `POST /auth/bootstrap` to create the first admin key.
+        keyCount:
+          type: integer
+          description: Number of API keys currently registered (0 in non-RBAC modes).
+
+    CreateKeyResponse:
+      type: object
+      description: |
+        Response to a successful key creation. The `key` field contains the raw API key
+        and is shown **only once** — store it securely.
+      required: [id, name, key, prefix, role, databases, tenants]
+      properties:
+        id:
+          type: string
+          description: Unique key ID (UUID).
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        name:
+          type: string
+          description: Human-readable key name.
+          example: production-writer
+        key:
+          type: string
+          description: The raw API key value. **Shown only on creation — store it now.**
+          example: nai_1a2b3c4d5e6f7g8h9i0j...
+        prefix:
+          type: string
+          description: First 8 characters of the key for identification (e.g., in logs).
+          example: nai_1a2b
+        role:
+          type: string
+          enum: [admin, writer, reader]
+        databases:
+          type: array
+          items:
+            type: string
+          description: Databases this key can access (empty array means all databases).
+        tenants:
+          type: array
+          items:
+            type: string
+          description: Tenants this key can access (empty array means all tenants).
+        expiresAt:
+          type: integer
+          format: int64
+          nullable: true
+          description: Unix epoch milliseconds when the key expires (`null` means no expiry).
+
+    KeyInfoResponse:
+      type: object
+      description: Metadata about an API key (without the raw key value).
+      required: [id, name, prefix, role, databases, tenants, createdAt, enabled, description]
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        name:
+          type: string
+          example: production-writer
+        prefix:
+          type: string
+          example: nai_1a2b
+        role:
+          type: string
+          enum: [admin, writer, reader]
+        databases:
+          type: array
+          items:
+            type: string
+        tenants:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: integer
+          format: int64
+          description: Unix epoch milliseconds when the key was created.
+        lastUsedAt:
+          type: integer
+          format: int64
+          nullable: true
+          description: Unix epoch milliseconds when the key was last used for a request.
+        expiresAt:
+          type: integer
+          format: int64
+          nullable: true
+        enabled:
+          type: boolean
+          description: Whether the key is currently active.
+        description:
+          type: string
+          description: Optional human-readable description.
+
+    WhoAmIResponse:
+      type: object
+      required: [mode, name, role, permissions, databases, tenants]
+      properties:
+        mode:
+          type: string
+          enum: [disabled, legacy, rbac]
+        keyId:
+          type: string
+          nullable: true
+          description: Key ID in RBAC mode; `null` in other modes.
+        name:
+          type: string
+          description: Key name or `"anonymous"` in open-access mode.
+        role:
+          type: string
+          enum: [admin, writer, reader]
+        permissions:
+          type: array
+          items:
+            type: string
+          description: |
+            List of permission names granted to this key. Possible values:
+            `fact_read`, `fact_write`, `rule_read`, `rule_write`, `inference`,
+            `memory_read`, `memory_write`, `extract`, `synthesize`, `database_create`,
+            `database_delete`, `database_list`, `tenant_create`, `tenant_delete`,
+            `nuke`, `backup`, `key_manage`, `transaction`.
+        databases:
+          type: array
+          items:
+            type: string
+          description: Scoped databases (empty means all).
+        tenants:
+          type: array
+          items:
+            type: string
+          description: Scoped tenants (empty means all).
+
+    # ── LLM Types ─────────────────────────────────────────────────────────────
+
+    ExtractedFactDto:
+      type: object
+      required: [predicate, args]
+      properties:
+        predicate:
+          type: string
+          example: works_at
+        args:
+          type: array
+          items:
+            type: string
+          example: [alice, acme-corp]
+        confidence:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          default: 1.0
+          description: LLM confidence score for this extracted fact.
+
+    ExtractedAtomDto:
+      type: object
+      required: [predicate, args]
+      properties:
+        predicate:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        negated:
+          type: boolean
+          default: false
+
+    ExtractedRuleDto:
+      type: object
+      required: [head, body, variables]
+      properties:
+        head:
+          $ref: '#/components/schemas/ExtractedAtomDto'
+        body:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExtractedAtomDto'
+        variables:
+          type: array
+          items:
+            type: string
+          description: Variable names used in this rule (without the `?` prefix).
+          example: [x, y]
+        confidence:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          default: 1.0
+        templateType:
+          type: string
+          nullable: true
+          description: |
+            Identifies the logical template pattern the LLM detected, if any.
+            Example values: `modus_ponens`, `transitivity`, `inverse`.
+
+    ExtractionResponse:
+      type: object
+      required: [facts, rules, asserted, provider, model]
+      properties:
+        facts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExtractedFactDto'
+          description: Extracted facts.
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExtractedRuleDto'
+          description: Extracted logical rules (only populated when `rules: true` was requested).
+        asserted:
+          type: boolean
+          description: Whether the extracted facts/rules were asserted into the knowledge base.
+        provider:
+          type: string
+          description: Name of the LLM provider used (e.g., `openai`, `anthropic`, `google`).
+        model:
+          type: string
+          description: Specific model identifier used.
+          example: gpt-4o
+
+    BatchExtractionResult:
+      type: object
+      required: [text, facts, asserted]
+      properties:
+        text:
+          type: string
+          description: The original input text for this item.
+        facts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExtractedFactDto'
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExtractedRuleDto'
+        asserted:
+          type: boolean
+
+    BatchExtractionResponse:
+      type: object
+      required: [results, provider, model]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchExtractionResult'
+        provider:
+          type: string
+        model:
+          type: string
+
+    DerivationStep:
+      type: object
+      required: [fact, type]
+      properties:
+        fact:
+          type: string
+          description: String representation of the fact involved in this derivation step.
+          example: "mortal(alice)"
+        type:
+          type: string
+          enum: [fact_match, rule_application, llm_reported]
+          description: How this step was derived.
+        rule:
+          type: string
+          nullable: true
+          description: The rule applied (only present when `type` is `rule_application`).
+
+    SynthesisResponse:
+      type: object
+      required: [answer, derivation, missingContext, confidence, queriesExecuted, provider, model]
+      properties:
+        answer:
+          type: string
+          description: Natural language answer synthesized from knowledge base query results.
+          example: "Yes, Alice is mortal because she is human and all humans are mortal."
+        derivation:
+          type: array
+          items:
+            $ref: '#/components/schemas/DerivationStep'
+          description: The logical derivation steps supporting the answer.
+        missingContext:
+          type: string
+          description: |
+            Description of any knowledge that would help answer the question more
+            completely, or empty string if the answer is fully supported.
+        confidence:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Confidence score for the answer (0.1 = no facts found, up to 0.95).
+        queriesExecuted:
+          type: array
+          items:
+            type: string
+          description: The logic query patterns that were executed to find relevant facts.
+          example: ["mortal(?x)", "human(alice)"]
+        provider:
+          type: string
+        model:
+          type: string
+
+    # ── Event Types (SSE) ──────────────────────────────────────────────────────
+
+    KnowledgeEvent:
+      type: object
+      description: |
+        A Server-Sent Event payload from `GET /memory/events` or `GET /memory/stream`.
+        The `type` field discriminates the event variant.
+      required: [type, eventId, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [fact_asserted, fact_retracted, rule_asserted, fact_expired, consolidation]
+          description: |
+            Event type. The simplified `/memory/stream` endpoint uses aliases:
+            `told`, `forgotten`, `rule_taught`, `expired`, `compressed`.
+        eventId:
+          type: integer
+          format: int64
+          description: Monotonically increasing event sequence number. Use with `?since=` to resume a stream.
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix epoch milliseconds when the event occurred.
+        atom:
+          $ref: '#/components/schemas/AtomResponse'
+          description: The affected atom (present for fact_asserted, fact_retracted, fact_expired, consolidation).
+        rule:
+          type: string
+          nullable: true
+          description: String representation of the asserted rule (present for rule_asserted).
+        sourceCount:
+          type: integer
+          nullable: true
+          description: Number of source facts that were consolidated (present for consolidation).
+
+    # ── Error ──────────────────────────────────────────────────────────────────
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: |
+            Machine-readable error code. Common values:
+            `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`, `UNAUTHORIZED`, `FORBIDDEN`,
+            `TOO_MANY_REQUESTS`, `INTERNAL_ERROR`, `BAD_REQUEST`, `AUTH_DISABLED`,
+            `LLM_NOT_CONFIGURED`, `EXTRACTION_DISABLED`, `LLM_TIMEOUT`, `LLM_UNREACHABLE`,
+            `EXTRACTION_ERROR`, `SYNTHESIS_ERROR`.
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: Human-readable explanation of the error.
+          example: "Predicate must not be blank"
+        details:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+          description: Optional additional error context as key-value pairs.
+
+  # ── Shared Request Bodies ──────────────────────────────────────────────────
+
+  requestBodies:
+    FactBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [predicate, args]
+            properties:
+              predicate:
+                type: string
+                maxLength: 255
+                description: Predicate name.
+                example: parent
+              args:
+                type: array
+                items:
+                  type: string
+                maxItems: 50
+                description: |
+                  Argument strings. Prefix with `?` for variables (e.g., `?x`). Numbers
+                  are auto-detected. All other strings become identifiers.
+                example: [alice, bob]
+              truthVal:
+                type: boolean
+                default: true
+                description: |
+                  Truth value of the fact. When `false`, stores a negative fact.
+                  Prefer using `negated: true` for clarity.
+              negated:
+                type: boolean
+                default: false
+                description: |
+                  Shorthand for `truthVal: false`. When `true`, the effective truth value
+                  is `false` regardless of `truthVal`.
+              scope:
+                type: string
+                nullable: true
+                description: Optional scope tag.
+              metadata:
+                type: object
+                additionalProperties: true
+                description: Arbitrary JSON metadata to attach to the fact.
+              validFrom:
+                type: integer
+                format: int64
+                nullable: true
+                description: Unix epoch ms from which this fact is valid.
+              validUntil:
+                type: integer
+                format: int64
+                nullable: true
+                description: Unix epoch ms after which this fact expires.
+              ttl:
+                type: integer
+                format: int64
+                nullable: true
+                description: Time-to-live in milliseconds from assertion time.
+
+  responses:
+    BadRequest:
+      description: Validation error or malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: VALIDATION_ERROR
+            message: "Predicate must not be blank"
+    Unauthorized:
+      description: Missing or invalid API key.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: UNAUTHORIZED
+            message: "Invalid or missing API key"
+    Forbidden:
+      description: Key lacks the required permission.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: FORBIDDEN
+            message: "Insufficient permissions"
+    NotFound:
+      description: Database, tenant, or resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: NOT_FOUND
+            message: "Database 'mydb' not found"
+    Conflict:
+      description: The operation would create a logical contradiction.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: CONFLICT
+            message: "Contradiction: fact conflicts with existing knowledge"
+    TooManyRequests:
+      description: Rate limit exceeded.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalServerError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    LlmUnavailable:
+      description: LLM provider not configured (`503`) or not reachable (`502`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            not_configured:
+              value:
+                code: LLM_NOT_CONFIGURED
+                message: "No LLM provider configured. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_API_KEY."
+            not_reachable:
+              value:
+                code: LLM_UNREACHABLE
+                message: "Cannot reach LLM provider. Check that Ollama is running and the LLM_BASE_URL is correct."
+    LlmTimeout:
+      description: LLM request timed out.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: LLM_TIMEOUT
+            message: "LLM request timed out. If using Ollama, the model may still be loading."
+
+paths:
+
+  # ── Simplified API ─────────────────────────────────────────────────────────
+
+  /tell:
+    post:
+      tags: [Simplified API]
+      summary: Tell — Assert a fact
+      operationId: tell
+      description: |
+        Store a fact in the knowledge base. Equivalent to `POST /assert/fact`.
+        Use variables (prefixed with `?`) in args to store patterns, though typically
+        facts are fully ground (no variables).
+
+        Supports optional temporal bounds (`validFrom`, `validUntil`, `ttl`) for
+        time-scoped facts that expire automatically.
+
+        If `X-Transaction-ID` is provided, the fact is buffered into that transaction
+        rather than applied immediately.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/TransactionHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predicate, args]
+              properties:
+                predicate:
+                  type: string
+                  maxLength: 255
+                  example: parent
+                args:
+                  type: array
+                  items:
+                    type: string
+                  maxItems: 50
+                  example: [alice, bob]
+                truthVal:
+                  type: boolean
+                  default: true
+                negated:
+                  type: boolean
+                  default: false
+                scope:
+                  type: string
+                  nullable: true
+                metadata:
+                  type: object
+                  additionalProperties: true
+                validFrom:
+                  type: integer
+                  format: int64
+                  nullable: true
+                validUntil:
+                  type: integer
+                  format: int64
+                  nullable: true
+                ttl:
+                  type: integer
+                  format: int64
+                  nullable: true
+                  description: Time-to-live in milliseconds.
+            examples:
+              simple_fact:
+                summary: Store a simple fact
+                value:
+                  predicate: parent
+                  args: [alice, bob]
+              temporal_fact:
+                summary: Store a fact with TTL (expires in 1 hour)
+                value:
+                  predicate: user_session
+                  args: [user-42, active]
+                  ttl: 3600000
+              negative_fact:
+                summary: Store a negative fact
+                value:
+                  predicate: authorized
+                  args: [charlie, admin-panel]
+                  negated: true
+      responses:
+        '200':
+          description: Fact asserted successfully.
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                stored:
+                  value: "Stored: parent(alice, bob)"
+                buffered_in_tx:
+                  value: "Stored in Tx 1704067200000: parent(alice, bob)"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /ask:
+    post:
+      tags: [Simplified API]
+      summary: Ask — Query with inference
+      operationId: ask
+      description: |
+        Query the knowledge base using backward-chaining inference. Returns all solutions
+        to the query, including facts derived through rules.
+
+        Use variables (prefixed with `?`) in args to find all matching bindings.
+        For example, `{predicate: "parent", args: ["alice", "?x"]}` returns everyone
+        alice is a parent of.
+
+        Set `withProof: true` to receive the full derivation tree for each result.
+        For direct fact-only lookup (no inference), use `POST /query` instead.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predicate, args]
+              properties:
+                predicate:
+                  type: string
+                  example: parent
+                args:
+                  type: array
+                  items:
+                    type: string
+                  example: [alice, '?x']
+                scope:
+                  type: string
+                  nullable: true
+                withProof:
+                  type: boolean
+                  default: false
+                  description: When `true`, returns proof trees instead of plain atoms.
+            examples:
+              find_children:
+                summary: Find all children of alice
+                value:
+                  predicate: parent
+                  args: [alice, '?x']
+              with_proof:
+                summary: Ask with proof tree
+                value:
+                  predicate: mortal
+                  args: ['?x']
+                  withProof: true
+      responses:
+        '200':
+          description: |
+            Array of results. When `withProof` is `false`, returns `AtomResponse[]`.
+            When `withProof` is `true`, returns `ProofTreeResponse[]`.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/AtomResponse'
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/ProofTreeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /query:
+    post:
+      tags: [Simplified API]
+      summary: Query — Direct fact pattern match (no inference)
+      operationId: query
+      description: |
+        Pattern-match directly against stored facts in the Hexastore without running
+        inference. Faster than `/ask` when you only need stored facts, not derived ones.
+        Variables (`?x`) are supported for open-ended pattern matching.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predicate, args]
+              properties:
+                predicate:
+                  type: string
+                  example: temperature
+                args:
+                  type: array
+                  items:
+                    type: string
+                  example: [sensor-1, '?reading']
+                scope:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Array of matching atoms.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AtomResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /teach:
+    post:
+      tags: [Simplified API]
+      summary: Teach — Assert a rule
+      operationId: teach
+      description: |
+        Teach NocturnusAI a Horn clause rule. The engine will use the rule during
+        backward chaining to derive new facts from existing ones.
+
+        Variable names in `args` must be prefixed with `?`. Variables used in the head
+        and body are automatically detected and unified.
+
+        Example rule: "If X is human, then X is mortal":
+        ```json
+        {
+          "head": {"predicate": "mortal", "args": ["?x"]},
+          "body": [{"predicate": "human", "args": ["?x"]}]
+        }
+        ```
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/TransactionHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [head, body]
+              properties:
+                head:
+                  $ref: '#/components/schemas/AtomDto'
+                  description: The conclusion (consequent) of the rule.
+                body:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AtomDto'
+                  minItems: 1
+                  description: The conditions (antecedents) that must all hold for the head to be derived.
+                scope:
+                  type: string
+                  nullable: true
+            examples:
+              mortality_rule:
+                summary: All humans are mortal
+                value:
+                  head:
+                    predicate: mortal
+                    args: ['?x']
+                  body:
+                    - predicate: human
+                      args: ['?x']
+              grandparent_rule:
+                summary: Grandparent transitivity
+                value:
+                  head:
+                    predicate: grandparent
+                    args: ['?x', '?z']
+                  body:
+                    - predicate: parent
+                      args: ['?x', '?y']
+                    - predicate: parent
+                      args: ['?y', '?z']
+      responses:
+        '200':
+          description: Rule asserted successfully.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Rule stored: FORALL ?x { mortal(?x) <- human(?x) }"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /forget:
+    post:
+      tags: [Simplified API]
+      summary: Forget — Retract a fact
+      operationId: forget
+      description: |
+        Remove a fact from the knowledge base. The Truth Maintenance System (TMS)
+        automatically retracts any facts that were derived from this one, maintaining
+        consistency throughout the knowledge base.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/TransactionHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predicate, args]
+              properties:
+                predicate:
+                  type: string
+                  example: parent
+                args:
+                  type: array
+                  items:
+                    type: string
+                  example: [alice, bob]
+                scope:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Fact retracted successfully.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Forgotten: parent(alice, bob) (and any knowledge derived from it)"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /memory/recall:
+    post:
+      tags: [Simplified API]
+      summary: Recall — Query facts at a point in time
+      operationId: memoryRecall
+      description: |
+        Time-travel query: retrieve facts that were valid at a specific past timestamp.
+        Alias for `POST /memory/query/temporal`.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predicate, args, timestamp]
+              properties:
+                predicate:
+                  type: string
+                  example: location
+                args:
+                  type: array
+                  items:
+                    type: string
+                  example: [user-42, '?where']
+                timestamp:
+                  type: integer
+                  format: int64
+                  description: Unix epoch milliseconds for the point-in-time query.
+                scope:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Facts that were valid at the given timestamp.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AtomResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /memory/compress:
+    post:
+      tags: [Simplified API]
+      summary: Compress — Consolidate episodic memory
+      operationId: memoryCompress
+      description: |
+        Trigger memory consolidation: compress repeated episodic patterns into semantic
+        facts. For long-running agent sessions, call periodically to keep memory lean.
+        Alias for `POST /memory/consolidate`.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: Consolidation result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsolidationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /memory/cleanup:
+    post:
+      tags: [Simplified API]
+      summary: Cleanup — Decay stale and low-relevance memory
+      operationId: memoryCleanup
+      description: |
+        Expire TTL'd facts and evict low-salience facts below the threshold.
+        Alias for `POST /memory/decay`.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                threshold:
+                  type: number
+                  format: double
+                  nullable: true
+                  description: Override the default salience eviction threshold (0.0–1.0).
+      responses:
+        '200':
+          description: Decay result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecayResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /memory/prioritize:
+    post:
+      tags: [Simplified API]
+      summary: Prioritize — Set salience priority for a fact
+      operationId: memoryPrioritize
+      description: |
+        Explicitly set the salience priority for a specific fact. Higher priority facts
+        appear first in context windows and are less likely to be evicted by decay.
+        Alias for `POST /memory/priority`.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predicate, args, priority]
+              properties:
+                predicate:
+                  type: string
+                  example: user_goal
+                args:
+                  type: array
+                  items:
+                    type: string
+                  example: [user-42, complete-onboarding]
+                priority:
+                  type: number
+                  format: double
+                  minimum: 0.0
+                  maximum: 1.0
+                  description: Explicit priority weight (0.0 = lowest, 1.0 = highest).
+                  example: 0.9
+                truthVal:
+                  type: boolean
+                  default: true
+                scope:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Priority updated.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Priority set: 0.9 for user_goal(user-42, complete-onboarding)"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /memory/stream:
+    get:
+      tags: [Simplified API]
+      summary: Stream — Subscribe to knowledge change events (SSE)
+      operationId: memoryStream
+      description: |
+        Subscribe to real-time knowledge change events as a Server-Sent Events stream.
+        Events use simplified type names (`told`, `forgotten`, `rule_taught`, `expired`,
+        `compressed`). For the original type names, use `GET /memory/events`.
+
+        The connection sends keepalive comments every 30 seconds. Use the `?since=` query
+        parameter with the last received `eventId` to resume after a disconnect without
+        missing events.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: predicate
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter events to only those involving this predicate name.
+        - name: events
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            Comma-separated list of event types to subscribe to.
+            Simplified names: `told`, `forgotten`, `rule_taught`, `expired`, `compressed`.
+            Legacy names: `fact_asserted`, `fact_retracted`, `rule_asserted`, `fact_expired`, `consolidation`.
+            Defaults to all event types.
+          example: "told,forgotten"
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: Resume from this event ID. Events with IDs > `since` are replayed first.
+      responses:
+        '200':
+          description: SSE stream of knowledge events.
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/KnowledgeEvent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /memory/context:
+    post:
+      tags: [Simplified API, Memory API]
+      summary: Context Window — Get ranked facts for agent context
+      operationId: memoryContext
+      description: |
+        Build an optimized context window for the current reasoning step. Returns the
+        most relevant facts, ranked by composite salience score (recency × frequency ×
+        priority), trimmed to `maxFacts`. Optionally filter by predicate names or scope.
+
+        This endpoint is shared between the Simplified API and Memory API.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maxFacts:
+                  type: integer
+                  default: 100
+                  description: Maximum number of facts to include in the context window.
+                minSalience:
+                  type: number
+                  format: double
+                  default: 0.0
+                  description: Minimum salience score for a fact to be included.
+                predicates:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                  description: Restrict context to facts with these predicates. `null` means all predicates.
+                  example: [user_preference, user_goal, location]
+                scope:
+                  type: string
+                  nullable: true
+            example:
+              maxFacts: 50
+              minSalience: 0.3
+              predicates: [user_preference, user_goal]
+      responses:
+        '200':
+          description: Context window.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextWindowResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Full Logic API ─────────────────────────────────────────────────────────
+
+  /assert/fact:
+    post:
+      tags: [Logic API]
+      summary: Assert Fact
+      operationId: assertFact
+      description: |
+        Assert a fact into the knowledge base. Functionally identical to `POST /tell`.
+        The `truthVal` field is available here in addition to `negated` for explicit
+        control over the truth value.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/TransactionHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/FactBody'
+      responses:
+        '200':
+          description: Fact asserted.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Fact Asserted: parent(alice, bob)"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /assert/rule:
+    post:
+      tags: [Logic API]
+      summary: Assert Rule
+      operationId: assertRule
+      description: Assert a Horn clause rule. Identical to `POST /teach`.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/TransactionHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [head, body]
+              properties:
+                head:
+                  $ref: '#/components/schemas/AtomDto'
+                body:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AtomDto'
+                  minItems: 1
+                scope:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Rule asserted.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /assert/template:
+    post:
+      tags: [Logic API]
+      summary: Assert Template — Apply a predefined logic template
+      operationId: assertTemplate
+      description: |
+        Apply a named logic template to generate and assert one or more rules.
+        Templates encode common logical patterns (e.g., Modus Ponens, transitivity)
+        parameterized by predicate names.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/TransactionHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [templateId, params]
+              properties:
+                templateId:
+                  type: string
+                  description: |
+                    Identifier of the template to apply. Examples:
+                    `modus_ponens`, `modus_tollens`, `transitivity`, `inverse`,
+                    `symmetry`, `reflexivity`.
+                  example: transitivity
+                params:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Template parameters. Typically includes `subject`, `property`, and related predicate names.
+                  example:
+                    subject: '?x'
+                    relation: ancestor
+                    intermediate: '?y'
+                    target: '?z'
+      responses:
+        '200':
+          description: Template rules asserted.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Rule Asserted: FORALL ?x, ?y, ?z { ancestor(?x, ?z) <- ancestor(?x, ?y) AND ancestor(?y, ?z) }\n"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /infer:
+    post:
+      tags: [Logic API]
+      summary: Infer — Backward-chaining query
+      operationId: infer
+      description: |
+        Run backward-chaining inference for a query. Equivalent to `POST /ask`.
+        Use the `?proof=true` query parameter to receive full proof trees.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: proof
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: When `true`, return proof trees instead of plain atoms.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predicate, args]
+              properties:
+                predicate:
+                  type: string
+                  example: mortal
+                args:
+                  type: array
+                  items:
+                    type: string
+                  example: ['?x']
+                negated:
+                  type: boolean
+                  default: false
+                truthVal:
+                  type: boolean
+                  default: true
+                scope:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: |
+            Query results. `AtomResponse[]` when `?proof=false`, `ProofTreeResponse[]`
+            when `?proof=true`.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/AtomResponse'
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/ProofTreeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /retract:
+    post:
+      tags: [Logic API]
+      summary: Retract Fact
+      operationId: retractFact
+      description: |
+        Retract a fact and trigger Truth Maintenance. Equivalent to `POST /forget`.
+        TMS automatically retracts all facts derived from the retracted one.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/TransactionHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predicate, args]
+              properties:
+                predicate:
+                  type: string
+                  example: parent
+                args:
+                  type: array
+                  items:
+                    type: string
+                  example: [alice, bob]
+                truthVal:
+                  type: boolean
+                  default: true
+                negated:
+                  type: boolean
+                  default: false
+                scope:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Fact retracted.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Retracted: parent(alice, bob)"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /execute:
+    post:
+      tags: [Logic API]
+      summary: Execute — Run a Logiql DSL command
+      operationId: execute
+      description: |
+        Execute a command in the Logiql DSL directly. Supports all predicate syntax
+        including `FORALL` quantification, Horn clauses (`:-`), and negation (`NOT`).
+        Useful for power users and batch scripting.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command]
+              properties:
+                command:
+                  type: string
+                  description: A Logiql DSL command string.
+                  example: "parent(alice, bob)"
+          text/plain:
+            schema:
+              type: string
+            example: "mortal(?x) :- human(?x)"
+      responses:
+        '200':
+          description: Execution result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /predicates:
+    get:
+      tags: [Logic API, Observability]
+      summary: Schema Discovery — List all predicates
+      operationId: getPredicates
+      description: |
+        Discover the knowledge schema: lists all predicate names with fact count, rule
+        count, arity, and whether they have associated inference rules. Useful for
+        understanding what knowledge is available before querying.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter to a specific scope.
+      responses:
+        '200':
+          description: Schema discovery result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemaDiscoveryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Memory API ─────────────────────────────────────────────────────────────
+
+  /memory/query/temporal:
+    post:
+      tags: [Memory API]
+      summary: Temporal Query — Facts valid at a point in time
+      operationId: memoryQueryTemporal
+      description: |
+        Retrieve facts that were valid at a specific point in time. A fact is valid at
+        timestamp T if: `validFrom <= T < validUntil` and `createdAt + ttl > T`.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predicate, args, timestamp]
+              properties:
+                predicate:
+                  type: string
+                  example: location
+                args:
+                  type: array
+                  items:
+                    type: string
+                  example: [user-42, '?where']
+                timestamp:
+                  type: integer
+                  format: int64
+                  description: Unix epoch milliseconds for the point-in-time query.
+                  example: 1704067200000
+                scope:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Facts valid at the given timestamp.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AtomResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /memory/query/salient:
+    post:
+      tags: [Memory API]
+      summary: Salient Query — Relevance-ranked fact retrieval
+      operationId: memoryQuerySalient
+      description: |
+        Retrieve facts matching a pattern, ordered by composite salience score.
+        Salience is computed from recency, access frequency, and explicit priority.
+        Use `minSalience` to filter out low-relevance facts and `limit` to cap results.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predicate, args]
+              properties:
+                predicate:
+                  type: string
+                  example: user_preference
+                args:
+                  type: array
+                  items:
+                    type: string
+                  example: [user-42, '?key', '?value']
+                scope:
+                  type: string
+                  nullable: true
+                limit:
+                  type: integer
+                  default: 50
+                  description: Maximum number of results to return.
+                minSalience:
+                  type: number
+                  format: double
+                  default: 0.0
+                  minimum: 0.0
+                  maximum: 1.0
+      responses:
+        '200':
+          description: Salience-ranked matching facts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScoredAtomResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /memory/priority:
+    post:
+      tags: [Memory API]
+      summary: Set Priority — Assign explicit salience weight to a fact
+      operationId: memorySetPriority
+      description: |
+        Assign an explicit salience priority (0.0–1.0) to a specific fact, influencing
+        its rank in context windows and resistance to decay eviction.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predicate, args, priority]
+              properties:
+                predicate:
+                  type: string
+                args:
+                  type: array
+                  items:
+                    type: string
+                priority:
+                  type: number
+                  format: double
+                  minimum: 0.0
+                  maximum: 1.0
+                  example: 0.95
+                truthVal:
+                  type: boolean
+                  default: true
+                scope:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Priority updated.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /memory/consolidate:
+    post:
+      tags: [Memory API]
+      summary: Consolidate — Compress episodic patterns into semantic facts
+      operationId: memoryConsolidate
+      description: |
+        Run memory consolidation: identify repeated episodic patterns and compress them
+        into higher-level semantic facts. Reduces memory footprint for long-running
+        agent sessions while preserving important knowledge.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: Consolidation result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsolidationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /memory/decay:
+    post:
+      tags: [Memory API]
+      summary: Decay — Expire TTL'd and low-salience facts
+      operationId: memoryDecay
+      description: |
+        Run memory decay: remove facts whose TTL or `validUntil` has elapsed, and
+        optionally evict facts with salience below the given threshold.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                threshold:
+                  type: number
+                  format: double
+                  nullable: true
+                  description: Override the default eviction threshold.
+      responses:
+        '200':
+          description: Decay result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecayResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /memory/events:
+    get:
+      tags: [Memory API]
+      summary: Events — Subscribe to knowledge change events (SSE)
+      operationId: memoryEvents
+      description: |
+        Subscribe to real-time knowledge change events using Server-Sent Events.
+        Events use internal type names (`fact_asserted`, `fact_retracted`, etc.).
+        For simplified type names, use `GET /memory/stream`.
+
+        Sends keepalive comments (`': keepalive'`) every 30 seconds.
+        Use `?since=<eventId>` to resume after a disconnect.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: predicate
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter events to this predicate.
+        - name: events
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            Comma-separated list of event types:
+            `fact_asserted`, `fact_retracted`, `rule_asserted`, `fact_expired`, `consolidation`.
+            Defaults to all types.
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: Resume from this event ID; missed events are replayed first.
+      responses:
+        '200':
+          description: SSE stream of knowledge events.
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/KnowledgeEvent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Transactions ────────────────────────────────────────────────────────────
+
+  /tx/begin:
+    post:
+      tags: [Transactions]
+      summary: Begin Transaction
+      operationId: txBegin
+      description: |
+        Start a new ACID transaction. Returns a `transactionId` to pass in the
+        `X-Transaction-ID` header on subsequent `assert/fact`, `assert/rule`, `retract`,
+        `tell`, `teach`, and `forget` calls to buffer them into this transaction.
+
+        The transaction is committed atomically with `POST /tx/commit/{id}` or rolled
+        back with `POST /tx/rollback/{id}`. Uncommitted transactions do not affect
+        query results.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+      responses:
+        '200':
+          description: Transaction started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionBeginResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /tx/commit/{id}:
+    post:
+      tags: [Transactions]
+      summary: Commit Transaction
+      operationId: txCommit
+      description: |
+        Commit a buffered transaction, applying all operations atomically.
+        If any operation would cause a contradiction, the entire transaction is rolled
+        back and a `409 Conflict` is returned.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Transaction ID returned by `POST /tx/begin`.
+      responses:
+        '200':
+          description: Transaction committed successfully.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Transaction 1704067200000 committed"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /tx/rollback/{id}:
+    post:
+      tags: [Transactions]
+      summary: Rollback Transaction
+      operationId: txRollback
+      description: Discard all buffered operations in the transaction without applying them.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Transaction ID returned by `POST /tx/begin`.
+      responses:
+        '200':
+          description: Transaction rolled back.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Transaction 1704067200000 rolled back"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ── Admin API ──────────────────────────────────────────────────────────────
+
+  /admin/databases:
+    get:
+      tags: [Admin]
+      summary: List Databases
+      operationId: listDatabases
+      description: List all logical databases on this server.
+      responses:
+        '200':
+          description: Array of database info objects.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DatabaseInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Admin]
+      summary: Create Database
+      operationId: createDatabase
+      description: Create a new logical database. Database names must be alphanumeric, dash, or underscore (max 64 chars).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 64
+                  pattern: '^[a-zA-Z0-9_-]+$'
+                  example: production
+      responses:
+        '200':
+          description: Database created.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Database 'production' created (MultiTenant=true)"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/databases/{name}:
+    delete:
+      tags: [Admin]
+      summary: Delete Database
+      operationId: deleteDatabase
+      description: |
+        Permanently delete a database and all its data. This operation is irreversible.
+        Requires the `database_delete` permission (`admin` role in RBAC mode).
+      parameters:
+        - $ref: '#/components/parameters/DatabaseNamePath'
+      responses:
+        '200':
+          description: Database deleted.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Database 'production' deleted"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/databases/{name}/facts:
+    get:
+      tags: [Admin]
+      summary: List Facts in Database
+      operationId: listFacts
+      description: List all facts stored in the database for a given tenant.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseNamePath'
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter to a specific scope.
+      responses:
+        '200':
+          description: Array of atoms.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AtomResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/databases/{name}/facts/count:
+    get:
+      tags: [Admin]
+      summary: Count Facts in Database
+      operationId: countFacts
+      description: Return the count of facts stored in the database for a given tenant.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseNamePath'
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Fact count.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/databases/{name}/rules:
+    get:
+      tags: [Admin]
+      summary: List Rules in Database
+      operationId: listRules
+      description: List all rules in the database for a given tenant, as string representations.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseNamePath'
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of rule strings in `FORALL ?x { head <- body }` format.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+              example:
+                - "FORALL ?x { mortal(?x) <- human(?x) }"
+                - "FORALL ?x, ?y, ?z { grandparent(?x, ?z) <- parent(?x, ?y) AND parent(?y, ?z) }"
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/databases/{name}/tenants:
+    get:
+      tags: [Admin]
+      summary: List Tenants
+      operationId: listTenants
+      description: List all registered tenant IDs in the database.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseNamePath'
+      responses:
+        '200':
+          description: Array of tenant ID strings.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+              example: [agent-001, agent-002, user-42]
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Admin]
+      summary: Create Tenant
+      operationId: createTenant
+      description: Register a new tenant in the database. Tenant IDs must be alphanumeric, dash, or underscore (max 128 chars).
+      parameters:
+        - $ref: '#/components/parameters/DatabaseNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId]
+              properties:
+                tenantId:
+                  type: string
+                  maxLength: 128
+                  pattern: '^[a-zA-Z0-9_-]+$'
+                  example: agent-007
+      responses:
+        '200':
+          description: Tenant created.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Tenant 'agent-007' created"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/databases/{name}/tenants/{id}:
+    delete:
+      tags: [Admin]
+      summary: Delete Tenant
+      operationId: deleteTenant
+      description: Remove a tenant registration from the database (does not nuke data; use the nuke endpoint for that).
+      parameters:
+        - $ref: '#/components/parameters/DatabaseNamePath'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Tenant ID to delete.
+      responses:
+        '200':
+          description: Tenant deleted.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/databases/{name}/nuke:
+    post:
+      tags: [Admin]
+      summary: Nuke Database — Erase all data
+      operationId: nukeDatabase
+      description: |
+        Permanently erase ALL data in the database (facts, rules, memory, events).
+        This is a destructive, irreversible operation. Requires the `nuke` permission
+        (`admin` role in RBAC mode).
+      parameters:
+        - $ref: '#/components/parameters/DatabaseNamePath'
+      responses:
+        '200':
+          description: Database nuked.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Database 'staging' has been nuked. All data cleared."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /admin/databases/{name}/tenants/{id}/nuke:
+    post:
+      tags: [Admin]
+      summary: Nuke Tenant — Erase all data for a tenant
+      operationId: nukeTenant
+      description: |
+        Permanently erase all data for a specific tenant within a database.
+        Requires the `nuke` permission.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseNamePath'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Tenant ID to nuke.
+      responses:
+        '200':
+          description: Tenant data nuked.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Tenant 'agent-007' in database 'staging' has been nuked. All data cleared."
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /admin/backups:
+    post:
+      tags: [Admin]
+      summary: Create Backup — Snapshot database to disk
+      operationId: createBackup
+      description: |
+        Create a full-state JSON snapshot of the specified database and write it to the
+        server's backup directory. Requires the `backup` permission.
+      parameters:
+        - name: db
+          in: query
+          required: false
+          schema:
+            type: string
+            default: default
+          description: Name of the database to back up.
+      responses:
+        '200':
+          description: Backup created.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Backup created at: /data/backups/default_2026-02-27T14-30-00.json"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ── Auth API ───────────────────────────────────────────────────────────────
+
+  /auth/status:
+    get:
+      tags: [Auth]
+      summary: Auth Status
+      operationId: authStatus
+      description: |
+        Returns the current authentication mode and whether the bootstrap step is needed.
+        Use this before any auth setup to determine if `POST /auth/bootstrap` should be called.
+      security: []
+      responses:
+        '200':
+          description: Auth status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthStatusResponse'
+              examples:
+                rbac_needs_bootstrap:
+                  value:
+                    mode: rbac
+                    bootstrapRequired: true
+                    keyCount: 0
+                rbac_configured:
+                  value:
+                    mode: rbac
+                    bootstrapRequired: false
+                    keyCount: 5
+                disabled:
+                  value:
+                    mode: disabled
+                    bootstrapRequired: false
+                    keyCount: 0
+
+  /auth/bootstrap:
+    post:
+      tags: [Auth]
+      summary: Bootstrap — Create first admin key
+      operationId: authBootstrap
+      description: |
+        Creates the first admin API key. Only works when:
+        1. `AUTH_ENABLED=true` is set (RBAC mode is active).
+        2. No API keys have been created yet.
+
+        Authenticate with the server's admin credentials (`NOCTURNUSAI_ADMIN_USER` and
+        `NOCTURNUSAI_ADMIN_PASS` env vars). The returned `key` is shown **only once** —
+        store it securely.
+
+        Rate-limited to 5 attempts per minute per IP with a 5-minute lockout.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  description: Admin username from `NOCTURNUSAI_ADMIN_USER` env var.
+                  example: admin
+                password:
+                  type: string
+                  format: password
+                  description: Admin password from `NOCTURNUSAI_ADMIN_PASS` env var.
+                keyName:
+                  type: string
+                  nullable: true
+                  description: Name for the created admin key. Defaults to `"admin"`.
+                  example: first-admin-key
+      responses:
+        '201':
+          description: First admin key created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateKeyResponse'
+        '400':
+          description: RBAC not enabled or invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid admin credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Bootstrap already completed (keys already exist).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/keys:
+    get:
+      tags: [Auth]
+      summary: List API Keys
+      operationId: listKeys
+      description: List all API keys. Requires `admin` role (RBAC mode).
+      responses:
+        '200':
+          description: Array of key metadata (raw key values are not included).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KeyInfoResponse'
+        '400':
+          description: RBAC not enabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Auth]
+      summary: Create API Key
+      operationId: createKey
+      description: |
+        Create a new API key. Requires `admin` role or `writer`/`reader` creating a
+        key of equal or lesser privilege. Admin role is required to create other admin keys.
+
+        Scope the key to specific databases and tenants by providing non-empty lists for
+        `databases` and `tenants`. Empty lists mean unrestricted access.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, role]
+              properties:
+                name:
+                  type: string
+                  description: Human-readable label for the key.
+                  example: ci-pipeline-writer
+                role:
+                  type: string
+                  enum: [admin, writer, reader]
+                  description: |
+                    `admin` — full access including key management and nuke operations.
+                    `writer` — read + write facts/rules, inference, memory, extraction.
+                    `reader` — read-only: query facts, inference, read memory.
+                databases:
+                  type: array
+                  items:
+                    type: string
+                  default: []
+                  description: Database scope (empty = all databases).
+                tenants:
+                  type: array
+                  items:
+                    type: string
+                  default: []
+                  description: Tenant scope (empty = all tenants).
+                expiresInDays:
+                  type: integer
+                  nullable: true
+                  description: Key expiry in days from now. `null` means no expiry.
+                  example: 90
+                description:
+                  type: string
+                  default: ''
+                  description: Optional human-readable description.
+      responses:
+        '201':
+          description: Key created. Store the `key` value — it will not be shown again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateKeyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /auth/keys/{id}:
+    get:
+      tags: [Auth]
+      summary: Get API Key Details
+      operationId: getKey
+      description: Retrieve metadata for a specific API key by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Key ID (UUID).
+      responses:
+        '200':
+          description: Key metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyInfoResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Auth]
+      summary: Update API Key
+      operationId: updateKey
+      description: |
+        Update properties of an existing API key. Only `admin` keys can update other keys.
+        Partial updates are supported — omit fields to leave them unchanged.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Key ID (UUID).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                  nullable: true
+                  description: Enable or disable the key without deleting it.
+                role:
+                  type: string
+                  enum: [admin, writer, reader]
+                  nullable: true
+                databases:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                tenants:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                description:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Updated key metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyInfoResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Auth]
+      summary: Revoke API Key
+      operationId: revokeKey
+      description: |
+        Permanently revoke an API key. The key is immediately invalid for all subsequent
+        requests. You cannot revoke your own key (use another admin key to do so).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Key ID (UUID).
+      responses:
+        '200':
+          description: Key revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Key revoked
+                  id:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /auth/whoami:
+    get:
+      tags: [Auth]
+      summary: Who Am I — Current identity and permissions
+      operationId: whoami
+      description: |
+        Returns the identity and permissions of the currently authenticated key.
+        In open-access mode (auth disabled), returns a synthetic anonymous identity.
+      responses:
+        '200':
+          description: Current identity.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoAmIResponse'
+              examples:
+                rbac_admin:
+                  value:
+                    mode: rbac
+                    keyId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                    name: production-admin
+                    role: admin
+                    permissions: [fact_read, fact_write, rule_read, rule_write, inference, memory_read, memory_write, extract, synthesize, database_create, database_delete, database_list, tenant_create, tenant_delete, nuke, backup, key_manage, transaction]
+                    databases: []
+                    tenants: []
+                anonymous:
+                  value:
+                    mode: disabled
+                    keyId: null
+                    name: anonymous
+                    role: admin
+                    permissions: [fact_read, fact_write, rule_read, rule_write, inference, memory_read, memory_write, extract, synthesize, database_create, database_delete, database_list, tenant_create, tenant_delete, nuke, backup, key_manage, transaction]
+                    databases: []
+                    tenants: []
+
+  # ── LLM API ────────────────────────────────────────────────────────────────
+
+  /extract:
+    post:
+      tags: [LLM]
+      summary: Extract — Derive facts from free text
+      operationId: extract
+      description: |
+        Use an LLM to extract structured facts (and optionally rules) from natural language
+        text. The extracted facts are converted to atoms using the same predicate/args
+        format as the rest of the API.
+
+        Set `assert: true` to automatically assert extracted facts into the knowledge base.
+        Set `rules: true` to additionally extract logical rules from the text.
+
+        Requires a configured LLM provider (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or
+        `GOOGLE_API_KEY` env var). Returns `503` if no provider is configured.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  description: Natural language text to extract facts from.
+                  example: "Alice is Bob's manager. Bob joined the company on January 1st 2025."
+                assert:
+                  type: boolean
+                  default: false
+                  description: When `true`, extracted facts are asserted into the knowledge base.
+                rules:
+                  type: boolean
+                  default: false
+                  description: When `true`, the LLM also attempts to extract logical rules.
+                context:
+                  type: string
+                  nullable: true
+                  description: Optional context hint to guide extraction (e.g., domain name).
+                  example: "HR records"
+                scope:
+                  type: string
+                  nullable: true
+                  description: Scope tag for asserted facts/rules.
+      responses:
+        '200':
+          description: Extraction result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/LlmUnavailable'
+        '502':
+          $ref: '#/components/responses/LlmUnavailable'
+        '504':
+          $ref: '#/components/responses/LlmTimeout'
+
+  /extract/batch:
+    post:
+      tags: [LLM]
+      summary: Extract Batch — Extract from multiple texts
+      operationId: extractBatch
+      description: |
+        Process multiple text inputs in a single request, extracting facts (and optionally
+        rules) from each. Each input is processed independently. Blank inputs are skipped.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [texts]
+              properties:
+                texts:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  description: Array of natural language texts to process.
+                assert:
+                  type: boolean
+                  default: false
+                rules:
+                  type: boolean
+                  default: false
+                context:
+                  type: string
+                  nullable: true
+                scope:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Batch extraction results, one entry per input text.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchExtractionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/LlmUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /synthesize:
+    post:
+      tags: [LLM]
+      summary: Synthesize — Answer a natural language question
+      operationId: synthesize
+      description: |
+        Translate a natural language question into logic queries, execute them against
+        the knowledge base (with full backward-chaining inference), and synthesize a
+        natural language answer via the LLM.
+
+        Returns the answer, the supporting derivation chain, a confidence score, and
+        any missing context that would improve the answer.
+      parameters:
+        - $ref: '#/components/parameters/DatabaseHeader'
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+                  description: Natural language question to answer.
+                  example: "Who are Alice's grandchildren?"
+                scope:
+                  type: string
+                  nullable: true
+                  description: Restrict queries to this scope.
+      responses:
+        '200':
+          description: Synthesized answer with derivation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SynthesisResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/LlmUnavailable'
+        '502':
+          $ref: '#/components/responses/LlmUnavailable'
+        '504':
+          $ref: '#/components/responses/LlmTimeout'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ── MCP ─────────────────────────────────────────────────────────────────────
+
+  /mcp:
+    post:
+      tags: [MCP]
+      summary: MCP JSON-RPC — Model Context Protocol endpoint
+      operationId: mcpJsonRpc
+      description: |
+        Model Context Protocol (MCP) endpoint using JSON-RPC 2.0 over HTTP POST.
+        Agent frameworks that support MCP (e.g., Claude Desktop, Cursor, Continue)
+        can connect to NocturnusAI as an MCP server.
+
+        Configure in your MCP client with:
+        ```json
+        {
+          "mcpServers": {
+            "nocturnusai": {
+              "url": "http://localhost:9300/mcp",
+              "headers": { "X-Tenant-ID": "my-agent" }
+            }
+          }
+        }
+        ```
+
+        MCP protocol version: `2025-11-25`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jsonrpc, method]
+              properties:
+                jsonrpc:
+                  type: string
+                  enum: ['2.0']
+                method:
+                  type: string
+                  description: MCP method name (e.g., `tools/list`, `tools/call`).
+                id:
+                  oneOf:
+                    - type: string
+                    - type: integer
+                  description: Request ID for response correlation.
+                params:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: JSON-RPC 2.0 response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jsonrpc:
+                    type: string
+                    enum: ['2.0']
+                  id:
+                    oneOf:
+                      - type: string
+                      - type: integer
+                  result:
+                    description: Present on success.
+                  error:
+                    type: object
+                    description: Present on error.
+                    properties:
+                      code:
+                        type: integer
+                      message:
+                        type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /mcp/sse:
+    get:
+      tags: [MCP]
+      summary: MCP SSE — Model Context Protocol streaming transport
+      operationId: mcpSse
+      description: |
+        Server-Sent Events transport for MCP. Supports the streaming MCP transport
+        for clients that prefer SSE over plain HTTP POST.
+      responses:
+        '200':
+          description: SSE stream for MCP transport.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  # ── Observability ──────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      tags: [Observability]
+      summary: Health Check
+      operationId: health
+      description: |
+        Returns overall server health and per-subsystem check results. Returns HTTP 200
+        when healthy or degraded; returns HTTP 503 when unhealthy.
+        Check names: `wal_writable`, `disk_space`, `memory`, `databases`, `transactions`, `llm`, `auth`.
+      security: []
+      responses:
+        '200':
+          description: Server is healthy or degraded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: healthy
+                version: 2.0.0
+                checks:
+                  wal_writable: { status: pass, message: "Storage directory is writable" }
+                  disk_space: { status: pass, message: "Disk usage: 42%" }
+                  memory: { status: pass, message: "Memory usage: 31% (256MB / 512MB)" }
+                  databases: { status: pass, message: "2 database(s) loaded" }
+                  transactions: { status: pass, message: "0 active transaction(s)" }
+                  llm: { status: pass, message: "LLM provider configured (extraction=on)" }
+                  auth: { status: pass, message: "RBAC auth enabled" }
+        '503':
+          description: Server is unhealthy (one or more checks failed).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /health/live:
+    get:
+      tags: [Observability]
+      summary: Liveness Probe
+      operationId: healthLive
+      description: |
+        Simple liveness probe for Kubernetes / load balancers. Returns `200 OK` with
+        body `"OK"` if the process is alive. Does not perform subsystem checks.
+      security: []
+      responses:
+        '200':
+          description: Process is alive.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: OK
+
+  /health/ready:
+    get:
+      tags: [Observability]
+      summary: Readiness Probe
+      operationId: healthReady
+      description: |
+        Readiness probe: returns full health check results. Returns HTTP 503 if
+        unhealthy, indicating the server should be removed from load balancer rotation.
+      security: []
+      responses:
+        '200':
+          description: Server is ready to handle requests.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: Server is not ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /metrics:
+    get:
+      tags: [Observability]
+      summary: Prometheus Metrics
+      operationId: metrics
+      description: |
+        Prometheus metrics endpoint in standard text exposition format.
+        Includes counters for facts asserted/retracted, inference latency histograms,
+        LLM call counters and latencies, memory consolidation/decay counts, and JVM metrics.
+      responses:
+        '200':
+          description: Prometheus metrics in text format.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                # HELP nocturnusai_facts_asserted_total Total facts asserted
+                # TYPE nocturnusai_facts_asserted_total counter
+                nocturnusai_facts_asserted_total{database="default",tenant="agent-1"} 42.0
+
+  /llm.txt:
+    get:
+      tags: [Observability]
+      summary: LLM Documentation
+      operationId: llmTxt
+      description: |
+        Auto-generated API documentation in plain text, optimized for LLM consumption.
+        Useful for seeding an LLM's context with the server's capabilities.
+      security: []
+      responses:
+        '200':
+          description: Plain text API documentation.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /userguide:
+    get:
+      tags: [Observability]
+      summary: User Guide
+      operationId: userGuide
+      description: Returns the bundled user guide in Markdown format.
+      security: []
+      responses:
+        '200':
+          description: User guide Markdown.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: User guide not bundled in this build.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /.well-known/agent.json:
+    get:
+      tags: [Observability]
+      summary: A2A Agent Card
+      operationId: agentCard
+      description: |
+        Agent2Agent (A2A) Protocol discovery endpoint. Returns a machine-readable
+        description of NocturnusAI's capabilities, skills, authentication requirements,
+        and protocol support (REST, MCP) for agent framework discovery.
+      security: []
+      responses:
+        '200':
+          description: A2A Agent Card JSON.
+          content:
+            application/json:
+              schema:
+                type: object
+                description: A2A Agent Card following the Agent2Agent Protocol specification.
+                properties:
+                  name:
+                    type: string
+                    example: NocturnusAI
+                  description:
+                    type: string
+                  url:
+                    type: string
+                    format: uri
+                  version:
+                    type: string
+                  documentationUrl:
+                    type: string
+                    format: uri
+                  capabilities:
+                    type: object
+                  authentication:
+                    type: object
+                  skills:
+                    type: array
+                    items:
+                      type: object
+                  protocolSupport:
+                    type: object
+
+  # ── Replication ─────────────────────────────────────────────────────────────
+
+  /replication/wal:
+    get:
+      tags: [Replication]
+      summary: WAL Stream — Stream Write-Ahead Log entries
+      operationId: replicationWal
+      description: |
+        Stream WAL (Write-Ahead Log) entries for leader-follower replication. Followers
+        connect to this endpoint on the leader to receive and replay all write operations.
+        Requires `REPLICATION_MODE=LEADER` on the source server.
+      parameters:
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+          description: Resume replication from this WAL sequence number.
+      responses:
+        '200':
+          description: WAL entry stream (newline-delimited JSON).
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
