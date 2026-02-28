@@ -9,6 +9,8 @@
 package com.nocturnusai
 
 import com.nocturnusai.core.Atom
+import com.nocturnusai.core.ConflictStrategy
+import com.nocturnusai.core.Rule
 import com.nocturnusai.core.Term
 import com.nocturnusai.storage.AggregateOp
 import java.io.File
@@ -289,5 +291,158 @@ class NocturnusAIRetractByPatternTest {
             "default", "s2"
         ).toList()
         assertEquals(1, s2.size)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional gap-coverage tests
+// ---------------------------------------------------------------------------
+
+class NocturnusAIAggregationEdgeCaseTest {
+
+    private lateinit var engine: NocturnusAI
+    private lateinit var tmpDir: File
+
+    @BeforeTest
+    fun setup() {
+        val (e, d) = tempEngine()
+        engine = e
+        tmpDir = d
+    }
+
+    @AfterTest
+    fun teardown() {
+        engine.close()
+        tmpDir.deleteRecursively()
+    }
+
+    @Test
+    fun `aggregateFacts with argIndex out of range returns null`() {
+        engine.assertFact(Atom("score", listOf(id("alice"), num(10.0))), "default")
+        engine.assertFact(Atom("score", listOf(id("bob"), num(20.0))), "default")
+
+        val pattern = Atom("score", listOf(variable("p"), variable("v")))
+        // argIndex=99 is far out of range for 2-arity atoms
+        val result = engine.aggregateFacts(pattern, 99, AggregateOp.SUM, "default")
+        assertNull(result, "aggregateFacts should return null when argIndex is out of range")
+
+        val minResult = engine.aggregateFacts(pattern, 99, AggregateOp.MIN, "default")
+        assertNull(minResult, "MIN should also return null for out-of-range argIndex")
+
+        val maxResult = engine.aggregateFacts(pattern, 99, AggregateOp.MAX, "default")
+        assertNull(maxResult, "MAX should also return null for out-of-range argIndex")
+
+        val avgResult = engine.aggregateFacts(pattern, 99, AggregateOp.AVG, "default")
+        assertNull(avgResult, "AVG should also return null for out-of-range argIndex")
+    }
+
+    @Test
+    fun `countFacts with scope isolation does not include other scope facts`() {
+        engine.assertFact(Atom("item", listOf(id("a"), id("x")), scope = "scopeA"), "default")
+        engine.assertFact(Atom("item", listOf(id("b"), id("y")), scope = "scopeA"), "default")
+        engine.assertFact(Atom("item", listOf(id("c"), id("z")), scope = "scopeB"), "default")
+        engine.assertFact(Atom("item", listOf(id("d"), id("w")), scope = "scopeB"), "default")
+        engine.assertFact(Atom("item", listOf(id("e"), id("v")), scope = "scopeB"), "default")
+
+        val pattern = Atom("item", listOf(variable("x"), variable("y")))
+
+        assertEquals(2, engine.countFacts(pattern, "default", scope = "scopeA"),
+            "scopeA should have exactly 2 items")
+        assertEquals(3, engine.countFacts(pattern, "default", scope = "scopeB"),
+            "scopeB should have exactly 3 items")
+    }
+}
+
+class NocturnusAIRetractByPatternTMSTest {
+
+    private lateinit var engine: NocturnusAI
+    private lateinit var tmpDir: File
+
+    @BeforeTest
+    fun setup() {
+        val (e, d) = tempEngine()
+        engine = e
+        tmpDir = d
+    }
+
+    @AfterTest
+    fun teardown() {
+        engine.close()
+        tmpDir.deleteRecursively()
+    }
+
+    @Test
+    fun `retractByPattern triggering TMS cascade removes derived facts`() {
+        // Rule: mortal(?x) :- human(?x)
+        val rule = Rule(
+            variables = listOf(Term.Variable("x")),
+            head = Atom("mortal", listOf(variable("x"))),
+            body = listOf(Atom("human", listOf(variable("x"))))
+        )
+        engine.assertRule(rule, "default")
+
+        // Assert premise — forward chaining (RETE) should derive mortal(socrates)
+        engine.assertFact(Atom("human", listOf(id("socrates"))), "default")
+
+        // Verify the derived fact exists via query
+        val derived = engine.query(
+            Atom("mortal", listOf(id("socrates"))), "default"
+        ).toList()
+        assertTrue(derived.isNotEmpty(), "mortal(socrates) should be derived via forward chaining")
+
+        // Retract the premise by pattern — TMS should cascade-delete mortal(socrates)
+        val result = engine.retractByPattern(
+            Atom("human", listOf(variable("x"))), "default"
+        )
+        assertEquals(1, result.retracted, "Should retract human(socrates)")
+
+        // Verify the derived fact is also gone
+        val afterRetract = engine.query(
+            Atom("mortal", listOf(id("socrates"))), "default"
+        ).toList()
+        assertTrue(
+            afterRetract.isEmpty(),
+            "mortal(socrates) should be cascade-deleted by TMS after premise retraction"
+        )
+    }
+}
+
+class NocturnusAIBulkAssertConflictStrategyTest {
+
+    @Test
+    fun `bulkAssertFacts with database default NEWEST_WINS resolves contradictions`() {
+        val dir = Files.createTempDirectory("nai-test-conflict-").toFile()
+        val engine = NocturnusAI(
+            storageDir = dir,
+            isMultiTenant = false,
+            defaultConflictStrategy = ConflictStrategy.NEWEST_WINS
+        )
+        try {
+            // Assert an initial positive fact
+            engine.assertFact(Atom("alive", listOf(id("alice"), id("yes"))), "default")
+
+            // Bulk assert a contradiction — with NEWEST_WINS, the negation should win
+            val atoms = listOf(
+                Atom("alive", listOf(id("alice"), id("yes")), truthVal = false),
+                Atom("alive", listOf(id("bob"), id("yes")))
+            )
+            val result = engine.bulkAssertFacts(atoms, "default")
+
+            // Both should succeed with NEWEST_WINS (no contradiction rejection)
+            assertEquals(2, result.asserted, "Both facts should be asserted with NEWEST_WINS")
+            assertEquals(0, result.failed, "No failures expected with NEWEST_WINS")
+
+            // Verify the positive fact for alice was replaced by the negation
+            val alicePositive = engine.query(
+                Atom("alive", listOf(id("alice"), id("yes"))), "default"
+            ).toList()
+            assertTrue(
+                alicePositive.isEmpty(),
+                "The original positive alive(alice,yes) should have been retracted by NEWEST_WINS"
+            )
+        } finally {
+            engine.close()
+            dir.deleteRecursively()
+        }
     }
 }

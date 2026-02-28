@@ -509,7 +509,8 @@ private fun callAssertRule(db: com.nocturnusai.NocturnusAI, tenantId: String, ar
         val bp = obj["predicate"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing body predicate")
         val ba = obj["args"]?.jsonArray?.map { parseTerm(it.jsonPrimitive.content) } ?: emptyList()
         val negated = obj["negated"]?.jsonPrimitive?.booleanOrNull ?: false
-        com.nocturnusai.core.Atom(bp, ba, truthVal = !negated, scope = scope)
+        val naf = obj["naf"]?.jsonPrimitive?.booleanOrNull ?: false
+        com.nocturnusai.core.Atom(bp, ba, truthVal = !negated, scope = scope, naf = naf)
     }
 
     val allTerms = headArgs + bodyAtoms.flatMap { it.args }

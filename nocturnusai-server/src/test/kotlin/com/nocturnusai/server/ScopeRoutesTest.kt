@@ -580,4 +580,231 @@ class ScopeRoutesTest {
         assertFalse(body.contains("\"isError\":true"), "Expected success, got: $body")
         assertTrue(body.contains("No named scopes"), "Should say no scopes found")
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /scope/merge — KEEP_BOTH strategy
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `POST scope-merge - KEEP_BOTH retains both conflicting facts`() = withTestApp {
+        // Create a conflict between global (positive) and a separate scope (negated)
+        assertGlobalFact("p", "a", "b")                       // global: true
+        assertScopedFact("p", "a", "b", "hyp-kb", negated = true) // hyp-kb: false
+
+        // Merge with KEEP_BOTH — both the positive and negative should survive
+        val mergeResp = client.post("/scope/merge") {
+            header("X-Tenant-ID", tenant)
+            contentType(ContentType.Application.Json)
+            setBody("""{"sourceScope":"hyp-kb","strategy":"KEEP_BOTH"}""")
+        }
+        assertEquals(HttpStatusCode.OK, mergeResp.status)
+        val mergeObj = Json.parseToJsonElement(mergeResp.bodyAsText()).jsonObject
+        assertEquals("KEEP_BOTH", mergeObj["strategy"]?.jsonPrimitive?.content)
+        // KEEP_BOTH should resolve the conflict by keeping both versions
+        val conflictsResolved = mergeObj["conflictsResolved"]?.jsonPrimitive?.int ?: 0
+        assertTrue(conflictsResolved >= 1, "Expected at least 1 conflict resolved via KEEP_BOTH")
+        assertNotNull(mergeObj["timestamp"])
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /scope/merge — explicit non-null targetScope
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `POST scope-merge - merge into a named target scope`() = withTestApp {
+        // Create facts in two named scopes
+        assertScopedFact("p", "a", "b", "src-named")
+        assertScopedFact("q", "x", "y", "dest-named")
+
+        val mergeResp = client.post("/scope/merge") {
+            header("X-Tenant-ID", tenant)
+            contentType(ContentType.Application.Json)
+            setBody("""{"sourceScope":"src-named","targetScope":"dest-named","strategy":"SOURCE_WINS"}""")
+        }
+        assertEquals(HttpStatusCode.OK, mergeResp.status)
+        val obj = Json.parseToJsonElement(mergeResp.bodyAsText()).jsonObject
+        val merged = obj["merged"]?.jsonPrimitive?.int ?: 0
+        assertTrue(merged >= 1, "Expected at least 1 fact merged into dest-named scope")
+        assertEquals("SOURCE_WINS", obj["strategy"]?.jsonPrimitive?.content)
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /scope/fork — named source to named target
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `POST scope-fork - fork named scope A into named scope B`() = withTestApp {
+        assertScopedFact("likes", "alice", "bob", "scope-a")
+        assertScopedFact("likes", "carol", "dave", "scope-a")
+        assertScopedFact("knows", "eve", "frank", "scope-a")
+
+        val response = client.post("/scope/fork") {
+            header("X-Tenant-ID", tenant)
+            contentType(ContentType.Application.Json)
+            setBody("""{"sourceScope":"scope-a","targetScope":"scope-b"}""")
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val obj = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        assertEquals(3, obj["copied"]?.jsonPrimitive?.int)
+        assertEquals("scope-a", obj["sourceScope"]?.jsonPrimitive?.content)
+        assertEquals("scope-b", obj["targetScope"]?.jsonPrimitive?.content)
+
+        // Verify scope-b now appears in the scope list
+        val listResp = client.get("/scopes") { header("X-Tenant-ID", tenant) }
+        val scopes = Json.parseToJsonElement(listResp.bodyAsText()).jsonObject["scopes"]!!.jsonArray
+            .map { it.jsonPrimitive.content }
+        assertTrue("scope-b" in scopes, "scope-b should exist after fork")
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /scope/merge — nonexistent source scope
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `POST scope-merge - nonexistent source scope returns merged 0`() = withTestApp {
+        assertGlobalFact("p", "a", "b") // something in global to make it non-empty
+
+        val mergeResp = client.post("/scope/merge") {
+            header("X-Tenant-ID", tenant)
+            contentType(ContentType.Application.Json)
+            setBody("""{"sourceScope":"no-such-scope","strategy":"SOURCE_WINS"}""")
+        }
+        assertEquals(HttpStatusCode.OK, mergeResp.status)
+        val obj = Json.parseToJsonElement(mergeResp.bodyAsText()).jsonObject
+        assertEquals(0, obj["merged"]?.jsonPrimitive?.int, "No facts should be merged from nonexistent scope")
+        assertEquals(0, obj["conflictsResolved"]?.jsonPrimitive?.int)
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /scope/fork — targetScope equals sourceScope (self-fork)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `POST scope-fork - fork scope onto itself`() = withTestApp {
+        assertScopedFact("p", "a", "b", "self-scope")
+
+        val response = client.post("/scope/fork") {
+            header("X-Tenant-ID", tenant)
+            contentType(ContentType.Application.Json)
+            setBody("""{"sourceScope":"self-scope","targetScope":"self-scope"}""")
+        }
+        // Should succeed — forking a scope onto itself is effectively a no-op or
+        // duplicates atoms (implementation dependent). The key assertion is that
+        // it does not crash.
+        assertEquals(HttpStatusCode.OK, response.status)
+        val obj = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        assertEquals("self-scope", obj["sourceScope"]?.jsonPrimitive?.content)
+        assertEquals("self-scope", obj["targetScope"]?.jsonPrimitive?.content)
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MCP tool — merge_scope with TARGET_WINS
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `MCP tool merge_scope - TARGET_WINS strategy resolves conflicts`() = withTestApp {
+        // Global has positive fact, source scope has conflicting negated version
+        assertGlobalFact("p", "a", "b")
+        assertScopedFact("p", "a", "b", "mcp-src-tw", negated = true)
+
+        val response = client.post("/mcp") {
+            header("X-Tenant-ID", tenant)
+            contentType(ContentType.Application.Json)
+            setBody("""
+            {
+                "jsonrpc":"2.0","id":1,"method":"tools/call",
+                "params":{
+                    "name":"merge_scope",
+                    "arguments":{"sourceScope":"mcp-src-tw","strategy":"TARGET_WINS"}
+                }
+            }
+            """.trimIndent())
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertFalse(body.contains("\"isError\":true"), "Expected success, got: $body")
+        assertTrue(body.contains("TARGET_WINS"), "Response should mention TARGET_WINS strategy")
+        assertTrue(body.contains("conflict"), "Response should mention conflict resolution")
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MCP tool — merge_scope with REJECT triggering conflict
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `MCP tool merge_scope - REJECT strategy returns error on conflict`() = withTestApp {
+        // Global has positive fact, source scope has conflicting negated version
+        assertGlobalFact("p", "a", "b")
+        assertScopedFact("p", "a", "b", "mcp-src-reject", negated = true)
+
+        val response = client.post("/mcp") {
+            header("X-Tenant-ID", tenant)
+            contentType(ContentType.Application.Json)
+            setBody("""
+            {
+                "jsonrpc":"2.0","id":2,"method":"tools/call",
+                "params":{
+                    "name":"merge_scope",
+                    "arguments":{"sourceScope":"mcp-src-reject","strategy":"REJECT"}
+                }
+            }
+            """.trimIndent())
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertTrue(body.contains("\"isError\":true"), "Expected isError:true for REJECT with conflicts, got: $body")
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MCP tool — fork_scope from named source scope
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `MCP tool fork_scope - forks from named source scope`() = withTestApp {
+        assertScopedFact("likes", "alice", "bob", "mcp-named-src")
+        assertScopedFact("knows", "carol", "dave", "mcp-named-src")
+
+        val response = client.post("/mcp") {
+            header("X-Tenant-ID", tenant)
+            contentType(ContentType.Application.Json)
+            setBody("""
+            {
+                "jsonrpc":"2.0","id":3,"method":"tools/call",
+                "params":{
+                    "name":"fork_scope",
+                    "arguments":{"sourceScope":"mcp-named-src","targetScope":"mcp-named-dst"}
+                }
+            }
+            """.trimIndent())
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertFalse(body.contains("\"isError\":true"), "Expected success, got: $body")
+        assertTrue(body.contains("mcp-named-dst"), "Response should mention the target scope")
+        assertTrue(body.contains("mcp-named-src"), "Response should mention the source scope")
+        assertTrue(body.contains("2"), "Response should mention 2 atoms forked")
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MCP tool — delete_scope for nonexistent scope
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `MCP tool delete_scope - nonexistent scope reports zero deleted`() = withTestApp {
+        val response = client.post("/mcp") {
+            header("X-Tenant-ID", tenant)
+            contentType(ContentType.Application.Json)
+            setBody("""
+            {
+                "jsonrpc":"2.0","id":4,"method":"tools/call",
+                "params":{"name":"delete_scope","arguments":{"scope":"ghost-scope"}}
+            }
+            """.trimIndent())
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertFalse(body.contains("\"isError\":true"), "Expected success, got: $body")
+        assertTrue(body.contains("ghost-scope"), "Response should mention the scope name")
+        assertTrue(body.contains("0"), "Response should indicate 0 atoms deleted")
+    }
 }

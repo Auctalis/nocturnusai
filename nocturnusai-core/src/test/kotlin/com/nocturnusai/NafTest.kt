@@ -752,6 +752,276 @@ class NafTest {
     }
 
     // -------------------------------------------------------------------------
+    // 17. NAF with fully ground (constant) atom in the NOT condition
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `NAF with ground atom - NOT bar(baz) succeeds when bar(baz) is absent`() {
+        val store = makeStore()
+
+        val varX = v("x")
+        // Rule: special(?x) <- foo(?x) AND NAF bar(baz)
+        // The NAF condition is fully ground (no variables) — it checks whether
+        // bar(baz) is provable regardless of the binding of ?x.
+        val rule = Rule(
+            variables = listOf(varX),
+            head = Atom("special", listOf(varX)),
+            body = listOf(
+                Atom("foo", listOf(varX)),
+                Atom("bar", listOf(id("baz")), naf = true)
+            )
+        )
+
+        store.add(Atom("foo", listOf(id("alpha"))))
+        store.add(Atom("foo", listOf(id("beta"))))
+
+        val chainer = makeChainer(store, rule)
+        val results = chainer.solve(Atom("special", listOf(v("who")))).toList()
+        val names = results.map { it.args[0].toString() }
+
+        assertTrue("alpha" in names, "alpha should be special when bar(baz) is absent")
+        assertTrue("beta" in names, "beta should be special when bar(baz) is absent")
+    }
+
+    @Test
+    fun `NAF with ground atom - NOT bar(baz) fails when bar(baz) is present`() {
+        val store = makeStore()
+
+        val varX = v("x")
+        val rule = Rule(
+            variables = listOf(varX),
+            head = Atom("special", listOf(varX)),
+            body = listOf(
+                Atom("foo", listOf(varX)),
+                Atom("bar", listOf(id("baz")), naf = true)
+            )
+        )
+
+        store.add(Atom("foo", listOf(id("alpha"))))
+        store.add(Atom("bar", listOf(id("baz"))))  // ground NAF blocker
+
+        val chainer = makeChainer(store, rule)
+        val results = chainer.solve(Atom("special", listOf(v("who")))).toList()
+
+        assertTrue(results.isEmpty(),
+            "No entities should be special when bar(baz) is provable; got $results")
+    }
+
+    // -------------------------------------------------------------------------
+    // 18. NAF with multi-argument (binary) predicate
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `NAF with binary predicate - NOT depends_on(x, y) with shared variable`() {
+        val store = makeStore()
+
+        val varX = v("x")
+        val varY = v("y")
+        // Rule: independent(?x) <- person(?x) AND NAF depends_on(?x, ?y)
+        // This is an unsafe NAF because ?y is unbound. The backward chainer
+        // should raise an error because NAF requires all variables to be bound.
+        val rule = Rule(
+            variables = listOf(varX, varY),
+            head = Atom("independent", listOf(varX)),
+            body = listOf(
+                Atom("person", listOf(varX)),
+                Atom("depends_on", listOf(varX, varY), naf = true)
+            )
+        )
+
+        store.add(Atom("person", listOf(id("alice"))))
+
+        val chainer = makeChainer(store, rule)
+
+        // ?y is unbound in the NAF condition, so this should throw
+        assertFailsWith<IllegalStateException> {
+            chainer.solve(Atom("independent", listOf(v("who")))).toList()
+        }
+    }
+
+    @Test
+    fun `NAF with binary predicate - both args bound by positive conditions`() {
+        val store = makeStore()
+
+        val varX = v("x")
+        val varY = v("y")
+        // Rule: can_transfer(?x, ?y) <- account(?x) AND account(?y) AND
+        //       NOT blocked_transfer(?x, ?y)
+        // Both ?x and ?y are bound by positive body conditions, so NAF is safe.
+        val rule = Rule(
+            variables = listOf(varX, varY),
+            head = Atom("can_transfer", listOf(varX, varY)),
+            body = listOf(
+                Atom("account", listOf(varX)),
+                Atom("account", listOf(varY)),
+                Atom("blocked_transfer", listOf(varX, varY), naf = true)
+            )
+        )
+
+        store.add(Atom("account", listOf(id("a1"))))
+        store.add(Atom("account", listOf(id("a2"))))
+        store.add(Atom("account", listOf(id("a3"))))
+        store.add(Atom("blocked_transfer", listOf(id("a1"), id("a3"))))
+
+        val chainer = makeChainer(store, rule)
+        val results = chainer.solve(Atom("can_transfer", listOf(v("from"), v("to")))).toList()
+
+        val pairs = results.map { "${it.args[0]}->${it.args[1]}" }
+
+        // a1->a2 should be allowed (no block)
+        assertTrue("a1->a2" in pairs, "a1->a2 should be transferable; got $pairs")
+        // a1->a3 should be blocked
+        assertFalse("a1->a3" in pairs, "a1->a3 should be blocked; got $pairs")
+        // a2->a1 should be allowed (block is directional)
+        assertTrue("a2->a1" in pairs, "a2->a1 should be transferable; got $pairs")
+        // a2->a3 should be allowed
+        assertTrue("a2->a3" in pairs, "a2->a3 should be transferable; got $pairs")
+    }
+
+    // -------------------------------------------------------------------------
+    // 19. NAF interacts with explicit negation (truthVal=false)
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `NAF and explicit negation interaction - explicit false does not block NAF`() {
+        val store = makeStore()
+
+        // Assert penguin(tux) with truthVal=true (positive assertion)
+        store.add(Atom("penguin", listOf(id("tux")), truthVal = true))
+
+        // Assert penguin(tweety) with truthVal=false (explicit negation)
+        store.add(Atom("penguin", listOf(id("tweety")), truthVal = false))
+
+        val varX = v("x")
+        val rule = Rule(
+            variables = listOf(varX),
+            head = Atom("flies", listOf(varX)),
+            body = listOf(
+                Atom("bird", listOf(varX)),
+                Atom("penguin", listOf(varX), naf = true)
+            )
+        )
+
+        store.add(Atom("bird", listOf(id("tux"))))
+        store.add(Atom("bird", listOf(id("tweety"))))
+        store.add(Atom("bird", listOf(id("robin"))))
+
+        val chainer = makeChainer(store, rule)
+        val results = chainer.solve(Atom("flies", listOf(v("who")))).toList()
+        val names = results.map { it.args[0].toString() }
+
+        // tux has a POSITIVE penguin fact, so NAF blocks => tux should NOT fly
+        assertFalse("tux" in names,
+            "tux has positive penguin(tux) so NAF should block; got $names")
+
+        // tweety has only an EXPLICIT NEGATIVE penguin fact (truthVal=false).
+        // NAF checks for provability of penguin(tweety) with truthVal=true.
+        // Since no positive penguin(tweety) exists, NAF succeeds => tweety flies.
+        assertTrue("tweety" in names,
+            "tweety has only explicit-negative penguin so NAF should succeed; got $names")
+
+        // robin has no penguin fact at all => NAF succeeds => robin flies
+        assertTrue("robin" in names,
+            "robin has no penguin fact so NAF should succeed; got $names")
+    }
+
+    @Test
+    fun `NAF sees positive fact even when explicit negative also exists for same entity`() {
+        val store = makeStore()
+
+        // Assert BOTH a positive and negative penguin fact for the same entity.
+        // This is unusual but tests how the system handles conflicting assertions.
+        store.add(Atom("penguin", listOf(id("confused")), truthVal = true))
+        store.add(Atom("penguin", listOf(id("confused")), truthVal = false))
+
+        val varX = v("x")
+        val rule = Rule(
+            variables = listOf(varX),
+            head = Atom("flies", listOf(varX)),
+            body = listOf(
+                Atom("bird", listOf(varX)),
+                Atom("penguin", listOf(varX), naf = true)
+            )
+        )
+
+        store.add(Atom("bird", listOf(id("confused"))))
+
+        val chainer = makeChainer(store, rule)
+        val results = chainer.solve(Atom("flies", listOf(v("who")))).toList()
+        val names = results.map { it.args[0].toString() }
+
+        // Because a positive penguin(confused) exists, NAF should still block.
+        // The explicit-negative fact is separate and should not cancel the positive one.
+        assertFalse("confused" in names,
+            "NAF should block because positive penguin(confused) exists, " +
+            "regardless of the explicit negative; got $names")
+    }
+
+    // -------------------------------------------------------------------------
+    // 20. DSL parser NAF with multi-argument predicate
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `DSL parser handles NOT with multi-arg predicate in rule body`() {
+        val dsl = """
+            ASSERT FORALL ?x ?y {
+                independent(?x) <- person(?x) AND NOT depends_on(?x, ?y)
+            };
+        """.trimIndent()
+
+        val tokens = Tokenizer(dsl).tokenize()
+        val commands = Parser(tokens).parse()
+
+        assertEquals(1, commands.size, "Expected exactly one command")
+        val cmd = commands[0] as com.nocturnusai.parser.Command.AssertRule
+        val rule = cmd.rule
+
+        assertEquals("independent", rule.head.predicate)
+        assertEquals(1, rule.head.args.size, "Head should have 1 arg")
+
+        assertEquals(2, rule.body.size, "Body should have 2 conditions")
+
+        // First body condition: person(?x) — positive
+        val personCond = rule.body[0]
+        assertEquals("person", personCond.predicate)
+        assertFalse(personCond.naf, "person condition should NOT be NAF")
+        assertEquals(1, personCond.args.size)
+
+        // Second body condition: NOT depends_on(?x, ?y) — NAF
+        val depCond = rule.body[1]
+        assertEquals("depends_on", depCond.predicate)
+        assertTrue(depCond.naf, "depends_on condition SHOULD be NAF")
+        assertEquals(2, depCond.args.size, "depends_on should have 2 args")
+
+        // Verify the args are variables
+        assertTrue(depCond.args[0] is Term.Variable,
+            "First arg of depends_on should be a variable")
+        assertTrue(depCond.args[1] is Term.Variable,
+            "Second arg of depends_on should be a variable")
+    }
+
+    @Test
+    fun `DSL parser handles NOT with triple-arg predicate`() {
+        val dsl = """
+            ASSERT FORALL ?x ?y ?z {
+                allowed(?x, ?y) <- role(?x, ?y) AND NOT restriction(?x, ?y, ?z)
+            };
+        """.trimIndent()
+
+        val tokens = Tokenizer(dsl).tokenize()
+        val commands = Parser(tokens).parse()
+        val rule = (commands[0] as com.nocturnusai.parser.Command.AssertRule).rule
+
+        assertEquals("allowed", rule.head.predicate)
+        assertEquals(2, rule.body.size)
+
+        val nafCond = rule.body[1]
+        assertEquals("restriction", nafCond.predicate)
+        assertTrue(nafCond.naf, "restriction should be NAF")
+        assertEquals(3, nafCond.args.size, "restriction should have 3 args")
+    }
+
+    // -------------------------------------------------------------------------
     // Helper to create a temp directory for NocturnusAI instances in tests
     // -------------------------------------------------------------------------
 

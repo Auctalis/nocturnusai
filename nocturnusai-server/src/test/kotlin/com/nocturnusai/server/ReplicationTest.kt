@@ -414,6 +414,161 @@ class ReplicationClientScopeTest {
 }
 
 // ---------------------------------------------------------------------------
+// 5. WAL endpoint — since parameter filtering
+// ---------------------------------------------------------------------------
+
+class ReplicationWalFilteringTest {
+
+    @Test
+    fun `WAL endpoint with since filters to only newer entries`() = testApplication {
+        application { module() }
+
+        // Record the current WAL state before we assert anything.
+        // Other tests sharing module() may have already written to the WAL.
+        val walBefore = client.get("/replication/wal") {
+            parameter("database", "default")
+            parameter("since", "0")
+        }
+        assertEquals(HttpStatusCode.OK, walBefore.status)
+        val idsBefore = Regex(""""id"\s*:\s*(\d+)""").findAll(walBefore.bodyAsText())
+            .map { it.groupValues[1].toLong() }.toList()
+        val baselineId = if (idsBefore.isEmpty()) 0L else idsBefore.max()
+
+        // Assert first fact
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"wal_filter_test","args":["first"]}""")
+        }
+
+        // Read WAL to find the id of our first fact's entry
+        val walAfterFirst = client.get("/replication/wal") {
+            parameter("database", "default")
+            parameter("since", baselineId.toString())
+        }
+        assertEquals(HttpStatusCode.OK, walAfterFirst.status)
+        val walBody1 = walAfterFirst.bodyAsText()
+        assertTrue(walBody1.contains("first"), "Expected 'first' fact in WAL after baseline")
+        val afterFirstIds = Regex(""""id"\s*:\s*(\d+)""").findAll(walBody1)
+            .map { it.groupValues[1].toLong() }.toList()
+        assertTrue(afterFirstIds.isNotEmpty(), "Expected at least one WAL entry after first assert")
+        val sinceId = afterFirstIds.max()
+
+        // Assert second fact
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"wal_filter_test","args":["second"]}""")
+        }
+
+        // Request WAL with since = sinceId (should exclude the first entry)
+        val walAfterSecond = client.get("/replication/wal") {
+            parameter("database", "default")
+            parameter("since", sinceId.toString())
+        }
+        assertEquals(HttpStatusCode.OK, walAfterSecond.status)
+        val walBody2 = walAfterSecond.bodyAsText()
+        assertTrue(walBody2.contains("second"), "Expected 'second' fact in filtered WAL")
+        // The filtered result should only contain entries with id > sinceId
+        val secondIds = Regex(""""id"\s*:\s*(\d+)""").findAll(walBody2)
+            .map { it.groupValues[1].toLong() }.toList()
+        assertTrue(secondIds.all { it > sinceId }, "All returned WAL entry ids should be greater than sinceId=$sinceId")
+    }
+
+    @Test
+    fun `WAL endpoint with since larger than any entry returns empty response`() = testApplication {
+        application { module() }
+
+        // Assert a fact so the WAL is non-empty
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"wal_future_test","args":["a"]}""")
+        }
+
+        // Request with a very large since value
+        val resp = client.get("/replication/wal") {
+            parameter("database", "default")
+            parameter("since", "999999999")
+        }
+        assertEquals(HttpStatusCode.OK, resp.status)
+        val body = resp.bodyAsText().trim()
+        // Should be empty — no entries have id > 999999999
+        assertTrue(body.isEmpty(), "Expected empty WAL response for very large since value, got: $body")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 6. Database list endpoint — multiple databases
+// ---------------------------------------------------------------------------
+
+class ReplicationDatabaseListTest {
+
+    @Test
+    fun `Database list returns multiple databases after creation`() = testApplication {
+        application { module() }
+
+        // Create a second database
+        client.post("/admin/databases") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":"repl-test-db-2"}""")
+        }
+
+        val resp = client.get("/replication/wal/databases")
+        assertEquals(HttpStatusCode.OK, resp.status)
+        val body = resp.bodyAsText()
+        assertTrue(body.contains("default"), "Expected 'default' in database list: $body")
+        assertTrue(body.contains("repl-test-db-2"), "Expected 'repl-test-db-2' in database list: $body")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 7. Snapshot endpoint — contains asserted facts
+// ---------------------------------------------------------------------------
+
+class ReplicationSnapshotContentTest {
+
+    @Test
+    fun `Snapshot contains asserted facts`() = testApplication {
+        application { module() }
+
+        // Assert several facts into the default database
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"snapshot_test","args":["alpha","beta"]}""")
+        }
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"snapshot_test","args":["gamma","delta"]}""")
+        }
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"color","args":["sky","blue"]}""")
+        }
+
+        val resp = client.get("/replication/snapshot") {
+            parameter("database", "default")
+        }
+        assertEquals(HttpStatusCode.OK, resp.status)
+        val body = resp.bodyAsText()
+
+        // Verify structure
+        assertTrue(body.contains("latestWalId"), "Expected 'latestWalId' in snapshot: $body")
+        assertTrue(body.contains("snapshot"), "Expected 'snapshot' in snapshot: $body")
+
+        // Verify the asserted facts are present in the snapshot data
+        assertTrue(body.contains("snapshot_test"), "Expected 'snapshot_test' predicate in snapshot: $body")
+        assertTrue(body.contains("alpha"), "Expected 'alpha' arg in snapshot: $body")
+        assertTrue(body.contains("gamma"), "Expected 'gamma' arg in snapshot: $body")
+        assertTrue(body.contains("color"), "Expected 'color' predicate in snapshot: $body")
+        assertTrue(body.contains("blue"), "Expected 'blue' arg in snapshot: $body")
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
