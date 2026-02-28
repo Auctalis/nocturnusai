@@ -62,6 +62,46 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <hr />
 
+    <h2 id="auth">MCP with Authentication</h2>
+    <p>MCP respects the same three auth modes as the REST API. Configure your MCP client headers accordingly:</p>
+
+    <h3>Disabled mode (default)</h3>
+    <p>No auth headers needed — just the SSE URL.</p>
+
+    <h3>Legacy mode (<code>API_KEY</code> env var set)</h3>
+    <pre><code class="language-json">&#123;
+  "mcpServers": &#123;
+    "nocturnus": &#123;
+      "url": "http://localhost:9300/mcp/sse",
+      "transport": "sse",
+      "headers": &#123;
+        "X-API-Key": "your-shared-secret"
+      &#125;
+    &#125;
+  &#125;
+&#125;</code></pre>
+
+    <h3>Managed / RBAC mode (<code>AUTH_ENABLED=true</code>)</h3>
+    <pre><code class="language-json">&#123;
+  "mcpServers": &#123;
+    "nocturnus": &#123;
+      "url": "http://localhost:9300/mcp/sse",
+      "transport": "sse",
+      "headers": &#123;
+        "Authorization": "Bearer nai_a1b2c3d4...",
+        "X-Database": "production",
+        "X-Tenant-ID": "acme_corp"
+      &#125;
+    &#125;
+  &#125;
+&#125;</code></pre>
+
+    <div class="callout callout-info">
+        <strong>MCP permissions.</strong> MCP requires the <code>INFERENCE</code> permission — all roles (reader, writer, admin) have it by default. Note: MCP routes default <code>X-Tenant-ID</code> to <code>"default"</code> if not specified, unlike REST endpoints which require it explicitly.
+    </div>
+
+    <hr />
+
     <h2 id="tools">Available MCP Tools</h2>
     <p>Once connected, your agent can use these tools automatically:</p>
 

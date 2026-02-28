@@ -100,6 +100,34 @@ Add to `.cursor/mcp.json`, `claude_desktop_config.json`, or any MCP client:
 
 Your agent immediately gets 9 tools: `tell`, `teach`, `ask`, `forget`, `recall`, `context`, `compress`, `cleanup`, `predicates`.
 
+**With auth enabled** (legacy mode — single shared key):
+```json
+{
+  "mcpServers": {
+    "nocturnus": {
+      "url": "http://localhost:9300/mcp/sse",
+      "headers": { "X-API-Key": "your-shared-secret" }
+    }
+  }
+}
+```
+
+**With auth enabled** (RBAC mode — `AUTH_ENABLED=true`):
+```json
+{
+  "mcpServers": {
+    "nocturnus": {
+      "url": "http://localhost:9300/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer nai_your-key-here",
+        "X-Database": "production",
+        "X-Tenant-ID": "acme_corp"
+      }
+    }
+  }
+}
+```
+
 ---
 
 ## Why NocturnusAI?

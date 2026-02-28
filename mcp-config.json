@@ -5,7 +5,9 @@
       "transport": "sse",
       "headers": {
         "X-Database": "default",
-        "X-Tenant-ID": "default"
+        "X-Tenant-ID": "default",
+        "_comment_auth_legacy": "For legacy auth, add: \"X-API-Key\": \"your-shared-secret\"",
+        "_comment_auth_rbac": "For RBAC auth, add: \"Authorization\": \"Bearer nai_your-key-here\""
       }
     }
   }

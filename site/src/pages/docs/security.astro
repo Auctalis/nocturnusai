@@ -16,15 +16,18 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <hr />
 
     <h2 id="auth-modes">Auth Modes</h2>
-    <p>Set the auth mode via environment variable:</p>
-    <pre><code class="language-bash"># .env
-AUTH_MODE=managed   # Options: disabled, legacy, managed</code></pre>
+    <p>Auth mode is determined by environment variables:</p>
+    <pre><code class="language-bash"># .env — three modes based on which variables are set
+# Disabled (default): no AUTH_ENABLED, no API_KEY
+# Legacy:  API_KEY=your-shared-secret
+# RBAC:    AUTH_ENABLED=true</code></pre>
 
     <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
             <thead>
                 <tr class="border-b border-white/10 text-white">
                     <th class="py-2">Mode</th>
+                    <th class="py-2">How It Activates</th>
                     <th class="py-2">Description</th>
                     <th class="py-2">Use Case</th>
                 </tr>
@@ -32,16 +35,19 @@ AUTH_MODE=managed   # Options: disabled, legacy, managed</code></pre>
             <tbody class="text-slate-400">
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-cyan-400">disabled</td>
+                    <td class="py-2">Neither <code>AUTH_ENABLED</code> nor <code>API_KEY</code> set</td>
                     <td class="py-2">No authentication required</td>
                     <td class="py-2">Local development, testing</td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-cyan-400">legacy</td>
-                    <td class="py-2">Single shared API key</td>
+                    <td class="py-2"><code>API_KEY</code> env var set (without <code>AUTH_ENABLED</code>)</td>
+                    <td class="py-2">Single shared API key via <code>X-API-Key</code> header</td>
                     <td class="py-2">Simple deployments</td>
                 </tr>
                 <tr class="border-b border-white/5">
-                    <td class="py-2 font-mono text-cyan-400">managed</td>
+                    <td class="py-2 font-mono text-cyan-400">managed (RBAC)</td>
+                    <td class="py-2"><code>AUTH_ENABLED=true</code></td>
                     <td class="py-2">Full key management with roles, scoping, rotation</td>
                     <td class="py-2">Production, multi-tenant</td>
                 </tr>
@@ -49,22 +55,28 @@ AUTH_MODE=managed   # Options: disabled, legacy, managed</code></pre>
         </table>
     </div>
 
+    <div class="callout callout-info">
+        <strong>Rate limiting.</strong> In managed mode, 20 failed authentication attempts within one minute from the same IP triggers a 1-minute lockout.
+    </div>
+
     <hr />
 
     <h2 id="bootstrap">Bootstrap Your First Key</h2>
-    <p>On first run with auth enabled, create your admin key via the bootstrap endpoint:</p>
+    <p>On first run with <code>AUTH_ENABLED=true</code>, create your admin key via the bootstrap endpoint:</p>
     <pre><code class="language-bash">curl -X POST http://localhost:9300/auth/bootstrap \
   -H "Content-Type: application/json" \
-  -d '&#123;"description": "Admin key"&#125;'</code></pre>
+  -d '&#123;"username": "admin", "password": "nocturnusai", "keyName": "admin"&#125;'</code></pre>
 
     <pre><code class="language-json">&#123;
-  "apiKey": "noc_a1b2c3d4...",
+  "apiKey": "nai_a1b2c3d4...",
+  "prefix": "nai_a1b2",
+  "id": "uuid-here",
   "role": "admin",
-  "description": "Admin key"
+  "name": "admin"
 &#125;</code></pre>
 
     <div class="callout callout-warning">
-        <strong>⚠️ One-time only.</strong> The bootstrap endpoint works only once. After your first admin key is created, use it to manage all subsequent keys.
+        <strong>⚠️ One-time only.</strong> The bootstrap endpoint works only once. Store the returned API key securely — it cannot be retrieved again. After your first admin key is created, use it to manage all subsequent keys.
     </div>
 
     <hr />
@@ -128,7 +140,7 @@ curl -X DELETE http://localhost:9300/auth/keys/$KEY_ID \
     <pre><code class="language-bash"># All requests include the bearer token
 curl -X POST http://localhost:9300/tell \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer noc_a1b2c3d4..." \
+  -H "Authorization: Bearer nai_a1b2c3d4..." \
   -d '&#123;"predicate": "plan", "args": ["enterprise"]&#125;'</code></pre>
 
     <hr />
@@ -148,7 +160,7 @@ TLS_KEYSTORE_PATH=/path/to/keystore.p12
 TLS_KEYSTORE_PASSWORD=your-password</code></pre>
 
     <div class="callout callout-tip">
-        <strong>💡 MCP with Auth.</strong> When using MCP with auth enabled, add the bearer token to your MCP client config headers. See <a href={`${base}/docs/mcp#quickstart`}>MCP Integration</a> for details.
+        <strong>💡 MCP with Auth.</strong> When using MCP with auth enabled, add the bearer token to your MCP client config headers. See <a href={`${base}/docs/mcp#auth`}>MCP Integration</a> for details.
     </div>
 
 </DocsLayout>

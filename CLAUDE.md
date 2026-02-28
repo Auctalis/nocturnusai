@@ -48,9 +48,9 @@ Three-module Gradle project (`settings.gradle.kts` includes `nocturnusai-core`, 
 Package: `com.nocturnusai`
 
 **Domain model** (`core/`):
-- `Atom` — fundamental unit of knowledge: predicate + args + truth value + source + scope + temporal fields (createdAt, validFrom, validUntil, ttl)
+- `Atom` — fundamental unit of knowledge: predicate + args + truth value + source + scope + temporal fields (createdAt, validFrom, validUntil, ttl) + `confidence: Double?` (0.0–1.0) + `naf: Boolean` (negation-as-failure flag, used in rule bodies)
 - `Term` — sealed class: `Identifier`, `StringLit`, `NumberLit`, `Variable` (prefixed with `?`)
-- `Rule` — Horn clause: head (consequent) + body (antecedent conditions)
+- `Rule` — Horn clause: head (consequent) + body (antecedent conditions) + optional `scope: String?`
 - `LogicContext` — per-tenant container holding a Hexastore, rules, inference engines, and MemoryManager
 
 **Storage** (`storage/Hexastore.kt`):
@@ -67,6 +67,9 @@ Package: `com.nocturnusai`
 **Truth maintenance** (`logic/`):
 - `ProvenanceTracker` — tracks inference dependencies, auto-retracts derived facts when premises removed
 - `ConsistencyGuard` — enforces domain constraints (uniqueness, exclusivity, range validation)
+
+**Conflict Resolution**:
+- `ConflictStrategy` enum: `REJECT` (default), `NEWEST_WINS`, `CONFIDENCE`, `KEEP_BOTH`
 
 **Persistence** (`persistence/`):
 - `WriteAheadLog` — append-only WAL for crash recovery
@@ -93,6 +96,12 @@ Built on Ktor 2.3.7 with Netty. Depends on `:nocturnusai-core`.
 **Routes** (`routes/`):
 - `LogicRoutes` — `POST /assert/fact`, `/assert/rule`, `/assert/template`, `/infer`, `/retract`, `/execute`
 - `MemoryRoutes` — `POST /memory/query/temporal`, `/memory/query/salient`, `/memory/context`, `/memory/priority`, `/memory/consolidate`, `/memory/decay`, `GET /memory/events` (SSE)
+- `SimplifiedRoutes` — `POST /tell`, `/ask`, `/query`, `/teach`, `/forget` (developer-friendly aliases); `POST /memory/recall`, `/memory/compress`, `/memory/cleanup`, `/memory/prioritize`; `GET /memory/stream`
+- `ScopeRoutes` — `POST /scope/fork`, `/scope/diff`, `/scope/merge`, `DELETE /scope/{name}`, `GET /scopes`
+- `AggregateRoutes` — `POST /aggregate` (COUNT/SUM/MIN/MAX/AVG), `POST /assert/facts` (bulk), `POST /retract/pattern`
+- `AuthRoutes` — `POST /auth/bootstrap`, `GET /auth/status`, `POST /auth/keys`, `GET /auth/keys`, `GET /auth/keys/{id}`, `PATCH /auth/keys/{id}`, `DELETE /auth/keys/{id}`, `GET /auth/whoami`
+- `ExtractionRoutes` — `POST /extract`, `POST /extract/batch`
+- `SynthesisRoutes` — `POST /synthesize`
 - `McpRoutes` — `POST /mcp` (JSON-RPC 2.0), `GET /mcp/sse` (MCP streaming transport)
 - `AdminRoutes` — `GET/POST/DELETE /admin/databases`, facts/rules listing, tenant management
 - `TransactionRoutes` — `POST /tx/begin`, `/tx/commit/{id}`, `/tx/rollback/{id}`
@@ -105,19 +114,23 @@ Built on Ktor 2.3.7 with Netty. Depends on `:nocturnusai-core`.
 - `ServerConfig` — env var config (`PORT`, `HOST`, `API_KEY`, `STORAGE_DIR`, `REPLICATION_MODE`, `LEADER_URL`)
 - `TemplateService` — logic template application (Modus Ponens, Modus Tollens, etc.)
 - `LlmTxtGenerator` — auto-generates `/llm.txt` API documentation via reflection
+- `AuthInterceptor` — RBAC auth with 3 modes (DISABLED, LEGACY, RBAC), rate limiting
+- `ApiKeyManager` — key lifecycle, role-based permissions, database/tenant scoping
 
-**Multi-tenancy**: `X-Database` header selects database, `X-Tenant-ID` header selects tenant within database.
+**Multi-tenancy**: `X-Database` header selects database (defaults to `'default'`). `X-Tenant-ID` header is **required** on most endpoints (throws `ValidationException` if missing); MCP routes default to `'default'`. Each tenant gets a separate `LogicContext` with isolated Hexastore, rules, and memory.
+
+**Scope management**: Scopes are logical partitions within a tenant (NOT true isolation — use tenants for that). `scope=null` queries match atoms from ALL scopes. Fork/diff/merge/delete available via `/scope/*` endpoints. `MergeStrategy`: `SOURCE_WINS`, `TARGET_WINS`, `KEEP_BOTH`, `REJECT`.
 
 ### nocturnusai-cli — Interactive REPL
 Package: `com.nocturnusai.cli`
 
 Ktor-client based CLI that connects to a running NocturnusAI server over HTTP.
 
-**Commands**: `ask`, `tell`, `teach`, `forget`, `inspect`, `context`, `compress`, `cleanup`, `dsl`, `use`, `dbs`, `health`
+**Commands**: `ask`, `tell`, `teach`, `forget`, `ingest`, `inspect`, `context`, `compress`, `cleanup`, `dsl`, `import`/`load`, `export`/`dump`, `use`, `tenant`, `dbs`, `health`, `status`, `setup`, `login`, `whoami`, `keys`, `history`, `clear`, `help`
 **Shortcuts**: `?`=ask, `+`=tell, `++`=teach, `-`=forget, `ls`=inspect, `ctx`=context
 
-Parses natural predicate syntax (`likes(alice, bob)`, `mortal(?x) :- human(?x)`) client-side.
-Args: `--server`, `--db`, `--api-key`, `--tenant`.
+Parses natural predicate syntax (`likes(alice, bob)`, `mortal(?x) :- human(?x)`) client-side. `ask`, `tell`, and `ingest` also support natural language — routed through LLM extraction/synthesis when no predicate syntax is detected.
+Args: `--server`, `--db`, `--api-key`, `--tenant`/`-t`, `--exec`/`-e`.
 
 ### sdks/python — Python SDK (`nocturnusai` on PyPI)
 - Async client (`NocturnusAIClient`) and sync wrapper (`SyncNocturnusAIClient`) using httpx
@@ -162,7 +175,7 @@ Args: `--server`, `--db`, `--api-key`, `--tenant`.
 - **Salience-based memory**: Composite scoring (recency × frequency × priority) determines which facts are most relevant for agent context windows.
 - **Memory lifecycle**: Consolidation compresses repeated episodic patterns into semantic facts. Decay evicts expired/low-salience facts.
 - **Variables use `?` prefix**: e.g., `?x`, `?who` — this convention is used throughout the codebase and API.
-- **Scope-based multi-tenancy**: Facts/rules can be scoped for hypothetical reasoning, versioning, or tenant isolation.
+- **Scope-based partitioning**: Within a tenant, facts/rules can be scoped for hypothetical reasoning, versioning, and A/B testing. Scopes are logical partitions (not isolation boundaries) — use the `X-Tenant-ID` header for true data isolation. Scope management via fork/diff/merge enables Git-like knowledge branching.
 
 ## Environment Variables (Server)
 
@@ -181,3 +194,9 @@ Args: `--server`, `--db`, `--api-key`, `--tenant`.
 | `ENCRYPTION_KEY` | _(none)_ | 64 hex-char AES-256 key |
 | `REPLICATION_MODE` | `LEADER` | `LEADER` or `FOLLOWER` |
 | `LEADER_URL` | _(none)_ | Leader URL (follower mode) |
+| `EXTRACTION_ENABLED` | `false` | Enable LLM extraction endpoints |
+| `LLM_BASE_URL` | _(none)_ | Ollama or custom OpenAI-compatible endpoint |
+| `LLM_MODEL` | _(none)_ | LLM model name |
+| `OPENAI_API_KEY` | _(none)_ | OpenAI API key for extraction/synthesis |
+| `ANTHROPIC_API_KEY` | _(none)_ | Anthropic API key for extraction/synthesis |
+| `GOOGLE_API_KEY` | _(none)_ | Google API key for extraction/synthesis |
