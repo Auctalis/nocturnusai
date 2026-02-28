@@ -60,8 +60,8 @@ Package: `com.nocturnusai`
 - Scope-aware queries for multi-tenant/partitioned data
 
 **Inference** (`inference/`):
-- `BackwardChainer` — goal-driven SLD resolution with unification, variable renaming, depth limit (100)
-- `ReteEngine` — forward chaining triggered on fact assertion
+- `BackwardChainer` — goal-driven SLD resolution with unification, variable renaming, depth limit (100). Supports Negation-as-Failure (NAF): body atoms with `naf=true` succeed when the atom *cannot be proven* from known facts (closed-world assumption). NAF is only meaningful in rule bodies — not on head atoms or asserted facts.
+- `ReteEngine` — forward chaining triggered on fact assertion. NAF conditions are evaluated at rule-fire time: if the blocking fact exists when the rule fires, the derivation is suppressed. **Important**: assert NAF-blocking facts *before* triggering facts so both forward and backward chaining agree.
 - `Unifier` — term unification with substitution propagation
 
 **Truth maintenance** (`logic/`):
@@ -102,7 +102,7 @@ Built on Ktor 2.3.7 with Netty. Depends on `:nocturnusai-core`.
 - `AuthRoutes` — `POST /auth/bootstrap`, `GET /auth/status`, `POST /auth/keys`, `GET /auth/keys`, `GET /auth/keys/{id}`, `PATCH /auth/keys/{id}`, `DELETE /auth/keys/{id}`, `GET /auth/whoami`
 - `ExtractionRoutes` — `POST /extract`, `POST /extract/batch`
 - `SynthesisRoutes` — `POST /synthesize`
-- `McpRoutes` — `POST /mcp` (JSON-RPC 2.0), `GET /mcp/sse` (MCP streaming transport)
+- `McpRoutes` — `POST /mcp` (JSON-RPC 2.0), `GET /mcp/sse` (MCP streaming transport). MCP tools: `tell`, `ask`, `teach`, `forget`, `inspect`, `context`, `aggregate`, `bulk_assert`, `retract_pattern`, `fork_scope`, `merge_scope`, `list_scopes`, `delete_scope`. The `teach` tool maps both `negated` (→ `truthVal=false`) and `naf` (→ `Atom.naf=true`) fields on body atoms.
 - `AdminRoutes` — `GET/POST/DELETE /admin/databases`, facts/rules listing, tenant management
 - `TransactionRoutes` — `POST /tx/begin`, `/tx/commit/{id}`, `/tx/rollback/{id}`
 - `ObservabilityRoutes` — `GET /health`, `/metrics` (Prometheus), `/llm.txt`, `GET /.well-known/agent.json` (A2A Agent Card)
@@ -144,6 +144,14 @@ Args: `--server`, `--db`, `--api-key`, `--tenant`/`-t`, `--exec`/`-e`.
 - MCP client helper (`NocturnusAIMCPClient`)
 - Zero runtime dependencies (uses built-in fetch)
 
+### site/ — Documentation Site (Astro + GitHub Pages)
+- Static site built with **Astro**, deployed to GitHub Pages at `https://auctalis.github.io/nocturnusai/`
+- Source: `site/src/pages/` (`.astro` files), `site/src/layouts/DocsLayout.astro` (shared sidebar + nav), `site/src/components/Navbar.astro`
+- All doc pages use `DocsLayout` with `const base = import.meta.env.BASE_URL.replace(/\/$/, '')` for correct path resolution on GitHub Pages
+- Convention: sidebar section titles match page `<h1>` and `<DocsLayout title="">` prop (e.g., "CLI Reference", "API Reference", "MCP Integration")
+- Deploy workflow: `.github/workflows/docs.yml` — triggers on pushes to `main` with changes in `site/**`
+- Build: `cd site && npm ci && npm run build`
+
 ### Agent Integration Points
 - **MCP**: `POST /mcp` (JSON-RPC 2.0) + `GET /mcp/sse` (streaming). Configure via `mcp-config.json`.
 - **A2A**: `GET /.well-known/agent.json` for Agent2Agent Protocol discovery
@@ -176,6 +184,32 @@ Args: `--server`, `--db`, `--api-key`, `--tenant`/`-t`, `--exec`/`-e`.
 - **Memory lifecycle**: Consolidation compresses repeated episodic patterns into semantic facts. Decay evicts expired/low-salience facts.
 - **Variables use `?` prefix**: e.g., `?x`, `?who` — this convention is used throughout the codebase and API.
 - **Scope-based partitioning**: Within a tenant, facts/rules can be scoped for hypothetical reasoning, versioning, and A/B testing. Scopes are logical partitions (not isolation boundaries) — use the `X-Tenant-ID` header for true data isolation. Scope management via fork/diff/merge enables Git-like knowledge branching.
+- **Negation-as-Failure (NAF)**: Closed-world assumption — `NOT p(?x)` in a rule body succeeds when `p(?x)` cannot be proven. Distinct from explicit negation (`truthVal=false`). In JSON: `{"predicate":"p","args":["?x"],"naf":true}`. In CLI/DSL: `NOT p(?x)`. Rete forward chaining evaluates NAF at fire time; backward chainer evaluates at query time.
+- **Confidence and conflict resolution**: Facts can carry `confidence: 0.0–1.0`. Queries accept `minConfidence` to filter low-confidence results. `ConflictStrategy` controls duplicate predicate+args handling: `REJECT` (error), `NEWEST_WINS`, `CONFIDENCE` (highest wins), `KEEP_BOTH`.
+- **Aggregation**: `POST /aggregate` with `AggregateOp` enum: `COUNT`, `SUM`, `MIN`, `MAX`, `AVG`. Operates over matched facts with optional `scope` and `argIndex` parameters. `COUNT` doesn't require `argIndex`; numeric ops do.
+
+## Testing
+
+764 tests across core and server modules. Key patterns:
+
+- **`withTestApp { }`** (`TestHelpers.kt`): Creates a fresh temp directory, starts a `testApplication` with `moduleWithStorageDir(tmpDir)`, and cleans up on exit. Guarantees complete state isolation per test.
+- **Tenant setup**: Most server tests require `client.post("/admin/databases/default/tenants") { setBody("""{"tenantId":"test"}""") }` before assertions.
+- **Headers**: All requests to tenant-scoped endpoints must include `header("X-Tenant-ID", tenant)`.
+- **MCP tests**: Send JSON-RPC 2.0 to `POST /mcp`, parse response as `JsonObject`, use `result["content"][0]["text"]` for tool output.
+- **NAF test ordering**: Assert NAF-blocking facts *before* triggering facts so Rete forward chaining and backward chaining agree (e.g., assert `penguin(tweety)` before `bird(tweety)`).
+
+```bash
+./gradlew test                           # all 764 tests
+./gradlew :nocturnusai-core:test --tests "com.nocturnusai.NafTest"
+./gradlew :nocturnusai-server:test --tests "com.nocturnusai.server.NafRoutesTest"
+```
+
+## GitHub
+
+- Push requires: `gh auth switch --user Auctalis` (if multiple GitHub accounts)
+- CI workflow: `.github/workflows/ci.yml` (runs on all pushes to main)
+- Release workflow: `.github/workflows/release.yml` (triggers on version tags `v*`)
+- Docs workflow: `.github/workflows/docs.yml` (triggers on `site/**` changes)
 
 ## Environment Variables (Server)
 
