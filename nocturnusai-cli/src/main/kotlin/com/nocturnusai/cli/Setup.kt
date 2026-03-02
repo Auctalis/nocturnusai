@@ -472,18 +472,6 @@ class Setup(
 
     // ── Ollama model selection ─────────────────────────────────────────────────
 
-    /** Popular Ollama models offered when no local instance is available to query. */
-    private val OLLAMA_POPULAR_MODELS = listOf(
-        "llama3.2"       to "Llama 3.2 3B (default, small & fast — 2GB)",
-        "llama3.2:1b"    to "Llama 3.2 1B (tiny, fastest — 1.3GB)",
-        "llama3.3"       to "Llama 3.3 70B (large, most capable — 43GB)",
-        "mistral"        to "Mistral 7B (fast, good quality — 4.1GB)",
-        "gemma3"         to "Gemma 3 4B (Google, balanced — 3.3GB)",
-        "qwen3"          to "Qwen 3 8B (Alibaba, strong reasoning — 5.2GB)",
-        "phi4"           to "Phi-4 14B (Microsoft, compact — 9.1GB)",
-        "deepseek-r1"    to "DeepSeek R1 7B (reasoning focused — 4.7GB)",
-    )
-
     /**
      * Select an Ollama model. If [ollamaUrl] is provided, query the running
      * instance for installed models and show them first, followed by popular
