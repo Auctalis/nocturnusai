@@ -3,12 +3,10 @@
 #
 # Quick start:
 #   cp .env.example .env        # configure provider & keys
-#   docker compose up -d        # server only (bring your own LLM)
-#   docker compose --profile ollama up -d   # server + local Ollama
+#   docker compose up -d        # start the server
 #
 # Shortcuts via Makefile:
-#   make up                     # server only
-#   make up-ollama              # server + Ollama sidecar
+#   make up                     # start server
 #   make down / make logs / make health
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -55,61 +53,16 @@ services:
       - LEADER_URL=${LEADER_URL:-}
     networks:
       - nocturnusai-net
+    # Allows the container to reach Ollama (or any service) running on the host.
+    # On Docker Desktop (Mac/Windows) this is auto-injected; on Linux it requires the entry below.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-
-  # ── Ollama (local LLM — opt-in via profile) ───────────────────────────────
-  # Activated with:  docker compose --profile ollama up -d
-  # Or:  make up-ollama
-  #
-  # On first start, pulls the model (~2GB for llama3.2).
-  # GPU passthrough: uncomment the deploy section below.
-  ollama:
-    image: ollama/ollama:latest
-    container_name: nocturnusai-ollama
-    profiles:
-      - ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama-models:/root/.ollama
-    networks:
-      - nocturnusai-net
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
-    # ── GPU support (uncomment for NVIDIA) ──
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-
-  # ── Ollama model bootstrap ────────────────────────────────────────────────
-  # Pulls the configured model on first start, then exits.
-  ollama-pull:
-    image: curlimages/curl:latest
-    container_name: nocturnusai-ollama-pull
-    profiles:
-      - ollama
-    depends_on:
-      ollama:
-        condition: service_healthy
-    networks:
-      - nocturnusai-net
-    restart: "no"
-    entrypoint: >
-      sh -c "curl -sf http://ollama:11434/api/pull -d '{\"name\": \"${LLM_MODEL:-llama3.2}\"}' && echo 'Model ready.'"
 
   # ── Monitoring Stack (opt-in via profile) ──────────────────────────────
   # Activated with:  docker compose --profile monitoring up -d
@@ -157,8 +110,6 @@ services:
 
 volumes:
   nocturnusai-data:
-    driver: local
-  ollama-models:
     driver: local
   prometheus-data:
     driver: local

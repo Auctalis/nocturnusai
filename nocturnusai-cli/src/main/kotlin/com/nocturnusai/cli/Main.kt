@@ -29,7 +29,6 @@ fun main(args: Array<String>) {
         val code = Setup(
             dir = setupArgs.dir,
             port = setupArgs.port,
-            ollamaFlag = setupArgs.ollama,
             hostOllamaFlag = setupArgs.hostOllama,
             llmKeys = setupArgs.keys,
             nonInteractive = setupArgs.nonInteractive,
@@ -107,7 +106,6 @@ private fun parseArgs(args: Array<String>): CliArgs {
 internal data class SetupArgs(
     val dir: String = "./nocturnusai",
     val port: Int = 9300,
-    val ollama: Boolean = false,
     val hostOllama: Boolean = false,
     val keys: List<String> = emptyList(),
     val nonInteractive: Boolean = false,
@@ -116,7 +114,6 @@ internal data class SetupArgs(
 internal fun parseSetupArgs(args: Array<String>): SetupArgs {
     var dir = "./nocturnusai"
     var port = 9300
-    var ollama = false
     var hostOllama = false
     val keys = mutableListOf<String>()
     var nonInteractive = false
@@ -126,7 +123,6 @@ internal fun parseSetupArgs(args: Array<String>): SetupArgs {
         when (args[i]) {
             "--dir"             -> { dir = args.getOrElse(i + 1) { dir }; i += 2 }
             "--port"            -> { port = args.getOrElse(i + 1) { "9300" }.toIntOrNull() ?: 9300; i += 2 }
-            "--ollama"          -> { ollama = true; i++ }
             "--host-ollama"     -> { hostOllama = true; i++ }
             "--key"             -> { args.getOrElse(i + 1) { null }?.let { keys.add(it) }; i += 2 }
             "--non-interactive" -> { nonInteractive = true; i++ }
@@ -135,7 +131,7 @@ internal fun parseSetupArgs(args: Array<String>): SetupArgs {
         }
     }
 
-    return SetupArgs(dir, port, ollama, hostOllama, keys, nonInteractive)
+    return SetupArgs(dir, port, hostOllama, keys, nonInteractive)
 }
 
 // ── Uninstall ─────────────────────────────────────────────────────────────
@@ -315,7 +311,7 @@ Options:
 
 Examples:
   nocturnusai
-  nocturnusai setup --ollama
+  nocturnusai setup --host-ollama
   nocturnusai -d mydb -e "tell human(socrates)"
   nocturnusai -d mydb -e "ask mortal(?who)"
   nocturnusai -d mydb -e "export"
@@ -339,7 +335,6 @@ Usage: nocturnusai setup [options]
 Options:
   --dir DIR              Install directory (default: ./nocturnusai)
   --port PORT            Server port (default: 9300)
-  --ollama               Run Ollama in Docker (no API key needed)
   --host-ollama          Use existing Ollama on your machine
   --key KEY              LLM API key (repeatable, auto-detects provider)
   --non-interactive      Skip interactive prompts, use defaults
@@ -347,7 +342,6 @@ Options:
 
 Examples:
   nocturnusai setup                           # interactive wizard
-  nocturnusai setup --ollama                  # Ollama in Docker
   nocturnusai setup --host-ollama             # use existing local Ollama
   nocturnusai setup --key sk-ant-abc123...    # Anthropic Claude
   nocturnusai setup --key sk-ant-... --key sk-...  # multiple providers

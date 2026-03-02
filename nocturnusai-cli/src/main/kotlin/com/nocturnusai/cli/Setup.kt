@@ -25,18 +25,16 @@ import java.security.SecureRandom
  * Handles: container runtime detection, LLM/auth configuration,
  * compose generation, server start, health check, and success banner.
  *
- * Called via:  nocturnusai setup [--dir DIR] [--port PORT] [--ollama] [--key KEY]
+ * Called via:  nocturnusai setup [--dir DIR] [--port PORT] [--host-ollama] [--key KEY]
  */
 class Setup(
     private val dir: String = "./nocturnusai",
     private val port: Int = 9300,
-    private val ollamaFlag: Boolean = false,
     private val hostOllamaFlag: Boolean = false,
     private val llmKeys: List<String> = emptyList(),
     private val nonInteractive: Boolean = false,
 ) {
     private val interactive = !nonInteractive && System.console() != null
-    private var useOllama = ollamaFlag
     private var useHostOllama = hostOllamaFlag  // true = connect to existing host Ollama (no Docker container)
     private var composeCmd = ""
     private var containerCmd = ""
@@ -110,19 +108,15 @@ class Setup(
         println("${BOLD}Starting NocturnusAI...$RESET")
         val upCmd = buildString {
             append(composeCmd)
-            if (needBuild && useOllama) append(" --profile ollama")
             append(" up -d")
         }
         shVisible(upCmd, installDir)
 
         // 13. Wait for health
         println()
-        val healthy = waitForHealth()
+        waitForHealth()
 
-        // 14. Pull Ollama model if needed
-        if (useOllama && healthy) pullOllamaModel()
-
-        // 15. Success banner
+        // 14. Success banner
         printSuccessBanner()
         return 0
     }
@@ -351,17 +345,6 @@ class Setup(
             // Cloud provider — clear any stale Ollama base URL and enable extraction
             clearEnvKey(envFile, "LLM_BASE_URL")
             setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-            useOllama = false
-            return
-        }
-
-        // Flag: --ollama (Docker Ollama)
-        if (useOllama) {
-            ollamaModel = selectOllamaModel(null)
-            setEnvKey(envFile, "LLM_PROVIDER", "ollama")
-            setEnvKey(envFile, "LLM_MODEL", ollamaModel)
-            setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-            println("${GREEN}Using:$RESET Ollama in Docker with model ${BOLD}$ollamaModel$RESET")
             return
         }
 
@@ -380,29 +363,30 @@ class Setup(
         // Non-interactive: server only
         if (!interactive) {
             println("${GREEN}Server-only mode$RESET (no LLM — core API works without one)")
-            println("${DIM}  Use --ollama for local LLM, or --key <api-key> for cloud$RESET")
+            println("${DIM}  Use --host-ollama for local Ollama, or --key <api-key> for cloud$RESET")
             return
         }
 
         // Interactive wizard — top-level LLM choice
         val llmChoice = menu(
             "LLM Provider ${DIM}(optional — core logic API works without one)$RESET",
-            "Ollama — run locally in Docker (free, private, no API key needed)",
+            "Ollama — already running on this machine (recommended, free, private)",
             "Cloud API key (Anthropic, OpenAI, or Google)",
-            "I already have Ollama running on this machine",
-            "Skip — no LLM (configure later in .env)",
+            "Skip — no LLM (configure later)",
         )
 
         when (llmChoice) {
             0 -> {
-                // Ollama in Docker — offer model selection
-                useOllama = true
-                ollamaModel = selectOllamaModel(null)
+                // Host Ollama — query for installed models
+                useHostOllama = true
+                ollamaModel = selectOllamaModel("http://localhost:11434")
+                val hostAddr = detectHostAddress()
                 setEnvKey(envFile, "LLM_PROVIDER", "ollama")
                 setEnvKey(envFile, "LLM_MODEL", ollamaModel)
+                setEnvKey(envFile, "LLM_BASE_URL", "http://$hostAddr:11434/v1")
                 setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-                println("${GREEN}Using Ollama in Docker$RESET with model ${BOLD}$ollamaModel$RESET.")
-                println("${DIM}Model will download on first start.$RESET")
+                println("${GREEN}Using existing Ollama$RESET at $hostAddr:11434 with model ${BOLD}$ollamaModel$RESET")
+                println("${DIM}Make sure Ollama is running: ollama serve$RESET")
             }
             1 -> {
                 // Cloud API keys
@@ -437,18 +421,6 @@ class Setup(
                     println("${DIM}Add keys later in .env to enable natural language features.$RESET")
                 }
             }
-            2 -> {
-                // Existing host Ollama — query for installed models
-                useHostOllama = true
-                ollamaModel = selectOllamaModel("http://localhost:11434")
-                val hostAddr = detectHostAddress()
-                setEnvKey(envFile, "LLM_PROVIDER", "ollama")
-                setEnvKey(envFile, "LLM_MODEL", ollamaModel)
-                setEnvKey(envFile, "LLM_BASE_URL", "http://$hostAddr:11434/v1")
-                setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-                println("${GREEN}Using existing Ollama$RESET at $hostAddr:11434 with model ${BOLD}$ollamaModel$RESET")
-                println("${DIM}Make sure Ollama is running: ollama serve$RESET")
-            }
             else -> {
                 println("${DIM}Skipped — edit .env later to add LLM provider.$RESET")
             }
@@ -459,7 +431,7 @@ class Setup(
 
     private fun selectModel(envFile: File) {
         // Skip if Ollama (model selected via selectOllamaModel) or non-interactive
-        if (useOllama || useHostOllama || !interactive) return
+        if (useHostOllama || !interactive) return
 
         // Build model options based on configured providers
         val hasAnthropic = envHasKey(envFile, "ANTHROPIC_API_KEY")
@@ -622,7 +594,6 @@ class Setup(
         if (envHasKey(envFile, "OPENAI_API_KEY"))    providers.add("OpenAI GPT")
         if (envHasKey(envFile, "GOOGLE_API_KEY"))    providers.add("Google Gemini")
         if (envHasKey(envFile, "LLM_API_KEY"))       providers.add("Custom LLM")
-        if (useOllama) providers.add("Ollama (Docker)")
         if (useHostOllama) providers.add("Ollama (host)")
         if (providers.isNotEmpty()) {
             llmConfigured = true
@@ -634,13 +605,8 @@ class Setup(
     // ── Compose generation ─────────────────────────────────────────────────────
 
     private fun generateCompose() {
-        val template = when {
-            useOllama -> COMPOSE_WITH_OLLAMA
-            useHostOllama -> COMPOSE_HOST_OLLAMA
-            else -> COMPOSE_BASIC
-        }
         // @{ is a placeholder for ${ to avoid Kotlin string interpolation
-        File(installDir, "docker-compose.yml").writeText(template.replace("@{", "\${"))
+        File(installDir, "docker-compose.yml").writeText(COMPOSE_TEMPLATE.replace("@{", "\${"))
     }
 
     // ── Existing container resolution ─────────────────────────────────────────
@@ -651,7 +617,6 @@ class Setup(
      */
     private fun resolveExistingContainers(): Boolean {
         val names = mutableListOf("nocturnusai")
-        if (useOllama) names.add("nocturnusai-ollama")
 
         val conflicts = names.filter { name ->
             sh("$containerCmd inspect $name >/dev/null 2>&1").success
@@ -860,24 +825,6 @@ class Setup(
         false
     }
 
-    // ── Ollama model pull ──────────────────────────────────────────────────────
-
-    private fun pullOllamaModel() {
-        print("${DIM}Waiting for Ollama...")
-        System.out.flush()
-        for (i in 1..15) {
-            if (sh("curl -sf http://localhost:11434/api/tags >/dev/null 2>&1").success) {
-                println(" ready$RESET")
-                println("${DIM}Pulling model ($ollamaModel)... runs in background.$RESET")
-                sh("curl -sf http://localhost:11434/api/pull -d '{\"name\":\"$ollamaModel\"}' >/dev/null 2>&1 &")
-                return
-            }
-            Thread.sleep(2000)
-        }
-        println(" ${YELLOW}not ready yet$RESET")
-        println("${DIM}Model will pull automatically when Ollama is healthy.$RESET")
-    }
-
     // ── Success banner ─────────────────────────────────────────────────────────
 
     private fun printSuccessBanner() {
@@ -891,8 +838,6 @@ class Setup(
         println("  ${BOLD}Server$RESET       http://localhost:$port")
         if (llmConfigured)
             println("  ${BOLD}LLM$RESET          ${GREEN}$llmProviderLabel$RESET")
-        if (useOllama)
-            println("  ${BOLD}Ollama$RESET       http://localhost:11434 ${DIM}(Docker)$RESET")
         if (useHostOllama)
             println("  ${BOLD}Ollama$RESET       ${GREEN}using host Ollama$RESET ${DIM}(${detectHostAddress()}:11434)$RESET")
         if (authConfigured)
@@ -981,10 +926,11 @@ class Setup(
         private const val REPO_URL = "https://github.com/Auctalis/nocturnusai.git"
         private const val REPO_RAW = "https://raw.githubusercontent.com/Auctalis/nocturnusai/main"
 
-        // Compose templates — @{ is a placeholder for ${ (avoids Kotlin interpolation)
+        // Compose template — @{ is a placeholder for ${ (avoids Kotlin interpolation)
         // Compose reads .env automatically for variable substitution.
+        // extra_hosts allows the container to reach Ollama running on the host machine.
 
-        private val COMPOSE_BASIC = """
+        private val COMPOSE_TEMPLATE = """
 services:
   nocturnusai:
     image: ghcr.io/auctalis/nocturnusai:latest
@@ -1006,87 +952,14 @@ services:
       - OPENAI_API_KEY=@{OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=@{GOOGLE_API_KEY:-}
       - EXTRACTION_ENABLED=@{EXTRACTION_ENABLED:-false}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:@{PORT:-9300}/health"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-""".trimIndent() + "\n"
-
-        private val COMPOSE_HOST_OLLAMA = """
-services:
-  nocturnusai:
-    image: ghcr.io/auctalis/nocturnusai:latest
-    container_name: nocturnusai
-    restart: unless-stopped
-    ports:
-      - "@{PORT:-9300}:@{PORT:-9300}"
-    volumes:
-      - ./data:/data
-    environment:
-      - PORT=@{PORT:-9300}
-      - HOST=0.0.0.0
-      - STORAGE_DIR=/data
-      - API_KEY=@{API_KEY:-}
-      - LLM_PROVIDER=@{LLM_PROVIDER:-}
-      - LLM_MODEL=@{LLM_MODEL:-}
-      - LLM_BASE_URL=@{LLM_BASE_URL:-}
-      - ANTHROPIC_API_KEY=@{ANTHROPIC_API_KEY:-}
-      - OPENAI_API_KEY=@{OPENAI_API_KEY:-}
-      - GOOGLE_API_KEY=@{GOOGLE_API_KEY:-}
-      - EXTRACTION_ENABLED=@{EXTRACTION_ENABLED:-false}
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:@{PORT:-9300}/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-""".trimIndent() + "\n"
-
-        private val COMPOSE_WITH_OLLAMA = """
-services:
-  nocturnusai:
-    image: ghcr.io/auctalis/nocturnusai:latest
-    container_name: nocturnusai
-    restart: unless-stopped
-    ports:
-      - "@{PORT:-9300}:@{PORT:-9300}"
-    volumes:
-      - ./data:/data
-    environment:
-      - PORT=@{PORT:-9300}
-      - HOST=0.0.0.0
-      - STORAGE_DIR=/data
-      - API_KEY=@{API_KEY:-}
-      - LLM_PROVIDER=@{LLM_PROVIDER:-}
-      - LLM_MODEL=@{LLM_MODEL:-}
-      - LLM_BASE_URL=@{LLM_BASE_URL:-}
-      - ANTHROPIC_API_KEY=@{ANTHROPIC_API_KEY:-}
-      - OPENAI_API_KEY=@{OPENAI_API_KEY:-}
-      - GOOGLE_API_KEY=@{GOOGLE_API_KEY:-}
-      - EXTRACTION_ENABLED=@{EXTRACTION_ENABLED:-false}
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:@{PORT:-9300}/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  ollama:
-    image: ollama/ollama:latest
-    container_name: nocturnusai-ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ./ollama-models:/root/.ollama
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
 """.trimIndent() + "\n"
     }
 }

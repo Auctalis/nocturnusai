@@ -15,6 +15,38 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <hr />
 
+    <!-- ============ AI INSTALL ============ -->
+    <div class="ai-install">
+        <div class="ai-install-header">
+            <span class="ai-install-icon">✦</span>
+            <span>Install with AI</span>
+        </div>
+        <p class="ai-install-desc">Copy a prompt and paste it into your AI coding assistant — it will run the installer for you.</p>
+        <div class="ai-prompts">
+            <div class="ai-prompt-card">
+                <div class="ai-prompt-meta">
+                    <span class="ai-prompt-label">Claude Code</span>
+                    <button class="ai-copy-btn" data-copy="Install the NocturnusAI CLI on my machine using the official installer: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash — then verify it works by running: nocturnusai --version">copy</button>
+                </div>
+                <div class="ai-prompt-text">Install the NocturnusAI CLI on my machine using the official installer: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash — then verify it works by running: nocturnusai --version</div>
+            </div>
+            <div class="ai-prompt-card">
+                <div class="ai-prompt-meta">
+                    <span class="ai-prompt-label">GitHub Copilot</span>
+                    <button class="ai-copy-btn" data-copy="@terminal Install the NocturnusAI CLI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash">copy</button>
+                </div>
+                <div class="ai-prompt-text">@terminal Install the NocturnusAI CLI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</div>
+            </div>
+            <div class="ai-prompt-card">
+                <div class="ai-prompt-meta">
+                    <span class="ai-prompt-label">Cursor</span>
+                    <button class="ai-copy-btn" data-copy="Run this in my terminal to install the NocturnusAI CLI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash">copy</button>
+                </div>
+                <div class="ai-prompt-text">Run this in my terminal to install the NocturnusAI CLI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</div>
+            </div>
+        </div>
+    </div>
+
     <!-- ============ INSTALLATION ============ -->
     <h2 id="install">Installation</h2>
 
@@ -647,5 +679,29 @@ default&gt; dsl QUERY mortal(?who).</code></pre>
             </tbody>
         </table>
     </div>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.ai-copy-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const text = (btn as HTMLElement).dataset.copy ?? '';
+                try {
+                    await navigator.clipboard.writeText(text);
+                } catch {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    ta.remove();
+                }
+                btn.textContent = 'copied!';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 2000);
+            });
+        });
+    });
+</script>
 
 </DocsLayout>
