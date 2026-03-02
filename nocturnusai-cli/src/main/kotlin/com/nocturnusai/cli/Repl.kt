@@ -1217,9 +1217,11 @@ class Repl(private val client: Client) {
             val resp = runBlocking { client.health() }
             val obj = json.parseToJsonElement(resp).jsonObject
             val status = obj["status"]?.jsonPrimitive?.contentOrNull ?: "unknown"
+            val serverVersion = obj["version"]?.jsonPrimitive?.contentOrNull
+            val versionStr = if (serverVersion != null) "  ${DIM}server v$serverVersion${RESET}" else ""
             when (status) {
-                "healthy"  -> println("${GREEN}connected${RESET}")
-                "degraded" -> println("${YELLOW}connected (degraded)${RESET}")
+                "healthy"  -> println("${GREEN}connected${RESET}$versionStr")
+                "degraded" -> println("${YELLOW}connected (degraded)${RESET}$versionStr")
                 else       -> println("${RED}$status${RESET}")
             }
 

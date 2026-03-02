@@ -486,35 +486,51 @@ class Setup(
 
     /**
      * Select an Ollama model. If [ollamaUrl] is provided, query the running
-     * instance for installed models. Otherwise offer the curated list.
+     * instance for installed models and show them first, followed by popular
+     * models not already installed. Otherwise offer only the popular list.
      */
     private fun selectOllamaModel(ollamaUrl: String?): String {
         if (!interactive) return "llama3.2"
 
-        // Try to query a running Ollama instance for installed models
-        if (ollamaUrl != null) {
-            val installed = queryOllamaModels(ollamaUrl)
-            if (installed.isNotEmpty()) {
-                val options = installed.map { it }.toMutableList()
-                options.add("Other (enter model name)")
-                val labels = options.toTypedArray()
-                val choice = menu("Installed Ollama models:", *labels)
-                return if (choice < installed.size) {
-                    installed[choice]
-                } else {
-                    prompt("Model name", "llama3.2") ?: "llama3.2"
-                }
+        val installed = if (ollamaUrl != null) queryOllamaModels(ollamaUrl) else emptyList()
+
+        val popular = listOf(
+            "llama3.2"       to "Meta — fast, general purpose",
+            "llama3.1:8b"    to "Meta — larger, more capable",
+            "mistral"        to "Mistral AI — good reasoning",
+            "qwen2.5-coder"  to "Alibaba — great for code",
+            "codellama"      to "Meta — code specialist",
+            "phi4"           to "Microsoft — compact and capable",
+            "gemma3"         to "Google — fast and efficient",
+            "deepseek-r1"    to "DeepSeek — strong reasoning",
+        ).filter { (name, _) -> installed.none { it == name || it.startsWith("$name:") } }
+
+        val options = mutableListOf<String>()
+        val values  = mutableListOf<String>()
+
+        if (installed.isNotEmpty()) {
+            installed.forEach { model ->
+                options.add("$model  ${DIM}(installed)${RESET}")
+                values.add(model)
             }
         }
+        popular.forEach { (model, desc) ->
+            options.add("$model  ${DIM}$desc${RESET}")
+            values.add(model)
+        }
+        options.add("Other — enter model name")
+        values.add("__other__")
 
-        // No running Ollama or Docker Ollama — show popular models
-        val labels = OLLAMA_POPULAR_MODELS.map { it.second }.toMutableList()
-        labels.add("Other (enter model name)")
-        val choice = menu("Select Ollama model to download:", *labels.toTypedArray())
-        return if (choice < OLLAMA_POPULAR_MODELS.size) {
-            OLLAMA_POPULAR_MODELS[choice].first
-        } else {
+        val header = if (installed.isNotEmpty())
+            "Select Ollama model  ${DIM}(installed first, then popular)${RESET}"
+        else
+            "Select Ollama model  ${DIM}(Ollama not reachable — choose to pull on start)${RESET}"
+
+        val choice = menu(header, *options.toTypedArray())
+        return if (values[choice] == "__other__") {
             prompt("Model name", "llama3.2") ?: "llama3.2"
+        } else {
+            values[choice]
         }
     }
 
@@ -788,8 +804,15 @@ class Setup(
     }
 
     private fun removeContainers(names: List<String>) {
-        for (name in names) {
-            sh("$containerCmd rm -f $name 2>/dev/null")
+        // compose down handles pods, networks, and name variants (works for both Docker and Podman)
+        if (::installDir.isInitialized) {
+            sh("$composeCmd down --remove-orphans 2>/dev/null", installDir)
+        } else {
+            // Fallback when installDir not yet set
+            for (name in names) {
+                sh("$containerCmd stop $name 2>/dev/null")
+                sh("$containerCmd rm -f $name 2>/dev/null")
+            }
         }
     }
 
