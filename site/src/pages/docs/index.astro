@@ -23,6 +23,38 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         </ul>
     </div>
 
+    <!-- ============ AI INSTALL ============ -->
+    <div class="ai-install">
+        <div class="ai-install-header">
+            <span class="ai-install-icon">✦</span>
+            <span>Install with AI</span>
+        </div>
+        <p class="ai-install-desc">Copy a prompt into your AI coding assistant and it will install NocturnusAI for you.</p>
+        <div class="ai-prompts">
+            <div class="ai-prompt-card">
+                <div class="ai-prompt-meta">
+                    <span class="ai-prompt-label">Claude Code</span>
+                    <button class="ai-copy-btn" data-copy="Install NocturnusAI on my machine. Run: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash — then verify with: curl http://localhost:9300/health">copy</button>
+                </div>
+                <div class="ai-prompt-text">Install NocturnusAI on my machine. Run: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash — then verify with: curl http://localhost:9300/health</div>
+            </div>
+            <div class="ai-prompt-card">
+                <div class="ai-prompt-meta">
+                    <span class="ai-prompt-label">GitHub Copilot</span>
+                    <button class="ai-copy-btn" data-copy="@terminal Install NocturnusAI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash">copy</button>
+                </div>
+                <div class="ai-prompt-text">@terminal Install NocturnusAI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</div>
+            </div>
+            <div class="ai-prompt-card">
+                <div class="ai-prompt-meta">
+                    <span class="ai-prompt-label">Cursor</span>
+                    <button class="ai-copy-btn" data-copy="Run this in my terminal to install NocturnusAI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash">copy</button>
+                </div>
+                <div class="ai-prompt-text">Run this in my terminal to install NocturnusAI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</div>
+            </div>
+        </div>
+    </div>
+
     <!-- ============ STEP 1 ============ -->
     <div class="step-card" id="install">
         <div style="position:absolute; top:-12px; left:24px; font-size:0.65rem; font-weight:700; font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; padding:4px 14px; border-radius:20px; color:white; background:linear-gradient(135deg,#06b6d4,#8b5cf6);">STEP 1 · INSTALL</div>
@@ -34,8 +66,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <span class="syn-comment"># With an API key for LLM features (enables /extract and /synthesize in Steps 2–3):</span>
 <span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --key sk-ant-...
 
-<span class="syn-comment"># With local Ollama (no API key needed):</span>
-<span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama</code></pre>
+<span class="syn-comment"># With local Ollama (free, no API key needed — install Ollama first):</span>
+<span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --host-ollama</code></pre>
 
         <p>Verify it's running:</p>
         <pre data-lang="bash"><code><span class="syn-var">$</span> curl http://localhost:9300/health
@@ -426,4 +458,18 @@ result = executor.<span class="syn-fn">invoke</span>(&#123;
             <p>Interactive REPL, scripting, and administration from your terminal</p>
         </a>
     </div>
+
+    <script>
+        document.querySelectorAll('.ai-copy-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const text = (btn as HTMLElement).dataset.copy || '';
+                try {
+                    await navigator.clipboard.writeText(text);
+                    const orig = btn.textContent;
+                    btn.textContent = 'copied!';
+                    setTimeout(() => { btn.textContent = orig; }, 1500);
+                } catch { /* clipboard not available */ }
+            });
+        });
+    </script>
 </DocsLayout>
