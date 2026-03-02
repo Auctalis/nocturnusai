@@ -75,10 +75,7 @@ class Setup(
         // 5. Configure LLM
         configureLlm(envFile)
 
-        // 6. Select model
-        selectModel(envFile)
-
-        // 7. Configure auth
+        // 6. Configure auth
         configureAuth(envFile)
 
         // 8. Save CLI config (so `nocturnusai` auto-connects)
@@ -96,7 +93,8 @@ class Setup(
             println("${BOLD}Building NocturnusAI from source...$RESET")
             println("${DIM}(first build takes 2-3 minutes — subsequent starts are instant)$RESET")
             if (shVisible("$composeCmd build nocturnusai", installDir) != 0) {
-                println("${RED}Build failed.$RESET Check the output above.")
+                println("${RED}Build failed.$RESET")
+                println("${DIM}Run:  $composeCmd logs nocturnusai  — to see what went wrong.$RESET")
                 return 1
             }
         }
@@ -106,11 +104,7 @@ class Setup(
         if (!resolveExistingContainers()) return 0
 
         println("${BOLD}Starting NocturnusAI...$RESET")
-        val upCmd = buildString {
-            append(composeCmd)
-            append(" up -d")
-        }
-        shVisible(upCmd, installDir)
+        shVisible("$composeCmd up -d", installDir)
 
         // 13. Wait for health
         println()
@@ -368,11 +362,15 @@ class Setup(
         }
 
         // Interactive wizard — top-level LLM choice
+        println()
+        println("${DIM}Optional — the core logic API works without an LLM.$RESET")
         val llmChoice = menu(
-            "LLM Provider ${DIM}(optional — core logic API works without one)$RESET",
-            "Ollama — already running on this machine (recommended, free, private)",
-            "Cloud API key (Anthropic, OpenAI, or Google)",
-            "Skip — no LLM (configure later)",
+            "LLM Provider",
+            "Ollama — already running on this machine  ${DIM}(free, private, recommended)$RESET",
+            "Anthropic Claude  ${DIM}(claude-sonnet-4-5)$RESET",
+            "OpenAI GPT  ${DIM}(gpt-4.1-mini)$RESET",
+            "Google Gemini  ${DIM}(gemini-2.5-flash)$RESET",
+            "Skip — configure later",
         )
 
         when (llmChoice) {
@@ -385,89 +383,52 @@ class Setup(
                 setEnvKey(envFile, "LLM_MODEL", ollamaModel)
                 setEnvKey(envFile, "LLM_BASE_URL", "http://$hostAddr:11434/v1")
                 setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-                println("${GREEN}Using existing Ollama$RESET at $hostAddr:11434 with model ${BOLD}$ollamaModel$RESET")
+                println("${GREEN}Using Ollama$RESET at $hostAddr:11434  model: ${BOLD}$ollamaModel$RESET")
                 println("${DIM}Make sure Ollama is running: ollama serve$RESET")
             }
             1 -> {
-                // Cloud API keys
-                println()
-                println("${DIM}Enter API keys (press Enter to skip a provider).$RESET")
-                println()
-
-                val antKey = prompt("Anthropic API key ${DIM}(sk-ant-...)$RESET")
-                if (!antKey.isNullOrBlank()) {
-                    setEnvKey(envFile, "ANTHROPIC_API_KEY", antKey)
-                    println("  ${GREEN}Anthropic Claude configured$RESET")
-                }
-
-                val oaiKey = prompt("OpenAI API key ${DIM}(sk-...)$RESET")
-                if (!oaiKey.isNullOrBlank()) {
-                    setEnvKey(envFile, "OPENAI_API_KEY", oaiKey)
-                    println("  ${GREEN}OpenAI GPT configured$RESET")
-                }
-
-                val gglKey = prompt("Google API key ${DIM}(AIza...)$RESET")
-                if (!gglKey.isNullOrBlank()) {
-                    setEnvKey(envFile, "GOOGLE_API_KEY", gglKey)
-                    println("  ${GREEN}Google Gemini configured$RESET")
-                }
-
-                val hasCloudKey = !antKey.isNullOrBlank() || !oaiKey.isNullOrBlank() || !gglKey.isNullOrBlank()
-                if (hasCloudKey) {
+                val key = prompt("Anthropic API key ${DIM}(sk-ant-...)$RESET")
+                if (!key.isNullOrBlank()) {
+                    setEnvKey(envFile, "ANTHROPIC_API_KEY", key)
+                    setEnvKey(envFile, "LLM_PROVIDER", "anthropic")
+                    setEnvKey(envFile, "LLM_MODEL", "claude-sonnet-4-5-20250514")
                     clearEnvKey(envFile, "LLM_BASE_URL")
                     setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
+                    println("  ${GREEN}Anthropic Claude configured$RESET  ${DIM}model: claude-sonnet-4-5$RESET")
                 } else {
-                    println("${YELLOW}No keys entered.$RESET LLM features won't be available.")
-                    println("${DIM}Add keys later in .env to enable natural language features.$RESET")
+                    println("${YELLOW}No key entered.$RESET LLM features won't be available.")
+                }
+            }
+            2 -> {
+                val key = prompt("OpenAI API key ${DIM}(sk-...)$RESET")
+                if (!key.isNullOrBlank()) {
+                    setEnvKey(envFile, "OPENAI_API_KEY", key)
+                    setEnvKey(envFile, "LLM_PROVIDER", "openai")
+                    setEnvKey(envFile, "LLM_MODEL", "gpt-4.1-mini")
+                    clearEnvKey(envFile, "LLM_BASE_URL")
+                    setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
+                    println("  ${GREEN}OpenAI configured$RESET  ${DIM}model: gpt-4.1-mini$RESET")
+                } else {
+                    println("${YELLOW}No key entered.$RESET LLM features won't be available.")
+                }
+            }
+            3 -> {
+                val key = prompt("Google API key ${DIM}(AIza...)$RESET")
+                if (!key.isNullOrBlank()) {
+                    setEnvKey(envFile, "GOOGLE_API_KEY", key)
+                    setEnvKey(envFile, "LLM_PROVIDER", "google")
+                    setEnvKey(envFile, "LLM_MODEL", "gemini-2.5-flash")
+                    clearEnvKey(envFile, "LLM_BASE_URL")
+                    setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
+                    println("  ${GREEN}Google Gemini configured$RESET  ${DIM}model: gemini-2.5-flash$RESET")
+                } else {
+                    println("${YELLOW}No key entered.$RESET LLM features won't be available.")
                 }
             }
             else -> {
-                println("${DIM}Skipped — edit .env later to add LLM provider.$RESET")
+                println("${DIM}Skipped. Edit .env in ${installDir.path}/ and restart to add LLM later.$RESET")
             }
         }
-    }
-
-    // ── Model selection ────────────────────────────────────────────────────────
-
-    private fun selectModel(envFile: File) {
-        // Skip if Ollama (model selected via selectOllamaModel) or non-interactive
-        if (useHostOllama || !interactive) return
-
-        // Build model options based on configured providers
-        val hasAnthropic = envHasKey(envFile, "ANTHROPIC_API_KEY")
-        val hasOpenAI = envHasKey(envFile, "OPENAI_API_KEY")
-        val hasGoogle = envHasKey(envFile, "GOOGLE_API_KEY")
-
-        if (!hasAnthropic && !hasOpenAI && !hasGoogle) return
-
-        val models = mutableListOf<Pair<String, String>>() // label to provider:model
-        if (hasAnthropic) {
-            models.add("Anthropic — Claude Sonnet 4.5 (recommended)" to "anthropic:claude-sonnet-4-5-20250514")
-            models.add("Anthropic — Claude Opus 4" to "anthropic:claude-opus-4-20250514")
-            models.add("Anthropic — Claude Haiku 4.5 (fastest)" to "anthropic:claude-haiku-4-5-20251001")
-            models.add("Anthropic — Claude Sonnet 4" to "anthropic:claude-sonnet-4-20250514")
-        }
-        if (hasOpenAI) {
-            models.add("OpenAI — GPT-4.1 (latest)" to "openai:gpt-4.1")
-            models.add("OpenAI — GPT-4.1 mini (fastest)" to "openai:gpt-4.1-mini")
-            models.add("OpenAI — GPT-4.1 nano" to "openai:gpt-4.1-nano")
-            models.add("OpenAI — GPT-4o" to "openai:gpt-4o")
-            models.add("OpenAI — o3" to "openai:o3")
-            models.add("OpenAI — o3 mini" to "openai:o3-mini")
-            models.add("OpenAI — o4 mini (reasoning)" to "openai:o4-mini")
-        }
-        if (hasGoogle) {
-            models.add("Google — Gemini 2.5 Pro (latest)" to "google:gemini-2.5-pro")
-            models.add("Google — Gemini 2.5 Flash (fastest)" to "google:gemini-2.5-flash")
-            models.add("Google — Gemini 2.0 Flash" to "google:gemini-2.0-flash")
-        }
-
-        val labels = models.map { it.first }.toTypedArray()
-        val choice = menu("Select the default LLM model:", *labels)
-        val (provider, model) = models[choice].second.split(":")
-        setEnvKey(envFile, "LLM_PROVIDER", provider)
-        setEnvKey(envFile, "LLM_MODEL", model)
-        println("  ${GREEN}Default model:$RESET ${models[choice].first}")
     }
 
     // ── Ollama model selection ─────────────────────────────────────────────────
@@ -820,8 +781,9 @@ class Setup(
             Thread.sleep(2000)
         }
         println()
-        println("${YELLOW}Server still starting...$RESET")
-        println("${DIM}Check: $composeCmd logs -f nocturnusai$RESET")
+        println("${YELLOW}Server is taking longer than expected to start.$RESET")
+        println("${DIM}Check logs:  $composeCmd logs -f nocturnusai$RESET")
+        println("${DIM}Health:      curl http://localhost:$port/health$RESET")
         return false
     }
 
@@ -920,7 +882,7 @@ class Setup(
         println("    $composeCmd up -d                  ${DIM}# restart$RESET")
         println()
         println("  ${DIM}Config: ${installDir.path}/.env$RESET")
-        println("  ${DIM}Docs:   https://github.com/Auctalis/nocturnusai$RESET")
+        println("  ${DIM}Docs:   https://auctalis.github.io/nocturnusai/$RESET")
         println()
     }
 
