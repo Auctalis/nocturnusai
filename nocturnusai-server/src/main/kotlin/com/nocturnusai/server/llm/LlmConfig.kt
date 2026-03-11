@@ -35,6 +35,12 @@ object LlmConfig {
     val extractionModel: String? = System.getenv("EXTRACTION_MODEL")
     val extractionMaxFacts: Int = System.getenv("EXTRACTION_MAX_FACTS")?.toIntOrNull() ?: 50
 
+    // Embedding config — separate from completion provider
+    // EMBED_PROVIDER: "ollama", "openai", "custom", or "none" to disable
+    // EMBED_MODEL: the model name to use for embeddings (e.g. "nomic-embed-text")
+    val embedProvider: String? = System.getenv("EMBED_PROVIDER")?.ifBlank { null }
+    val embedModel: String? = System.getenv("EMBED_MODEL")?.ifBlank { null }
+
     fun createProvider(): LlmProvider? {
         val resolvedProvider = provider ?: detectProvider()
         if (resolvedProvider == null) {
@@ -87,6 +93,48 @@ object LlmConfig {
         }
 
         return llmProvider
+    }
+
+    /**
+     * Create a provider dedicated to embedding (vectorization).
+     * Priority: EMBED_PROVIDER > detect from current provider (if it supports embed) > Ollama local fallback.
+     * Use EMBED_PROVIDER=none to disable embeddings entirely.
+     */
+    fun createEmbedProvider(): LlmProvider? {
+        if (embedProvider?.lowercase() == "none") return null
+
+        val resolvedEmbedProvider = embedProvider ?: "ollama"
+        val resolvedEmbedModel = embedModel ?: "nomic-embed-text"
+
+        return when (resolvedEmbedProvider.lowercase()) {
+            "ollama" -> {
+                val url = baseUrl ?: detectOllamaUrl()
+                logger.info("Embedding provider: Ollama model=$resolvedEmbedModel at $url")
+                OpenAiCompatibleProvider(resolvedEmbedModel, null, url)
+            }
+            "openai" -> {
+                val key = openaiApiKey ?: apiKey
+                if (key.isNullOrBlank()) {
+                    logger.warn("EMBED_PROVIDER=openai but no API key found, disabling embeddings")
+                    return null
+                }
+                val url = baseUrl ?: "https://api.openai.com/v1"
+                logger.info("Embedding provider: OpenAI model=$resolvedEmbedModel at $url")
+                OpenAiCompatibleProvider(resolvedEmbedModel, key, url)
+            }
+            "custom" -> {
+                val url = baseUrl ?: run {
+                    logger.warn("EMBED_PROVIDER=custom but no LLM_BASE_URL found, disabling embeddings")
+                    return null
+                }
+                logger.info("Embedding provider: custom model=$resolvedEmbedModel at $url")
+                OpenAiCompatibleProvider(resolvedEmbedModel, apiKey, url)
+            }
+            else -> {
+                logger.warn("Unknown EMBED_PROVIDER '$resolvedEmbedProvider', defaulting to Ollama")
+                OpenAiCompatibleProvider(resolvedEmbedModel, null, detectOllamaUrl())
+            }
+        }
     }
 
     /**

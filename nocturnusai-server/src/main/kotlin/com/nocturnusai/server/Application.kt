@@ -191,8 +191,22 @@ fun Application.moduleWithStorageDir(storageDir: File) {
         null
     }
 
+    // Embedding provider — separate from completion LLM (e.g. Ollama nomic-embed-text)
+    val embedProvider = try {
+        LlmConfig.createEmbedProvider()
+    } catch (e: Exception) {
+        environment.log.warn("Failed to initialize embedding provider: ${e.message}")
+        null
+    }
+    val semanticContext = com.nocturnusai.server.core.CachedSemanticContext(embedProvider)
+    if (embedProvider != null) {
+        environment.log.info("Semantic similarity: enabled (embed provider=${embedProvider.name}, model=${embedProvider.model})")
+    } else {
+        environment.log.info("Semantic similarity: disabled (no embedding provider configured)")
+    }
+
     // Database Manager
-    val dbManager = DatabaseManager(storageDir, factExtractor, ruleExtractor)
+    val dbManager = DatabaseManager(storageDir, factExtractor, ruleExtractor, semanticContext)
     Metrics.activeDatabases.set(dbManager.getDatabaseNames().size)
 
     // ── MDC enrichment — correlation ID + context per request ────────

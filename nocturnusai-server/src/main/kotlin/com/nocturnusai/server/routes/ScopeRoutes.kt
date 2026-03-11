@@ -48,6 +48,28 @@ data class DiffScopesRequest(
     val scopeB: String? = null
 )
 
+// ── Scope DAG (Item 4: Counterfactual Simulation) ────────────────────────────
+
+@Serializable
+data class SetScopeParentRequest(
+    /** The child scope that will inherit from [parent]. */
+    val child: String,
+    /** The parent scope to inherit from. */
+    val parent: String
+)
+
+@Serializable
+data class ScopeAncestorsResponse(
+    val scope: String,
+    val ancestors: List<String>
+)
+
+@Serializable
+data class ScopeDagResponse(
+    /** Map of child -> parent for all registered parent relationships. */
+    val parents: Map<String, String>
+)
+
 @Serializable
 data class MergeScopeRequest(
     val sourceScope: String,
@@ -222,6 +244,96 @@ fun Route.scopeRoutes(dbManager: DatabaseManager) {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
         } catch (e: Exception) {
             call.application.environment.log.error("List scopes error", e)
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", e.message ?: "Internal error"))
+        }
+    }
+
+    // ── Counterfactual Scope DAG endpoints (Item 4) ──────────────────────────
+
+    /**
+     * POST /scope/parent
+     *
+     * Set a parent scope, linking child -> parent in the DAG.
+     * When querying the child scope with `inheritParentScopes=true`, facts from
+     * the parent (and its ancestors) are returned if not overridden in the child.
+     * Body: { "child": "Option_A", "parent": "Reality" }
+     */
+    post("/scope/parent") {
+        try {
+            val (db, _) = call.getContext(dbManager)
+            val req = call.receive<SetScopeParentRequest>()
+            if (req.child.isBlank() || req.parent.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", "child and parent must not be blank"))
+                return@post
+            }
+            db.setScopeParent(req.child, req.parent)
+            call.respond(mapOf("child" to req.child, "parent" to req.parent, "status" to "linked"))
+        } catch (e: IllegalArgumentException) {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Invalid scope parent"))
+        } catch (e: DatabaseNotFoundException) {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
+        } catch (e: Exception) {
+            call.application.environment.log.error("Set scope parent error", e)
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", e.message ?: "Internal error"))
+        }
+    }
+
+    /**
+     * DELETE /scope/parent/{child}
+     *
+     * Remove the parent link for the given child scope (make it a root scope).
+     */
+    delete("/scope/parent/{child}") {
+        try {
+            val (db, _) = call.getContext(dbManager)
+            val child = call.parameters["child"]
+                ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", "child scope name required"))
+            db.removeScopeParent(child)
+            call.respond(mapOf("child" to child, "status" to "unlinked"))
+        } catch (e: DatabaseNotFoundException) {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
+        } catch (e: Exception) {
+            call.application.environment.log.error("Remove scope parent error", e)
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", e.message ?: "Internal error"))
+        }
+    }
+
+    /**
+     * GET /scope/ancestors/{scope}
+     *
+     * Returns the full ancestry chain for a scope: [scope, parent, grandparent, ...].
+     * Response: { "scope": "Option_A", "ancestors": ["Option_A", "Reality"] }
+     */
+    get("/scope/ancestors/{scope}") {
+        try {
+            val (db, _) = call.getContext(dbManager)
+            val scope = call.parameters["scope"]
+                ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", "scope name required"))
+            val ancestors = db.getScopeAncestors(scope)
+            call.respond(ScopeAncestorsResponse(scope, ancestors))
+        } catch (e: DatabaseNotFoundException) {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
+        } catch (e: Exception) {
+            call.application.environment.log.error("Scope ancestors error", e)
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", e.message ?: "Internal error"))
+        }
+    }
+
+    /**
+     * GET /scope/dag
+     *
+     * Returns the full scope parent DAG as a map of child -> parent.
+     * Response: { "parents": { "Option_A": "Reality", "Option_B": "Reality" } }
+     */
+    get("/scope/dag") {
+        try {
+            val (db, _) = call.getContext(dbManager)
+            val dag = db.getScopeParentMap()
+            call.respond(ScopeDagResponse(dag))
+        } catch (e: DatabaseNotFoundException) {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
+        } catch (e: Exception) {
+            call.application.environment.log.error("Scope DAG error", e)
             call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", e.message ?: "Internal error"))
         }
     }

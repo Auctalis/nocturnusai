@@ -57,14 +57,16 @@ data class AtomDto(
     // When true on a rule body atom, this condition uses Negation-as-Failure:
     // it succeeds iff the atom CANNOT be proven (closed-world assumption).
     // Distinct from negated=true which is classical explicit negation.
-    val naf: Boolean = false
+    val naf: Boolean = false,
+    val confidence: Double? = null
 )
 
 @Serializable
 data class RuleRequest(
     val head: AtomDto,
     val body: List<AtomDto>,
-    val scope: String? = null
+    val scope: String? = null,
+    val confidence: Double? = null
 )
 
 @Serializable
@@ -330,10 +332,16 @@ object Validator {
         for (arg in req.args) {
             if (arg.length > ValidationLimits.MAX_STRING_LENGTH) throw ValidationException("Argument exceeds max length of ${ValidationLimits.MAX_STRING_LENGTH}")
         }
+        if (req.confidence != null && (req.confidence < 0.0 || req.confidence > 1.0)) {
+            throw ValidationException("Confidence must be between 0.0 and 1.0")
+        }
         validateMetadata(req.metadata, "fact")
     }
 
     fun validateRuleRequest(req: RuleRequest) {
+        if (req.confidence != null && (req.confidence < 0.0 || req.confidence > 1.0)) {
+            throw ValidationException("Rule confidence must be between 0.0 and 1.0")
+        }
         validateAtomDto(req.head, "head")
         if (req.body.isEmpty()) throw ValidationException("Rule body must not be empty")
         req.body.forEachIndexed { i, atom ->
@@ -347,6 +355,9 @@ object Validator {
         if (atom.args.size > ValidationLimits.MAX_ARG_COUNT) throw ValidationException("$label argument count exceeds max of ${ValidationLimits.MAX_ARG_COUNT}")
         for (arg in atom.args) {
             if (arg.length > ValidationLimits.MAX_STRING_LENGTH) throw ValidationException("$label argument exceeds max length of ${ValidationLimits.MAX_STRING_LENGTH}")
+        }
+        if (atom.confidence != null && (atom.confidence < 0.0 || atom.confidence > 1.0)) {
+            throw ValidationException("$label confidence must be between 0.0 and 1.0")
         }
         validateMetadata(atom.metadata, label)
     }

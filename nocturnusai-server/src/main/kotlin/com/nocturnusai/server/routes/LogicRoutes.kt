@@ -123,7 +123,7 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
 
             // Parse Head
             val headTerms = req.head.args.map { parseTerm(it) }
-            val headAtom = com.nocturnusai.core.Atom(req.head.predicate, headTerms, truthVal = !req.head.negated, scope = req.head.scope, metadata = req.head.metadata)
+            val headAtom = com.nocturnusai.core.Atom(req.head.predicate, headTerms, truthVal = !req.head.negated, scope = req.head.scope, metadata = req.head.metadata, confidence = req.head.confidence)
 
             // Parse Body
             val bodyAtoms = req.body.map { atomReq ->
@@ -133,7 +133,8 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
                     truthVal = !atomReq.negated,
                     scope = atomReq.scope,
                     metadata = atomReq.metadata,
-                    naf = atomReq.naf
+                    naf = atomReq.naf,
+                    confidence = atomReq.confidence
                 )
             }
 
@@ -141,7 +142,7 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
             val allTerms = headTerms + bodyAtoms.flatMap { it.args }
             val variables = allTerms.filterIsInstance<com.nocturnusai.core.Term.Variable>().distinct()
 
-            val rule = com.nocturnusai.core.Rule(variables, headAtom, bodyAtoms, scope = req.scope)
+            val rule = com.nocturnusai.core.Rule(variables, headAtom, bodyAtoms, scope = req.scope, confidence = req.confidence)
 
             val txId = call.request.header("X-Transaction-ID")?.toLongOrNull()
 

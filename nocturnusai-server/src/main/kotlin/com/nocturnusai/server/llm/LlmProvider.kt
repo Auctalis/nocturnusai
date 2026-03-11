@@ -20,4 +20,10 @@ interface LlmProvider {
     val name: String
     val model: String
     suspend fun complete(messages: List<LlmMessage>): String
+    
+    /**
+     * Compute vector embeddings for the given text.
+     * By default, returns an empty array.
+     */
+    suspend fun embed(text: String): FloatArray = FloatArray(0)
 }

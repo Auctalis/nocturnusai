@@ -21,7 +21,8 @@ data class Rule(
     val variables: List<Term.Variable>,
     val head: Atom, // Consequent
     val body: List<Atom>, // Antecedent (conditions)
-    val scope: String? = null
+    val scope: String? = null,
+    val confidence: Double? = null
 ) {
     override fun toString(): String {
         val vars = variables.joinToString(", ") { it.toString() }

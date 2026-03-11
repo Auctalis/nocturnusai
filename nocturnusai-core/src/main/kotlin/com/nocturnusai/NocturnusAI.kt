@@ -72,7 +72,8 @@ class NocturnusAI(
     val factExtractor: FactExtractor? = null,
     val ruleExtractor: RuleExtractor? = null,
     /** Database-level default conflict strategy. Individual requests can override via assertFact(). */
-    val defaultConflictStrategy: com.nocturnusai.core.ConflictStrategy = com.nocturnusai.core.ConflictStrategy.REJECT
+    val defaultConflictStrategy: com.nocturnusai.core.ConflictStrategy = com.nocturnusai.core.ConflictStrategy.REJECT,
+    val semanticContext: SemanticContext = DummySemanticContext
 ) {
 
     private val logger = org.slf4j.LoggerFactory.getLogger(NocturnusAI::class.java)
@@ -95,16 +96,59 @@ class NocturnusAI(
         if (isMultiTenant && key != "default" && !tenants.contains(key)) {
             throw TenantNotFoundException(key)
         }
-        return contexts.getOrPut(key) { LogicContext() }
+        return contexts.getOrPut(key) { LogicContext(semanticContext) }
     }
 
     // Helper for internal use where we know we want a specific context
     private fun getContextByKey(key: String): LogicContext {
-        return contexts.getOrPut(key) { LogicContext() }
+        return contexts.getOrPut(key) { LogicContext(semanticContext) }
     }
 
     private val tenants = ConcurrentHashMap.newKeySet<String>()
     private val tenantsFile = File(storageDir, "tenants.json")
+
+    // ── Counterfactual Scope DAG (Item 4) ────────────────────────────────────
+    // Maps childScope -> parentScopeId. Null parent = root (inherits from global).
+    private val scopeParents = ConcurrentHashMap<String, String>()
+
+    /**
+     * Set a parent scope for [child], creating a DAG inheritance relationship.
+     * When querying [child], facts from [parent] (and its ancestors) are also visible
+     * unless overridden by facts in [child] itself.
+     *
+     * Throws if the relationship would create a cycle.
+     */
+    fun setScopeParent(child: String, parent: String) {
+        require(child != parent) { "A scope cannot be its own parent" }
+        // Cycle detection: walk parent chain from `parent` upward
+        var cursor: String? = parent
+        val visited = mutableSetOf<String>()
+        while (cursor != null) {
+            if (!visited.add(cursor)) break  // loop guard
+            if (cursor == child) throw IllegalArgumentException("Setting scope parent '$parent' for '$child' would create a cycle")
+            cursor = scopeParents[cursor]
+        }
+        scopeParents[child] = parent
+        logger.info("Scope DAG: '$child' now inherits from '$parent'")
+    }
+
+    /** Remove a scope's parent (make it a root scope). */
+    fun removeScopeParent(child: String) { scopeParents.remove(child) }
+
+    /** Returns the ordered ancestry chain for [scope]: [scope, parent, grandparent, ...].*/
+    fun getScopeAncestors(scope: String): List<String> {
+        val chain = mutableListOf(scope)
+        var cursor: String? = scopeParents[scope]
+        val seen = mutableSetOf(scope)
+        while (cursor != null && seen.add(cursor)) {
+            chain.add(cursor)
+            cursor = scopeParents[cursor]
+        }
+        return chain
+    }
+
+    /** Returns the current scope-parent map for inspection. */
+    fun getScopeParentMap(): Map<String, String> = scopeParents.toMap()
 
     init {
         // Load tenants
@@ -368,12 +412,33 @@ class NocturnusAI(
         pattern: Atom,
         tenantId: String? = null,
         scope: String? = null,
-        minConfidence: Double? = null
+        minConfidence: Double? = null,
+        inheritParentScopes: Boolean = false
     ): Sequence<Atom> {
         val ctx = getContext(tenantId)
-        val results = ctx.store.match(pattern, scope = scope)
-        return if (minConfidence == null) results
-        else results.filter { it.confidence == null || it.confidence >= minConfidence }
+        val base = ctx.store.match(pattern, scope = scope)
+        val filtered = if (minConfidence == null) base
+                       else base.filter { it.confidence == null || it.confidence >= minConfidence }
+
+        // Scope inheritance: if the scope has parents and inheritance is requested,
+        // union facts from parent scopes — skipping any whose args already appear in child.
+        if (scope != null && inheritParentScopes) {
+            val ancestors = getScopeAncestors(scope).drop(1)  // skip self
+            if (ancestors.isEmpty()) return filtered
+            val childArgSets = mutableSetOf<List<com.nocturnusai.core.Term>>()
+            val resultList = filtered.onEach { childArgSets.add(it.args) }.toMutableList()
+            for (ancestor in ancestors) {
+                val ancestorFacts = ctx.store.match(pattern, scope = ancestor)
+                ancestorFacts.forEach { fact ->
+                    if (!childArgSets.contains(fact.args)) {
+                        childArgSets.add(fact.args)
+                        resultList.add(fact.copy(scope = scope))  // surface as if from child scope
+                    }
+                }
+            }
+            return resultList.asSequence()
+        }
+        return filtered
     }
 
     // --- Aggregation API ---
@@ -618,7 +683,7 @@ class NocturnusAI(
         logger.warn("NUKE: Clearing all data for tenant '$key' in database '$dbName'")
 
         // Replace the context with a fresh one
-        contexts[key] = LogicContext()
+        contexts[key] = LogicContext(semanticContext)
 
         createSnapshot()
     }
@@ -634,7 +699,7 @@ class NocturnusAI(
         contexts.clear()
 
         // Reinitialize default context
-        contexts["default"] = LogicContext()
+        contexts["default"] = LogicContext(semanticContext)
 
         // Clear WAL and create fresh snapshot
         wal.clear()

@@ -197,7 +197,8 @@ Isolate your implementation plans or different user sessions.
 {
   "head": "AtomDto",
   "body": "ArrayList",
-  "scope": "String"
+  "scope": "String",
+  "confidence": "Double?"
 }
 ```
 ### `AtomDto`
@@ -208,7 +209,8 @@ Isolate your implementation plans or different user sessions.
   "negated": "Boolean",
   "scope": "String",
   "metadata": "LinkedHashMap",
-  "naf": "Boolean"
+  "naf": "Boolean",
+  "confidence": "Double?"
 }
 ```
 ### `TemplateRequest`

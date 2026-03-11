@@ -34,7 +34,8 @@ data class DatabaseConfig(
 class DatabaseManager(
     private val rootStorageDir: File,
     private val factExtractor: FactExtractor? = null,
-    private val ruleExtractor: RuleExtractor? = null
+    private val ruleExtractor: RuleExtractor? = null,
+    private val semanticContext: com.nocturnusai.core.SemanticContext = com.nocturnusai.core.DummySemanticContext
 ) {
     private val databases = ConcurrentHashMap<String, NocturnusAI>()
     private val encryption: EncryptionService? = ServerConfig.encryptionKey?.let { EncryptionService(it) }
@@ -107,7 +108,8 @@ class DatabaseManager(
         val db = NocturnusAI(
             dbDir, true, dbName = name, encryption = encryption,
             factExtractor = factExtractor, ruleExtractor = ruleExtractor,
-            defaultConflictStrategy = defaultConflictStrategy
+            defaultConflictStrategy = defaultConflictStrategy,
+            semanticContext = semanticContext
         )
         if (!db.getRegisteredTenants().contains("default")) {
             db.createTenant("default")
@@ -157,7 +159,8 @@ class DatabaseManager(
         val db = NocturnusAI(
             dbDir, isMultiTenant, dbName = name, encryption = encryption,
             factExtractor = factExtractor, ruleExtractor = ruleExtractor,
-            defaultConflictStrategy = defaultConflictStrategy
+            defaultConflictStrategy = defaultConflictStrategy,
+            semanticContext = semanticContext
         )
         if (isMultiTenant && !db.getRegisteredTenants().contains("default")) {
             db.createTenant("default")

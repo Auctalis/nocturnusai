@@ -26,7 +26,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Encapsulates the logic and storage state for a single logical scope.
  * This can represent a standard single-database instance or a single tenant.
  */
-class LogicContext {
+class LogicContext(private val semanticContext: SemanticContext = DummySemanticContext) {
     val store = Hexastore() // Positive Store
     val negativeStore = Hexastore() // Negative Store (Explicit NOT)
 
@@ -34,7 +34,7 @@ class LogicContext {
     val rules = CopyOnWriteArrayList<Rule>()
 
     val rete = ReteEngine(store, tracker)
-    val backwardChainer = BackwardChainer(store, rules)
+    val backwardChainer = BackwardChainer(store, rules, semanticContext = semanticContext)
     val consistencyGuard = ConsistencyGuard(store)
 
     /** Agent memory manager for temporal queries, salience, consolidation, decay. */

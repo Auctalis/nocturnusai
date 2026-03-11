@@ -18,12 +18,16 @@ import com.nocturnusai.core.*
 import com.nocturnusai.storage.Hexastore
 import com.nocturnusai.inference.Substitution
 import com.nocturnusai.inference.Unifier
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.serialization.json.*
 
 class BackwardChainer(
     private val store: Hexastore,
     private val rules: List<Rule>,
-    private val maxDepth: Int = 100 // Hard limit to prevent stack overflow
+    private val maxDepth: Int = 100, // Hard limit to prevent stack overflow
+    private val semanticContext: SemanticContext = DummySemanticContext
 ) {
 
     /**
@@ -38,11 +42,11 @@ class BackwardChainer(
         val rulesByPredicate = rules.groupBy { it.head.predicate }
         val memo = HashMap<Atom, List<Atom>>()
         // We track (substitution, confidence) together so confidence from the matched fact
-        // is available when constructing the result atom.
+        // or rule aggregation is available when constructing the result atom.
         return solveRecursiveWithConfidence(listOf(goal), 0, emptyMap(), null, 0, rulesByPredicate, memo)
-            .map { (subst, confidence) ->
+            .map { (subst, aggregatedConfidence) ->
                 val result = Unifier.substitute(goal, subst)
-                if (confidence != null) result.copy(confidence = confidence) else result
+                if (aggregatedConfidence != null) result.copy(confidence = aggregatedConfidence) else result
             }
             .distinctBy { it.args } // distinct by args (structural identity, ignoring metadata)
     }
@@ -60,6 +64,92 @@ class BackwardChainer(
         if (index >= goals.size) return sequenceOf(Pair(subst, confidence))
 
         val currentGoal = Unifier.substitute(goals[index], subst)
+
+        // --- HTTP_GET_JSON built-in predicate (Item 5: API-bound Extensional Logic) ---
+        // Syntax: HTTP_GET_JSON("https://url", "$.json.path", ?result)
+        // On success, binds ?result to the extracted JSON value string.
+        // On failure (network error, missing path), the predicate fails.
+        if (currentGoal.predicate == "HTTP_GET_JSON") {
+            if (currentGoal.args.size != 3) {
+                throw IllegalStateException("HTTP_GET_JSON requires exactly 3 args: url, jsonPath, ?binding. Got ${currentGoal.args.size}")
+            }
+            val urlArg = currentGoal.args[0]
+            val pathArg = currentGoal.args[1]
+            if (urlArg is Term.Variable || pathArg is Term.Variable) {
+                throw IllegalStateException("HTTP_GET_JSON url and path must be ground (not variables)")
+            }
+            val url = urlArg.toString().removeSurrounding("\"")
+            val jsonPath = pathArg.toString().removeSurrounding("\"")
+            val resultBinding = currentGoal.args[2]
+
+            val extracted = resolveHttpGetJson(url, jsonPath)
+                ?: return emptySequence()  // fail if HTTP call or path extraction fails
+
+            val extractedTerm = Term.StringLit(extracted)
+            val newSubst = if (resultBinding is Term.Variable) {
+                // Bind the variable to the extracted value
+                subst + mapOf(resultBinding to extractedTerm)
+            } else {
+                // Arg is ground — unify and continue only if it matches
+                if (resultBinding.toString().removeSurrounding("\"") == extracted) subst
+                else return emptySequence()
+            }
+            // Scale confidence: HTTP facts inherit full confidence (no penalty)
+            return solveRecursiveWithConfidence(goals, index + 1, newSubst, confidence, depth, rulesByPredicate, memo)
+        }
+
+        // --- Neuro-Symbolic SIMILAR predicate ---
+        if (currentGoal.predicate == "SIMILAR") {
+            if (currentGoal.args.size != 3) {
+                throw IllegalStateException("SIMILAR requires exactly 3 arguments: a, b, threshold. Got ${currentGoal.args.size}")
+            }
+            val arg1 = currentGoal.args[0]
+            val arg2 = currentGoal.args[1]
+            val thresholdArg = currentGoal.args[2]
+
+            if (arg1 is Term.Variable || arg2 is Term.Variable) {
+                throw IllegalStateException("SIMILAR args must be grounded. Unbound variables: $arg1, $arg2")
+            }
+            
+            val threshold = when (thresholdArg) {
+                is Term.NumberLit -> thresholdArg.value
+                else -> throw IllegalStateException("SIMILAR threshold must be a number literal")
+            }
+
+            val sim = semanticContext.cosineSimilarity(arg1.toString().removeSurrounding("\""), arg2.toString().removeSurrounding("\""))
+            if (sim >= threshold) {
+                val nextConfidence = when {
+                    confidence == null -> sim
+                    else -> confidence * sim
+                }
+                return solveRecursiveWithConfidence(goals, index + 1, subst, nextConfidence, depth, rulesByPredicate, memo)
+            } else {
+                return emptySequence()
+            }
+        }
+
+        // --- Negation-as-Failure (NAF) handling ---
+        if (currentGoal.naf) {
+            val innerGoal = currentGoal.copy(naf = false)
+            val unboundVars = innerGoal.args.filterIsInstance<Term.Variable>()
+            if (unboundVars.isNotEmpty()) {
+                throw IllegalStateException(
+                    "NAF condition '${innerGoal}' contains unbound variable(s) " +
+                    "${unboundVars.map { "?${it.name}" }} — NAF goals must be ground at evaluation time"
+                )
+            }
+            val innerMemo = HashMap<Atom, List<Atom>>()
+            val hasSolution = solveRecursiveWithConfidence(
+                listOf(innerGoal), 0, emptyMap(), null, depth + 1, rulesByPredicate, innerMemo
+            ).any()
+
+            return if (hasSolution) {
+                emptySequence()
+            } else {
+                solveRecursiveWithConfidence(goals, index + 1, subst, confidence, depth, rulesByPredicate, memo)
+            }
+        }
+
         val normalizedKey = normalizeForMemo(currentGoal)
         val resolvedAtoms: List<Atom> = memo[normalizedKey] ?: run {
             memo[normalizedKey] = emptyList()
@@ -69,11 +159,14 @@ class BackwardChainer(
             for (rule in candidateRules) {
                 val uniqueRule = renameVars(rule)
                 val headMatch = Unifier.unifyAtoms(currentGoal, uniqueRule.head) ?: continue
-                solveRecursive(uniqueRule.body, 0, headMatch, depth + 1, rulesByPredicate, memo)
-                    .forEach { bodySubst ->
-                        results.add(Unifier.substitute(uniqueRule.head, bodySubst))
+                solveRecursiveWithConfidence(uniqueRule.body, 0, headMatch, uniqueRule.confidence, depth + 1, rulesByPredicate, memo)
+                    .forEach { (bodySubst, branchConfidence) ->
+                        results.add(Unifier.substitute(uniqueRule.head, bodySubst).copy(confidence = branchConfidence))
                     }
             }
+            // For now, retaining distinct results might obscure different confidence paths,
+            // but for safe recursion stopping, we must limit. In future iterations,
+            // we might want `maxByOrNull { it.confidence }` grouping.
             val distinct = results.distinct()
             memo[normalizedKey] = distinct
             distinct
@@ -81,18 +174,17 @@ class BackwardChainer(
 
         return resolvedAtoms.asSequence().mapNotNull { resultAtom ->
             val matchSubst = Unifier.unifyAtoms(currentGoal, resultAtom) ?: return@mapNotNull null
-            // If this is a direct fact from the store, carry its confidence; rule-derived atoms
-            // return null confidence (no confidence aggregation for derived facts).
+            // For both base facts and rule-derived atoms, we extract confidence
             val atomConfidence = resultAtom.confidence
             Pair(matchSubst, atomConfidence)
         }.flatMap { (matchSubst, atomConfidence) ->
             val nextSubst = subst + matchSubst
-            // Propagate the minimum confidence encountered along the solution path
+            // Propagate the multiplied confidence encountered along the solution path
             val nextConfidence = when {
                 confidence == null && atomConfidence == null -> null
                 confidence == null -> atomConfidence
                 atomConfidence == null -> confidence
-                else -> minOf(confidence, atomConfidence)
+                else -> confidence * atomConfidence
             }
             solveRecursiveWithConfidence(goals, index + 1, nextSubst, nextConfidence, depth, rulesByPredicate, memo)
         }
@@ -118,6 +210,32 @@ class BackwardChainer(
         }
 
         val currentGoal = Unifier.substitute(goals[index], subst)
+
+        // --- Neuro-Symbolic SIMILAR predicate ---
+        if (currentGoal.predicate == "SIMILAR") {
+            if (currentGoal.args.size != 3) {
+                throw IllegalStateException("SIMILAR requires exactly 3 arguments: a, b, threshold. Got ${currentGoal.args.size}")
+            }
+            val arg1 = currentGoal.args[0]
+            val arg2 = currentGoal.args[1]
+            val thresholdArg = currentGoal.args[2]
+
+            if (arg1 is Term.Variable || arg2 is Term.Variable) {
+                throw IllegalStateException("SIMILAR args must be grounded. Unbound variables: $arg1, $arg2")
+            }
+            
+            val threshold = when (thresholdArg) {
+                is Term.NumberLit -> thresholdArg.value
+                else -> throw IllegalStateException("SIMILAR threshold must be a number literal")
+            }
+
+            val sim = semanticContext.cosineSimilarity(arg1.toString().removeSurrounding("\""), arg2.toString().removeSurrounding("\""))
+            if (sim >= threshold) {
+                return solveRecursive(goals, index + 1, subst, depth, rulesByPredicate, memo)
+            } else {
+                return emptySequence()
+            }
+        }
 
         // --- Negation-as-Failure (NAF) handling ---
         // When the body condition carries naf=true, we attempt to prove the
@@ -223,6 +341,43 @@ class BackwardChainer(
 
         val currentGoal = Unifier.substitute(goals[index], subst)
 
+        // --- Neuro-Symbolic SIMILAR predicate handling for Proofs ---
+        if (currentGoal.predicate == "SIMILAR") {
+            if (currentGoal.args.size != 3) {
+                throw IllegalStateException("SIMILAR requires exactly 3 arguments: a, b, threshold. Got ${currentGoal.args.size}")
+            }
+            val arg1 = currentGoal.args[0]
+            val arg2 = currentGoal.args[1]
+            val thresholdArg = currentGoal.args[2]
+
+            if (arg1 is Term.Variable || arg2 is Term.Variable) {
+                throw IllegalStateException("SIMILAR args must be grounded. Unbound variables: $arg1, $arg2")
+            }
+            
+            val threshold = when (thresholdArg) {
+                is Term.NumberLit -> thresholdArg.value
+                else -> throw IllegalStateException("SIMILAR threshold must be a number literal")
+            }
+
+            val sim = semanticContext.cosineSimilarity(arg1.toString().removeSurrounding("\""), arg2.toString().removeSurrounding("\""))
+            if (sim >= threshold) {
+                val simFact = Atom(
+                    "SIMILAR_EVALUATED", 
+                    listOf(Term.StringLit(arg1.toString()), Term.StringLit(arg2.toString()), Term.NumberLit(sim))
+                )
+                val proofNode = ProofNode(
+                    goal = currentGoal,
+                    step = ProofStep.FactMatch(simFact),
+                    substitution = emptyMap()
+                )
+                return solveRecursiveWithProof(goals, index + 1, subst, depth, rulesByPredicate).map { (restSubst, restProofs) ->
+                    Pair(restSubst, listOf(proofNode) + restProofs)
+                }
+            } else {
+                return emptySequence()
+            }
+        }
+
         // 1. Unify with facts
         val factMatches = store.match(currentGoal).mapNotNull { fact ->
             val unification = Unifier.unifyAtoms(currentGoal, fact)
@@ -295,6 +450,43 @@ class BackwardChainer(
 
     companion object {
         private val varCounter = AtomicLong(0)
+
+        /**
+         * Makes a blocking HTTP GET to [url], parses the JSON response, and extracts
+         * the value at [jsonPath] (supports simple `$.field` and `$.field.nested.path`).
+         * Returns the extracted value as a String, or null on any error.
+         */
+        fun resolveHttpGetJson(url: String, jsonPath: String): String? {
+            return try {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.connectTimeout = 5_000
+                connection.readTimeout = 10_000
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Accept", "application/json")
+                val status = connection.responseCode
+                if (status !in 200..299) return null
+                val body = connection.inputStream.bufferedReader().readText()
+
+                // Simple JSONPath: $.field or $.field.subfield ... etc
+                val segments = jsonPath.trimStart('$', '.').split('.')
+                var element: JsonElement = Json.parseToJsonElement(body)
+                for (segment in segments) {
+                    if (segment.isEmpty()) continue
+                    element = when (element) {
+                        is JsonObject -> element[segment] ?: return null
+                        is JsonArray  -> element[segment.toInt()]
+                        else          -> return null
+                    }
+                }
+                // Unwrap primitive values
+                when (element) {
+                    is JsonPrimitive -> if (element.isString) element.content else element.toString()
+                    else             -> element.toString()
+                }
+            } catch (e: Exception) {
+                null  // network or parse error → predicate fails
+            }
+        }
     }
 
     // Simple standardization apart — renames variables to unique names while
@@ -320,7 +512,9 @@ class BackwardChainer(
         return Rule(
             variables = rule.variables.map { Term.Variable(it.name + suffix) },
             head = renameAtom(rule.head),
-            body = rule.body.map { renameAtom(it) }
+            body = rule.body.map { renameAtom(it) },
+            scope = rule.scope,
+            confidence = rule.confidence
         )
     }
 }

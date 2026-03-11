@@ -88,11 +88,57 @@ class OpenAiCompatibleProvider(
             throw RuntimeException("LLM API error (${response.status}): $body")
         }
 
-        val json = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        val completionBody = response.bodyAsText()
+        val json = Json.parseToJsonElement(completionBody).jsonObject
         val choices = json["choices"]?.jsonArray
             ?: throw RuntimeException("No 'choices' in LLM response")
         val content = choices[0].jsonObject["message"]?.jsonObject?.get("content")?.jsonPrimitive?.content
             ?: throw RuntimeException("No content in LLM response")
         return content
+    }
+
+    override suspend fun embed(text: String): FloatArray {
+        if (text.isBlank()) return FloatArray(0)
+        
+        // Use text-embedding-3-small as default for OpenAI, otherwise fallback to configured model
+        val embedModel = if (baseUrl.contains("openai.com")) "text-embedding-3-small" else model
+
+        val requestBody = buildJsonObject {
+            put("model", embedModel)
+            put("input", text)
+        }
+
+        val response = client.post("${baseUrl.trimEnd('/')}/embeddings") {
+            contentType(ContentType.Application.Json)
+            if (!apiKey.isNullOrBlank()) {
+                header("Authorization", "Bearer $apiKey")
+            }
+            setBody(requestBody.toString())
+        }
+
+        val responseBody = response.bodyAsText()
+
+        if (response.status.value !in 200..299) {
+            throw RuntimeException("LLM Embedding API error (${response.status}): $responseBody")
+        }
+
+        val json = Json.parseToJsonElement(responseBody).jsonObject
+        // Ollama usually returns `embedding` or `embeddings` directly, while OpenAI uses `data[0].embedding`
+        val embeddingArray = if (json.containsKey("data")) {
+            val data = json["data"]?.jsonArray
+                ?: throw RuntimeException("No 'data' in Embedding response")
+            data[0].jsonObject["embedding"]?.jsonArray
+        } else if (json.containsKey("embedding")) {
+            json["embedding"]?.jsonArray
+        } else if (json.containsKey("embeddings")) {
+            // some ollama versions return `embeddings`
+            json["embeddings"]?.jsonArray?.get(0)?.jsonArray
+        } else {
+            null
+        } ?: throw RuntimeException("No embedding found in response: $responseBody")
+            
+        return FloatArray(embeddingArray!!.size) { i ->
+            embeddingArray[i].jsonPrimitive.float
+        }
     }
 }
