@@ -20,12 +20,13 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 logger = logging.getLogger("nocturnusai.langgraph")
 
 try:
-    from langgraph.checkpoint.base import BaseCheckpointSaver
+    from langgraph.checkpoint.base import BaseCheckpointSaver  # noqa: F401
 
     _LANGGRAPH_AVAILABLE = True
 except ImportError:

@@ -20,7 +20,7 @@ def mock_client() -> MagicMock:
 
 class TestLangGraphImportGuard:
     def test_check_raises_without_package(self) -> None:
-        from nocturnusai.langgraph import _check_langgraph, _LANGGRAPH_AVAILABLE
+        from nocturnusai.langgraph import _LANGGRAPH_AVAILABLE, _check_langgraph
         if not _LANGGRAPH_AVAILABLE:
             with pytest.raises(ImportError, match="pip install nocturnusai\\[langgraph\\]"):
                 _check_langgraph()

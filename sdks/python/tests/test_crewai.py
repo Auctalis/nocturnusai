@@ -1,8 +1,7 @@
 """Tests for CrewAI integration."""
 from __future__ import annotations
 
-import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -24,7 +23,7 @@ class TestCrewAIImportGuard:
 
     def test_check_crewai_raises_without_package(self) -> None:
         """_check_crewai raises ImportError when crewai is not installed."""
-        from nocturnusai.crewai import _check_crewai, _CREWAI_AVAILABLE
+        from nocturnusai.crewai import _CREWAI_AVAILABLE, _check_crewai
 
         if not _CREWAI_AVAILABLE:
             with pytest.raises(ImportError, match="pip install nocturnusai\\[crewai\\]"):

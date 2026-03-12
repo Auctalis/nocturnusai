@@ -18,7 +18,7 @@ def mock_client() -> MagicMock:
 
 class TestOpenAIAgentsImportGuard:
     def test_check_raises_without_package(self) -> None:
-        from nocturnusai.openai_agents import _check_openai_agents, _OPENAI_AGENTS_AVAILABLE
+        from nocturnusai.openai_agents import _OPENAI_AGENTS_AVAILABLE, _check_openai_agents
         if not _OPENAI_AGENTS_AVAILABLE:
             with pytest.raises(ImportError, match="pip install nocturnusai\\[openai-agents\\]"):
                 _check_openai_agents()

@@ -25,7 +25,7 @@ def mock_client() -> MagicMock:
 
 class TestAutoGenImportGuard:
     def test_check_raises_without_package(self) -> None:
-        from nocturnusai.autogen import _check_autogen, _AUTOGEN_AVAILABLE
+        from nocturnusai.autogen import _AUTOGEN_AVAILABLE, _check_autogen
         if not _AUTOGEN_AVAILABLE:
             with pytest.raises(ImportError, match="pip install nocturnusai\\[autogen\\]"):
                 _check_autogen()
@@ -41,7 +41,7 @@ class TestAutoGenTools:
         from nocturnusai.autogen import get_nocturnusai_tools
         tools = get_nocturnusai_tools(mock_client)
         tell = [t for t in tools if "tell" in t.__name__][0]
-        result = tell(predicate="likes", args='["alice", "bob"]')
+        tell(predicate="likes", args='["alice", "bob"]')
         mock_client.assert_fact.assert_called_once()
 
 

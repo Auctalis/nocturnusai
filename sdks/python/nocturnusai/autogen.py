@@ -23,7 +23,7 @@ from typing import Any
 logger = logging.getLogger("nocturnusai.autogen")
 
 try:
-    from autogen_agentchat.tools import FunctionTool
+    from autogen_agentchat.tools import FunctionTool  # noqa: F401
 
     _AUTOGEN_AVAILABLE = True
 except ImportError:
