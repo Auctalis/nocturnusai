@@ -19,6 +19,11 @@ keywords = [
     "knowledge-base",
     "reasoning",
     "symbolic-ai",
+    "agent-memory",
+    "crewai",
+    "autogen",
+    "langgraph",
+    "openai-agents",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -42,6 +47,18 @@ dependencies = [
 langchain = [
     "langchain-core>=0.2.0,<1.0.0",
 ]
+crewai = [
+    "crewai>=0.80",
+]
+autogen = [
+    "autogen-agentchat>=0.4",
+]
+langgraph = [
+    "langgraph-checkpoint>=2.0",
+]
+openai-agents = [
+    "openai-agents>=0.1",
+]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
@@ -51,6 +68,10 @@ dev = [
 ]
 all = [
     "nocturnusai[langchain]",
+    "nocturnusai[crewai]",
+    "nocturnusai[autogen]",
+    "nocturnusai[langgraph]",
+    "nocturnusai[openai-agents]",
 ]
 
 [project.urls]
