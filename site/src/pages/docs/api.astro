@@ -1,5 +1,6 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
@@ -352,4 +353,9 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
         </table>
     </div>
 
+    <NextSteps links={[
+        { title: "SDKs", description: "Python and TypeScript client libraries", href: `${base}/docs/sdks` },
+        { title: "MCP Integration", description: "JSON-RPC 2.0 protocol for agent tools", href: `${base}/docs/mcp` },
+        { title: "Core Concepts", description: "Understand the logic model behind the API", href: `${base}/docs/concepts` },
+    ]} />
 </DocsLayout>

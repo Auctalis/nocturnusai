@@ -1,5 +1,6 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
@@ -177,4 +178,9 @@ curl -N http://localhost:9300/mcp/sse</code></pre>
     <h2 id="a2a">Agent-to-Agent Discovery</h2>
     <p>Nocturnus serves an <a href="https://google.github.io/A2A/" target="_blank">Agent2Agent Protocol</a> discovery card at <code>GET /.well-known/agent.json</code>. Other agents can automatically discover and interact with your fact database without manual configuration.</p>
 
+    <NextSteps links={[
+        { title: "Integrations", description: "LangChain, CrewAI, AutoGen, and more framework integrations", href: `${base}/docs/integrations` },
+        { title: "API Reference", description: "Full HTTP endpoint documentation", href: `${base}/docs/api` },
+        { title: "CLI Reference", description: "Interactive REPL and command reference", href: `${base}/docs/cli` },
+    ]} />
 </DocsLayout>

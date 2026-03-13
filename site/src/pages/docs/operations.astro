@@ -1,5 +1,7 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="Operations">
@@ -126,4 +128,9 @@ spec:
     <h2 id="a2a">Agent-to-Agent Discovery</h2>
     <p>Nocturnus serves an <a href="https://google.github.io/A2A/" target="_blank">Agent2Agent Protocol</a> discovery card at <code>GET /.well-known/agent.json</code>. Other agents can automatically discover and interact with your fact database.</p>
 
+    <NextSteps links={[
+        { title: "Security & Auth", description: "API keys, roles, and encryption", href: `${base}/docs/security` },
+        { title: "Multi-Tenancy", description: "Tenant isolation and scoped data", href: `${base}/docs/multi-tenancy` },
+        { title: "API Reference", description: "Health check and metrics endpoints", href: `${base}/docs/api` },
+    ]} />
 </DocsLayout>

@@ -1,5 +1,6 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
@@ -704,4 +705,9 @@ default&gt; dsl QUERY mortal(?who).</code></pre>
     });
 </script>
 
+    <NextSteps links={[
+        { title: "API Reference", description: "Full HTTP endpoint documentation", href: `${base}/docs/api` },
+        { title: "Core Concepts", description: "Facts, rules, inference, and salience scoring", href: `${base}/docs/concepts` },
+        { title: "Operations", description: "Monitoring, persistence, and deployment", href: `${base}/docs/operations` },
+    ]} />
 </DocsLayout>

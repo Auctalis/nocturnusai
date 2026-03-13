@@ -1,5 +1,6 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
@@ -188,4 +189,9 @@ curl -X POST http://localhost:9300/auth/keys \
     "description": "Acme Corp writer key"
   &#125;'</code></pre>
 
+    <NextSteps links={[
+        { title: "Security & Auth", description: "API keys, roles, and encryption", href: `${base}/docs/security` },
+        { title: "Operations", description: "Monitoring, persistence, and deployment", href: `${base}/docs/operations` },
+        { title: "API Reference", description: "Headers and endpoint documentation", href: `${base}/docs/api` },
+    ]} />
 </DocsLayout>

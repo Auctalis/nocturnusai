@@ -1,5 +1,6 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
@@ -163,4 +164,9 @@ TLS_KEYSTORE_PASSWORD=your-password</code></pre>
         <strong>💡 MCP with Auth.</strong> When using MCP with auth enabled, add the bearer token to your MCP client config headers. See <a href={`${base}/docs/mcp#auth`}>MCP Integration</a> for details.
     </div>
 
+    <NextSteps links={[
+        { title: "Multi-Tenancy", description: "Isolate data across organizations and environments", href: `${base}/docs/multi-tenancy` },
+        { title: "Operations", description: "Monitoring, logging, and persistence", href: `${base}/docs/operations` },
+        { title: "API Reference", description: "Full endpoint documentation including auth headers", href: `${base}/docs/api` },
+    ]} />
 </DocsLayout>

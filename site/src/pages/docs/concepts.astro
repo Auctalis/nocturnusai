@@ -1,5 +1,6 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
@@ -184,4 +185,9 @@ curl -X POST http://localhost:9300/memory/decay \
   -H "Content-Type: application/json" \
   -d '&#123;"threshold": 0.05&#125;'</code></pre>
 
+    <NextSteps links={[
+        { title: "API Reference", description: "Every endpoint with full request/response shapes", href: `${base}/docs/api` },
+        { title: "CLI Reference", description: "Interactive REPL for exploring facts and rules", href: `${base}/docs/cli` },
+        { title: "Integrations", description: "Connect NocturnusAI to your agent framework", href: `${base}/docs/integrations` },
+    ]} />
 </DocsLayout>

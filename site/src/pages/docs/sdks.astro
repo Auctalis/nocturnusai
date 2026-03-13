@@ -1,5 +1,7 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="SDKs">
@@ -364,4 +366,9 @@ const result = await mcp.callTool('ask', &#123;
   args: ['?who', 'charlie']
 &#125;);</code></pre>
 
+    <NextSteps links={[
+        { title: "Integrations", description: "Quick-start cards for all 6 framework integrations", href: `${base}/docs/integrations` },
+        { title: "API Reference", description: "Every endpoint with full request/response shapes", href: `${base}/docs/api` },
+        { title: "MCP Integration", description: "Connect via Model Context Protocol in 30 seconds", href: `${base}/docs/mcp` },
+    ]} />
 </DocsLayout>

@@ -1,5 +1,7 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="LLM Integration">
@@ -190,4 +192,9 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
         <li><code>LLM_TEMPERATURE=0.1</code> — lower = more deterministic extraction</li>
     </ul>
 
+    <NextSteps links={[
+        { title: "Quickstart", description: "Use natural language mode with LLM extraction", href: `${base}/docs` },
+        { title: "API Reference", description: "Extract and synthesize endpoint details", href: `${base}/docs/api` },
+        { title: "Integrations", description: "Connect to LangChain, CrewAI, and more", href: `${base}/docs/integrations` },
+    ]} />
 </DocsLayout>
