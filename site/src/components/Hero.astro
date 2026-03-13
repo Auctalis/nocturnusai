@@ -132,8 +132,17 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <!-- Framework compatibility -->
     <div class="mt-8 flex flex-wrap items-center justify-center gap-3 animate-fade-in-up delay-400">
       <span class="text-xs text-slate-600 uppercase tracking-wider font-medium">Works with</span>
-      {["LangChain", "CrewAI", "Claude", "Cursor", "Windsurf", "AutoGen", "Any MCP client"].map(f => (
-        <span class="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-400">{f}</span>
+      {[
+        { name: "LangChain", href: `${base}/docs/integrations#langchain` },
+        { name: "CrewAI", href: `${base}/docs/integrations#crewai` },
+        { name: "AutoGen", href: `${base}/docs/integrations#autogen` },
+        { name: "OpenAI Agents", href: `${base}/docs/integrations#openai-agents` },
+        { name: "Anthropic", href: `${base}/docs/integrations#anthropic` },
+        { name: "Claude", href: `${base}/docs/mcp` },
+        { name: "Cursor", href: `${base}/docs/mcp` },
+        { name: "Any MCP client", href: `${base}/docs/mcp` },
+      ].map(f => (
+        <a href={f.href} class="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-400 hover:text-cyan-400 hover:border-cyan-400/30 transition-colors">{f.name}</a>
       ))}
     </div>
   </div>
