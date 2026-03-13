@@ -98,5 +98,24 @@ warn_unused_configs = true
 # JSON HTTP clients return Any from deserialization; disable at module level
 warn_return_any = false
 
+# Optional framework dependencies — not installed in CI base environment
+[[tool.mypy.overrides]]
+module = [
+    "agents",
+    "agents.*",
+    "crewai",
+    "crewai.*",
+    "autogen_agentchat",
+    "autogen_agentchat.*",
+    "langgraph",
+    "langgraph.*",
+]
+ignore_missing_imports = true
+
+# crewai.tools.BaseTool resolves to Any without stubs — subclassing Any is fine here
+[[tool.mypy.overrides]]
+module = "nocturnusai.crewai"
+disable_error_code = ["misc"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
