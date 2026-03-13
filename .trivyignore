@@ -1,4 +1,1 @@
-# Legacy data files — large binaries, not source code
-axiombase-server/data/sonic/snapshot.bak
-axiombase-server/data/sonic/snapshot.json
-axiombase-server/data/sonic/axiombase.wal
+# Trivy scan exclusions

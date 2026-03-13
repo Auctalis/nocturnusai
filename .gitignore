@@ -4,6 +4,9 @@
 *.DS_Store
 *.swp
 
+# Legacy build artifacts (old project name)
+axiombase-*/
+
 # Gradle
 .gradle/
 build/
