@@ -24,6 +24,99 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         </ul>
     </div>
 
+    <!-- ============ FRAMEWORK INTEGRATIONS ============ -->
+    <div class="framework-strip">
+        <h3 style="margin-top:0; margin-bottom:0.75rem; font-size:1rem; color:white;">Works with your agent stack</h3>
+        <div class="framework-grid">
+            <a href={`${base}/docs/integrations#langchain`} class="fw-card">
+                <span class="fw-name">LangChain</span>
+                <code class="fw-install">pip install nocturnusai[langchain]</code>
+                <span class="fw-snippet">tools = get_nocturnusai_tools(client)</span>
+            </a>
+            <a href={`${base}/docs/integrations#crewai`} class="fw-card">
+                <span class="fw-name">CrewAI</span>
+                <code class="fw-install">pip install nocturnusai[crewai]</code>
+                <span class="fw-snippet">tools = get_nocturnusai_tools(client)</span>
+            </a>
+            <a href={`${base}/docs/integrations#autogen`} class="fw-card">
+                <span class="fw-name">AutoGen</span>
+                <code class="fw-install">pip install nocturnusai[autogen]</code>
+                <span class="fw-snippet">tools = get_nocturnusai_tools(client)</span>
+            </a>
+            <a href={`${base}/docs/integrations#openai-agents`} class="fw-card">
+                <span class="fw-name">OpenAI Agents</span>
+                <code class="fw-install">pip install nocturnusai[openai-agents]</code>
+                <span class="fw-snippet">tools = get_nocturnusai_tools(client)</span>
+            </a>
+            <a href={`${base}/docs/integrations#anthropic`} class="fw-card">
+                <span class="fw-name">Anthropic</span>
+                <code class="fw-install">pip install nocturnusai[anthropic]</code>
+                <span class="fw-snippet">tools = get_nocturnusai_tool_definitions()</span>
+            </a>
+            <a href={`${base}/docs/integrations#langgraph`} class="fw-card">
+                <span class="fw-name">LangGraph</span>
+                <code class="fw-install">pip install nocturnusai[langgraph]</code>
+                <span class="fw-snippet">saver = NocturnusAICheckpointSaver(client)</span>
+            </a>
+        </div>
+        <p style="margin:0.75rem 0 0; font-size:0.8rem; color:rgb(148,163,184);">
+            Also available via <a href={`${base}/docs/mcp`} style="color:#06b6d4;">MCP protocol</a> (Cursor, Claude, any MCP client) · <a href={`${base}/docs/sdks#typescript`} style="color:#06b6d4;">TypeScript SDK</a> · <a href={`${base}/docs/api`} style="color:#06b6d4;">REST API</a>
+        </p>
+    </div>
+
+    <style>
+        .framework-strip {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            border: 1px solid rgba(6, 182, 212, 0.15);
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.05), rgba(139, 92, 246, 0.05));
+        }
+        .framework-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+        @media (max-width: 768px) {
+            .framework-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 480px) {
+            .framework-grid { grid-template-columns: 1fr; }
+        }
+        .fw-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding: 0.75rem;
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.02);
+            text-decoration: none;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .fw-card:hover {
+            border-color: rgba(6, 182, 212, 0.3);
+            background: rgba(6, 182, 212, 0.05);
+        }
+        .fw-name {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: white;
+        }
+        .fw-install {
+            font-size: 0.7rem;
+            color: rgb(148, 163, 184);
+            background: none;
+            padding: 0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .fw-snippet {
+            font-size: 0.7rem;
+            color: #06b6d4;
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+
     <!-- ============ AI INSTALL ============ -->
     <div class="ai-install">
         <div class="ai-install-header">
