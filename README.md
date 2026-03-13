@@ -31,17 +31,6 @@ No prompt engineering. No temperature tuning. The answer is `acme` because the r
 
 ---
 
-> **LEGAL & SAFETY NOTICE**
->
-> NocturnusAI is a deterministic reasoning engine, but **its output is only as reliable as the facts provided to it.**
->
-> 1. **No Warranty of Truth.** "Verified" refers to *logical consistency* of inference, not *accuracy* of real-world claims. If you assert false facts, the engine will derive false but logically consistent conclusions.
-> 2. **Not for Autonomous High-Stakes Decisions.** Do not use this engine for unsupervised medical, financial, legal, or physical-safety decisions without an independent human-in-the-loop verification step.
-> 3. **Logic Layer Only.** NocturnusAI provides information and inference; it does not execute actions. Any agent layer that acts upon NocturnusAI output is a separate system for which the authors bear no responsibility.
-> 4. **No Liability.** Under no circumstances shall the authors or contributors be liable for damages arising from decisions made using engine output. See [DISCLAIMER.md](DISCLAIMER.md) and [LICENSE](LICENSE).
-
----
-
 ## Architecture
 
 ```
@@ -320,3 +309,14 @@ Report vulnerabilities privately via [GitHub Security Advisories](https://github
 ## License
 
 Business Source License 1.1 — free for non-production use and internal production use within your organization. Offering NocturnusAI to third parties as a product or service requires a commercial license from [licensing@nocturnus.ai](mailto:licensing@nocturnus.ai). Converts to Apache 2.0 on 2030-02-19. See [LICENSE](LICENSE) and [DISCLAIMER.md](DISCLAIMER.md).
+
+---
+
+> **LEGAL & SAFETY NOTICE**
+>
+> NocturnusAI is a deterministic reasoning engine, but **its output is only as reliable as the facts provided to it.**
+>
+> 1. **No Warranty of Truth.** "Verified" refers to *logical consistency* of inference, not *accuracy* of real-world claims. If you assert false facts, the engine will derive false but logically consistent conclusions.
+> 2. **Not for Autonomous High-Stakes Decisions.** Do not use this engine for unsupervised medical, financial, legal, or physical-safety decisions without an independent human-in-the-loop verification step.
+> 3. **Logic Layer Only.** NocturnusAI provides information and inference; it does not execute actions. Any agent layer that acts upon NocturnusAI output is a separate system for which the authors bear no responsibility.
+> 4. **No Liability.** Under no circumstances shall the authors or contributors be liable for damages arising from decisions made using engine output. See [DISCLAIMER.md](DISCLAIMER.md) and [LICENSE](LICENSE).

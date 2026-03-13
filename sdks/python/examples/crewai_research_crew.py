@@ -7,7 +7,7 @@ Prerequisites:
     #   -H "Content-Type: application/json" -d '{"tenantId": "default"}'
 """
 from nocturnusai import SyncNocturnusAIClient
-from nocturnusai.crewai import get_nocturnusai_tools, NocturnusAIStorage
+from nocturnusai.crewai import NocturnusAIStorage, get_nocturnusai_tools
 
 client = SyncNocturnusAIClient("http://localhost:9300")
 tools = get_nocturnusai_tools(client)

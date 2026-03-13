@@ -5,7 +5,7 @@ Prerequisites:
     # Start NocturnusAI: ./gradlew :nocturnusai-server:run
 """
 from nocturnusai import SyncNocturnusAIClient
-from nocturnusai.autogen import get_nocturnusai_tools, NocturnusAIMemory
+from nocturnusai.autogen import NocturnusAIMemory, get_nocturnusai_tools
 
 client = SyncNocturnusAIClient("http://localhost:9300")
 tools = get_nocturnusai_tools(client)
