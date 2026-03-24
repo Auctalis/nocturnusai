@@ -65,3 +65,4 @@ generate_llm_txt.py
 hexastore_debug.log
 database_analysis.md
 legal_logic.logiql
+.worktrees/
