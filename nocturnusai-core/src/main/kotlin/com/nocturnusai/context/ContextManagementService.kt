@@ -1,170 +1,155 @@
 package com.nocturnusai.context
 
 import com.nocturnusai.core.Atom
+import com.nocturnusai.core.Rule
+import com.nocturnusai.core.SourceType
+import com.nocturnusai.core.Term
+import com.nocturnusai.inference.BackwardChainer
+import com.nocturnusai.logic.ProvenanceTracker
 import com.nocturnusai.memory.MemoryManager
-import com.nocturnusai.memory.SalienceTracker
 import com.nocturnusai.storage.Hexastore
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.math.min
 
 /**
- * ContextManagementService — token-aware context optimization for AI agents.
+ * ContextManagementService — goal-driven, consistency-checked context optimization.
  *
- * The problem: Large context windows are expensive. Agents re-send stale, redundant,
- * and low-relevance facts every turn, wasting tokens and degrading reasoning quality.
+ * Unlike the v1 that applied arbitrary category buckets, this version is built
+ * around two hard insights:
  *
- * This service solves that by:
- * 1. **Token budgeting** — fits context into a token budget, not just fact count
- * 2. **Category allocation** — distributes budget across categories (core_knowledge, recent_facts, inferred, rules)
- * 3. **Deduplication** — eliminates redundant and subsumed facts
- * 4. **Compression** — groups related facts into compact summaries
- * 5. **Context diffing** — returns only what changed since last window, for incremental updates
- * 6. **Freshness gating** — excludes expired/invalid facts before they consume budget
- * 7. **Importance-weighted allocation** — high-salience facts get priority within each category
+ * 1. **The agent knows what it needs.** Instead of us guessing categories, the agent
+ *    passes a goal (or set of goals) and we use backward chaining to find facts
+ *    *actually relevant to that goal*. Facts unreachable from the goal don't enter
+ *    the context at all.
+ *
+ * 2. **Fact count is the honest budget unit.** Token estimation from character counts
+ *    is unreliable (BPE tokenizers don't respect predicate boundaries). We budget by
+ *    fact count, and report the character count as advisory metadata — not as a first-
+ *    class budget constraint.
+ *
+ * Additional capabilities:
+ * - **Consistency checking**: detects contradictions (P and NOT P) before they enter context
+ * - **Provenance-aware ranking**: facts with known derivation chains rank higher than orphans
+ * - **Deduplication**: consolidated facts subsume their raw sources
+ * - **Session diffing**: incremental updates with bounded session storage (TTL + max sessions)
+ * - **Agent-defined relevance buckets**: the caller defines categories and weights, not us
  */
 class ContextManagementService(
     private val memoryManager: MemoryManager,
-    private val defaultTokenBudget: Int = 4000,
-    private val avgTokensPerFact: Int = 25
+    private val backwardChainer: BackwardChainer? = null,
+    private val provenanceTracker: ProvenanceTracker? = null,
+    private val negativeStore: Hexastore? = null,
+    private val maxSessions: Int = 1000,
+    private val sessionTtlMs: Long = 3_600_000L // 1 hour
 ) {
     private val logger = LoggerFactory.getLogger(ContextManagementService::class.java)
     private val sessionWindows = ConcurrentHashMap<String, ContextSnapshot>()
     private val windowIdCounter = AtomicLong(0)
 
     /**
-     * Build an optimized context window within a token budget.
+     * Goal-driven context: "Given these goals, what facts do I actually need?"
      *
-     * This is the primary entry point. Given a store full of facts, it:
-     * 1. Filters out expired/invalid facts
-     * 2. Scores every fact by salience
-     * 3. Categorizes facts (core knowledge, recent, inferred, rules)
-     * 4. Deduplicates within categories
-     * 5. Allocates token budget across categories
-     * 6. Fills each category's allocation with highest-salience facts
-     * 7. Returns an optimized window with token estimates and metadata
+     * Uses backward chaining to find facts reachable from each goal, then ranks
+     * by salience within that relevant set. Facts not reachable from any goal
+     * are excluded entirely — this is the primary token-saving mechanism.
+     *
+     * If no goals are provided, falls back to salience-ranked retrieval across
+     * all valid facts (equivalent to the existing /memory/context behavior,
+     * but with consistency checking and dedup).
      */
     fun optimizeContext(
         store: Hexastore,
         request: OptimizeContextRequest
     ): OptimizedContextWindow {
         val now = System.currentTimeMillis()
-        val budget = request.tokenBudget ?: defaultTokenBudget
-        val categoryWeights = request.categoryWeights ?: DEFAULT_CATEGORY_WEIGHTS
+        val maxFacts = request.maxFacts ?: 100
 
-        // 1. Gather all valid facts
-        val allAtoms = store.getAllAtoms()
-            .filter { it.isValidAt(now) }
-            .filter { request.scope == null || it.scope == request.scope }
-            .filter { request.predicates == null || it.predicate in request.predicates }
-            .toList()
+        // 1. Gather candidate facts — goal-driven or global
+        val candidates: List<Atom> = if (request.goals.isNullOrEmpty()) {
+            // No goals: fall back to all valid facts (filtered)
+            store.getAllAtoms()
+                .filter { it.isValidAt(now) }
+                .filter { request.scope == null || it.scope == request.scope }
+                .filter { request.predicates == null || it.predicate in request.predicates }
+                .toList()
+        } else {
+            // Goal-driven: use backward chaining to find relevant facts
+            collectGoalRelevantFacts(store, request.goals, request.scope, now)
+        }
 
-        // 2. Score and categorize
-        val scored = allAtoms.map { atom ->
+        // 2. Score by salience
+        val scored = candidates.map { atom ->
             val salience = memoryManager.salienceTracker.computeSalience(atom, now)
-            val category = categorize(atom)
-            val tokenEstimate = estimateTokens(atom)
-            ScoredContextEntry(atom, salience, category, tokenEstimate)
+            val provenanceBoost = if (provenanceTracker?.getDerivation(atom) != null) 0.05 else 0.0
+            ScoredEntry(atom, (salience + provenanceBoost).coerceAtMost(1.0))
         }
 
         // 3. Deduplicate
         val deduped = deduplicate(scored)
         val deduplicationSavings = scored.size - deduped.size
 
-        // 4. Group by category
-        val byCategory = deduped.groupBy { it.category }
+        // 4. Consistency check — flag contradictions
+        val contradictions = findContradictions(deduped, store)
 
-        // 5. Allocate budget across categories
-        val allocations = allocateBudget(budget, categoryWeights, byCategory)
+        // 5. Remove contradicted facts (keep the higher-salience version)
+        val consistent = resolveContradictions(deduped, contradictions)
 
-        // 6. Fill each category with top facts within its token allocation
-        val selectedEntries = mutableListOf<SelectedContextEntry>()
-        val categoryStats = mutableMapOf<String, CategoryStats>()
+        // 6. Apply agent-defined relevance buckets (if provided) or flat ranking
+        val selected: List<SelectedContextEntry>
+        val bucketStats: Map<String, BucketStats>
 
-        for ((category, allocation) in allocations) {
-            val candidates = (byCategory[category] ?: emptyList())
+        if (request.relevanceBuckets != null && request.relevanceBuckets.isNotEmpty()) {
+            val result = applyBuckets(consistent, request.relevanceBuckets, maxFacts)
+            selected = result.first
+            bucketStats = result.second
+        } else {
+            // Flat ranking: just take top N by salience
+            selected = consistent
                 .sortedByDescending { it.salience }
-
-            var tokensUsed = 0
-            val selected = mutableListOf<ScoredContextEntry>()
-
-            for (entry in candidates) {
-                if (tokensUsed + entry.tokenEstimate > allocation.tokenBudget) continue
-                selected.add(entry)
-                tokensUsed += entry.tokenEstimate
-            }
-
-            for (entry in selected) {
-                selectedEntries.add(
+                .take(maxFacts)
+                .map { entry ->
                     SelectedContextEntry(
                         atom = entry.atom,
                         salience = entry.salience,
-                        category = entry.category,
-                        tokenEstimate = entry.tokenEstimate
+                        category = inferCategory(entry.atom, now),
+                        charCount = atomCharCount(entry.atom),
+                        hasProvenance = provenanceTracker?.getDerivation(entry.atom) != null
                     )
-                )
-            }
-
-            categoryStats[category] = CategoryStats(
-                factsAvailable = (byCategory[category] ?: emptyList()).size,
-                factsIncluded = selected.size,
-                tokensAllocated = allocation.tokenBudget,
-                tokensUsed = tokensUsed,
-                minSalience = selected.minOfOrNull { it.salience } ?: 0.0,
-                maxSalience = selected.maxOfOrNull { it.salience } ?: 0.0
-            )
+                }
+            bucketStats = emptyMap()
         }
 
-        // 7. Sort final selection by salience (highest first)
-        selectedEntries.sortByDescending { it.salience }
-
-        val totalTokensUsed = selectedEntries.sumOf { it.tokenEstimate }
-
-        // 8. Compress related facts if requested
-        val compressions = if (request.enableCompression) {
-            compressRelatedFacts(selectedEntries)
-        } else {
-            emptyList()
-        }
-
-        val compressionSavings = compressions.sumOf { it.tokensSaved }
-
-        // 9. Create window and snapshot for diffing
+        // 7. Session snapshot for diffing
         val windowId = "ctx_${windowIdCounter.incrementAndGet()}"
-
-        val window = OptimizedContextWindow(
-            windowId = windowId,
-            entries = selectedEntries,
-            compressions = compressions,
-            totalTokenBudget = budget,
-            totalTokensUsed = totalTokensUsed - compressionSavings,
-            totalFactsAvailable = allAtoms.size,
-            totalFactsIncluded = selectedEntries.size,
-            deduplicationSavings = deduplicationSavings,
-            compressionSavings = compressionSavings,
-            categoryStats = categoryStats,
-            generatedAt = now
-        )
-
-        // Store snapshot for future diffing
         if (request.sessionId != null) {
+            evictStaleSessions(now)
             sessionWindows[request.sessionId] = ContextSnapshot(
                 windowId = windowId,
-                entryKeys = selectedEntries.map { entryKey(it.atom) }.toSet(),
+                entryKeys = selected.map { entryKey(it.atom) }.toSet(),
                 generatedAt = now
             )
         }
 
-        return window
+        return OptimizedContextWindow(
+            windowId = windowId,
+            entries = selected,
+            totalFactsAvailable = candidates.size,
+            totalFactsIncluded = selected.size,
+            deduplicationSavings = deduplicationSavings,
+            contradictionsFound = contradictions.size,
+            contradictionsResolved = contradictions.size,
+            bucketStats = bucketStats,
+            totalCharCount = selected.sumOf { it.charCount },
+            goalDriven = !request.goals.isNullOrEmpty(),
+            generatedAt = now
+        )
     }
 
     /**
-     * Compute what changed since a previous context window.
+     * Incremental diff: what changed since the last window for this session?
      *
-     * Returns only the additions, removals, and updates — so the agent
-     * can apply an incremental patch instead of re-sending everything.
-     * This can save 50-90% of tokens on subsequent turns.
+     * Session state is bounded by maxSessions and sessionTtlMs to prevent leaks.
      */
     fun diffContext(
         store: Hexastore,
@@ -176,20 +161,19 @@ class ContextManagementService(
                 currentWindowId = "none",
                 added = emptyList(),
                 removed = emptyList(),
-                updated = emptyList(),
                 unchanged = 0,
-                tokensSaved = 0,
-                fullRefreshRecommended = true
+                fullRefreshRecommended = true,
+                reason = "no previous session found"
             )
 
-        // Build current optimized window
+        // Build current window
         val currentWindow = optimizeContext(store, OptimizeContextRequest(
-            tokenBudget = request.tokenBudget,
+            maxFacts = request.maxFacts,
             scope = request.scope,
             predicates = request.predicates,
-            categoryWeights = request.categoryWeights,
+            goals = request.goals,
             sessionId = request.sessionId,
-            enableCompression = request.enableCompression
+            relevanceBuckets = request.relevanceBuckets
         ))
 
         val currentKeys = currentWindow.entries.map { entryKey(it.atom) }.toSet()
@@ -197,36 +181,30 @@ class ContextManagementService(
 
         val addedKeys = currentKeys - previousKeys
         val removedKeys = previousKeys - currentKeys
-        val unchangedKeys = currentKeys.intersect(previousKeys)
+        val unchangedCount = currentKeys.intersect(previousKeys).size
 
         val added = currentWindow.entries.filter { entryKey(it.atom) in addedKeys }
-        val removed = removedKeys.toList()
-
-        // Estimate tokens saved by diffing vs full refresh
-        val fullRefreshTokens = currentWindow.totalTokensUsed
-        val diffTokens = added.sumOf { it.tokenEstimate } + removedKeys.size * 5 // ~5 tokens per removal notice
-        val tokensSaved = (fullRefreshTokens - diffTokens).coerceAtLeast(0)
+        val churnRate = if (previousKeys.isNotEmpty()) {
+            (addedKeys.size + removedKeys.size).toDouble() / previousKeys.size
+        } else 1.0
 
         return ContextDiff(
             previousWindowId = previousSnapshot.windowId,
             currentWindowId = currentWindow.windowId,
             added = added,
-            removed = removed,
-            updated = emptyList(), // Future: detect salience changes
-            unchanged = unchangedKeys.size,
-            tokensSaved = tokensSaved,
-            fullRefreshRecommended = addedKeys.size + removedKeys.size > unchangedKeys.size
+            removed = removedKeys.toList(),
+            unchanged = unchangedCount,
+            fullRefreshRecommended = churnRate > 0.5,
+            reason = if (churnRate > 0.5) "high churn (${(churnRate * 100).toInt()}%): full refresh cheaper than patching" else null
         )
     }
 
     /**
-     * Get a context summary — a compact representation of the knowledge base
-     * suitable for system prompts or high-level agent briefings.
+     * Compact knowledge base summary for system prompts.
      */
     fun summarizeContext(
         store: Hexastore,
-        scope: String? = null,
-        maxTokens: Int = 500
+        scope: String? = null
     ): ContextSummary {
         val now = System.currentTimeMillis()
         val allAtoms = store.getAllAtoms()
@@ -234,285 +212,412 @@ class ContextManagementService(
             .filter { scope == null || it.scope == scope }
             .toList()
 
-        // Predicate distribution
         val predicateCounts = allAtoms.groupBy { it.predicate }
             .mapValues { (_, atoms) -> atoms.size }
             .toList()
             .sortedByDescending { it.second }
 
-        // Top predicates by frequency
-        val topPredicates = predicateCounts.take(10).map { (pred, count) ->
-            PredicateSummary(pred, count)
-        }
-
-        // Temporal stats
         val withTtl = allAtoms.count { it.ttl != null }
         val expiringWithin1h = allAtoms.count { atom ->
             atom.ttl != null && atom.createdAt != null &&
                 (atom.createdAt + atom.ttl) < now + 3_600_000L
         }
 
-        // Category distribution
-        val categories = allAtoms.groupBy { categorize(it) }
-            .mapValues { (_, atoms) -> atoms.size }
+        val contradictionPairs = findContradictionsGlobal(allAtoms, store)
 
-        // Top salient facts
         val topFacts = allAtoms
             .map { it to memoryManager.salienceTracker.computeSalience(it, now) }
             .sortedByDescending { it.second }
             .take(5)
             .map { (atom, score) ->
-                SelectedContextEntry(atom, score, categorize(atom), estimateTokens(atom))
+                SelectedContextEntry(atom, score, inferCategory(atom, now), atomCharCount(atom),
+                    provenanceTracker?.getDerivation(atom) != null)
             }
 
         return ContextSummary(
             totalFacts = allAtoms.size,
             predicateCount = predicateCounts.size,
-            topPredicates = topPredicates,
-            categoryDistribution = categories,
+            topPredicates = predicateCounts.take(10).map { PredicateSummary(it.first, it.second) },
             factsWithTtl = withTtl,
             factsExpiringWithin1h = expiringWithin1h,
+            contradictions = contradictionPairs,
             topSalientFacts = topFacts,
-            estimatedTotalTokens = allAtoms.sumOf { estimateTokens(it) },
+            totalCharCount = allAtoms.sumOf { atomCharCount(it) },
             generatedAt = now
         )
     }
 
-    /**
-     * Clear session state (call when agent session ends).
-     */
     fun clearSession(sessionId: String) {
         sessionWindows.remove(sessionId)
     }
 
-    // --- Internal Logic ---
+    // --- Goal-Driven Relevance ---
 
     /**
-     * Categorize an atom into one of the context categories.
-     * Categories determine budget allocation priority.
+     * Use backward chaining to discover which facts are reachable from the given goals.
+     * This is the key differentiator: instead of returning "top facts globally," we
+     * return "facts the agent actually needs to reason about its current goals."
      */
-    internal fun categorize(atom: Atom): String {
-        return when (atom.source) {
-            com.nocturnusai.core.SourceType.INFERRED -> CATEGORY_INFERRED
-            com.nocturnusai.core.SourceType.CONSOLIDATED -> CATEGORY_CONSOLIDATED
-            com.nocturnusai.core.SourceType.USER_INPUT -> {
-                // Distinguish core knowledge from recent facts based on age
-                val age = if (atom.createdAt != null) {
-                    System.currentTimeMillis() - atom.createdAt
-                } else {
-                    Long.MAX_VALUE
+    private fun collectGoalRelevantFacts(
+        store: Hexastore,
+        goals: List<GoalSpec>,
+        scope: String?,
+        now: Long
+    ): List<Atom> {
+        val relevant = linkedSetOf<Atom>() // preserve insertion order, dedup
+
+        for (goal in goals) {
+            val goalAtom = Atom(
+                predicate = goal.predicate,
+                args = goal.args.map { parseTerm(it) },
+                truthVal = true,
+                scope = scope
+            )
+
+            // Direct matches from store
+            store.match(goalAtom, scope = scope)
+                .filter { it.isValidAt(now) }
+                .forEach { relevant.add(it) }
+
+            // Backward chaining: find facts reachable via rules
+            if (backwardChainer != null) {
+                try {
+                    backwardChainer.solve(goalAtom)
+                        .filter { it.isValidAt(now) }
+                        .forEach { result ->
+                            relevant.add(result)
+                            // Also add premises that support this result
+                            collectPremises(result, relevant)
+                        }
+                } catch (e: Exception) {
+                    logger.debug("Backward chaining failed for goal {}: {}", goalAtom, e.message)
                 }
-                when {
-                    atom.ttl != null -> CATEGORY_EPHEMERAL
-                    age < 300_000L -> CATEGORY_RECENT // < 5 minutes old
-                    else -> CATEGORY_CORE_KNOWLEDGE
-                }
+            }
+        }
+
+        return relevant.toList()
+    }
+
+    /**
+     * Walk the provenance chain to include supporting premises.
+     * If mortal(socrates) was derived from human(socrates) + a rule,
+     * the agent needs human(socrates) in context too.
+     */
+    private fun collectPremises(fact: Atom, collected: MutableSet<Atom>) {
+        val derivation = provenanceTracker?.getDerivation(fact) ?: return
+        for (premise in derivation.premises) {
+            if (collected.add(premise)) {
+                collectPremises(premise, collected) // recursive: walk full derivation chain
             }
         }
     }
 
+    // --- Consistency Checking ---
+
     /**
-     * Estimate token count for a fact's string representation.
-     * Uses a simple heuristic: ~4 characters per token for structured data.
+     * Find facts where both P(args) and NOT P(args) appear in the candidate set
+     * or where the candidate set conflicts with the negative store.
      */
-    internal fun estimateTokens(atom: Atom): Int {
-        val predLen = atom.predicate.length
-        val argsLen = atom.args.sumOf { it.toString().length + 2 } // +2 for separators
-        val metaLen = if (atom.metadata.isNotEmpty()) {
-            atom.metadata.entries.sumOf { (k, v) -> k.length + v.toString().length + 4 }
-        } else 0
-        val totalChars = predLen + argsLen + metaLen + 10 // overhead for formatting
-        return (totalChars / 4).coerceAtLeast(5) // minimum 5 tokens per fact
+    private fun findContradictions(
+        entries: List<ScoredEntry>,
+        store: Hexastore
+    ): List<Contradiction> {
+        val contradictions = mutableListOf<Contradiction>()
+        val byKey = entries.groupBy { "${it.atom.predicate}|${it.atom.args.joinToString(",")}" }
+
+        for ((key, group) in byKey) {
+            val positive = group.filter { it.atom.truthVal }
+            val negative = group.filter { !it.atom.truthVal }
+            if (positive.isNotEmpty() && negative.isNotEmpty()) {
+                contradictions.add(Contradiction(
+                    predicate = positive.first().atom.predicate,
+                    args = positive.first().atom.args.map { it.toString() },
+                    positiveSalience = positive.maxOf { it.salience },
+                    negativeSalience = negative.maxOf { it.salience }
+                ))
+            }
+        }
+
+        // Check against negative store
+        if (negativeStore != null) {
+            for (entry in entries) {
+                if (!entry.atom.truthVal) continue
+                val negMatch = negativeStore.match(entry.atom).firstOrNull()
+                if (negMatch != null) {
+                    val existing = contradictions.any {
+                        it.predicate == entry.atom.predicate &&
+                        it.args == entry.atom.args.map { a -> a.toString() }
+                    }
+                    if (!existing) {
+                        contradictions.add(Contradiction(
+                            predicate = entry.atom.predicate,
+                            args = entry.atom.args.map { it.toString() },
+                            positiveSalience = entry.salience,
+                            negativeSalience = 0.0
+                        ))
+                    }
+                }
+            }
+        }
+
+        return contradictions
     }
 
     /**
-     * Deduplicate facts — remove entries that are subsumed by or identical to others.
-     *
-     * Dedup strategies:
-     * - Exact duplicates (same predicate + args, different temporal fields)
-     * - Subsumption: consolidated facts supersede their raw episodic sources
+     * Lightweight global contradiction scan for summaries.
      */
-    internal fun deduplicate(entries: List<ScoredContextEntry>): List<ScoredContextEntry> {
+    private fun findContradictionsGlobal(atoms: List<Atom>, store: Hexastore): Int {
+        val byKey = atoms.groupBy { "${it.predicate}|${it.args.joinToString(",")}" }
+        var count = 0
+        for ((_, group) in byKey) {
+            val hasPos = group.any { it.truthVal }
+            val hasNeg = group.any { !it.truthVal }
+            if (hasPos && hasNeg) count++
+        }
+        return count
+    }
+
+    /**
+     * Resolve contradictions by keeping the higher-salience side.
+     */
+    private fun resolveContradictions(
+        entries: List<ScoredEntry>,
+        contradictions: List<Contradiction>
+    ): List<ScoredEntry> {
+        if (contradictions.isEmpty()) return entries
+
+        val contradictedKeys = contradictions.map { c ->
+            val keepPositive = c.positiveSalience >= c.negativeSalience
+            Triple("${c.predicate}|${c.args.joinToString(",")}", keepPositive, !keepPositive)
+        }
+
+        return entries.filter { entry ->
+            val key = "${entry.atom.predicate}|${entry.atom.args.joinToString(",")}"
+            val rule = contradictedKeys.find { it.first == key }
+            if (rule == null) {
+                true // not contradicted
+            } else {
+                // Keep the side with higher salience
+                if (entry.atom.truthVal) rule.second else rule.third
+            }
+        }
+    }
+
+    // --- Agent-Defined Relevance Buckets ---
+
+    /**
+     * The agent defines its own buckets with predicates and weight.
+     * We fill each bucket proportionally, then use remaining budget for overflow.
+     *
+     * This replaces the hardcoded category system. The agent knows its domain:
+     * - A cooking agent: buckets for "ingredients", "steps", "preferences"
+     * - A code agent: buckets for "functions", "types", "errors"
+     * - A planning agent: buckets for "goals", "constraints", "resources"
+     */
+    private fun applyBuckets(
+        entries: List<ScoredEntry>,
+        buckets: List<RelevanceBucket>,
+        totalMaxFacts: Int
+    ): Pair<List<SelectedContextEntry>, Map<String, BucketStats>> {
+        val now = System.currentTimeMillis()
+        val totalWeight = buckets.sumOf { it.weight }
+        val selected = mutableListOf<SelectedContextEntry>()
+        val stats = mutableMapOf<String, BucketStats>()
+        val usedAtomKeys = mutableSetOf<String>()
+
+        for (bucket in buckets) {
+            val bucketMax = ((bucket.weight / totalWeight) * totalMaxFacts).toInt().coerceAtLeast(1)
+            val matching = entries
+                .filter { entry ->
+                    val key = entryKey(entry.atom)
+                    key !in usedAtomKeys && (
+                        bucket.predicates == null ||
+                        entry.atom.predicate in bucket.predicates
+                    )
+                }
+                .sortedByDescending { it.salience }
+                .take(bucketMax)
+
+            for (entry in matching) {
+                val key = entryKey(entry.atom)
+                usedAtomKeys.add(key)
+                selected.add(SelectedContextEntry(
+                    atom = entry.atom,
+                    salience = entry.salience,
+                    category = bucket.name,
+                    charCount = atomCharCount(entry.atom),
+                    hasProvenance = provenanceTracker?.getDerivation(entry.atom) != null
+                ))
+            }
+
+            stats[bucket.name] = BucketStats(
+                factsIncluded = matching.size,
+                maxAllocation = bucketMax,
+                minSalience = matching.minOfOrNull { it.salience } ?: 0.0,
+                maxSalience = matching.maxOfOrNull { it.salience } ?: 0.0
+            )
+        }
+
+        // Fill remaining budget with unclaimed facts
+        val remaining = totalMaxFacts - selected.size
+        if (remaining > 0) {
+            val overflow = entries
+                .filter { entryKey(it.atom) !in usedAtomKeys }
+                .sortedByDescending { it.salience }
+                .take(remaining)
+
+            for (entry in overflow) {
+                selected.add(SelectedContextEntry(
+                    atom = entry.atom,
+                    salience = entry.salience,
+                    category = "_overflow",
+                    charCount = atomCharCount(entry.atom),
+                    hasProvenance = provenanceTracker?.getDerivation(entry.atom) != null
+                ))
+            }
+        }
+
+        return Pair(selected, stats)
+    }
+
+    // --- Deduplication ---
+
+    /**
+     * Remove exact duplicates and facts subsumed by consolidated versions.
+     * Does NOT attempt semantic dedup (that requires embeddings we don't have).
+     */
+    private fun deduplicate(entries: List<ScoredEntry>): List<ScoredEntry> {
         val seen = mutableSetOf<String>()
         val consolidatedPredicates = entries
-            .filter { it.atom.source == com.nocturnusai.core.SourceType.CONSOLIDATED }
+            .filter { it.atom.source == SourceType.CONSOLIDATED }
             .map { it.atom.predicate.removeSuffix("_consolidated") }
             .toSet()
 
         return entries.filter { entry ->
-            val key = entryKey(entry.atom)
-
             // Skip raw facts that have been consolidated
-            if (entry.atom.source == com.nocturnusai.core.SourceType.USER_INPUT &&
-                entry.atom.predicate in consolidatedPredicates
-            ) {
+            if (entry.atom.source == SourceType.USER_INPUT &&
+                entry.atom.predicate in consolidatedPredicates) {
                 return@filter false
             }
-
             // Skip exact duplicates
-            seen.add(key)
+            seen.add(entryKey(entry.atom))
         }
     }
 
+    // --- Session Management ---
+
     /**
-     * Allocate token budget across categories using weights.
-     * Categories with more available facts get proportionally more budget,
-     * but weights set the maximum share each category can claim.
+     * Evict sessions older than TTL or when over capacity.
+     * Prevents unbounded memory growth.
      */
-    internal fun allocateBudget(
-        totalBudget: Int,
-        weights: Map<String, Double>,
-        available: Map<String, List<ScoredContextEntry>>
-    ): Map<String, BudgetAllocation> {
-        val allocations = mutableMapOf<String, BudgetAllocation>()
-
-        // First pass: compute weighted shares
-        val totalWeight = weights.values.sum()
-        val activeCats = weights.keys.filter { (available[it]?.size ?: 0) > 0 }
-
-        if (activeCats.isEmpty()) return allocations
-
-        // Redistribute budget from empty categories to active ones
-        val activeWeight = activeCats.sumOf { weights[it] ?: 0.0 }
-        val scaleFactor = if (activeWeight > 0) totalWeight / activeWeight else 1.0
-
-        for (cat in activeCats) {
-            val weight = (weights[cat] ?: 0.0) * scaleFactor
-            val share = (totalBudget * weight / totalWeight).toInt()
-            val needed = (available[cat] ?: emptyList()).sumOf { it.tokenEstimate }
-            allocations[cat] = BudgetAllocation(
-                tokenBudget = min(share, needed),
-                weight = weight / totalWeight
-            )
+    private fun evictStaleSessions(now: Long) {
+        // TTL eviction
+        sessionWindows.entries.removeIf { (_, snap) ->
+            now - snap.generatedAt > sessionTtlMs
         }
+        // Capacity eviction: remove oldest if over limit
+        if (sessionWindows.size > maxSessions) {
+            val toRemove = sessionWindows.entries
+                .sortedBy { it.value.generatedAt }
+                .take(sessionWindows.size - maxSessions)
+            for (entry in toRemove) {
+                sessionWindows.remove(entry.key)
+            }
+        }
+    }
 
-        // Second pass: redistribute unused budget to categories that need more
-        val usedBudget = allocations.values.sumOf { it.tokenBudget }
-        var surplus = totalBudget - usedBudget
+    // --- Utilities ---
 
-        if (surplus > 0) {
-            for (cat in activeCats.sortedByDescending { weights[it] ?: 0.0 }) {
-                val current = allocations[cat] ?: continue
-                val needed = (available[cat] ?: emptyList()).sumOf { it.tokenEstimate }
-                val canUse = (needed - current.tokenBudget).coerceAtLeast(0)
-                val extra = min(surplus, canUse)
-                if (extra > 0) {
-                    allocations[cat] = current.copy(tokenBudget = current.tokenBudget + extra)
-                    surplus -= extra
+    /**
+     * Infer a category label for display purposes only.
+     * This is descriptive metadata, NOT a budget allocation mechanism.
+     */
+    private fun inferCategory(atom: Atom, now: Long): String {
+        return when (atom.source) {
+            SourceType.INFERRED -> "inferred"
+            SourceType.CONSOLIDATED -> "consolidated"
+            SourceType.USER_INPUT -> {
+                when {
+                    atom.ttl != null -> "ephemeral"
+                    atom.createdAt != null && (now - atom.createdAt) < 300_000L -> "recent"
+                    else -> "asserted"
                 }
             }
         }
-
-        return allocations
     }
 
     /**
-     * Compress related facts into grouped summaries.
-     * Example: 5 facts about "likes(alice, X)" → one compressed entry
-     * "alice likes: [bob, charlie, dogs, hiking, music]"
+     * Character count of a fact's string representation.
+     * Reported as advisory metadata — NOT used for budget decisions.
+     * The caller (SDK/agent) can apply their own tokenizer if they want token counts.
      */
-    internal fun compressRelatedFacts(entries: List<SelectedContextEntry>): List<Compression> {
-        val compressions = mutableListOf<Compression>()
-
-        // Group by predicate + first arg (common pattern: subject-predicate-object)
-        val groups = entries
-            .filter { it.atom.args.size >= 2 }
-            .groupBy { "${it.atom.predicate}|${it.atom.args.first()}" }
-
-        for ((groupKey, group) in groups) {
-            if (group.size < 3) continue // Only compress groups of 3+
-
-            val parts = groupKey.split("|", limit = 2)
-            val predicate = parts[0]
-            val subject = parts.getOrElse(1) { "" }
-
-            val objects = group.map { it.atom.args.drop(1).joinToString(", ") { t -> t.toString() } }
-            val compressed = "$predicate($subject, [${objects.joinToString(", ")}])"
-
-            val originalTokens = group.sumOf { it.tokenEstimate }
-            val compressedTokens = (compressed.length / 4).coerceAtLeast(5)
-
-            if (compressedTokens < originalTokens) {
-                compressions.add(
-                    Compression(
-                        groupKey = groupKey,
-                        predicate = predicate,
-                        subject = subject,
-                        compressedForm = compressed,
-                        originalCount = group.size,
-                        originalTokens = originalTokens,
-                        compressedTokens = compressedTokens,
-                        tokensSaved = originalTokens - compressedTokens
-                    )
-                )
-            }
-        }
-
-        return compressions
+    private fun atomCharCount(atom: Atom): Int {
+        return atom.toString().length
     }
 
     private fun entryKey(atom: Atom): String {
         return "${atom.predicate}|${atom.args.joinToString(",")}|${atom.truthVal}|${atom.scope ?: ""}"
     }
 
-    companion object {
-        // Category names
-        const val CATEGORY_CORE_KNOWLEDGE = "core_knowledge"
-        const val CATEGORY_RECENT = "recent"
-        const val CATEGORY_INFERRED = "inferred"
-        const val CATEGORY_CONSOLIDATED = "consolidated"
-        const val CATEGORY_EPHEMERAL = "ephemeral"
-
-        // Default budget allocation weights (must sum to ~1.0)
-        val DEFAULT_CATEGORY_WEIGHTS = mapOf(
-            CATEGORY_CORE_KNOWLEDGE to 0.35,
-            CATEGORY_RECENT to 0.30,
-            CATEGORY_INFERRED to 0.15,
-            CATEGORY_CONSOLIDATED to 0.10,
-            CATEGORY_EPHEMERAL to 0.10
-        )
+    private fun parseTerm(str: String): Term {
+        return if (str.startsWith("?")) {
+            Term.Variable(str.drop(1))
+        } else {
+            str.toDoubleOrNull()?.let { Term.NumberLit(it) } ?: Term.Identifier(str)
+        }
     }
 }
 
 // --- Data Classes ---
 
+data class GoalSpec(
+    val predicate: String,
+    val args: List<String>
+)
+
+data class RelevanceBucket(
+    val name: String,
+    val predicates: List<String>? = null, // null = match all
+    val weight: Double = 1.0
+)
+
 data class OptimizeContextRequest(
-    val tokenBudget: Int? = null,
+    val maxFacts: Int? = null,
     val scope: String? = null,
     val predicates: List<String>? = null,
-    val categoryWeights: Map<String, Double>? = null,
-    val sessionId: String? = null,
-    val enableCompression: Boolean = false,
-    val minSalience: Double = 0.0
+    val goals: List<GoalSpec>? = null,
+    val relevanceBuckets: List<RelevanceBucket>? = null,
+    val sessionId: String? = null
 )
 
 data class ContextDiffRequest(
     val sessionId: String,
-    val tokenBudget: Int? = null,
+    val maxFacts: Int? = null,
     val scope: String? = null,
     val predicates: List<String>? = null,
-    val categoryWeights: Map<String, Double>? = null,
-    val enableCompression: Boolean = false
+    val goals: List<GoalSpec>? = null,
+    val relevanceBuckets: List<RelevanceBucket>? = null
 )
 
 data class SelectedContextEntry(
     val atom: Atom,
     val salience: Double,
     val category: String,
-    val tokenEstimate: Int
+    val charCount: Int,
+    val hasProvenance: Boolean
 )
 
 data class OptimizedContextWindow(
     val windowId: String,
     val entries: List<SelectedContextEntry>,
-    val compressions: List<Compression>,
-    val totalTokenBudget: Int,
-    val totalTokensUsed: Int,
     val totalFactsAvailable: Int,
     val totalFactsIncluded: Int,
     val deduplicationSavings: Int,
-    val compressionSavings: Int,
-    val categoryStats: Map<String, CategoryStats>,
+    val contradictionsFound: Int,
+    val contradictionsResolved: Int,
+    val bucketStats: Map<String, BucketStats>,
+    val totalCharCount: Int,
+    val goalDriven: Boolean,
     val generatedAt: Long
 )
 
@@ -520,22 +625,21 @@ data class ContextDiff(
     val previousWindowId: String?,
     val currentWindowId: String,
     val added: List<SelectedContextEntry>,
-    val removed: List<String>, // entry keys
-    val updated: List<SelectedContextEntry>,
+    val removed: List<String>,
     val unchanged: Int,
-    val tokensSaved: Int,
-    val fullRefreshRecommended: Boolean
+    val fullRefreshRecommended: Boolean,
+    val reason: String?
 )
 
 data class ContextSummary(
     val totalFacts: Int,
     val predicateCount: Int,
     val topPredicates: List<PredicateSummary>,
-    val categoryDistribution: Map<String, Int>,
     val factsWithTtl: Int,
     val factsExpiringWithin1h: Int,
+    val contradictions: Int,
     val topSalientFacts: List<SelectedContextEntry>,
-    val estimatedTotalTokens: Int,
+    val totalCharCount: Int,
     val generatedAt: Long
 )
 
@@ -544,37 +648,24 @@ data class PredicateSummary(
     val count: Int
 )
 
-data class CategoryStats(
-    val factsAvailable: Int,
+data class BucketStats(
     val factsIncluded: Int,
-    val tokensAllocated: Int,
-    val tokensUsed: Int,
+    val maxAllocation: Int,
     val minSalience: Double,
     val maxSalience: Double
 )
 
-data class Compression(
-    val groupKey: String,
+data class Contradiction(
     val predicate: String,
-    val subject: String,
-    val compressedForm: String,
-    val originalCount: Int,
-    val originalTokens: Int,
-    val compressedTokens: Int,
-    val tokensSaved: Int
+    val args: List<String>,
+    val positiveSalience: Double,
+    val negativeSalience: Double
 )
 
 // Internal types
-internal data class ScoredContextEntry(
+internal data class ScoredEntry(
     val atom: Atom,
-    val salience: Double,
-    val category: String,
-    val tokenEstimate: Int
-)
-
-internal data class BudgetAllocation(
-    val tokenBudget: Int,
-    val weight: Double
+    val salience: Double
 )
 
 internal data class ContextSnapshot(

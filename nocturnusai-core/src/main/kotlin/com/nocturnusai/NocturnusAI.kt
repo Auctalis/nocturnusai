@@ -439,7 +439,7 @@ class NocturnusAI(
 
     // --- Context Management API ---
 
-    /** Build an optimized, token-budgeted context window for an agent. */
+    /** Build an optimized context window, optionally goal-driven via backward chaining. */
     fun optimizeContext(
         request: OptimizeContextRequest,
         tenantId: String? = null
@@ -448,7 +448,7 @@ class NocturnusAI(
         return ctx.contextManager.optimizeContext(ctx.store, request)
     }
 
-    /** Get incremental diff since previous context window (saves tokens on subsequent turns). */
+    /** Get incremental diff since previous context window. */
     fun diffContext(
         request: ContextDiffRequest,
         tenantId: String? = null
@@ -457,17 +457,16 @@ class NocturnusAI(
         return ctx.contextManager.diffContext(ctx.store, request)
     }
 
-    /** Get a compact summary of the knowledge base (for system prompts / briefings). */
+    /** Get a compact summary of the knowledge base. */
     fun summarizeContext(
         tenantId: String? = null,
-        scope: String? = null,
-        maxTokens: Int = 500
+        scope: String? = null
     ): ContextSummary {
         val ctx = getContext(tenantId)
-        return ctx.contextManager.summarizeContext(ctx.store, scope, maxTokens)
+        return ctx.contextManager.summarizeContext(ctx.store, scope)
     }
 
-    /** Clear session state for context diffing (call when agent session ends). */
+    /** Clear session state for context diffing. */
     fun clearContextSession(sessionId: String, tenantId: String? = null) {
         val ctx = getContext(tenantId)
         ctx.contextManager.clearSession(sessionId)

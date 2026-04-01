@@ -13,30 +13,41 @@ import kotlinx.serialization.json.JsonElement
 // --- Request DTOs ---
 
 @Serializable
+data class GoalSpecDto(
+    val predicate: String,
+    val args: List<String>
+)
+
+@Serializable
+data class RelevanceBucketDto(
+    val name: String,
+    val predicates: List<String>? = null,
+    val weight: Double = 1.0
+)
+
+@Serializable
 data class OptimizeContextApiRequest(
-    val tokenBudget: Int? = null,
+    val maxFacts: Int? = null,
     val scope: String? = null,
     val predicates: List<String>? = null,
-    val categoryWeights: Map<String, Double>? = null,
-    val sessionId: String? = null,
-    val enableCompression: Boolean = false,
-    val minSalience: Double = 0.0
+    val goals: List<GoalSpecDto>? = null,
+    val relevanceBuckets: List<RelevanceBucketDto>? = null,
+    val sessionId: String? = null
 )
 
 @Serializable
 data class ContextDiffApiRequest(
     val sessionId: String,
-    val tokenBudget: Int? = null,
+    val maxFacts: Int? = null,
     val scope: String? = null,
     val predicates: List<String>? = null,
-    val categoryWeights: Map<String, Double>? = null,
-    val enableCompression: Boolean = false
+    val goals: List<GoalSpecDto>? = null,
+    val relevanceBuckets: List<RelevanceBucketDto>? = null
 )
 
 @Serializable
 data class ContextSummaryApiRequest(
-    val scope: String? = null,
-    val maxTokens: Int = 500
+    val scope: String? = null
 )
 
 @Serializable
@@ -54,7 +65,8 @@ data class ContextEntryResponse(
     val scope: String? = null,
     val salience: Double,
     val category: String,
-    val tokenEstimate: Int,
+    val charCount: Int,
+    val hasProvenance: Boolean,
     val createdAt: Long? = null,
     val validFrom: Long? = null,
     val validUntil: Long? = null,
@@ -62,23 +74,9 @@ data class ContextEntryResponse(
 )
 
 @Serializable
-data class CompressionResponse(
-    val groupKey: String,
-    val predicate: String,
-    val subject: String,
-    val compressedForm: String,
-    val originalCount: Int,
-    val originalTokens: Int,
-    val compressedTokens: Int,
-    val tokensSaved: Int
-)
-
-@Serializable
-data class CategoryStatsResponse(
-    val factsAvailable: Int,
+data class BucketStatsResponse(
     val factsIncluded: Int,
-    val tokensAllocated: Int,
-    val tokensUsed: Int,
+    val maxAllocation: Int,
     val minSalience: Double,
     val maxSalience: Double
 )
@@ -87,14 +85,14 @@ data class CategoryStatsResponse(
 data class OptimizedContextResponse(
     val windowId: String,
     val entries: List<ContextEntryResponse>,
-    val compressions: List<CompressionResponse>,
-    val totalTokenBudget: Int,
-    val totalTokensUsed: Int,
     val totalFactsAvailable: Int,
     val totalFactsIncluded: Int,
     val deduplicationSavings: Int,
-    val compressionSavings: Int,
-    val categoryStats: Map<String, CategoryStatsResponse>,
+    val contradictionsFound: Int,
+    val contradictionsResolved: Int,
+    val bucketStats: Map<String, BucketStatsResponse>,
+    val totalCharCount: Int,
+    val goalDriven: Boolean,
     val generatedAt: Long
 )
 
@@ -104,10 +102,9 @@ data class ContextDiffResponse(
     val currentWindowId: String,
     val added: List<ContextEntryResponse>,
     val removed: List<String>,
-    val updated: List<ContextEntryResponse>,
     val unchanged: Int,
-    val tokensSaved: Int,
-    val fullRefreshRecommended: Boolean
+    val fullRefreshRecommended: Boolean,
+    val reason: String? = null
 )
 
 @Serializable
@@ -121,11 +118,11 @@ data class ContextSummaryResponse(
     val totalFacts: Int,
     val predicateCount: Int,
     val topPredicates: List<PredicateSummaryResponse>,
-    val categoryDistribution: Map<String, Int>,
     val factsWithTtl: Int,
     val factsExpiringWithin1h: Int,
+    val contradictions: Int,
     val topSalientFacts: List<ContextEntryResponse>,
-    val estimatedTotalTokens: Int,
+    val totalCharCount: Int,
     val generatedAt: Long
 )
 
@@ -138,29 +135,21 @@ private fun SelectedContextEntry.toResponse() = ContextEntryResponse(
     scope = atom.scope,
     salience = salience,
     category = category,
-    tokenEstimate = tokenEstimate,
+    charCount = charCount,
+    hasProvenance = hasProvenance,
     createdAt = atom.createdAt,
     validFrom = atom.validFrom,
     validUntil = atom.validUntil,
     metadata = atom.metadata
 )
 
-private fun Compression.toResponse() = CompressionResponse(
-    groupKey = groupKey,
-    predicate = predicate,
-    subject = subject,
-    compressedForm = compressedForm,
-    originalCount = originalCount,
-    originalTokens = originalTokens,
-    compressedTokens = compressedTokens,
-    tokensSaved = tokensSaved
-)
+private fun GoalSpecDto.toDomain() = GoalSpec(predicate, args)
 
-private fun CategoryStats.toResponse() = CategoryStatsResponse(
-    factsAvailable = factsAvailable,
+private fun RelevanceBucketDto.toDomain() = RelevanceBucket(name, predicates, weight)
+
+private fun BucketStats.toResponse() = BucketStatsResponse(
     factsIncluded = factsIncluded,
-    tokensAllocated = tokensAllocated,
-    tokensUsed = tokensUsed,
+    maxAllocation = maxAllocation,
     minSalience = minSalience,
     maxSalience = maxSalience
 )
@@ -169,7 +158,7 @@ private fun CategoryStats.toResponse() = CategoryStatsResponse(
 
 fun Route.contextManagementRoutes(dbManager: DatabaseManager) {
 
-    // Optimize context: build a token-budgeted, deduplicated, category-allocated context window
+    // Goal-driven context optimization
     post("/context/optimize") {
         try {
             val (db, tenantId) = call.getContext(dbManager)
@@ -177,13 +166,12 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager) {
 
             val result = db.optimizeContext(
                 request = OptimizeContextRequest(
-                    tokenBudget = req.tokenBudget,
+                    maxFacts = req.maxFacts,
                     scope = req.scope,
                     predicates = req.predicates,
-                    categoryWeights = req.categoryWeights,
-                    sessionId = req.sessionId,
-                    enableCompression = req.enableCompression,
-                    minSalience = req.minSalience
+                    goals = req.goals?.map { it.toDomain() },
+                    relevanceBuckets = req.relevanceBuckets?.map { it.toDomain() },
+                    sessionId = req.sessionId
                 ),
                 tenantId = tenantId
             )
@@ -191,14 +179,14 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager) {
             call.respond(OptimizedContextResponse(
                 windowId = result.windowId,
                 entries = result.entries.map { it.toResponse() },
-                compressions = result.compressions.map { it.toResponse() },
-                totalTokenBudget = result.totalTokenBudget,
-                totalTokensUsed = result.totalTokensUsed,
                 totalFactsAvailable = result.totalFactsAvailable,
                 totalFactsIncluded = result.totalFactsIncluded,
                 deduplicationSavings = result.deduplicationSavings,
-                compressionSavings = result.compressionSavings,
-                categoryStats = result.categoryStats.mapValues { (_, v) -> v.toResponse() },
+                contradictionsFound = result.contradictionsFound,
+                contradictionsResolved = result.contradictionsResolved,
+                bucketStats = result.bucketStats.mapValues { (_, v) -> v.toResponse() },
+                totalCharCount = result.totalCharCount,
+                goalDriven = result.goalDriven,
                 generatedAt = result.generatedAt
             ))
         } catch (e: ValidationException) {
@@ -210,7 +198,7 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager) {
         }
     }
 
-    // Context diff: get only what changed since last window (incremental updates)
+    // Incremental diff
     post("/context/diff") {
         try {
             val (db, tenantId) = call.getContext(dbManager)
@@ -219,11 +207,11 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager) {
             val result = db.diffContext(
                 request = ContextDiffRequest(
                     sessionId = req.sessionId,
-                    tokenBudget = req.tokenBudget,
+                    maxFacts = req.maxFacts,
                     scope = req.scope,
                     predicates = req.predicates,
-                    categoryWeights = req.categoryWeights,
-                    enableCompression = req.enableCompression
+                    goals = req.goals?.map { it.toDomain() },
+                    relevanceBuckets = req.relevanceBuckets?.map { it.toDomain() }
                 ),
                 tenantId = tenantId
             )
@@ -233,10 +221,9 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager) {
                 currentWindowId = result.currentWindowId,
                 added = result.added.map { it.toResponse() },
                 removed = result.removed,
-                updated = result.updated.map { it.toResponse() },
                 unchanged = result.unchanged,
-                tokensSaved = result.tokensSaved,
-                fullRefreshRecommended = result.fullRefreshRecommended
+                fullRefreshRecommended = result.fullRefreshRecommended,
+                reason = result.reason
             ))
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
@@ -247,23 +234,23 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager) {
         }
     }
 
-    // Context summary: compact overview of the knowledge base
+    // Knowledge base summary
     post("/context/summary") {
         try {
             val (db, tenantId) = call.getContext(dbManager)
             val req = try { call.receive<ContextSummaryApiRequest>() } catch (_: Exception) { ContextSummaryApiRequest() }
 
-            val result = db.summarizeContext(tenantId, req.scope, req.maxTokens)
+            val result = db.summarizeContext(tenantId, req.scope)
 
             call.respond(ContextSummaryResponse(
                 totalFacts = result.totalFacts,
                 predicateCount = result.predicateCount,
                 topPredicates = result.topPredicates.map { PredicateSummaryResponse(it.predicate, it.count) },
-                categoryDistribution = result.categoryDistribution,
                 factsWithTtl = result.factsWithTtl,
                 factsExpiringWithin1h = result.factsExpiringWithin1h,
+                contradictions = result.contradictions,
                 topSalientFacts = result.topSalientFacts.map { it.toResponse() },
-                estimatedTotalTokens = result.estimatedTotalTokens,
+                totalCharCount = result.totalCharCount,
                 generatedAt = result.generatedAt
             ))
         } catch (e: ValidationException) {
@@ -275,12 +262,11 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager) {
         }
     }
 
-    // Clear session: clean up diffing state when agent session ends
+    // Clear session
     post("/context/session/clear") {
         try {
             val (db, tenantId) = call.getContext(dbManager)
             val req = call.receive<ClearSessionApiRequest>()
-
             db.clearContextSession(req.sessionId, tenantId)
             call.respondText("Session '${req.sessionId}' cleared")
         } catch (e: Exception) {

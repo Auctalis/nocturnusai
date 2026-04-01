@@ -27,6 +27,11 @@ class LogicContext {
     /** Agent memory manager for temporal queries, salience, consolidation, decay. */
     val memoryManager = MemoryManager()
 
-    /** Context management service for token-aware context optimization. */
-    val contextManager = ContextManagementService(memoryManager)
+    /** Context management service — goal-driven, consistency-checked context optimization. */
+    val contextManager = ContextManagementService(
+        memoryManager = memoryManager,
+        backwardChainer = backwardChainer,
+        provenanceTracker = tracker,
+        negativeStore = negativeStore
+    )
 }
