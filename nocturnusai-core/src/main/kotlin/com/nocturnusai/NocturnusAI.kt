@@ -27,6 +27,7 @@ import com.nocturnusai.extraction.ExtractedFact
 import com.nocturnusai.extraction.ExtractedRule
 import com.nocturnusai.extraction.FactExtractor
 import com.nocturnusai.extraction.RuleExtractor
+import com.nocturnusai.context.*
 import com.nocturnusai.memory.*
 import com.nocturnusai.testing.TestRunner
 import com.nocturnusai.transaction.TransactionManager
@@ -434,6 +435,47 @@ class NocturnusAI(
     /** Get the memory manager for a tenant (for direct access to advanced features). */
     fun getMemoryManager(tenantId: String? = null): MemoryManager {
         return getContext(tenantId).memoryManager
+    }
+
+    // --- Context Management API ---
+
+    /** Build an optimized, token-budgeted context window for an agent. */
+    fun optimizeContext(
+        request: OptimizeContextRequest,
+        tenantId: String? = null
+    ): OptimizedContextWindow {
+        val ctx = getContext(tenantId)
+        return ctx.contextManager.optimizeContext(ctx.store, request)
+    }
+
+    /** Get incremental diff since previous context window (saves tokens on subsequent turns). */
+    fun diffContext(
+        request: ContextDiffRequest,
+        tenantId: String? = null
+    ): ContextDiff {
+        val ctx = getContext(tenantId)
+        return ctx.contextManager.diffContext(ctx.store, request)
+    }
+
+    /** Get a compact summary of the knowledge base (for system prompts / briefings). */
+    fun summarizeContext(
+        tenantId: String? = null,
+        scope: String? = null,
+        maxTokens: Int = 500
+    ): ContextSummary {
+        val ctx = getContext(tenantId)
+        return ctx.contextManager.summarizeContext(ctx.store, scope, maxTokens)
+    }
+
+    /** Clear session state for context diffing (call when agent session ends). */
+    fun clearContextSession(sessionId: String, tenantId: String? = null) {
+        val ctx = getContext(tenantId)
+        ctx.contextManager.clearSession(sessionId)
+    }
+
+    /** Get the context management service for a tenant. */
+    fun getContextManager(tenantId: String? = null): ContextManagementService {
+        return getContext(tenantId).contextManager
     }
 
     // --- Tenant Management ---

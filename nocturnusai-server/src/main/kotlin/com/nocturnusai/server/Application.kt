@@ -213,6 +213,7 @@ fun Application.module() {
         transactionRoutes(dbManager)
         testRoutes(dbManager)
         memoryRoutes(dbManager)
+        contextManagementRoutes(dbManager)
         mcpRoutes(dbManager)
         observabilityRoutes(appMicrometerRegistry, dbManager, ServerConfig.storageDir, llmProvider != null)
         replicationRoutes(dbManager)

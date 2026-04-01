@@ -1,5 +1,6 @@
 package com.nocturnusai.core
 
+import com.nocturnusai.context.ContextManagementService
 import com.nocturnusai.inference.ReteEngine
 import com.nocturnusai.inference.BackwardChainer
 import com.nocturnusai.logic.ConsistencyGuard
@@ -25,4 +26,7 @@ class LogicContext {
 
     /** Agent memory manager for temporal queries, salience, consolidation, decay. */
     val memoryManager = MemoryManager()
+
+    /** Context management service for token-aware context optimization. */
+    val contextManager = ContextManagementService(memoryManager)
 }
