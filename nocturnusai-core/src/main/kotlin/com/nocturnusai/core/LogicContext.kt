@@ -34,4 +34,9 @@ class LogicContext {
         provenanceTracker = tracker,
         negativeStore = negativeStore
     )
+
+    init {
+        // Wire up EventBus → cache invalidation for context manager
+        contextManager.subscribeToEvents(memoryManager.eventBus)
+    }
 }
