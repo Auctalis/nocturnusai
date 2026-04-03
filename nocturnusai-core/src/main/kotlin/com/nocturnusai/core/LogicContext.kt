@@ -32,7 +32,8 @@ class LogicContext {
         memoryManager = memoryManager,
         backwardChainer = backwardChainer,
         provenanceTracker = tracker,
-        negativeStore = negativeStore
+        negativeStore = negativeStore,
+        rules = rules
     )
 
     init {

@@ -40,6 +40,7 @@ class ContextManagementService(
     private val backwardChainer: BackwardChainer? = null,
     private val provenanceTracker: ProvenanceTracker? = null,
     private val negativeStore: Hexastore? = null,
+    private val rules: List<Rule>? = null,
     private val sessionStore: SessionStore = InMemorySessionStore(),
     private val goalCacheTtlMs: Long = 30_000L // 30 seconds
 ) {
@@ -50,6 +51,9 @@ class ContextManagementService(
     // Key: normalized goal string, Value: cached result + timestamp
     private val goalCache = ConcurrentHashMap<String, CachedGoalResult>()
     private val cacheGeneration = AtomicLong(0) // incremented on any fact/rule change
+
+    // --- Summary Cache ---
+    @Volatile private var cachedSummary: CachedSummaryResult? = null
 
     // --- EventBus Integration ---
     private var eventSubscriptionId: String? = null
@@ -112,40 +116,65 @@ class ContextManagementService(
         val deduped = deduplicate(scored)
         val deduplicationSavings = scored.size - deduped.size
 
-        // 5. Consistency check
+        // 5. Consistency check — always find contradictions
         val contradictions = findContradictions(deduped)
-        val consistent = resolveContradictions(deduped, contradictions)
 
-        // 6. Apply buckets or flat ranking
+        // 5b. Resolve contradictions only if opt-in (default true for backward compat)
+        val postContradiction: List<ScoredEntry>
+        val contradictionsResolved: Int
+        if (request.autoResolveContradictions && contradictions.isNotEmpty()) {
+            postContradiction = resolveContradictions(deduped, contradictions)
+            contradictionsResolved = contradictions.size
+        } else {
+            postContradiction = deduped
+            contradictionsResolved = 0
+        }
+
+        // 6. Apply diversity cap if requested
+        val diversified = if (request.maxFactsPerPredicate != null) {
+            applyDiversityCap(postContradiction, request.maxFactsPerPredicate)
+        } else {
+            postContradiction
+        }
+
+        // 7. Apply buckets or flat ranking
         val selected: List<SelectedContextEntry>
         val bucketStats: Map<String, BucketStats>
 
         if (request.relevanceBuckets != null && request.relevanceBuckets.isNotEmpty()) {
-            val result = applyBuckets(consistent, request.relevanceBuckets, maxFacts, now)
+            val result = applyBuckets(diversified, request.relevanceBuckets, maxFacts, now)
             selected = result.first
             bucketStats = result.second
         } else {
-            selected = consistent
+            selected = diversified
                 .sortedByDescending { it.salience }
                 .take(maxFacts)
-                .map { entry ->
-                    SelectedContextEntry(
-                        atom = entry.atom,
-                        salience = entry.salience,
-                        category = inferCategory(entry.atom, now),
-                        charCount = atomCharCount(entry.atom),
-                        hasProvenance = provenanceTracker?.getDerivation(entry.atom) != null
-                    )
-                }
+                .map { entry -> toSelectedEntry(entry, now) }
             bucketStats = emptyMap()
         }
 
-        // 7. Session snapshot
+        // 8. Record access — keep salience model up to date (#4)
+        for (entry in selected) {
+            memoryManager.salienceTracker.recordAccess(entry.atom)
+        }
+
+        // 9. Collect relevant rules (#1)
+        val relevantRules = collectRelevantRules(request.goals, request.scope)
+
+        // 10. Session snapshot (store structured entry info for diff #6)
         val windowId = "ctx_${windowIdCounter.incrementAndGet()}"
         if (request.sessionId != null) {
+            val entryInfoMap = selected.associate { entry ->
+                entryKey(entry.atom) to SnapshotEntryInfo(
+                    predicate = entry.atom.predicate,
+                    args = entry.atom.args.map { it.toString() },
+                    negated = !entry.atom.truthVal,
+                    scope = entry.atom.scope
+                )
+            }
             sessionStore.save(request.sessionId, ContextSnapshot(
                 windowId = windowId,
-                entryKeys = selected.map { entryKey(it.atom) }.toSet(),
+                entries = entryInfoMap,
                 generatedAt = now
             ))
         }
@@ -153,16 +182,62 @@ class ContextManagementService(
         return OptimizedContextWindow(
             windowId = windowId,
             entries = selected,
+            relevantRules = relevantRules,
             totalFactsAvailable = candidates.size,
             totalFactsIncluded = selected.size,
             deduplicationSavings = deduplicationSavings,
             contradictionsFound = contradictions.size,
-            contradictionsResolved = contradictions.size,
+            contradictionsResolved = contradictionsResolved,
+            contradictions = contradictions,
             bucketStats = bucketStats,
             totalCharCount = selected.sumOf { it.charCount },
             goalDriven = !request.goals.isNullOrEmpty(),
+            knowledgeGeneration = currentGen,
             generatedAt = now
         )
+    }
+
+    /** Convert a ScoredEntry to a SelectedContextEntry with provenance details. */
+    private fun toSelectedEntry(entry: ScoredEntry, now: Long): SelectedContextEntry {
+        return SelectedContextEntry(
+            atom = entry.atom,
+            salience = entry.salience,
+            category = inferCategory(entry.atom, now),
+            charCount = atomCharCount(entry.atom),
+            provenance = buildDerivationInfo(entry.atom)
+        )
+    }
+
+    /** Build derivation info from provenance tracker if available (#2). */
+    private fun buildDerivationInfo(atom: Atom): DerivationInfo? {
+        val derivation = provenanceTracker?.getDerivation(atom) ?: return null
+        return DerivationInfo(
+            rule = derivation.rule.toString(),
+            premises = derivation.premises.map { it.toString() }
+        )
+    }
+
+    /** Collect rules relevant to goals (#1). */
+    private fun collectRelevantRules(goals: List<GoalSpec>?, scope: String?): List<Rule> {
+        if (goals.isNullOrEmpty() || rules.isNullOrEmpty()) return emptyList()
+        val goalPredicates = goals.map { it.predicate }.toSet()
+        return rules.filter { rule ->
+            (scope == null || rule.scope == null || rule.scope == scope) &&
+            (rule.head.predicate in goalPredicates ||
+             rule.body.any { it.predicate in goalPredicates })
+        }.distinct()
+    }
+
+    /** Enforce per-predicate diversity cap (#5). */
+    private fun applyDiversityCap(entries: List<ScoredEntry>, maxPerPredicate: Int): List<ScoredEntry> {
+        val counts = mutableMapOf<String, Int>()
+        return entries.sortedByDescending { it.salience }.filter { entry ->
+            val count = counts.getOrDefault(entry.atom.predicate, 0)
+            if (count < maxPerPredicate) {
+                counts[entry.atom.predicate] = count + 1
+                true
+            } else false
+        }
     }
 
     fun diffContext(
@@ -190,13 +265,26 @@ class ContextManagementService(
         ))
 
         val currentKeys = currentWindow.entries.map { entryKey(it.atom) }.toSet()
-        val previousKeys = previousSnapshot.entryKeys
+        val previousKeys = previousSnapshot.entries.keys
 
         val addedKeys = currentKeys - previousKeys
         val removedKeys = previousKeys - currentKeys
         val unchangedCount = currentKeys.intersect(previousKeys).size
 
         val added = currentWindow.entries.filter { entryKey(it.atom) in addedKeys }
+
+        // Build structured removed entries from snapshot info (#6)
+        val removed = removedKeys.mapNotNull { key ->
+            val info = previousSnapshot.entries[key] ?: return@mapNotNull null
+            RemovedEntry(
+                key = key,
+                predicate = info.predicate,
+                args = info.args,
+                negated = info.negated,
+                scope = info.scope
+            )
+        }
+
         val churnRate = if (previousKeys.isNotEmpty()) {
             (addedKeys.size + removedKeys.size).toDouble() / previousKeys.size
         } else 1.0
@@ -205,7 +293,7 @@ class ContextManagementService(
             previousWindowId = previousSnapshot.windowId,
             currentWindowId = currentWindow.windowId,
             added = added,
-            removed = removedKeys.toList(),
+            removed = removed,
             unchanged = unchangedCount,
             fullRefreshRecommended = churnRate > 0.5,
             reason = if (churnRate > 0.5) "high churn (${(churnRate * 100).toInt()}%): full refresh cheaper than patching" else null
@@ -216,7 +304,19 @@ class ContextManagementService(
         store: Hexastore,
         scope: String? = null
     ): ContextSummary {
+        val currentGen = cacheGeneration.get()
         val now = System.currentTimeMillis()
+
+        // Check summary cache (#9)
+        val cached = cachedSummary
+        if (cached != null &&
+            cached.generation == currentGen &&
+            cached.scope == scope &&
+            now - cached.computedAt < goalCacheTtlMs
+        ) {
+            return cached.summary
+        }
+
         val allAtoms = store.getAllAtoms()
             .filter { it.isValidAt(now) }
             .filter { scope == null || it.scope == scope }
@@ -243,10 +343,10 @@ class ContextManagementService(
             .take(5)
             .map { (atom, score) ->
                 SelectedContextEntry(atom, score, inferCategory(atom, now), atomCharCount(atom),
-                    provenanceTracker?.getDerivation(atom) != null)
+                    buildDerivationInfo(atom))
             }
 
-        return ContextSummary(
+        val summary = ContextSummary(
             totalFacts = allAtoms.size,
             predicateCount = predicateCounts.size,
             topPredicates = predicateCounts.take(10).map { PredicateSummary(it.first, it.second) },
@@ -255,8 +355,14 @@ class ContextManagementService(
             contradictions = contradictionCount,
             topSalientFacts = topFacts,
             totalCharCount = allAtoms.sumOf { atomCharCount(it) },
+            knowledgeGeneration = currentGen,
             generatedAt = now
         )
+
+        // Cache the result
+        cachedSummary = CachedSummaryResult(summary, scope, currentGen, now)
+
+        return summary
     }
 
     fun clearSession(sessionId: String) {
@@ -334,8 +440,8 @@ class ContextManagementService(
     }
 
     private fun buildGoalCacheKey(goals: List<GoalSpec>, scope: String?): String {
-        val sorted = goals.sortedBy { "${it.predicate}|${it.args.joinToString(",")}" }
-        return "${scope ?: ""}:${sorted.joinToString(";") { "${it.predicate}(${it.args.joinToString(",")})" }}"
+        val sorted = goals.sortedBy { "${it.negated}|${it.predicate}|${it.args.joinToString(",")}" }
+        return "${scope ?: ""}:${sorted.joinToString(";") { "${if (it.negated) "!" else ""}${it.predicate}(${it.args.joinToString(",")})" }}"
     }
 
     private fun collectGoalRelevantFacts(
@@ -350,7 +456,7 @@ class ContextManagementService(
             val goalAtom = Atom(
                 predicate = goal.predicate,
                 args = goal.args.map { parseTerm(it) },
-                truthVal = true,
+                truthVal = !goal.negated,
                 scope = scope
             )
 
@@ -507,7 +613,7 @@ class ContextManagementService(
                     salience = entry.salience,
                     category = bucket.name,
                     charCount = atomCharCount(entry.atom),
-                    hasProvenance = provenanceTracker?.getDerivation(entry.atom) != null
+                    provenance = buildDerivationInfo(entry.atom)
                 ))
             }
 
@@ -532,7 +638,7 @@ class ContextManagementService(
                         salience = entry.salience,
                         category = "_overflow",
                         charCount = atomCharCount(entry.atom),
-                        hasProvenance = provenanceTracker?.getDerivation(entry.atom) != null
+                        provenance = buildDerivationInfo(entry.atom)
                     ))
                 }
         }
@@ -542,17 +648,31 @@ class ContextManagementService(
 
     // --- Deduplication ---
 
+    /**
+     * Deduplicate entries. When a CONSOLIDATED-source atom exists for a predicate+firstArg,
+     * drop USER_INPUT atoms that share the same predicate base and first argument,
+     * since the consolidated version is a summary (#8).
+     */
     private fun deduplicate(entries: List<ScoredEntry>): List<ScoredEntry> {
         val seen = mutableSetOf<String>()
-        val consolidatedPredicates = entries
+
+        // Build a set of (basePredicate, firstArg) pairs covered by consolidated facts
+        val consolidatedCoverage = entries
             .filter { it.atom.source == SourceType.CONSOLIDATED }
-            .map { it.atom.predicate.removeSuffix("_consolidated") }
+            .mapNotNull { entry ->
+                val basePredicate = entry.atom.predicate.removeSuffix("_consolidated")
+                val firstArg = entry.atom.args.firstOrNull()?.toString() ?: return@mapNotNull null
+                Pair(basePredicate, firstArg)
+            }
             .toSet()
 
         return entries.filter { entry ->
-            if (entry.atom.source == SourceType.USER_INPUT &&
-                entry.atom.predicate in consolidatedPredicates) {
-                return@filter false
+            // Skip USER_INPUT facts that are covered by a consolidated summary
+            if (entry.atom.source == SourceType.USER_INPUT && consolidatedCoverage.isNotEmpty()) {
+                val firstArg = entry.atom.args.firstOrNull()?.toString()
+                if (firstArg != null && Pair(entry.atom.predicate, firstArg) in consolidatedCoverage) {
+                    return@filter false
+                }
             }
             seen.add(entryKey(entry.atom))
         }
@@ -649,11 +769,19 @@ internal data class CachedGoalResult(
     val computedAt: Long
 )
 
+internal data class CachedSummaryResult(
+    val summary: ContextSummary,
+    val scope: String?,
+    val generation: Long,
+    val computedAt: Long
+)
+
 // --- Data Classes ---
 
 data class GoalSpec(
     val predicate: String,
-    val args: List<String>
+    val args: List<String>,
+    val negated: Boolean = false
 )
 
 data class RelevanceBucket(
@@ -668,7 +796,9 @@ data class OptimizeContextRequest(
     val predicates: List<String>? = null,
     val goals: List<GoalSpec>? = null,
     val relevanceBuckets: List<RelevanceBucket>? = null,
-    val sessionId: String? = null
+    val sessionId: String? = null,
+    val autoResolveContradictions: Boolean = true,
+    val maxFactsPerPredicate: Int? = null
 )
 
 data class ContextDiffRequest(
@@ -680,33 +810,51 @@ data class ContextDiffRequest(
     val relevanceBuckets: List<RelevanceBucket>? = null
 )
 
+/** Provenance derivation info exposed to callers (#2). */
+data class DerivationInfo(
+    val rule: String,
+    val premises: List<String>
+)
+
 data class SelectedContextEntry(
     val atom: Atom,
     val salience: Double,
     val category: String,
     val charCount: Int,
-    val hasProvenance: Boolean
+    val provenance: DerivationInfo?
 )
 
 data class OptimizedContextWindow(
     val windowId: String,
     val entries: List<SelectedContextEntry>,
+    val relevantRules: List<Rule>,
     val totalFactsAvailable: Int,
     val totalFactsIncluded: Int,
     val deduplicationSavings: Int,
     val contradictionsFound: Int,
     val contradictionsResolved: Int,
+    val contradictions: List<Contradiction>,
     val bucketStats: Map<String, BucketStats>,
     val totalCharCount: Int,
     val goalDriven: Boolean,
+    val knowledgeGeneration: Long,
     val generatedAt: Long
+)
+
+/** Structured info about a fact removed between context snapshots (#6). */
+data class RemovedEntry(
+    val key: String,
+    val predicate: String,
+    val args: List<String>,
+    val negated: Boolean,
+    val scope: String?
 )
 
 data class ContextDiff(
     val previousWindowId: String?,
     val currentWindowId: String,
     val added: List<SelectedContextEntry>,
-    val removed: List<String>,
+    val removed: List<RemovedEntry>,
     val unchanged: Int,
     val fullRefreshRecommended: Boolean,
     val reason: String?
@@ -721,6 +869,7 @@ data class ContextSummary(
     val contradictions: Int,
     val topSalientFacts: List<SelectedContextEntry>,
     val totalCharCount: Int,
+    val knowledgeGeneration: Long,
     val generatedAt: Long
 )
 
@@ -742,8 +891,16 @@ data class Contradiction(
 
 internal data class ScoredEntry(val atom: Atom, val salience: Double)
 
+/** Structured info stored per entry in session snapshots for rich diff output. */
+data class SnapshotEntryInfo(
+    val predicate: String,
+    val args: List<String>,
+    val negated: Boolean,
+    val scope: String?
+)
+
 data class ContextSnapshot(
     val windowId: String,
-    val entryKeys: Set<String>,
+    val entries: Map<String, SnapshotEntryInfo>,
     val generatedAt: Long
 )

@@ -15,7 +15,8 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 data class GoalSpecDto(
     val predicate: String,
-    val args: List<String>
+    val args: List<String>,
+    val negated: Boolean = false
 )
 
 @Serializable
@@ -32,7 +33,9 @@ data class OptimizeContextApiRequest(
     val predicates: List<String>? = null,
     val goals: List<GoalSpecDto>? = null,
     val relevanceBuckets: List<RelevanceBucketDto>? = null,
-    val sessionId: String? = null
+    val sessionId: String? = null,
+    val autoResolveContradictions: Boolean = true,
+    val maxFactsPerPredicate: Int? = null
 )
 
 @Serializable
@@ -42,7 +45,9 @@ data class ContextDiffApiRequest(
     val scope: String? = null,
     val predicates: List<String>? = null,
     val goals: List<GoalSpecDto>? = null,
-    val relevanceBuckets: List<RelevanceBucketDto>? = null
+    val relevanceBuckets: List<RelevanceBucketDto>? = null,
+    val autoResolveContradictions: Boolean = true,
+    val maxFactsPerPredicate: Int? = null
 )
 
 @Serializable
@@ -58,6 +63,12 @@ data class ClearSessionApiRequest(
 // --- Response DTOs ---
 
 @Serializable
+data class DerivationInfoResponse(
+    val rule: String,
+    val premises: List<String>
+)
+
+@Serializable
 data class ContextEntryResponse(
     val predicate: String,
     val args: List<String>,
@@ -66,7 +77,7 @@ data class ContextEntryResponse(
     val salience: Double,
     val category: String,
     val charCount: Int,
-    val hasProvenance: Boolean,
+    val provenance: DerivationInfoResponse? = null,
     val createdAt: Long? = null,
     val validFrom: Long? = null,
     val validUntil: Long? = null,
@@ -82,18 +93,38 @@ data class BucketStatsResponse(
 )
 
 @Serializable
+data class ContradictionResponse(
+    val predicate: String,
+    val args: List<String>,
+    val positiveSalience: Double,
+    val negativeSalience: Double
+)
+
+@Serializable
 data class OptimizedContextResponse(
     val windowId: String,
     val entries: List<ContextEntryResponse>,
+    val relevantRules: List<String>,
     val totalFactsAvailable: Int,
     val totalFactsIncluded: Int,
     val deduplicationSavings: Int,
     val contradictionsFound: Int,
     val contradictionsResolved: Int,
+    val contradictions: List<ContradictionResponse>,
     val bucketStats: Map<String, BucketStatsResponse>,
     val totalCharCount: Int,
     val goalDriven: Boolean,
+    val knowledgeGeneration: Long,
     val generatedAt: Long
+)
+
+@Serializable
+data class RemovedEntryResponse(
+    val key: String,
+    val predicate: String,
+    val args: List<String>,
+    val negated: Boolean = false,
+    val scope: String? = null
 )
 
 @Serializable
@@ -101,7 +132,7 @@ data class ContextDiffResponse(
     val previousWindowId: String?,
     val currentWindowId: String,
     val added: List<ContextEntryResponse>,
-    val removed: List<String>,
+    val removed: List<RemovedEntryResponse>,
     val unchanged: Int,
     val fullRefreshRecommended: Boolean,
     val reason: String? = null
@@ -123,10 +154,16 @@ data class ContextSummaryResponse(
     val contradictions: Int,
     val topSalientFacts: List<ContextEntryResponse>,
     val totalCharCount: Int,
+    val knowledgeGeneration: Long,
     val generatedAt: Long
 )
 
 // --- Mapping helpers ---
+
+private fun DerivationInfo.toResponse() = DerivationInfoResponse(
+    rule = rule,
+    premises = premises
+)
 
 private fun SelectedContextEntry.toResponse() = ContextEntryResponse(
     predicate = atom.predicate,
@@ -136,14 +173,14 @@ private fun SelectedContextEntry.toResponse() = ContextEntryResponse(
     salience = salience,
     category = category,
     charCount = charCount,
-    hasProvenance = hasProvenance,
+    provenance = provenance?.toResponse(),
     createdAt = atom.createdAt,
     validFrom = atom.validFrom,
     validUntil = atom.validUntil,
     metadata = atom.metadata
 )
 
-private fun GoalSpecDto.toDomain() = GoalSpec(predicate, args)
+private fun GoalSpecDto.toDomain() = GoalSpec(predicate, args, negated)
 
 private fun RelevanceBucketDto.toDomain() = RelevanceBucket(name, predicates, weight)
 
@@ -152,6 +189,21 @@ private fun BucketStats.toResponse() = BucketStatsResponse(
     maxAllocation = maxAllocation,
     minSalience = minSalience,
     maxSalience = maxSalience
+)
+
+private fun Contradiction.toResponse() = ContradictionResponse(
+    predicate = predicate,
+    args = args,
+    positiveSalience = positiveSalience,
+    negativeSalience = negativeSalience
+)
+
+private fun RemovedEntry.toResponse() = RemovedEntryResponse(
+    key = key,
+    predicate = predicate,
+    args = args,
+    negated = negated,
+    scope = scope
 )
 
 // --- Routes ---
@@ -171,7 +223,9 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager) {
                     predicates = req.predicates,
                     goals = req.goals?.map { it.toDomain() },
                     relevanceBuckets = req.relevanceBuckets?.map { it.toDomain() },
-                    sessionId = req.sessionId
+                    sessionId = req.sessionId,
+                    autoResolveContradictions = req.autoResolveContradictions,
+                    maxFactsPerPredicate = req.maxFactsPerPredicate
                 ),
                 tenantId = tenantId
             )
@@ -179,14 +233,17 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager) {
             call.respond(OptimizedContextResponse(
                 windowId = result.windowId,
                 entries = result.entries.map { it.toResponse() },
+                relevantRules = result.relevantRules.map { it.toString() },
                 totalFactsAvailable = result.totalFactsAvailable,
                 totalFactsIncluded = result.totalFactsIncluded,
                 deduplicationSavings = result.deduplicationSavings,
                 contradictionsFound = result.contradictionsFound,
                 contradictionsResolved = result.contradictionsResolved,
+                contradictions = result.contradictions.map { it.toResponse() },
                 bucketStats = result.bucketStats.mapValues { (_, v) -> v.toResponse() },
                 totalCharCount = result.totalCharCount,
                 goalDriven = result.goalDriven,
+                knowledgeGeneration = result.knowledgeGeneration,
                 generatedAt = result.generatedAt
             ))
         } catch (e: ValidationException) {
@@ -220,7 +277,7 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager) {
                 previousWindowId = result.previousWindowId,
                 currentWindowId = result.currentWindowId,
                 added = result.added.map { it.toResponse() },
-                removed = result.removed,
+                removed = result.removed.map { it.toResponse() },
                 unchanged = result.unchanged,
                 fullRefreshRecommended = result.fullRefreshRecommended,
                 reason = result.reason
@@ -251,6 +308,7 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager) {
                 contradictions = result.contradictions,
                 topSalientFacts = result.topSalientFacts.map { it.toResponse() },
                 totalCharCount = result.totalCharCount,
+                knowledgeGeneration = result.knowledgeGeneration,
                 generatedAt = result.generatedAt
             ))
         } catch (e: ValidationException) {
