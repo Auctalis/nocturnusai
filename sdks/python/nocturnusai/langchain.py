@@ -147,6 +147,53 @@ if _LANGCHAIN_AVAILABLE:
             description="Optional scope filter.",
         )
 
+    class OptimizeInput(BaseModel):  # type: ignore[misc]
+        """Input schema for the NocturnusAI optimize_context tool."""
+
+        goals: str | None = Field(
+            default=None,
+            description=(
+                "JSON array of goal specs for goal-driven context. "
+                "Each goal: {\"predicate\": \"name\", \"args\": [\"?x\", \"value\"]}. "
+                "Example: '[{\"predicate\": \"recommend\", \"args\": [\"?product\"]}]'"
+            ),
+        )
+        max_facts: int = Field(
+            default=50,
+            description="Maximum number of facts to return.",
+        )
+        session_id: str | None = Field(
+            default=None,
+            description="Session ID for incremental diffing between calls.",
+        )
+        relevance_buckets: str | None = Field(
+            default=None,
+            description=(
+                "JSON array of relevance buckets. "
+                "Each: {\"name\": \"category\", \"predicates\": [\"pred1\"], \"weight\": 3.0}. "
+                "Example: '[{\"name\": \"prefs\", \"predicates\": [\"likes\"], \"weight\": 3}]'"
+            ),
+        )
+        scope: str | None = Field(
+            default=None,
+            description="Optional scope filter.",
+        )
+
+    class ExtractInput(BaseModel):  # type: ignore[misc]
+        """Input schema for the NocturnusAI extract_facts tool."""
+
+        text: str = Field(
+            description="The raw text to extract structured facts from.",
+        )
+        assert_facts: bool = Field(
+            default=True,
+            description="If true, extracted facts are automatically stored in the knowledge base.",
+        )
+        scope: str | None = Field(
+            default=None,
+            description="Optional scope for extracted facts.",
+        )
+
     # ------------------------------------------------------------------
     # Tool definitions
     # ------------------------------------------------------------------
@@ -429,6 +476,184 @@ if _LANGCHAIN_AVAILABLE:
                 scope=scope,
             )
 
+    class NocturnusAIOptimizeTool(BaseTool):  # type: ignore[misc]
+        """LangChain tool for goal-driven optimized context from NocturnusAI.
+
+        Uses backward chaining to find facts reachable from goals,
+        deduplicates, detects contradictions, and applies relevance buckets
+        to return the minimal set of facts needed for reasoning.
+
+        Example invocation by an LLM agent::
+
+            Action: nocturnusai_optimize
+            Action Input: {"goals": "[{\"predicate\": \"recommend\", \"args\": [\"?product\"]}]", "max_facts": 30}
+        """
+
+        name: str = "nocturnusai_optimize"
+        description: str = (
+            "Get a goal-driven optimized context window from NocturnusAI. "
+            "Unlike the basic context tool, this uses backward chaining to find "
+            "facts reachable from your goals, deduplicates, detects contradictions, "
+            "and applies relevance buckets. Returns the minimal set of facts needed "
+            "for reasoning. Use this instead of nocturnusai_context for better results."
+        )
+        args_schema: Type[BaseModel] = OptimizeInput  # type: ignore[assignment]
+        client: Any = None
+
+        model_config = {"arbitrary_types_allowed": True}
+
+        def _run(
+            self,
+            goals: str | None = None,
+            max_facts: int = 50,
+            session_id: str | None = None,
+            relevance_buckets: str | None = None,
+            scope: str | None = None,
+        ) -> str:
+            """Execute the optimize context tool synchronously."""
+            if self.client is None:
+                return "Error: NocturnusAI client not configured."
+
+            parsed_goals: list[dict[str, Any]] | None = None
+            if goals:
+                try:
+                    parsed_goals = json.loads(goals)
+                except (json.JSONDecodeError, TypeError):
+                    return "Error: 'goals' must be a valid JSON array of goal specs."
+
+            parsed_buckets: list[dict[str, Any]] | None = None
+            if relevance_buckets:
+                try:
+                    parsed_buckets = json.loads(relevance_buckets)
+                except (json.JSONDecodeError, TypeError):
+                    return "Error: 'relevance_buckets' must be a valid JSON array."
+
+            try:
+                result = self.client.optimize_context(
+                    goals=parsed_goals,
+                    max_facts=max_facts,
+                    session_id=session_id,
+                    relevance_buckets=parsed_buckets,
+                    scope=scope,
+                )
+                included = result.get("included", 0)
+                available = result.get("available", 0)
+                generation = result.get("generation", 0)
+                contradictions = result.get("contradictions", {})
+                found = contradictions.get("found", 0)
+                resolved = contradictions.get("resolved", 0)
+                rules = result.get("rules", [])
+                facts = result.get("facts", [])
+                goal_label = "goal-driven" if parsed_goals else "global"
+
+                lines = [
+                    f"Optimized Context ({included}/{available} facts, generation={generation}):",
+                    f"Goals: [{goal_label}]",
+                    f"Contradictions: {found} found, {resolved} resolved",
+                    f"Rules: {rules}",
+                    "",
+                    "Facts:",
+                ]
+                for fact in facts:
+                    salience = fact.get("salience", 0.0)
+                    category = fact.get("category", "unknown")
+                    atom = fact.get("atom", {})
+                    predicate = atom.get("predicate", "?")
+                    args = atom.get("args", [])
+                    lines.append(
+                        f"  [salience={salience:.2f}, {category}] "
+                        f"{predicate}({', '.join(args)})"
+                    )
+                return "\n".join(lines)
+            except Exception as e:
+                return f"Error getting optimized context: {e}"
+
+        async def _arun(
+            self,
+            goals: str | None = None,
+            max_facts: int = 50,
+            session_id: str | None = None,
+            relevance_buckets: str | None = None,
+            scope: str | None = None,
+        ) -> str:
+            """Async execution delegates to sync."""
+            return self._run(
+                goals=goals,
+                max_facts=max_facts,
+                session_id=session_id,
+                relevance_buckets=relevance_buckets,
+                scope=scope,
+            )
+
+    class NocturnusAIExtractTool(BaseTool):  # type: ignore[misc]
+        """LangChain tool for extracting structured facts from raw text.
+
+        Sends free-form text to NocturnusAI for LLM-powered extraction
+        into structured predicate-argument facts. Optionally auto-asserts
+        them into the knowledge base.
+
+        Example invocation by an LLM agent::
+
+            Action: nocturnusai_extract
+            Action Input: {"text": "Alice likes pizza and Bob is her brother.", "assert_facts": true}
+        """
+
+        name: str = "nocturnusai_extract"
+        description: str = (
+            "Extract structured facts from raw text using LLM-powered extraction. "
+            "Send free-form text (conversation transcript, document, tool output) "
+            "and get back structured predicate-argument facts. Optionally auto-asserts "
+            "them into the knowledge base. Requires an LLM provider to be configured "
+            "on the server."
+        )
+        args_schema: Type[BaseModel] = ExtractInput  # type: ignore[assignment]
+        client: Any = None
+
+        model_config = {"arbitrary_types_allowed": True}
+
+        def _run(
+            self,
+            text: str,
+            assert_facts: bool = True,
+            scope: str | None = None,
+        ) -> str:
+            """Execute the extract tool synchronously."""
+            if self.client is None:
+                return "Error: NocturnusAI client not configured."
+            try:
+                result = self.client.extract_facts(
+                    text=text,
+                    assert_facts=assert_facts,
+                    scope=scope,
+                )
+                facts = result.get("facts", [])
+                asserted = "yes" if assert_facts else "no"
+                lines = [f"Extracted {len(facts)} facts (asserted: {asserted}):"]
+                for fact in facts:
+                    predicate = fact.get("predicate", "?")
+                    args = fact.get("args", [])
+                    confidence = fact.get("confidence", 0.0)
+                    lines.append(
+                        f"  {predicate}({', '.join(args)})  "
+                        f"[confidence={confidence:.2f}]"
+                    )
+                return "\n".join(lines)
+            except Exception as e:
+                return f"Error extracting facts: {e}"
+
+        async def _arun(
+            self,
+            text: str,
+            assert_facts: bool = True,
+            scope: str | None = None,
+        ) -> str:
+            """Async execution delegates to sync."""
+            return self._run(
+                text=text,
+                assert_facts=assert_facts,
+                scope=scope,
+            )
+
 
 def get_nocturnusai_tools(client: Any) -> list[Any]:
     """Create and return all NocturnusAI LangChain tools configured with a client.
@@ -440,7 +665,7 @@ def get_nocturnusai_tools(client: Any) -> list[Any]:
         client: A :class:`~nocturnusai.client.SyncNocturnusAIClient` instance.
 
     Returns:
-        A list of four LangChain tools: assert, query, infer, and context.
+        A list of six LangChain tools: assert, query, infer, context, optimize, and extract.
 
     Raises:
         ImportError: If ``langchain-core`` is not installed.
@@ -464,4 +689,6 @@ def get_nocturnusai_tools(client: Any) -> list[Any]:
         NocturnusAIQueryTool(client=client),
         NocturnusAIInferTool(client=client),
         NocturnusAIContextTool(client=client),
+        NocturnusAIOptimizeTool(client=client),
+        NocturnusAIExtractTool(client=client),
     ]
