@@ -752,11 +752,9 @@ class InMemorySessionStore(
         // TTL eviction
         store.entries.removeIf { (_, snap) -> now - snap.generatedAt > ttlMs }
         // Capacity eviction
-        if (store.size > maxSessions) {
-            store.entries
-                .sortedBy { it.value.generatedAt }
-                .take(store.size - maxSessions)
-                .forEach { store.remove(it.key) }
+        while (store.size >= maxSessions) {
+            val oldest = store.entries.minByOrNull { it.value.generatedAt } ?: break
+            store.remove(oldest.key)
         }
     }
 }
