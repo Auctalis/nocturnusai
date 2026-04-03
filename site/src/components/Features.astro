@@ -1,5 +1,5 @@
 ---
-import { MessageSquare, Search, Sparkles, Brain, Clock, GitMerge, Zap, Shield, Network } from 'lucide-astro';
+import { MessageSquare, Search, Sparkles, Brain, Clock, GitMerge, Zap, Shield, Network, Minimize2 } from 'lucide-astro';
 
 // Agent-first features — NL and agent usability first, then infrastructure depth
 const agentFeatures = [
@@ -27,6 +27,13 @@ const agentFeatures = [
 ];
 
 const infraFeatures = [
+  {
+    Icon: Minimize2,
+    title: "Context Management Engine",
+    desc: "500 facts in, 15 out. Goal-driven backward chaining extracts only what your agent needs. Salience ranking, contradiction detection, provenance chains, and incremental diffs — 97% token reduction with zero information loss.",
+    tag: "Context optimizer",
+    highlight: true
+  },
   {
     Icon: Brain,
     title: "Salience-Ranked Memory",
@@ -111,15 +118,33 @@ const infraFeatures = [
 
     <!-- Infrastructure tier — 6 cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {infraFeatures.map(({ Icon, title, desc, tag }) => (
-        <div class="glass p-6 rounded-xl group hover:-translate-y-1 transition-transform duration-300 relative overflow-hidden">
-          <div class="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono text-slate-600 group-hover:text-slate-400 transition-colors">
+      {infraFeatures.map(({ Icon, title, desc, tag, highlight }) => (
+        <div class={`p-6 rounded-xl group hover:-translate-y-1 transition-transform duration-300 relative overflow-hidden ${
+          highlight
+            ? 'bg-gradient-to-br from-emerald-500/8 to-cyan-500/5 border border-emerald-500/20 md:col-span-2 lg:col-span-1'
+            : 'glass'
+        }`}>
+          <div class={`absolute top-3 right-3 px-2 py-0.5 rounded-full text-[10px] font-mono transition-colors ${
+            highlight
+              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 group-hover:text-emerald-400'
+              : 'bg-white/5 border border-white/10 text-slate-600 group-hover:text-slate-400'
+          }`}>
             {tag}
           </div>
-          <div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4 group-hover:bg-purple-500/15 transition-colors">
-            <Icon class="w-5 h-5 text-slate-500 group-hover:text-purple-400 transition-colors" />
+          <div class={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 transition-colors ${
+            highlight
+              ? 'bg-emerald-500/15 group-hover:bg-emerald-500/25'
+              : 'bg-white/5 group-hover:bg-purple-500/15'
+          }`}>
+            <Icon class={`w-5 h-5 transition-colors ${
+              highlight
+                ? 'text-emerald-400 group-hover:text-emerald-300'
+                : 'text-slate-500 group-hover:text-purple-400'
+            }`} />
           </div>
-          <h3 class="text-base font-bold text-slate-200 mb-2 group-hover:text-white transition-colors pr-10">{title}</h3>
+          <h3 class={`text-base font-bold mb-2 transition-colors pr-10 ${
+            highlight ? 'text-emerald-200 group-hover:text-white' : 'text-slate-200 group-hover:text-white'
+          }`}>{title}</h3>
           <p class="text-slate-500 text-sm leading-relaxed">{desc}</p>
         </div>
       ))}
