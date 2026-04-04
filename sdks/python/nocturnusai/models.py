@@ -102,6 +102,111 @@ class ContextWindow(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class DerivationInfo(BaseModel):
+    """Provenance info showing how a fact was derived."""
+    rule: str = Field(description="The rule used for derivation.")
+    premises: list[str] = Field(default_factory=list, description="Premises used in the derivation.")
+    model_config = {"populate_by_name": True}
+
+
+class ContextEntry(BaseModel):
+    """A fact in an optimized context window with salience and provenance."""
+    predicate: str = Field(description="The predicate name.")
+    args: list[str] = Field(default_factory=list, description="Arguments to the predicate.")
+    negated: bool = Field(default=False, description="Whether this fact is negated.")
+    scope: str | None = Field(default=None, description="Optional scope.")
+    salience: float = Field(description="Salience score 0.0-1.0.")
+    category: str = Field(description="Category (bucket name, 'inferred', 'recent', etc.).")
+    char_count: int = Field(alias="charCount", description="Character count of fact representation.")
+    provenance: DerivationInfo | None = Field(default=None, description="Derivation chain if available.")
+    created_at: int | None = Field(default=None, alias="createdAt")
+    valid_from: int | None = Field(default=None, alias="validFrom")
+    valid_until: int | None = Field(default=None, alias="validUntil")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    model_config = {"populate_by_name": True}
+
+
+class ContradictionInfo(BaseModel):
+    """A detected contradiction between positive and negative facts."""
+    predicate: str = Field(description="The contradicted predicate.")
+    args: list[str] = Field(default_factory=list, description="Arguments of the contradicted fact.")
+    positive_salience: float = Field(alias="positiveSalience", description="Salience of the positive version.")
+    negative_salience: float = Field(alias="negativeSalience", description="Salience of the negative version.")
+    model_config = {"populate_by_name": True}
+
+
+class BucketStats(BaseModel):
+    """Statistics for a relevance bucket allocation."""
+    facts_included: int = Field(alias="factsIncluded")
+    max_allocation: int = Field(alias="maxAllocation")
+    min_salience: float = Field(alias="minSalience")
+    max_salience: float = Field(alias="maxSalience")
+    model_config = {"populate_by_name": True}
+
+
+class OptimizedContext(BaseModel):
+    """Result of goal-driven context optimization."""
+    window_id: str = Field(alias="windowId", description="Unique window identifier.")
+    entries: list[ContextEntry] = Field(default_factory=list, description="Selected context entries.")
+    relevant_rules: list[str] = Field(default_factory=list, alias="relevantRules", description="Rules relevant to goals.")
+    total_facts_available: int = Field(alias="totalFactsAvailable")
+    total_facts_included: int = Field(alias="totalFactsIncluded")
+    deduplication_savings: int = Field(alias="deduplicationSavings")
+    contradictions_found: int = Field(alias="contradictionsFound")
+    contradictions_resolved: int = Field(alias="contradictionsResolved")
+    contradictions: list[ContradictionInfo] = Field(default_factory=list, description="Detected contradictions.")
+    bucket_stats: dict[str, BucketStats] = Field(default_factory=dict, alias="bucketStats")
+    total_char_count: int = Field(alias="totalCharCount")
+    goal_driven: bool = Field(alias="goalDriven")
+    knowledge_generation: int = Field(alias="knowledgeGeneration", description="Generation counter for change detection.")
+    generated_at: int = Field(alias="generatedAt")
+    model_config = {"populate_by_name": True}
+
+
+class RemovedEntry(BaseModel):
+    """A fact that was removed between context snapshots."""
+    key: str = Field(description="Internal entry key.")
+    predicate: str = Field(description="The predicate name.")
+    args: list[str] = Field(default_factory=list)
+    negated: bool = Field(default=False)
+    scope: str | None = Field(default=None)
+    model_config = {"populate_by_name": True}
+
+
+class ContextDiff(BaseModel):
+    """Incremental diff between two context windows."""
+    previous_window_id: str | None = Field(alias="previousWindowId")
+    current_window_id: str = Field(alias="currentWindowId")
+    added: list[ContextEntry] = Field(default_factory=list, description="Facts added since last window.")
+    removed: list[RemovedEntry] = Field(default_factory=list, description="Facts removed since last window.")
+    unchanged: int = Field(description="Number of unchanged facts.")
+    full_refresh_recommended: bool = Field(alias="fullRefreshRecommended")
+    reason: str | None = Field(default=None, description="Reason if full refresh recommended.")
+    model_config = {"populate_by_name": True}
+
+
+class PredicateSummaryInfo(BaseModel):
+    """Summary info for a single predicate."""
+    predicate: str = Field(description="The predicate name.")
+    count: int = Field(description="Number of facts with this predicate.")
+    model_config = {"populate_by_name": True}
+
+
+class ContextSummary(BaseModel):
+    """Compact summary of the knowledge base."""
+    total_facts: int = Field(alias="totalFacts")
+    predicate_count: int = Field(alias="predicateCount")
+    top_predicates: list[PredicateSummaryInfo] = Field(default_factory=list, alias="topPredicates")
+    facts_with_ttl: int = Field(alias="factsWithTtl")
+    facts_expiring_within_1h: int = Field(alias="factsExpiringWithin1h")
+    contradictions: int = Field(description="Number of contradictions in the KB.")
+    top_salient_facts: list[ContextEntry] = Field(default_factory=list, alias="topSalientFacts")
+    total_char_count: int = Field(alias="totalCharCount")
+    knowledge_generation: int = Field(alias="knowledgeGeneration")
+    generated_at: int = Field(alias="generatedAt")
+    model_config = {"populate_by_name": True}
+
+
 class ConsolidationResult(BaseModel):
     """Result of a memory consolidation operation.
 

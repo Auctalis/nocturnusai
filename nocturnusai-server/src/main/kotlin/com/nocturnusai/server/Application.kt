@@ -353,6 +353,7 @@ fun Application.moduleWithStorageDir(storageDir: File) {
         transactionRoutes(dbManager)
         testRoutes(dbManager)
         memoryRoutes(dbManager)
+        contextManagementRoutes(dbManager, factExtractor, llmProvider?.name)
         scopeRoutes(dbManager)
         mcpRoutes(dbManager)
         observabilityRoutes(appMicrometerRegistry, dbManager, storageDir, llmProvider != null)

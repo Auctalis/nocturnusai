@@ -1,0 +1,269 @@
+---
+import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shield, Layers } from 'lucide-astro';
+---
+
+<section id="context-optimizer" class="py-28 relative overflow-hidden">
+  <!-- Background accent -->
+  <div class="absolute inset-0 pointer-events-none">
+    <div class="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-emerald-600/8 rounded-full blur-3xl"></div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-6 relative z-10">
+
+    <!-- Section Header -->
+    <div class="text-center mb-16">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-mono mb-6">
+        <Minimize2 class="w-3.5 h-3.5" />
+        Context Management Engine
+      </div>
+      <h2 class="text-3xl md:text-5xl font-black mb-5">
+        <span class="text-white">500 Facts In.</span><br />
+        <span class="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
+          15 Facts Out. Zero Lost.
+        </span>
+      </h2>
+      <p class="text-slate-400 max-w-2xl mx-auto text-lg leading-relaxed">
+        LLMs waste tokens on irrelevant context. NocturnusAI's Context Management Engine uses goal-driven backward chaining to deliver <em class="text-emerald-400 not-italic font-medium">only the facts your agent needs</em> — with full inference chains, contradiction detection, and provenance.
+      </p>
+    </div>
+
+    <!-- The Problem / Solution comparison -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto mb-16">
+      <!-- THE PROBLEM -->
+      <div class="rounded-2xl overflow-hidden bg-[#020617] border border-red-500/20 shadow-2xl">
+        <div class="px-5 py-3 bg-red-500/5 border-b border-red-500/10 flex items-center justify-between">
+          <span class="text-xs font-mono text-red-400">The Context Problem</span>
+          <span class="text-xs font-mono text-red-400/50">Every RAG pipeline</span>
+        </div>
+        <div class="p-6 space-y-4">
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <TrendingDown class="w-4 h-4 text-red-400" />
+            </div>
+            <div>
+              <div class="text-sm font-bold text-red-300 mb-1">150K+ token system prompts</div>
+              <div class="text-xs text-slate-500">Agents stuff everything into context hoping the LLM figures it out</div>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <TrendingDown class="w-4 h-4 text-red-400" />
+            </div>
+            <div>
+              <div class="text-sm font-bold text-red-300 mb-1">6.2M tokens/hour burned</div>
+              <div class="text-xs text-slate-500">Most of it irrelevant context that degrades accuracy and inflates cost</div>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <TrendingDown class="w-4 h-4 text-red-400" />
+            </div>
+            <div>
+              <div class="text-sm font-bold text-red-300 mb-1">Context poisoning</div>
+              <div class="text-xs text-slate-500">Contradictory or stale facts silently corrupt agent reasoning</div>
+            </div>
+          </div>
+          <!-- Cost visualization -->
+          <div class="mt-4 p-4 rounded-xl bg-red-500/5 border border-red-500/10">
+            <div class="text-xs font-mono text-red-400/60 mb-2">Token waste per request</div>
+            <div class="h-4 rounded-full bg-white/5 overflow-hidden">
+              <div class="h-full rounded-full bg-gradient-to-r from-red-500 to-red-400 w-[95%] flex items-center justify-end pr-2">
+                <span class="text-[9px] font-mono text-white font-bold">95% irrelevant</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- THE SOLUTION -->
+      <div class="rounded-2xl overflow-hidden bg-[#020617] border border-emerald-500/20 shadow-2xl relative group">
+        <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/3 to-cyan-500/3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+        <div class="px-5 py-3 bg-emerald-500/5 border-b border-emerald-500/10 flex items-center justify-between">
+          <span class="text-xs font-mono text-emerald-400">NocturnusAI Context Engine</span>
+          <span class="text-xs font-mono text-emerald-400/50">Goal-driven optimization</span>
+        </div>
+        <div class="p-6 space-y-4">
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Brain class="w-4 h-4 text-emerald-400" />
+            </div>
+            <div>
+              <div class="text-sm font-bold text-emerald-300 mb-1">Goal-driven backward chaining</div>
+              <div class="text-xs text-slate-500">Tell us the question — we trace exactly which facts matter via SLD resolution</div>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Filter class="w-4 h-4 text-emerald-400" />
+            </div>
+            <div>
+              <div class="text-sm font-bold text-emerald-300 mb-1">Salience-ranked, deduplicated</div>
+              <div class="text-xs text-slate-500">Recency, frequency, and priority scoring with diversity caps per predicate</div>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Shield class="w-4 h-4 text-emerald-400" />
+            </div>
+            <div>
+              <div class="text-sm font-bold text-emerald-300 mb-1">Contradictions caught, not hidden</div>
+              <div class="text-xs text-slate-500">Detects conflicting facts before they reach the LLM — auto-resolve or flag</div>
+            </div>
+          </div>
+          <!-- Efficiency visualization -->
+          <div class="mt-4 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+            <div class="text-xs font-mono text-emerald-400/60 mb-2">Context after optimization</div>
+            <div class="h-4 rounded-full bg-white/5 overflow-hidden">
+              <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 w-[3%] min-w-[60px] flex items-center justify-end pr-2">
+                <span class="text-[9px] font-mono text-white font-bold">3%</span>
+              </div>
+            </div>
+            <div class="text-[10px] font-mono text-emerald-400/40 mt-1">97% reduction — every remaining token is relevant</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- The Pipeline — visual flow -->
+    <div class="max-w-5xl mx-auto mb-16">
+      <div class="text-center mb-8">
+        <h3 class="text-xl font-bold text-white mb-2">The Optimization Pipeline</h3>
+        <p class="text-slate-500 text-sm">Every call to <code class="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded text-xs font-mono">POST /context/optimize</code> runs this pipeline in under 50ms</p>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {[
+          { icon: "Brain", label: "Goal Resolution", sub: "Backward chaining", color: "cyan" },
+          { icon: "Filter", label: "Salience Rank", sub: "Recency · freq · priority", color: "purple" },
+          { icon: "Layers", label: "Bucket Allocation", sub: "Per-domain budgets", color: "cyan" },
+          { icon: "Shield", label: "Contradiction Check", sub: "Detect conflicts", color: "yellow" },
+          { icon: "GitMerge", label: "Deduplication", sub: "Cross-source merge", color: "purple" },
+          { icon: "Zap", label: "Context Window", sub: "Token-optimized", color: "emerald" },
+        ].map((step, i) => (
+          <div class="relative">
+            <div class="p-4 rounded-xl bg-white/3 border border-white/8 text-center hover:bg-white/5 hover:border-emerald-500/20 transition-all group h-full">
+              <div class={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center mb-2 ${
+                step.color === 'cyan' ? 'bg-cyan-500/15' :
+                step.color === 'purple' ? 'bg-purple-500/15' :
+                step.color === 'yellow' ? 'bg-yellow-500/15' :
+                'bg-emerald-500/15'
+              }`}>
+                <span class={`text-xs font-bold ${
+                  step.color === 'cyan' ? 'text-cyan-400' :
+                  step.color === 'purple' ? 'text-purple-400' :
+                  step.color === 'yellow' ? 'text-yellow-400' :
+                  'text-emerald-400'
+                }`}>{String(i + 1).padStart(2, '0')}</span>
+              </div>
+              <div class="text-xs font-bold text-slate-200 mb-0.5">{step.label}</div>
+              <div class="text-[10px] text-slate-600">{step.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <!-- Live API Example -->
+    <div class="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Request -->
+      <div class="rounded-xl overflow-hidden bg-[#020617] border border-emerald-500/20 shadow-2xl">
+        <div class="flex items-center justify-between px-4 py-3 bg-emerald-500/5 border-b border-emerald-500/10">
+          <span class="text-xs font-mono text-emerald-400">POST /context/optimize</span>
+          <span class="text-xs font-mono text-slate-600">request</span>
+        </div>
+        <div class="p-5 font-mono text-sm overflow-x-auto">
+<pre class="!m-0 !p-0 !bg-transparent !border-0"><code>&#123;
+  <span class="text-purple-400">"maxFacts"</span>: <span class="text-blue-400">25</span>,
+  <span class="text-purple-400">"goals"</span>: [
+    &#123; <span class="text-purple-400">"predicate"</span>: <span class="text-green-400">"enforceable"</span>,
+      <span class="text-purple-400">"args"</span>: [<span class="text-green-400">"contract_001"</span>] &#125;,
+    &#123; <span class="text-purple-400">"predicate"</span>: <span class="text-green-400">"exception_applies"</span>,
+      <span class="text-purple-400">"args"</span>: [<span class="text-green-400">"contract_001"</span>, <span class="text-green-400">"?e"</span>] &#125;
+  ],
+  <span class="text-purple-400">"relevanceBuckets"</span>: [
+    &#123; <span class="text-purple-400">"name"</span>: <span class="text-green-400">"contract"</span>,
+      <span class="text-purple-400">"predicates"</span>: [<span class="text-green-400">"contract_type"</span>, <span class="text-green-400">"contract_value"</span>],
+      <span class="text-purple-400">"maxFacts"</span>: <span class="text-blue-400">8</span> &#125;,
+    &#123; <span class="text-purple-400">"name"</span>: <span class="text-green-400">"legal"</span>,
+      <span class="text-purple-400">"predicates"</span>: [<span class="text-green-400">"enforceable"</span>, <span class="text-green-400">"statute_of_frauds"</span>],
+      <span class="text-purple-400">"maxFacts"</span>: <span class="text-blue-400">10</span> &#125;
+  ],
+  <span class="text-purple-400">"sessionId"</span>: <span class="text-green-400">"session-42"</span>,
+  <span class="text-purple-400">"autoResolveContradictions"</span>: <span class="text-blue-400">false</span>
+&#125;</code></pre>
+        </div>
+      </div>
+
+      <!-- Response -->
+      <div class="rounded-xl overflow-hidden bg-[#020617] border border-cyan-500/20 shadow-2xl">
+        <div class="flex items-center justify-between px-4 py-3 bg-cyan-500/5 border-b border-cyan-500/10">
+          <span class="text-xs font-mono text-cyan-400">Optimized Context Window</span>
+          <span class="text-xs font-mono text-slate-600">response</span>
+        </div>
+        <div class="p-5 font-mono text-sm overflow-x-auto">
+<pre class="!m-0 !p-0 !bg-transparent !border-0"><code>&#123;
+  <span class="text-purple-400">"windowId"</span>: <span class="text-green-400">"ctx-a7f3b2e1"</span>,
+  <span class="text-purple-400">"entries"</span>: [
+    &#123; <span class="text-purple-400">"atom"</span>: <span class="text-green-400">"enforceable(contract_001)"</span>,
+      <span class="text-purple-400">"salience"</span>: <span class="text-blue-400">0.98</span>,
+      <span class="text-purple-400">"category"</span>: <span class="text-green-400">"goal_relevant"</span>,
+      <span class="text-purple-400">"provenance"</span>: &#123;
+        <span class="text-purple-400">"rule"</span>: <span class="text-green-400">"enforceable(?c) :- ..."</span>,
+        <span class="text-purple-400">"premises"</span>: [<span class="text-green-400">"statute_of_frauds..."</span>]
+      &#125; &#125;,
+    <span class="text-slate-600">... 14 more goal-relevant entries</span>
+  ],
+  <span class="text-purple-400">"totalFactsConsidered"</span>: <span class="text-blue-400">512</span>,
+  <span class="text-purple-400">"tokenEstimate"</span>: <span class="text-blue-400">820</span>,
+  <span class="text-purple-400">"compressionRatio"</span>: <span class="text-emerald-400">0.029</span>,
+  <span class="text-purple-400">"contradictions"</span>: [ <span class="text-yellow-400">1 flagged</span> ],
+  <span class="text-purple-400">"relevantRules"</span>: [ <span class="text-slate-400">4 rules</span> ]
+&#125;</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="max-w-4xl mx-auto mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
+      {[
+        { value: "97%", label: "Context Reduction", sub: "500 → 15 facts" },
+        { value: "< 50ms", label: "Pipeline Latency", sub: "Full optimization pass" },
+        { value: "0", label: "Lost Facts", sub: "Goal-relevant guaranteed" },
+        { value: "Diff", label: "Incremental Updates", sub: "Only send changes" },
+      ].map(stat => (
+        <div class="text-center p-5 rounded-xl bg-white/3 border border-white/8 hover:border-emerald-500/20 transition-all group">
+          <div class="text-2xl md:text-3xl font-black bg-clip-text text-transparent bg-gradient-to-br from-emerald-400 to-cyan-400 mb-1">
+            {stat.value}
+          </div>
+          <div class="text-xs font-bold text-slate-300 mb-0.5">{stat.label}</div>
+          <div class="text-[10px] text-slate-600">{stat.sub}</div>
+        </div>
+      ))}
+    </div>
+
+    <!-- Plug and play CTA -->
+    <div class="max-w-3xl mx-auto mt-12 text-center">
+      <div class="p-6 rounded-2xl bg-gradient-to-r from-emerald-500/5 to-cyan-500/5 border border-emerald-500/15">
+        <p class="text-slate-300 text-sm mb-4">
+          <span class="font-bold text-white">Plug and play.</span> Works with LangChain, CrewAI, or any framework.
+          Two lines of Python to optimize your agent's context window:
+        </p>
+        <div class="inline-block text-left rounded-lg bg-[#020617] border border-white/10 px-5 py-3 font-mono text-sm">
+          <div><span class="text-slate-500"># pip install nocturnusai</span></div>
+          <div><span class="text-blue-400">from</span> <span class="text-slate-300">nocturnusai</span> <span class="text-blue-400">import</span> <span class="text-slate-300">SyncNocturnusAIClient</span></div>
+          <div><span class="text-slate-300">ctx</span> = <span class="text-yellow-400">SyncNocturnusAIClient</span>().<span class="text-yellow-400">optimize_context</span>(</div>
+          <div class="pl-4"><span class="text-slate-300">goals</span>=[&#123;<span class="text-green-400">"predicate"</span>: <span class="text-green-400">"enforceable"</span>, <span class="text-green-400">"args"</span>: [<span class="text-green-400">"contract_001"</span>]&#125;]</div>
+          <div>)</div>
+          <div class="text-emerald-400 mt-1"># ctx.entries → 15 facts, 820 tokens, full provenance ✓</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<style>
+  .bg-white\/3 { background-color: rgba(255,255,255,0.03); }
+  .border-white\/8 { border-color: rgba(255,255,255,0.08); }
+  .bg-emerald-600\/8 { background-color: rgba(5,150,105,0.08); }
+</style>
