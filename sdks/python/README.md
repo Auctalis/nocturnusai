@@ -1,86 +1,111 @@
 # NocturnusAI Python SDK
 
-Python SDK for [NocturnusAI](https://github.com/Auctalis/nocturnusai) — a logic-based inference engine and knowledge database for agentic AI systems.
+Python SDK for [NocturnusAI](https://github.com/Auctalis/nocturnusai).
+
+The primary use case is context reduction for agent applications:
+
+1. ingest raw text or turns
+2. build a smaller working set
+3. narrow by goal
+4. reuse diffs on later turns
+
+Lower-level fact, rule, inference, and memory APIs are still available when you need backend mechanics.
 
 ## Install
 
 ```bash
 pip install nocturnusai
+pip install "nocturnusai[langchain]"   # optional LangChain tools
 ```
 
-With LangChain integration:
-```bash
-pip install "nocturnusai[langchain]"
-```
+## Context-first quick start
 
-## Quick start
-
-```python
-import asyncio
-from nocturnusai import NocturnusAIClient
-
-async def main():
-    async with NocturnusAIClient("http://localhost:9300") as client:
-        # Store facts
-        await client.tell("likes(alice, bob)")
-        await client.tell("likes(bob, carol)")
-
-        # Define rules
-        await client.teach("friends(?x, ?y) :- likes(?x, ?y), likes(?y, ?x)")
-
-        # Run inference
-        results = await client.ask("friends(?x, ?y)")
-        print(results)  # ['friends(alice, bob)', 'friends(bob, alice)']
-
-asyncio.run(main())
-```
-
-Sync usage:
 ```python
 from nocturnusai import SyncNocturnusAIClient
 
 with SyncNocturnusAIClient("http://localhost:9300") as client:
-    client.tell("likes(alice, bob)")
-    print(client.ask("likes(?x, bob)"))
+    ctx = client.ingest_and_optimize(
+        text="""
+        user: Customer says they are enterprise and blocked on SLA credits.
+        tool: CRM says account is Acme Corp with a 2M ARR contract.
+        tool: Billing note says renewal is due next month.
+        """,
+        goals=[{"predicate": "eligible_for_sla", "args": ["acme_corp"]}],
+        max_facts=12,
+        session_id="ticket-42",
+    )
+
+    diff = client.diff_context(
+        session_id="ticket-42",
+        goals=[{"predicate": "eligible_for_sla", "args": ["acme_corp"]}],
+        max_facts=12,
+    )
+
+    client.clear_context_session("ticket-42")
+    print(ctx.total_facts_included, len(diff.added))
+```
+
+## Key context methods
+
+- `context_window()` -> `POST /memory/context`
+- `optimize_context()` -> `POST /context/optimize`
+- `diff_context()` -> `POST /context/diff`
+- `summarize_context()` -> `POST /context/summary`
+- `clear_context_session()` -> `POST /context/session/clear`
+- `ingest_and_optimize()` -> extract text, assert, then optimize
+
+## Lower-level logic methods
+
+```python
+from nocturnusai import SyncNocturnusAIClient
+
+with SyncNocturnusAIClient("http://localhost:9300") as client:
+    client.assert_fact("parent", ["alice", "bob"])
+    client.assert_rule(
+        head={"predicate": "grandparent", "args": ["?x", "?z"]},
+        body=[
+            {"predicate": "parent", "args": ["?x", "?y"]},
+            {"predicate": "parent", "args": ["?y", "?z"]},
+        ],
+    )
+    print(client.infer("grandparent", ["?who", "bob"]))
 ```
 
 ## LangChain integration
 
 ```python
-from langchain_openai import ChatOpenAI
-from langchain.agents import create_react_agent, AgentExecutor
+from nocturnusai import SyncNocturnusAIClient
 from nocturnusai.langchain import get_nocturnusai_tools
 
-tools = get_nocturnusai_tools("http://localhost:9300")
-llm = ChatOpenAI(model="gpt-4o")
-agent = AgentExecutor(agent=create_react_agent(llm, tools, prompt), tools=tools)
+client = SyncNocturnusAIClient("http://localhost:9300")
+tools = get_nocturnusai_tools(client)
 ```
 
-## MCP (Model Context Protocol)
+## MCP helper
 
 ```python
-from nocturnusai import NocturnusAIMCPClient
+from nocturnusai.mcp import NocturnusAIMCPClient
 
 async with NocturnusAIMCPClient("http://localhost:9300") as mcp:
     await mcp.initialize()
     tools = await mcp.list_tools()
-    result = await mcp.call_tool("tell", {"statement": "likes(alice, bob)"})
+    result = await mcp.call_tool("context", {"maxFacts": 10, "minSalience": 0.1})
+    print(result.text)
 ```
 
-Or configure via `mcp-config.json` for Claude Desktop, Cursor, Windsurf, and VS Code — see [`mcp-configs/`](https://github.com/Auctalis/nocturnusai/tree/main/mcp-configs) in the main repo.
-
-## Starting NocturnusAI
+## Start the server
 
 ```bash
-# Docker (recommended)
+# Docker
 docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
 
-# Or one-line install
+# or installer
 curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 ```
 
-## Documentation
+## Docs
 
-- [Full API reference](https://github.com/Auctalis/nocturnusai/blob/main/sdks/python)
-- [Demos and examples](https://github.com/Auctalis/nocturnusai/tree/main/demos)
-- [MCP configuration](https://github.com/Auctalis/nocturnusai/tree/main/mcp-configs)
+- [Docs site](https://auctalis.github.io/nocturnusai/docs)
+- [SDK docs](https://auctalis.github.io/nocturnusai/docs/sdks)
+- [MCP configs](https://github.com/Auctalis/nocturnusai/tree/main/mcp-configs)
+- [Demos](https://github.com/Auctalis/nocturnusai/tree/main/demos)

@@ -1,43 +1,61 @@
-# Astro Starter Kit: Minimal
+# NocturnusAI Docs Site
 
-```sh
-npm create astro@latest -- --template minimal
+This directory contains the public documentation site for NocturnusAI.
+
+The site is built with Astro and deployed to GitHub Pages at [https://auctalis.github.io/nocturnusai/](https://auctalis.github.io/nocturnusai/).
+
+## What This Site Is For
+
+The docs now lead with the actual integration problem:
+
+- you have a large array of turns
+- you need a smaller context window for the next model call
+- you may need a goal-driven pass, an incremental diff, or a session reset
+
+Backend mechanics like predicates, rules, scopes, and inference still exist, but they belong behind that workflow instead of in front of it.
+
+## Local Development
+
+```bash
+cd site
+npm install
+npm run dev
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+Local preview: `http://localhost:4321`
 
-## 🚀 Project Structure
+## Build
 
-Inside of your Astro project, you'll see the following folders and files:
+```bash
+cd site
+npm run build
+```
+
+The production output is written to `site/dist/`.
+
+## Structure
 
 ```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
+site/
+├── public/                  Static assets
+├── src/components/          Reusable UI sections
+├── src/layouts/             Shared layouts and docs navigation
+├── src/pages/               Route files for the marketing site and docs
+└── package.json             Astro scripts and dependencies
 ```
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+Important docs files:
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+- `src/layouts/DocsLayout.astro` — shared docs shell and sidebar
+- `src/pages/docs/index.astro` — docs landing page
+- `src/pages/docs/context.astro` — context optimization workflow
+- `src/pages/docs/api.astro` — REST reference
+- `src/pages/docs/sdks.astro` — Python and TypeScript SDK reference
+- `src/pages/docs/mcp.astro` — MCP reference
+- `src/pages/docs/cli.astro` — CLI reference
 
-Any static assets, like images, can be placed in the `public/` directory.
+## Deployment
 
-## 🧞 Commands
+GitHub Pages deploys from the workflow at `.github/workflows/docs.yml`.
 
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+Pushes to `main` that change `site/**` trigger a rebuild and publish.

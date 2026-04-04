@@ -46,12 +46,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-cyan-400">Ollama</td>
-                    <td class="py-2 font-mono">OLLAMA_BASE_URL</td>
-                    <td class="py-2">Any local model (Llama, Mistral, etc.)</td>
+                    <td class="py-2 font-mono">LLM_BASE_URL</td>
+                    <td class="py-2">Any local model (Llama, Mistral, etc.) — set to <code>http://localhost:11434/v1</code></td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-cyan-400">OpenAI-Compatible</td>
-                    <td class="py-2 font-mono">OPENAI_COMPATIBLE_BASE_URL + OPENAI_COMPATIBLE_API_KEY</td>
+                    <td class="py-2 font-mono">LLM_BASE_URL + LLM_API_KEY</td>
                     <td class="py-2">Groq, Mistral, DeepSeek, etc.</td>
                 </tr>
             </tbody>
@@ -180,6 +180,14 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <li><strong>Query translation</strong> — the LLM maps the question to logical query patterns</li>
         <li><strong>Fact retrieval</strong> — queries are executed via direct lookup and backward chaining</li>
         <li><strong>Answer synthesis</strong> — the LLM composes a natural language answer from the matched facts</li>
+    </ol>
+
+    <h3>LLM + Context Optimization Loop</h3>
+    <p>For multi-turn conversations, combine extraction and context APIs:</p>
+    <ol>
+        <li>Use <code>/extract</code> (or <code>/context/ingest</code>) to convert raw language into facts.</li>
+        <li>Use <code>/context/optimize</code> with a stable <code>sessionId</code> to build the prompt window.</li>
+        <li>Use <code>/context/diff</code> on subsequent turns so only changes are sent to the model.</li>
     </ol>
 
     <hr />

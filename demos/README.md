@@ -1,112 +1,86 @@
 # NocturnusAI Demos
 
-NocturnusAI is a **reasoning memory backend for AI agents** — structured facts,
-Horn clause rules, backward-chaining inference, salience-ranked retrieval, and
-temporal awareness, all accessible via HTTP, MCP, and client SDKs.
+NocturnusAI is a context-reduction and reasoning backend for agents.
+
+Start with the practical problem first:
+
+- you have too many turns
+- you need a smaller context window
+- you want later turns to send only diffs
+
+The demos then show the backend machinery that makes that work: structured facts, rules, inference, temporal state, and salience.
 
 ## Start the server
 
 ```bash
-./gradlew :nocturnusai-server:run   # port 9300
+./gradlew :nocturnusai-server:run
 # or
-docker-compose up --build
+docker compose up --build
 ```
 
 ---
 
-## ⭐ Featured: LLM & Agent Integration [`llm/`](./llm/)
+## Featured: LLM & Agent Integration [`llm/`](./llm/)
 
 These are the primary demos. Start here.
 
 | Demo | Language | What it shows |
 |------|----------|---------------|
-| [LangChain agent](./llm/python/01_langchain_agent.py) | Python | `get_nocturnusai_tools()` → 4 tools wired into a ReAct agent |
-| [MCP protocol](./llm/python/02_mcp_client.py) | Python | `NocturnusAIMCPClient` — how Claude/GPT connect natively |
-| [OpenAI function calling](./llm/python/03_openai_tools.py) | Python | NocturnusAI as `remember`/`recall`/`reason`/`working_memory` tools |
-| [Agent memory lifecycle](./llm/python/04_agent_memory.py) | Python | The canonical "why NocturnusAI" demo — 3 agent sessions |
-| [MCP protocol](./llm/typescript/01_mcp_client.ts) | TypeScript | `NocturnusAIMCPClient` — tool discovery + simulated LLM loop |
-| [OpenAI function calling](./llm/typescript/02_openai_tools.ts) | TypeScript | Same OpenAI tool pattern, TypeScript |
-| [Agent memory lifecycle](./llm/typescript/03_agent_memory.ts) | TypeScript | Full agent memory lifecycle in TypeScript |
+| [LangChain agent](./llm/python/01_langchain_agent.py) | Python | Tool-calling agent over Nocturnus-backed memory |
+| [MCP protocol](./llm/python/02_mcp_client.py) | Python | How MCP clients discover and call Nocturnus tools |
+| [OpenAI function calling](./llm/python/03_openai_tools.py) | Python | Tool loop over a Nocturnus-backed state layer |
+| [Agent memory lifecycle](./llm/python/04_agent_memory.py) | Python | The real story: onboarding -> focused context -> later-turn cleanup |
+| [MCP protocol](./llm/typescript/01_mcp_client.ts) | TypeScript | Tool discovery and simulated MCP loop |
+| [OpenAI function calling](./llm/typescript/02_openai_tools.ts) | TypeScript | Same tool loop pattern in TypeScript |
+| [Agent memory lifecycle](./llm/typescript/03_agent_memory.ts) | TypeScript | Context reduction and memory lifecycle in TypeScript |
 
-### Quickstart (5 minutes, no API key needed)
+### Quickstart
 
 ```bash
-# Python — MCP protocol demo
+# Python MCP demo
 cd demos/llm/python
 pip install nocturnusai
 python 02_mcp_client.py
 
-# Python — canonical agent memory demo
+# Python memory lifecycle demo
 python 04_agent_memory.py
 
-# TypeScript — MCP protocol demo
-cd demos/llm/typescript
-npm install && npx ts-node 01_mcp_client.ts
-
-# TypeScript — agent memory lifecycle
-npx ts-node 03_agent_memory.ts
-```
-
-### With an LLM API key
-
-```bash
-export OPENAI_API_KEY=sk-...
-
-# LangChain ReAct agent
-python demos/llm/python/01_langchain_agent.py
-
-# OpenAI function calling loop
-python demos/llm/python/03_openai_tools.py
+# TypeScript MCP demo
+cd ../typescript
+npm install
+npx ts-node 01_mcp_client.ts
 ```
 
 ---
 
 ## Advanced / Deep-Dive [`advanced/`](./advanced/)
 
-Raw SDK mechanics — the building blocks powering the LLM demos above.
+These demos cover the lower-level SDK mechanics behind the LLM demos.
 
-### Python SDK
-
-```bash
-cd demos/advanced/python && pip install nocturnusai
-python 01_basics.py                # assert_fact, query, infer, retract
-python 02_rules_and_inference.py   # rules, proof trees, transitive closure
-python 03_memory_management.py     # context_window, temporal, consolidate, decay
-python 04_transactions.py          # ACID transactions
-python 05_auth_and_keys.py         # key management (AUTH_ENABLED=true)
-python 06_dsl_execute.py           # Logiql DSL
-python 08_agent_workflow.py        # full async agent workflow
-```
-
-### TypeScript SDK
-
-```bash
-cd demos/advanced/typescript && npm install
-npx ts-node 01_basics.ts
-npx ts-node 06_events_sse.ts       # real-time SSE event stream
-npx ts-node 07_agent_workflow.ts
-```
+- fact and rule operations
+- salience windows, temporal queries, consolidation, decay
+- transactions and auth
+- event streams and agent workflows
 
 ---
 
 ## Raw HTTP [`curl/`](./curl/)
 
-Every major REST endpoint as `curl` one-liners.
+Use these when you want exact request and response shapes for REST calls.
 
 ```bash
 bash demos/curl/examples.sh
+bash demos/curl/value_proof.sh
 ```
 
 ---
 
-## Why NocturnusAI for agents?
+## Why these demos exist
 
-| Problem | NocturnusAI solution |
-|---------|----------------------|
-| Agent forgets between turns | Persistent structured knowledge base |
-| RAG returns irrelevant blobs | Salience-ranked `context_window` |
-| Can't derive new facts | Horn clause rules + backward chaining |
-| No temporal awareness | `validFrom` / `validUntil` / `ttl` on every fact |
-| Episodic repetition | `consolidate()` compresses into semantic memory |
-| Stale knowledge accumulates | `decay()` evicts expired / low-salience facts |
-| LLM can't find the tools | Native MCP at `POST /mcp` — zero glue code |
+| Problem | Demo path |
+|---------|-----------|
+| Too many turns in every prompt | `llm/*agent_memory*` and `curl/value_proof.sh` |
+| Need a fast working set on each turn | MCP demos and memory demos |
+| Need exact REST shapes | `curl/` |
+| Need low-level SDK behavior | `advanced/` |
+| Need backend reasoning examples | `advanced/01_basics`, `02_rules_and_inference` |

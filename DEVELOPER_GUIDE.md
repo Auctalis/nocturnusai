@@ -1,15 +1,16 @@
 # NocturnusAI Developer Guide
 
-> The complete reference for building with NocturnusAI — from first `curl` to production deployment.
+> The complete reference for building with NocturnusAI - from first `POST /context` to production deployment.
 
-**NocturnusAI** is the logic server for Agentic AI. It gives your agents deterministic multi-step reasoning, truth maintenance, and memory lifecycle management via HTTP API, MCP protocol, and client SDKs.
+**NocturnusAI** is a context-reduction and reasoning backend for Agentic AI. Start with the context workflow when your application has too many turns, then drop into facts, rules, and inference only when you need backend mechanics.
 
 ---
 
 ## Table of Contents
 
+0. [Start Here: Cut Down Turn Arrays First](#0-start-here-cut-down-turn-arrays-first)
 1. [Installation](#1-installation)
-2. [Core Concepts](#2-core-concepts)
+2. [Backend Concepts](#2-backend-concepts)
 3. [HTTP API Reference](#3-http-api-reference)
 4. [Simplified API (tell/ask/teach/forget)](#4-simplified-api)
 5. [Memory Management](#5-memory-management)
@@ -31,33 +32,42 @@
 
 ---
 
+## 0. Start Here: Cut Down Turn Arrays First
+
+If your real problem is a huge thread payload, start with this loop:
+
+1. `POST /context` to reduce raw turns into a smaller working set
+2. `POST /context/optimize` to narrow by the next goal
+3. `POST /context/diff` so later turns only send changes
+4. `POST /context/session/clear` when the thread is finished
+
+This guide still covers facts, rules, inference, transactions, scopes, and auth. Those are backend mechanics behind the context workflow, not the first thing a new integrator needs to learn.
+
+---
+
 ## 1. Installation
 
 ### One-liner (recommended)
 
 ```bash
-# Works everywhere. Installs everything. You're welcome. 🦞
-curl -fsSL https://openclaw.ai/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 ```
 
 Options:
 
 ```bash
-curl -fsSL https://openclaw.ai/install.sh | bash -s -- --ollama         # + local LLM
-curl -fsSL https://openclaw.ai/install.sh | bash -s -- --monitoring     # + Prometheus/Grafana
-curl -fsSL https://openclaw.ai/install.sh | bash -s -- --key sk-ant-... # with your API key
-curl -fsSL https://openclaw.ai/install.sh | bash -s -- --port 8080      # custom port
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --host-ollama
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --key sk-ant-...
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --port 8080
 ```
 
 ### Docker Compose (manual)
 
 ```bash
-git clone https://github.com/essaouirallc/logic-server.git
-cd logic-server
-make setup        # creates .env from template
-make up           # server only
-make up-ollama    # server + local Ollama LLM
-make up-monitoring # server + Prometheus + Grafana
+git clone https://github.com/Auctalis/nocturnusai.git
+cd nocturnusai
+docker compose up --build
 ```
 
 ### Local development (no Docker)
@@ -65,8 +75,8 @@ make up-monitoring # server + Prometheus + Grafana
 Requires JDK 17+ and Gradle.
 
 ```bash
-git clone https://github.com/essaouirallc/logic-server.git
-cd logic-server
+git clone https://github.com/Auctalis/nocturnusai.git
+cd nocturnusai
 ./gradlew build
 ./run_local_dev.sh    # starts server on :9300
 ```
@@ -79,7 +89,7 @@ curl http://localhost:9300/health
 
 ---
 
-## 2. Core Concepts
+## 2. Backend Concepts
 
 ### Facts
 
@@ -1312,7 +1322,7 @@ Start with monitoring:
 ```bash
 make up-monitoring
 # or
-curl -fsSL https://openclaw.ai/install.sh | bash -s -- --monitoring
+docker compose --profile monitoring up -d --build
 ```
 
 - **Grafana:** http://localhost:3000 (admin / nocturnusai)
@@ -1347,11 +1357,15 @@ curl http://localhost:9300/userguide
 ### Docker production setup
 
 ```bash
-# 1. Install
-curl -fsSL https://openclaw.ai/install.sh | bash -s -- --monitoring
+# 1. Clone the repository
+git clone https://github.com/Auctalis/nocturnusai.git
+cd nocturnusai
 
-# 2. Configure .env for production
-cd ~/nocturnusai
+# 2. Configure environment
+cp .env.example .env
+
+# 3. Start the server and monitoring stack
+docker compose --profile monitoring up -d --build
 ```
 
 Edit `.env`:

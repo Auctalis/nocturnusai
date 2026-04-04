@@ -279,7 +279,8 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
             description = "Get the most relevant knowledge for your current reasoning step. Returns facts ranked by relevance (composite of recency, access frequency, and priority). Use this to efficiently populate your context window with the most important knowledge.",
             properties = mapOf(
                 "maxFacts" to propNumber("Maximum facts to return (default: 100)"),
-                "minRelevance" to propNumber("Minimum relevance score 0.0-1.0 (default: 0.0)"),
+                "minSalience" to propNumber("Minimum salience score 0.0-1.0 (default: 0.0)"),
+                "minRelevance" to propNumber("Legacy alias for minSalience"),
                 "predicates" to propArray("Optional: only include these relationship types"),
                 "scope" to propString("Optional scope filter")
             ),
@@ -584,7 +585,9 @@ private fun callRetract(db: com.nocturnusai.NocturnusAI, tenantId: String, args:
 
 private fun callContextWindow(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
     val maxFacts = args["maxFacts"]?.jsonPrimitive?.intOrNull ?: 100
-    val minSalience = args["minSalience"]?.jsonPrimitive?.doubleOrNull ?: 0.0
+    val minSalience = args["minSalience"]?.jsonPrimitive?.doubleOrNull
+        ?: args["minRelevance"]?.jsonPrimitive?.doubleOrNull
+        ?: 0.0
     val predicates = args["predicates"]?.jsonArray?.map { it.jsonPrimitive.content }
     val scope = args["scope"]?.jsonPrimitive?.contentOrNull
 

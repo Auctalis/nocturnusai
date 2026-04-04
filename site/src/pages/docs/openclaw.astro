@@ -1,0 +1,197 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<DocsLayout title="OpenClaw Context Integration">
+    <h1>OpenClaw Context Integration</h1>
+    <p class="lead text-xl text-slate-400">
+        Use NocturnusAI as OpenClaw's context backend: fast MCP tool integration now, or a full Context Engine plugin for deterministic context assembly.
+    </p>
+
+    <div class="callout callout-info">
+        <strong>When to use this page</strong>
+        <ul style="margin:0.5rem 0 0; padding-left:1.25rem;">
+            <li>You already run OpenClaw and want lower context cost with better recall precision.</li>
+            <li>You want OpenClaw's context lifecycle (<code>ingest</code>, <code>assemble</code>, <code>compact</code>) to route through NocturnusAI.</li>
+            <li>You need a practical migration path: registry-first, plugin-next.</li>
+        </ul>
+    </div>
+
+    <hr />
+
+    <h2 id="path-a">Path A: Register Nocturnus as an MCP Server (fastest)</h2>
+    <p>
+        OpenClaw can store outbound MCP server definitions via <code>openclaw mcp set</code>. This is the quickest way to make NocturnusAI MCP available to OpenClaw-managed runtimes.
+    </p>
+
+    <pre><code class="language-bash"># 1) Save an MCP server definition in OpenClaw config
+openclaw mcp set nocturnus '&#123;
+  "url":"http://localhost:9300/mcp/sse",
+  "headers": &#123;
+    "X-Database":"default",
+    "X-Tenant-ID":"default"
+  &#125;
+&#125;'
+
+# 2) Verify
+openclaw mcp list
+openclaw mcp show nocturnus --json</code></pre>
+
+    <div class="callout callout-tip">
+        <strong>Important OpenClaw behavior</strong> — <code>openclaw mcp set/list/show/unset</code> only manages config. It does not connect to the target server or validate reachability in real time.
+    </div>
+
+    <p>
+        Once attached in your runtime/surface, Nocturnus tools (<code>tell</code>, <code>ask</code>, <code>teach</code>, <code>forget</code>, <code>context</code>, etc.) give OpenClaw a deterministic fact layer without changing your model provider setup.
+    </p>
+
+    <hr />
+
+    <h2 id="path-b">Path B: Build a Context Engine Plugin (deep integration)</h2>
+    <p>
+        OpenClaw's Context Engine API is the right place to make NocturnusAI your canonical context assembler. OpenClaw calls the engine during <strong>ingest</strong>, <strong>assemble</strong>, and <strong>compact</strong> lifecycle stages.
+    </p>
+
+    <h3>Plugin sketch</h3>
+    <pre><code class="language-typescript">import &#123; definePluginEntry &#125; from "openclaw/plugin-sdk/plugin-entry";
+import &#123; delegateCompactionToRuntime &#125; from "openclaw/plugin-sdk/core";
+
+const NOCTURNUS = process.env.NOCTURNUS_URL ?? "http://localhost:9300";
+const HEADERS = &#123;
+  "Content-Type": "application/json",
+  "X-Database": process.env.NOCTURNUS_DB ?? "default",
+  "X-Tenant-ID": process.env.NOCTURNUS_TENANT ?? "default",
+&#125;;
+
+export default definePluginEntry(&#123;
+  id: "nocturnus-context",
+  name: "Nocturnus Context Engine",
+  register(api) &#123;
+    api.registerContextEngine("nocturnus-context", () => (&#123;
+      info: &#123; id: "nocturnus-context", name: "Nocturnus Context", ownsCompaction: false &#125;,
+
+      async ingest(&#123; message &#125;) &#123;
+        // Persist each turn into Nocturnus (choose /tell or /context ingest strategy).
+        await fetch(`$&#123;NOCTURNUS&#125;/context`, &#123;
+          method: "POST",
+          headers: HEADERS,
+          body: JSON.stringify(&#123; turns: [message.content], maxFacts: 1 &#125;),
+        &#125;);
+        return &#123; ingested: true &#125;;
+      &#125;,
+
+      async assemble(&#123; messages, tokenBudget &#125;) &#123;
+        // Use latest user intent as goal, then ask Nocturnus for optimized context.
+        const latest = messages[messages.length - 1];
+        const ctx = await fetch(`$&#123;NOCTURNUS&#125;/context/optimize`, &#123;
+          method: "POST",
+          headers: HEADERS,
+          body: JSON.stringify(&#123;
+            maxFacts: 25,
+            sessionId: "openclaw-main",
+            // replace with your own goal extraction
+            goals: [&#123; predicate: "priority_support", args: ["acme"] &#125;],
+          &#125;),
+        &#125;).then(r => r.json());
+
+        const contextText = ctx.entries
+          .map((e: any) => `$&#123;e.predicate&#125;($&#123;e.args.join(", ")&#125;)`)
+          .join("\n");
+
+        return &#123;
+          messages: [
+            ...messages.slice(-8),
+            &#123; role: "system", content: `Nocturnus facts:\n$&#123;contextText&#125;` &#125;,
+          ],
+          estimatedTokens: Math.ceil((contextText.length * 1.2) / 4),
+          systemPromptAddition: "Prefer Nocturnus facts over guessed context.",
+        &#125;;
+      &#125;,
+
+      async compact(params) &#123;
+        // Keep OpenClaw's native compaction behavior unless you own compaction.
+        return await delegateCompactionToRuntime(params);
+      &#125;,
+    &#125;));
+  &#125;,
+&#125;);</code></pre>
+
+    <h3>Enable the engine in OpenClaw</h3>
+    <pre><code class="language-json">&#123;
+  "plugins": &#123;
+    "slots": &#123;
+      "contextEngine": "nocturnus-context"
+    &#125;,
+    "entries": &#123;
+      "nocturnus-context": &#123;
+        "enabled": true
+      &#125;
+    &#125;
+  &#125;
+&#125;</code></pre>
+
+    <p>Validate + restart:</p>
+    <pre><code class="language-bash">openclaw doctor
+cat ~/.openclaw/openclaw.json | jq '.plugins.slots.contextEngine'
+# restart gateway after plugin/config updates</code></pre>
+
+    <div class="callout callout-warning">
+        <strong>Failure mode to know</strong> — if the selected Context Engine plugin cannot be resolved, OpenClaw does not auto-fallback to <code>legacy</code>. Fix the plugin or switch the slot back to <code>"legacy"</code>.
+    </div>
+
+    <hr />
+
+    <h2 id="mapping">Suggested Lifecycle Mapping</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">OpenClaw lifecycle</th>
+                    <th class="py-2">Nocturnus endpoint</th>
+                    <th class="py-2">Why</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono">ingest</td>
+                    <td class="py-2 font-mono text-cyan-400">POST /context</td>
+                    <td class="py-2">Lightweight turn ingestion and fact extraction for future runs.</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono">assemble</td>
+                    <td class="py-2 font-mono text-cyan-400">POST /context/optimize</td>
+                    <td class="py-2">Goal-driven, deduplicated context with contradiction handling.</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono">afterTurn</td>
+                    <td class="py-2 font-mono text-cyan-400">POST /context/diff</td>
+                    <td class="py-2">Incremental updates between turns to reduce repeated payload.</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono">compact</td>
+                    <td class="py-2 font-mono text-cyan-400">POST /context/summary</td>
+                    <td class="py-2">Observe KB pressure and compaction triggers; optionally delegate to runtime.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr />
+
+    <h2 id="refs">Research References</h2>
+    <ul>
+        <li><a href="https://docs.openclaw.ai/concepts/context-engine" target="_blank" rel="noopener noreferrer">OpenClaw Context Engine (official)</a></li>
+        <li><a href="https://docs.openclaw.ai/cli/mcp" target="_blank" rel="noopener noreferrer">OpenClaw MCP CLI + registry behavior (official)</a></li>
+        <li><a href="https://docs.openclaw.ai/plugins/architecture" target="_blank" rel="noopener noreferrer">OpenClaw Plugin Architecture (context engine registration)</a></li>
+        <li><a href={`${base}/docs/context`}>Nocturnus Context Optimization guide</a></li>
+        <li><a href={`${base}/docs/api#context-management`}>Nocturnus Context Management API</a></li>
+    </ul>
+
+    <NextSteps links={[
+        { title: "API Reference", description: "Use /context and /context/optimize as your assembly backend", href: `${base}/docs/api#context-management` },
+        { title: "MCP Integration", description: "Connect Nocturnus over MCP when you need tool-level integration", href: `${base}/docs/mcp` },
+        { title: "Core Concepts", description: "Understand salience, contradiction handling, and proofs", href: `${base}/docs/concepts` },
+    ]} />
+</DocsLayout>

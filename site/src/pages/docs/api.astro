@@ -20,6 +20,38 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <li><code>Authorization: Bearer &lt;key&gt;</code> — required when auth is enabled</li>
     </ul>
 
+    <h3 id="api-smoke">API Smoke Test (Copy/Paste)</h3>
+    <p>Use this first. It validates <code>/tell</code>, <code>/teach</code>, and <code>/ask</code> directly from the API reference.</p>
+    <pre><code class="language-bash">export NOCTURNUS_BASE_URL=http://localhost:9300
+export NOCTURNUS_DB=default
+export NOCTURNUS_TENANT=default
+
+curl -sS "$NOCTURNUS_BASE_URL/health"
+
+curl -sS -X POST "$NOCTURNUS_BASE_URL/tell" \
+  -H "Content-Type: application/json" \
+  -H "X-Database: $NOCTURNUS_DB" \
+  -H "X-Tenant-ID: $NOCTURNUS_TENANT" \
+  -d '&#123;"predicate":"parent","args":["alice","bob"]&#125;'
+
+curl -sS -X POST "$NOCTURNUS_BASE_URL/teach" \
+  -H "Content-Type: application/json" \
+  -H "X-Database: $NOCTURNUS_DB" \
+  -H "X-Tenant-ID: $NOCTURNUS_TENANT" \
+  -d '&#123;
+  "head": &#123;"predicate":"grandparent","args":["?x","?z"]&#125;,
+  "body": [
+    &#123;"predicate":"parent","args":["?x","?y"]&#125;,
+    &#123;"predicate":"parent","args":["?y","?z"]&#125;
+  ]
+&#125;'
+
+curl -sS -X POST "$NOCTURNUS_BASE_URL/ask" \
+  -H "Content-Type: application/json" \
+  -H "X-Database: $NOCTURNUS_DB" \
+  -H "X-Tenant-ID: $NOCTURNUS_TENANT" \
+  -d '&#123;"predicate":"grandparent","args":["?who","bob"]&#125;'</code></pre>
+
     <hr />
 
     <h3>Context Management (cost optimization)</h3>
@@ -106,6 +138,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <h2 id="assert-fact">POST /assert/fact (or /tell)</h2>
     <p>Assert a fact into the knowledge base.</p>
+    <h3>cURL</h3>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/assert/fact \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"predicate":"parent","args":["alice","bob"]&#125;'</code></pre>
     <h3>Request</h3>
     <pre><code class="language-json">&#123;
   "predicate": "parent",
@@ -125,6 +162,17 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <h2 id="assert-rule">POST /assert/rule (or /teach)</h2>
     <p>Define a logical rule for inference.</p>
+    <h3>cURL</h3>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/assert/rule \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "head": &#123;"predicate":"grandparent","args":["?x","?z"]&#125;,
+    "body": [
+      &#123;"predicate":"parent","args":["?x","?y"]&#125;,
+      &#123;"predicate":"parent","args":["?y","?z"]&#125;
+    ]
+  &#125;'</code></pre>
     <h3>Request</h3>
     <pre><code class="language-json">&#123;
   "head": &#123; "predicate": "grandparent", "args": ["?x", "?z"] &#125;,
@@ -139,6 +187,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <h2 id="infer">POST /infer (or /ask)</h2>
     <p>Run backward-chaining inference. Use <code>?</code>-prefixed variables for unknowns.</p>
+    <h3>cURL</h3>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/infer \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"predicate":"grandparent","args":["?who","charlie"]&#125;'</code></pre>
     <h3>Request</h3>
     <pre><code class="language-json">&#123;
   "predicate": "grandparent",
@@ -160,6 +213,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <h2 id="query">POST /query</h2>
     <p>Direct pattern matching without inference (no rule application). Reads the Hexastore directly — faster than <code>/infer</code> when you only need stored facts and don't need derived conclusions.</p>
+    <h3>cURL</h3>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/query \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"predicate":"parent","args":["?who","bob"]&#125;'</code></pre>
     <h3>Request</h3>
     <pre><code class="language-json">&#123;
   "predicate": "parent",
@@ -175,6 +233,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <h2 id="retract">POST /retract (or /forget)</h2>
     <p>Remove a fact. The TMS automatically cascade-retracts any derived conclusions that depended on it.</p>
+    <h3>cURL</h3>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/retract \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"predicate":"parent","args":["alice","bob"]&#125;'</code></pre>
     <h3>Request</h3>
     <pre><code class="language-json">&#123;
   "predicate": "parent",
@@ -185,28 +248,47 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <h2 id="transactions">ACID Transactions</h2>
     <p>Group multiple operations into an atomic unit. If any operation fails, the entire transaction rolls back — ensuring consistency when multiple agents write simultaneously.</p>
-    <pre><code class="language-bash"># 1. Begin transaction
-TX_ID=$(curl -s -X POST http://localhost:9300/tx/begin | jq -r '.id')
+    <pre><code class="language-bash"># Common headers used below
+export NOCTURNUS_TENANT=default
+export NOCTURNUS_DB=default
+
+# 1. Begin transaction (/tx/begin returns plain text transaction id)
+TX_ID=$(curl -s -X POST http://localhost:9300/tx/begin \
+  -H "X-Database: $NOCTURNUS_DB" \
+  -H "X-Tenant-ID: $NOCTURNUS_TENANT")
 
 # 2. Assert facts within the transaction
 curl -X POST http://localhost:9300/assert/fact \
   -H "Content-Type: application/json" \
+  -H "X-Database: $NOCTURNUS_DB" \
+  -H "X-Tenant-ID: $NOCTURNUS_TENANT" \
   -H "X-Transaction-ID: $TX_ID" \
   -d '&#123;"predicate":"balance","args":["alice","500"]&#125;'
 
 curl -X POST http://localhost:9300/assert/fact \
   -H "Content-Type: application/json" \
+  -H "X-Database: $NOCTURNUS_DB" \
+  -H "X-Tenant-ID: $NOCTURNUS_TENANT" \
   -H "X-Transaction-ID: $TX_ID" \
   -d '&#123;"predicate":"balance","args":["bob","300"]&#125;'
 
 # 3. Commit (or rollback)
-curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
-# curl -X POST "http://localhost:9300/tx/rollback/$TX_ID"</code></pre>
+curl -X POST "http://localhost:9300/tx/commit/$TX_ID" \
+  -H "X-Database: $NOCTURNUS_DB" \
+  -H "X-Tenant-ID: $NOCTURNUS_TENANT"
+# curl -X POST "http://localhost:9300/tx/rollback/$TX_ID" \
+#   -H "X-Database: $NOCTURNUS_DB" \
+#   -H "X-Tenant-ID: $NOCTURNUS_TENANT"</code></pre>
 
     <hr />
 
     <h2 id="extract">POST /extract</h2>
     <p>LLM-powered fact extraction from natural language text. See <a href={`${base}/docs/llm`}>LLM Integration</a> for details.</p>
+    <h3>cURL</h3>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/extract \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"text":"Acme Corp is on the enterprise plan.","assert":true&#125;'</code></pre>
     <h3>Request</h3>
     <pre><code class="language-json">&#123;
   "text": "Acme Corp is on the enterprise plan.",
@@ -220,6 +302,11 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
 
     <h2 id="synthesize">POST /synthesize</h2>
     <p>LLM-powered natural language question answering grounded in facts. See <a href={`${base}/docs/llm`}>LLM Integration</a>.</p>
+    <h3>cURL</h3>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/synthesize \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"question":"What plan is Acme Corp on?"&#125;'</code></pre>
     <h3>Request</h3>
     <pre><code class="language-json">&#123;
   "question": "What plan is Acme Corp on?",
@@ -240,8 +327,17 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
 
     <h2 id="memory">Memory Endpoints</h2>
 
-    <h3>GET /memory/context</h3>
+    <h3>POST /memory/context</h3>
     <p>Get the top-K most salient facts for the agent's context window.</p>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/memory/context \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "maxFacts": 100,
+    "minSalience": 0.0,
+    "predicates": null,
+    "scope": null
+  &#125;'</code></pre>
     <pre><code class="language-json">&#123;
   "maxFacts": 100,
   "minSalience": 0.0,
@@ -251,9 +347,11 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
 
     <h3>POST /memory/consolidate</h3>
     <p>Compress repetitive episodic patterns into semantic summaries.</p>
+    <p class="text-slate-400 text-sm">CLI-friendly alias: <code>POST /memory/compress</code>.</p>
 
     <h3>POST /memory/decay</h3>
     <p>Evict expired and low-salience facts.</p>
+    <p class="text-slate-400 text-sm">CLI-friendly alias: <code>POST /memory/cleanup</code>.</p>
     <pre><code class="language-json">&#123; "threshold": 0.05 &#125;</code></pre>
 
     <hr />
@@ -265,8 +363,64 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
         <strong>This is the money saver.</strong> Instead of stuffing 150K tokens into every LLM prompt ($2.25/request at GPT-4o rates), these endpoints deliver ~820 tokens of goal-relevant facts ($0.01/request). Same correct answer, 97% lower bill.
     </div>
 
+    <div class="callout callout-tip">
+        <strong>Recommended production loop.</strong> Use <code>/context</code> for fast turn ingestion, <code>/context/optimize</code> with a stable <code>sessionId</code> for assembly, <code>/context/diff</code> for follow-up turns, and <code>/context/session/clear</code> when the conversation ends.
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Method + Endpoint</th>
+                    <th class="py-2">When to Use It</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono">POST /memory/context</td>
+                    <td class="py-2">Fast salience-ranked window</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono">POST /context</td>
+                    <td class="py-2">Turns in, facts out (simple ingestion + selection)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono">POST /context/optimize</td>
+                    <td class="py-2">Goal-driven window with contradiction handling and session snapshots</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono">POST /context/diff</td>
+                    <td class="py-2">Delta updates since last optimized window</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono">POST /context/summary</td>
+                    <td class="py-2">Context/KB telemetry (counts, salience, contradictions)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono">POST /context/session/clear</td>
+                    <td class="py-2">Delete diff snapshot state at end of conversation</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono">POST /context/ingest</td>
+                    <td class="py-2">One-shot extract + assert + optimize workflow</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
     <h3 id="context-simple">POST /context</h3>
     <p>The simplest way to use NocturnusAI. Pass an array of conversation turns (strings), get back relevant facts. NocturnusAI extracts, stores, deduplicates, and ranks automatically.</p>
+    <h4>cURL</h4>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/context \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "turns": [
+      "Acme Corp is on the enterprise plan and based in Austin.",
+      "They have a $2M contract with 24/7 SLA support."
+    ],
+    "maxFacts": 50
+  &#125;'</code></pre>
     <h4>Request</h4>
     <pre><code class="language-json">&#123;
   "turns": [
@@ -298,6 +452,17 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
 
     <h3 id="context-optimize">POST /context/optimize</h3>
     <p>Build an optimized context window. Optionally goal-driven via backward chaining.</p>
+    <h4>cURL</h4>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/context/optimize \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "maxFacts": 25,
+    "goals": [
+      &#123;"predicate":"enforceable","args":["contract_001"]&#125;
+    ],
+    "sessionId": "session-42"
+  &#125;'</code></pre>
     <h4>Request</h4>
     <pre><code class="language-json">&#123;
   "maxFacts": 25,
@@ -306,8 +471,8 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
     &#123; "predicate": "exception_applies", "args": ["contract_001", "?e"] &#125;
   ],
   "relevanceBuckets": [
-    &#123; "name": "contract", "predicates": ["contract_type", "contract_value"], "maxFacts": 8 &#125;,
-    &#123; "name": "legal", "predicates": ["enforceable", "statute_of_frauds"], "maxFacts": 10 &#125;
+    &#123; "name": "contract", "predicates": ["contract_type", "contract_value"], "weight": 1.5 &#125;,
+    &#123; "name": "legal", "predicates": ["enforceable", "statute_of_frauds"], "weight": 3.0 &#125;
   ],
   "scope": null,
   "predicates": null,
@@ -343,7 +508,7 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
                     <td class="py-2 font-mono text-cyan-400">relevanceBuckets</td>
                     <td class="py-2">Bucket[]?</td>
                     <td class="py-2">null</td>
-                    <td class="py-2">Per-domain budgets: <code>name</code>, <code>predicates</code>, <code>weight</code>, <code>maxFacts</code></td>
+                    <td class="py-2">Per-domain weighting: <code>name</code>, <code>predicates</code>, <code>weight</code></td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-cyan-400">scope</td>
@@ -424,6 +589,7 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
   "knowledgeGeneration": 47,
   "generatedAt": 1712180450000
 &#125;</code></pre>
+    <p><code>totalCharCount</code> is useful for prompt budgeting. A quick estimate is <code>tokens ≈ totalCharCount / 4</code>.</p>
 
     <hr />
 

@@ -1,11 +1,14 @@
 # curl / HTTP API Examples
 
-Raw HTTP examples covering every major endpoint.
+Raw HTTP examples for the surfaces most teams integrate first.
+
+Start with context reduction. Drop down to backend mechanics only when you need them.
 
 ## Prerequisites
 
-- `curl` and `jq` installed
+- `curl` and `jq`
 - NocturnusAI server running at `http://localhost:9300`
+- `X-Tenant-ID` header on REST calls
 
 ## Run all examples
 
@@ -18,6 +21,14 @@ bash examples.sh
 | Section | Endpoint |
 |---------|----------|
 | Health | `GET /health` |
+| Simple turn reduction | `POST /context` |
+| Goal-driven context | `POST /context/optimize` |
+| Incremental diff | `POST /context/diff` |
+| Clear snapshot | `POST /context/session/clear` |
+| Salience window | `POST /memory/context` |
+| Consolidate | `POST /memory/consolidate` |
+| Decay | `POST /memory/decay` |
+| Simplified aliases | `POST /memory/compress`, `POST /memory/cleanup` |
 | Assert fact | `POST /assert/fact` |
 | Assert rule | `POST /assert/rule` |
 | Infer | `POST /infer` |
@@ -25,16 +36,13 @@ bash examples.sh
 | Schema | `GET /predicates` |
 | Retract | `POST /retract` |
 | DSL | `POST /execute` |
-| Context window | `POST /memory/context` |
 | Temporal query | `POST /memory/query/temporal` |
 | Set priority | `POST /memory/priority` |
-| Consolidate | `POST /memory/consolidate` |
-| Decay | `POST /memory/decay` |
-| Transactions | `POST /tx/begin` → assert → `POST /tx/commit/{id}` |
-| Rollback | `POST /tx/begin` → `POST /tx/rollback/{id}` |
+| Transactions | `POST /tx/begin` -> assert -> `POST /tx/commit/{id}` |
+| Rollback | `POST /tx/begin` -> `POST /tx/rollback/{id}` |
 | Auth status | `GET /auth/status` |
 | Agent card | `GET /.well-known/agent.json` |
-| Admin: databases | `GET /admin/databases` |
+| Admin databases | `GET /admin/databases` |
 
 ## Quick one-liners
 
@@ -42,25 +50,37 @@ bash examples.sh
 # Health check
 curl http://localhost:9300/health | jq .
 
-# Assert a fact
-curl -s -X POST http://localhost:9300/assert/fact \
+# Raw turns -> smaller working set
+curl -s -X POST http://localhost:9300/context \
   -H 'Content-Type: application/json' \
   -H 'X-Database: mydb' \
-  -d '{"predicate":"likes","args":["alice","cats"]}'
+  -H 'X-Tenant-ID: default' \
+  -d '{"turns":["user: enterprise customer blocked on SLA credits","tool: contract is worth 2M"],"maxFacts":10}' | jq .
 
-# Infer with backward chaining
-curl -s -X POST http://localhost:9300/infer \
+# Goal-driven context window
+curl -s -X POST http://localhost:9300/context/optimize \
   -H 'Content-Type: application/json' \
   -H 'X-Database: mydb' \
-  -d '{"predicate":"likes","args":["?who","?what"]}' | jq .
+  -H 'X-Tenant-ID: default' \
+  -d '{"goals":[{"predicate":"eligible_for_sla","args":["acme_corp"]}],"maxFacts":10,"sessionId":"ticket-42"}' | jq .
 
-# Get context window
+# Diff since the last snapshot
+curl -s -X POST http://localhost:9300/context/diff \
+  -H 'Content-Type: application/json' \
+  -H 'X-Database: mydb' \
+  -H 'X-Tenant-ID: default' \
+  -d '{"sessionId":"ticket-42","maxFacts":10}' | jq .
+
+# Salience-ranked memory window
 curl -s -X POST http://localhost:9300/memory/context \
   -H 'Content-Type: application/json' \
   -H 'X-Database: mydb' \
-  -d '{"maxFacts":10}' | jq .
+  -H 'X-Tenant-ID: default' \
+  -d '{"maxFacts":10,"minSalience":0.1}' | jq .
+```
 
-# Schema
-curl -s http://localhost:9300/predicates \
-  -H 'X-Database: mydb' | jq .
+## Value proof
+
+```bash
+bash value_proof.sh
 ```

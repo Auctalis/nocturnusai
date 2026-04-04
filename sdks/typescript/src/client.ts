@@ -25,6 +25,10 @@ import type {
   Atom,
   ScoredAtom,
   ContextWindow,
+  OptimizedContext,
+  ContextDiff,
+  ContextSummary,
+  IngestAndOptimizeResult,
   ConsolidationResult,
   DecayResult,
   RuleHead,
@@ -34,6 +38,9 @@ import type {
   RuleOptions,
   InferOptions,
   ContextWindowOptions,
+  OptimizeContextOptions,
+  DiffContextOptions,
+  IngestAndOptimizeOptions,
   EventSubscriptionOptions,
   KnowledgeEvent,
   HealthStatus,
@@ -91,9 +98,9 @@ export class NocturnusAIRequestError extends Error {
  * Main client for interacting with the NocturnusAI HTTP API.
  *
  * Provides typed methods for all core operations: asserting facts and rules,
- * querying, inference, retraction, memory management (context window, temporal
- * queries, consolidation, decay), executing DSL commands, health checks, and
- * SSE event subscriptions.
+ * querying, inference, retraction, memory management (context windows,
+ * goal-driven optimization, diffs, temporal queries, consolidation, decay),
+ * executing DSL commands, health checks, and SSE event subscriptions.
  *
  * All methods that communicate with the server return Promises and include
  * automatic retry logic with exponential backoff for transient failures
@@ -332,6 +339,143 @@ export class NocturnusAIClient {
     if (opts?.scope !== undefined) body.scope = opts.scope;
 
     return this.requestJson<ContextWindow>('POST', '/memory/context', body);
+  }
+
+  /**
+   * Build a goal-driven optimized context window.
+   *
+   * Unlike {@link contextWindow}, this endpoint can use goals, weighted buckets,
+   * contradiction handling, and snapshot storage for later diff calls.
+   *
+   * @param opts - Optimization options including goals, predicates, and sessionId.
+   * @returns Optimized context window with selected entries and telemetry.
+   *
+   * @example
+   * ```ts
+   * const ctx = await client.optimizeContext({
+   *   goals: [{ predicate: 'eligible_for_sla', args: ['acme_corp'] }],
+   *   maxFacts: 25,
+   *   sessionId: 'session-42',
+   * });
+   * console.log(ctx.totalFactsIncluded, ctx.totalCharCount);
+   * ```
+   */
+  async optimizeContext(opts?: OptimizeContextOptions): Promise<OptimizedContext> {
+    const body: Record<string, unknown> = {};
+    if (opts?.maxFacts !== undefined) body.maxFacts = opts.maxFacts;
+    if (opts?.scope !== undefined) body.scope = opts.scope;
+    if (opts?.predicates !== undefined) body.predicates = opts.predicates;
+    if (opts?.goals !== undefined) body.goals = opts.goals;
+    if (opts?.relevanceBuckets !== undefined) body.relevanceBuckets = opts.relevanceBuckets;
+    if (opts?.sessionId !== undefined) body.sessionId = opts.sessionId;
+    if (opts?.autoResolveContradictions !== undefined) {
+      body.autoResolveContradictions = opts.autoResolveContradictions;
+    }
+    if (opts?.maxFactsPerPredicate !== undefined) {
+      body.maxFactsPerPredicate = opts.maxFactsPerPredicate;
+    }
+
+    return this.requestJson<OptimizedContext>('POST', '/context/optimize', body);
+  }
+
+  /**
+   * Get incremental changes since the last optimized context snapshot.
+   *
+   * @param opts - Diff options. Requires a sessionId from a prior optimizeContext() call.
+   * @returns Added and removed entries since the previous snapshot.
+   *
+   * @example
+   * ```ts
+   * const diff = await client.diffContext({ sessionId: 'session-42', maxFacts: 25 });
+   * console.log(diff.added.length, diff.removed.length);
+   * ```
+   */
+  async diffContext(opts: DiffContextOptions): Promise<ContextDiff> {
+    const body: Record<string, unknown> = {
+      sessionId: opts.sessionId,
+    };
+    if (opts.maxFacts !== undefined) body.maxFacts = opts.maxFacts;
+    if (opts.scope !== undefined) body.scope = opts.scope;
+    if (opts.predicates !== undefined) body.predicates = opts.predicates;
+    if (opts.goals !== undefined) body.goals = opts.goals;
+    if (opts.relevanceBuckets !== undefined) body.relevanceBuckets = opts.relevanceBuckets;
+    if (opts.autoResolveContradictions !== undefined) {
+      body.autoResolveContradictions = opts.autoResolveContradictions;
+    }
+    if (opts.maxFactsPerPredicate !== undefined) {
+      body.maxFactsPerPredicate = opts.maxFactsPerPredicate;
+    }
+
+    return this.requestJson<ContextDiff>('POST', '/context/diff', body);
+  }
+
+  /**
+   * Summarize the current context store.
+   *
+   * @param scope - Optional scope filter.
+   * @returns Aggregate context metrics and top salient entries.
+   *
+   * @example
+   * ```ts
+   * const summary = await client.summarizeContext();
+   * console.log(summary.totalFacts, summary.contradictions);
+   * ```
+   */
+  async summarizeContext(scope?: string): Promise<ContextSummary> {
+    const body: Record<string, unknown> = {};
+    if (scope !== undefined) body.scope = scope;
+
+    return this.requestJson<ContextSummary>('POST', '/context/summary', body);
+  }
+
+  /**
+   * Clear stored snapshot state for a context session.
+   *
+   * @param sessionId - Session ID created by optimizeContext().
+   * @returns Server confirmation message.
+   *
+   * @example
+   * ```ts
+   * await client.clearContextSession('session-42');
+   * ```
+   */
+  async clearContextSession(sessionId: string): Promise<string> {
+    return this.requestText('POST', '/context/session/clear', { sessionId });
+  }
+
+  /**
+   * Extract facts from raw text, assert them, and return an optimized context window.
+   *
+   * @param opts - Ingest text plus optimization options.
+   * @returns Extracted facts and the optimized context window.
+   *
+   * @example
+   * ```ts
+   * const result = await client.ingestAndOptimize({
+   *   text: 'Acme Corp is on the enterprise plan.',
+   *   maxFacts: 10,
+   * });
+   * console.log(result.extracted.length, result.context.totalFactsIncluded);
+   * ```
+   */
+  async ingestAndOptimize(opts: IngestAndOptimizeOptions): Promise<IngestAndOptimizeResult> {
+    const body: Record<string, unknown> = {
+      text: opts.text,
+    };
+    if (opts.goals !== undefined) body.goals = opts.goals;
+    if (opts.maxFacts !== undefined) body.maxFacts = opts.maxFacts;
+    if (opts.maxFactsPerPredicate !== undefined) {
+      body.maxFactsPerPredicate = opts.maxFactsPerPredicate;
+    }
+    if (opts.autoResolveContradictions !== undefined) {
+      body.autoResolveContradictions = opts.autoResolveContradictions;
+    }
+    if (opts.sessionId !== undefined) body.sessionId = opts.sessionId;
+    if (opts.relevanceBuckets !== undefined) body.relevanceBuckets = opts.relevanceBuckets;
+    if (opts.scope !== undefined) body.scope = opts.scope;
+    if (opts.contextHint !== undefined) body.contextHint = opts.contextHint;
+
+    return this.requestJson<IngestAndOptimizeResult>('POST', '/context/ingest', body);
   }
 
   /**

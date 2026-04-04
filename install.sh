@@ -30,14 +30,18 @@ docker_fallback() {
     local port=9300
     local install_dir="./nocturnusai"
     local use_ollama=false
+    local use_host_ollama=false
+    local api_key=""
 
-    # Parse --port, --dir, --ollama from forwarded args
+    # Parse forwarded args
     while [ $# -gt 0 ]; do
         case "$1" in
-            --port)   port="$2"; shift 2 ;;
-            --dir)    install_dir="$2"; shift 2 ;;
-            --ollama) use_ollama=true; shift ;;
-            *)        shift ;;
+            --port)         port="$2"; shift 2 ;;
+            --dir)          install_dir="$2"; shift 2 ;;
+            --ollama)       use_ollama=true; shift ;;
+            --host-ollama)  use_host_ollama=true; shift ;;
+            --key)          api_key="$2"; shift 2 ;;
+            *)              shift ;;
         esac
     done
 
@@ -119,6 +123,35 @@ services:
       retries: 10
       start_period: 15s
 COMPOSE
+    elif [ "$use_host_ollama" = true ]; then
+        cat > "$install_dir/docker-compose.yml" <<'COMPOSE'
+services:
+  nocturnusai:
+    image: ghcr.io/auctalis/nocturnusai:latest
+    container_name: nocturnusai
+    restart: unless-stopped
+    ports:
+      - "${PORT:-9300}:${PORT:-9300}"
+    volumes:
+      - ./data:/data
+    environment:
+      - PORT=${PORT:-9300}
+      - HOST=0.0.0.0
+      - STORAGE_DIR=/data
+      - API_KEY=${API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_MODEL=${LLM_MODEL:-llama3.2}
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      - EXTRACTION_ENABLED=${EXTRACTION_ENABLED:-true}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+COMPOSE
     else
         cat > "$install_dir/docker-compose.yml" <<'COMPOSE'
 services:
@@ -151,9 +184,22 @@ services:
 COMPOSE
     fi
 
-    # Create .env with port
+    # Create .env with port and API key if provided
     if [ ! -f "$install_dir/.env" ]; then
         echo "PORT=$port" > "$install_dir/.env"
+    fi
+    if [ -n "$api_key" ]; then
+        # Auto-detect provider from key prefix and write to .env
+        if [[ "$api_key" == sk-ant-* ]]; then
+            echo "ANTHROPIC_API_KEY=$api_key" >> "$install_dir/.env"
+        elif [[ "$api_key" == sk-* ]]; then
+            echo "OPENAI_API_KEY=$api_key" >> "$install_dir/.env"
+        elif [[ "$api_key" == AI* ]]; then
+            echo "GOOGLE_API_KEY=$api_key" >> "$install_dir/.env"
+        else
+            echo "LLM_API_KEY=$api_key" >> "$install_dir/.env"
+        fi
+        echo "EXTRACTION_ENABLED=true" >> "$install_dir/.env"
     fi
 
     # Start

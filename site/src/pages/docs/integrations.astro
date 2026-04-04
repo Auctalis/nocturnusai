@@ -112,23 +112,58 @@ tools = get_nocturnusai_tool_definitions()
         <a href={`${base}/docs/mcp`}>MCP protocol</a>, or the
         <a href={`${base}/docs/sdks`}>direct SDK</a>.
     </p>
+    <p class="text-slate-400">
+        Running <strong>OpenClaw</strong>? Use the dedicated <a href={`${base}/docs/openclaw`}>OpenClaw Context Integration guide</a> for MCP registry setup and Context Engine plugin wiring.
+    </p>
 
     <hr />
 
     <h2>Context Optimization Across All Frameworks</h2>
     <p class="text-slate-400">
-        Every integration above gives your agent access to the <strong>Context Management Engine</strong>. Instead of stuffing your entire knowledge base into every LLM prompt, call <code>optimize_context()</code> with goals to get only the facts that matter — 97% fewer tokens billed per request, regardless of framework.
+        Every integration above gives your agent access to optimized context retrieval. In Python and TypeScript app code, call the context-management methods directly. In MCP/tool-first flows, call the <code>context</code> tool each turn and pair it with the HTTP Context API when you need goal-driven windows.
     </p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Integration Surface</th>
+                    <th class="py-2">Salience Context</th>
+                    <th class="py-2">Goal Context + Diff</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2">LangChain / CrewAI / AutoGen / OpenAI Agents / Anthropic (Python SDK)</td>
+                    <td class="py-2 font-mono"><code>context_window()</code> or framework context tool</td>
+                    <td class="py-2 font-mono"><code>optimize_context()</code>, <code>diff_context()</code>, <code>clear_context_session()</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">MCP clients (Cursor, Claude Desktop, Windsurf)</td>
+                    <td class="py-2 font-mono">JSON-RPC <code>tools/call</code> with tool <code>context</code></td>
+                    <td class="py-2 font-mono">HTTP <code>POST /context/optimize</code> + <code>POST /context/diff</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">TypeScript apps</td>
+                    <td class="py-2 font-mono"><code>contextWindow()</code></td>
+                    <td class="py-2 font-mono"><code>optimizeContext()</code>, <code>diffContext()</code>, <code>clearContextSession()</code></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
     <pre><code class="language-python"># Works with any framework above
 from nocturnusai import SyncNocturnusAIClient
 
 client = SyncNocturnusAIClient("http://localhost:9300")
 ctx = client.optimize_context(
     goals=[&#123;"predicate": "eligible_for_sla", "args": ["acme_corp"]&#125;],
-    max_facts=25
+    max_facts=25,
+    session_id="session-42",
 )
-# ctx.entries → 15 facts, 820 tokens, full provenance
-# vs. 150K tokens without optimization</code></pre>
+# ctx.entries -> optimized facts for this turn
+diff = client.diff_context(session_id="session-42")
+# diff.added / diff.removed -> send only deltas on later turns</code></pre>
 
     <NextSteps links={[
         { title: "SDKs", description: "Full Python and TypeScript SDK documentation", href: `${base}/docs/sdks` },

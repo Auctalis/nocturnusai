@@ -81,6 +81,43 @@ curl -X POST http://localhost:9300/ask \
 
     <hr />
 
+    <h2 id="context-isolation">Context Optimization Isolation Pattern</h2>
+    <p>For context-heavy agents, separate concerns like this:</p>
+    <ul>
+        <li><strong>Database</strong> = environment boundary (dev/staging/prod)</li>
+        <li><strong>Tenant</strong> = customer or agent boundary</li>
+        <li><strong>Scope</strong> = per-conversation or per-document slice</li>
+        <li><strong>sessionId</strong> = diff state for <code>/context/optimize</code> and <code>/context/diff</code></li>
+    </ul>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/context/optimize \
+  -H "Content-Type: application/json" \
+  -H "X-Database: production" \
+  -H "X-Tenant-ID: acme_corp" \
+  -d '&#123;
+    "scope": "conversation_2026_04_03",
+    "sessionId": "acme-support-thread-42",
+    "maxFacts": 25
+  &#125;'</code></pre>
+    <pre><code class="language-bash"># Same tenant+scope, later turn: request only changes
+curl -X POST http://localhost:9300/context/diff \
+  -H "Content-Type: application/json" \
+  -H "X-Database: production" \
+  -H "X-Tenant-ID: acme_corp" \
+  -d '&#123;
+    "scope": "conversation_2026_04_03",
+    "sessionId": "acme-support-thread-42",
+    "maxFacts": 25
+  &#125;'
+
+# End-of-thread cleanup for this tenant/session
+curl -X POST http://localhost:9300/context/session/clear \
+  -H "Content-Type: application/json" \
+  -H "X-Database: production" \
+  -H "X-Tenant-ID: acme_corp" \
+  -d '&#123;"sessionId":"acme-support-thread-42"&#125;'</code></pre>
+
+    <hr />
+
     <h2 id="patterns">Common Patterns</h2>
 
     <h3>SaaS Multi-Tenant</h3>

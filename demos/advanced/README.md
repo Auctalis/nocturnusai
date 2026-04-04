@@ -1,7 +1,8 @@
 # Advanced / Deep-Dive Demos
 
-These demos cover the raw SDK mechanics in depth — the building blocks
-that power the LLM integrations in [../llm/](../llm/).
+These demos cover the lower-level SDK mechanics behind the context workflow.
+
+Use them when you need to understand the backend pieces directly: fact assertion, rules, inference, salience, temporal queries, transactions, auth, and SSE events.
 
 ## Python SDK
 
@@ -20,14 +21,14 @@ python 08_agent_workflow.py
 
 | File | Topic |
 |------|-------|
-| `01_basics.py` | assert_fact, query, infer, retract |
-| `02_rules_and_inference.py` | assert_rule, multi-hop inference, proof trees |
-| `03_memory_management.py` | context_window, temporal_query, set_priority, consolidate, decay, TTL |
+| `01_basics.py` | `assert_fact`, `query`, `infer`, `retract` |
+| `02_rules_and_inference.py` | `assert_rule`, multi-hop inference, proof trees |
+| `03_memory_management.py` | `context_window`, `temporal_query`, `set_priority`, `consolidate`, `decay`, TTL |
 | `04_transactions.py` | begin/commit/rollback transactions |
-| `05_auth_and_keys.py` | auth_status, bootstrap, create/list/revoke keys |
-| `06_dsl_execute.py` | Logiql DSL, predicates (schema) |
-| `07_langchain_tools.py` | LangChain tool wrappers in isolation |
-| `08_agent_workflow.py` | Full async agent workflow |
+| `05_auth_and_keys.py` | auth bootstrap and key management |
+| `06_dsl_execute.py` | Logiql DSL and predicate discovery |
+| `07_langchain_tools.py` | LangChain tools in isolation |
+| `08_agent_workflow.py` | End-to-end agent lifecycle |
 
 ## TypeScript SDK
 
@@ -35,19 +36,22 @@ python 08_agent_workflow.py
 cd demos/advanced/typescript
 npm install
 npx ts-node 01_basics.ts
+npx ts-node 03_memory_management.ts
+npx ts-node 06_events_sse.ts
+npx ts-node 07_agent_workflow.ts
 ```
 
 | File | Topic |
 |------|-------|
-| `01_basics.ts` | assertFact, query, infer, retract |
-| `02_rules_and_inference.ts` | assertRule, multi-hop, proof trees |
-| `03_memory_management.ts` | contextWindow, temporalQuery, setPriority, consolidate, decay |
-| `04_transactions.ts` | beginTransaction, commitTransaction, rollbackTransaction |
-| `05_auth_and_keys.ts` | authStatus, bootstrap, createKey, listKeys, revokeKey |
-| `06_events_sse.ts` | subscribeEvents — real-time SSE |
-| `07_agent_workflow.ts` | Full TypeScript agent lifecycle |
+| `01_basics.ts` | `assertFact`, `query`, `infer`, `retract` |
+| `02_rules_and_inference.ts` | `assertRule`, multi-hop inference, proof trees |
+| `03_memory_management.ts` | `contextWindow`, `temporalQuery`, `setPriority`, `consolidate`, `decay` |
+| `04_transactions.ts` | begin/commit/rollback transactions |
+| `05_auth_and_keys.ts` | auth bootstrap and key management |
+| `06_events_sse.ts` | `subscribeEvents()` real-time stream |
+| `07_agent_workflow.ts` | End-to-end TypeScript workflow |
 
 ## See also
 
-- [../llm/](../llm/) — LLM & agent integration (featured)
-- [../curl/](../curl/) — Raw HTTP API examples
+- [../llm/](../llm/) - featured agent demos
+- [../curl/](../curl/) - raw HTTP examples

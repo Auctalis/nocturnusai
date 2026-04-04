@@ -7,11 +7,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <DocsLayout title="MCP Integration">
     <h1>MCP Integration</h1>
     <p class="lead text-xl text-slate-400">
-        Connect any MCP-compatible agent to Nocturnus in 30 seconds. Cut token costs by 97% with goal-driven context optimization.
+        Connect any MCP-compatible agent to Nocturnus in 30 seconds. Use the <code>context</code> tool for fast working-set retrieval on every turn, then pair it with the HTTP Context API when you need goal-driven assembly and session diffs.
     </p>
 
     <div class="callout callout-success">
-        <strong>Zero code required.</strong> Cursor, Claude Desktop, Windsurf, and any MCP client can use Nocturnus as a reasoning and context optimization tool with a single config line. No SDK, no API wrapper — just point and go. Your agent gets 97% token reduction automatically.
+        <strong>Zero code required.</strong> Cursor, Claude Desktop, Windsurf, and any MCP client can use Nocturnus as a reasoning and context tool with a single config line. No SDK, no API wrapper — just point and go.
     </div>
 
     <hr />
@@ -161,6 +161,26 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
                     <td class="py-2">Discover the KB schema (predicate names, arities, counts)</td>
                     <td class="py-2 text-sm">"What types of facts are stored?"</td>
                 </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">aggregate</td>
+                    <td class="py-2">COUNT/SUM/MIN/MAX/AVG over matched facts</td>
+                    <td class="py-2 text-sm">"Count all active contracts"</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">bulk_assert</td>
+                    <td class="py-2">Write many facts in a single call</td>
+                    <td class="py-2 text-sm">"Ingest a batch of extracted facts"</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">retract_pattern</td>
+                    <td class="py-2">Retract facts matching a wildcard pattern</td>
+                    <td class="py-2 text-sm">"Delete all facts for a stale scope"</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">fork_scope / merge_scope / list_scopes / delete_scope</td>
+                    <td class="py-2">Git-like scope branching and merge workflows</td>
+                    <td class="py-2 text-sm">"Fork a hypothesis scope, then merge if valid"</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -176,22 +196,68 @@ curl -N http://localhost:9300/mcp/sse</code></pre>
     <hr />
 
     <h2 id="context">Context Optimization via MCP</h2>
-    <p>MCP-connected agents can use the Context Management Engine to optimize their token spend. Instead of querying all facts, specify goals and get only what's relevant:</p>
-    <pre><code class="language-json">// MCP tool call
+    <p>MCP gives you salience-ranked context directly via the <code>context</code> tool. Use it every turn before answering:</p>
+    <pre><code class="language-json">// MCP tool call (supported arguments)
 &#123;
   "method": "tools/call",
   "params": &#123;
     "name": "context",
     "arguments": &#123;
-      "goals": [&#123;"predicate": "eligible_for_sla", "args": ["acme_corp"]&#125;],
-      "maxFacts": 25
+      "maxFacts": 25,
+      "minSalience": 0.15,
+      "predicates": ["customer_tier", "sla_tier", "contract_value"],
+      "scope": "session_acme_42"
     &#125;
   &#125;
-&#125;
+&#125;</code></pre>
+    <p class="text-slate-400 text-sm">The MCP server accepts <code>minSalience</code>. It also accepts the legacy alias <code>minRelevance</code> because some MCP clients still surface that older schema label.</p>
 
-// Returns: 15 goal-relevant facts, ~820 tokens
-// vs. 150K tokens from querying everything</code></pre>
-    <p>This is the difference between $2.25 and $0.01 per request when using GPT-4o or Claude at $15/M tokens.</p>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Context Task</th>
+                    <th class="py-2">Method</th>
+                    <th class="py-2">Where</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Salience-ranked context</td>
+                    <td class="py-2 font-mono">JSON-RPC <code>tools/call</code> + tool <code>context</code></td>
+                    <td class="py-2">MCP</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Goal-driven context assembly</td>
+                    <td class="py-2 font-mono">HTTP <code>POST /context/optimize</code></td>
+                    <td class="py-2">Context API</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Incremental updates</td>
+                    <td class="py-2 font-mono">HTTP <code>POST /context/diff</code></td>
+                    <td class="py-2">Context API</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Session cleanup</td>
+                    <td class="py-2 font-mono">HTTP <code>POST /context/session/clear</code></td>
+                    <td class="py-2">Context API</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p>
+        For <strong>goal-driven</strong> context windows (<code>/context/optimize</code> and <code>/context/diff</code>), call the HTTP Context API from your app/orchestrator alongside MCP tools. This gives you the full optimization pipeline: goals, contradiction handling, and session diffs.
+    </p>
+    <pre><code class="language-bash"># Companion HTTP call for goal-driven windows
+curl -X POST http://localhost:9300/context/optimize \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "goals":[&#123;"predicate":"eligible_for_sla","args":["acme_corp"]&#125;],
+    "maxFacts":25,
+    "sessionId":"mcp-session-42"
+  &#125;'</code></pre>
 
     <hr />
 

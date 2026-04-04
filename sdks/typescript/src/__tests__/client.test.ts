@@ -402,6 +402,244 @@ describe('contextWindow', () => {
 });
 
 // ---------------------------------------------------------------------------
+// optimizeContext
+// ---------------------------------------------------------------------------
+
+describe('optimizeContext', () => {
+  it('POSTs to /context/optimize with empty body when no opts', async () => {
+    const ctx = {
+      windowId: 'ctx-1',
+      entries: [],
+      relevantRules: [],
+      totalFactsAvailable: 0,
+      totalFactsIncluded: 0,
+      deduplicationSavings: 0,
+      contradictionsFound: 0,
+      contradictionsResolved: 0,
+      contradictions: [],
+      bucketStats: {},
+      totalCharCount: 0,
+      goalDriven: false,
+      knowledgeGeneration: 1,
+      generatedAt: 1000,
+    };
+    mockFetch.mockResolvedValueOnce(mockResponse(ctx));
+    const result = await makeClient().optimizeContext();
+    expect(lastUrl()).toBe('http://localhost:9300/context/optimize');
+    expect(lastMethod()).toBe('POST');
+    expect(result).toEqual(ctx);
+  });
+
+  it('includes goals, buckets, sessionId, and predicate caps when provided', async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse({
+      windowId: 'ctx-2',
+      entries: [],
+      relevantRules: [],
+      totalFactsAvailable: 0,
+      totalFactsIncluded: 0,
+      deduplicationSavings: 0,
+      contradictionsFound: 0,
+      contradictionsResolved: 0,
+      contradictions: [],
+      bucketStats: {},
+      totalCharCount: 0,
+      goalDriven: true,
+      knowledgeGeneration: 2,
+      generatedAt: 2000,
+    }));
+    await makeClient().optimizeContext({
+      maxFacts: 25,
+      scope: 'support',
+      predicates: ['customer_tier'],
+      goals: [{ predicate: 'eligible_for_sla', args: ['acme_corp'] }],
+      relevanceBuckets: [{ name: 'support', predicates: ['customer_tier'], weight: 2 }],
+      sessionId: 'session-42',
+      autoResolveContradictions: false,
+      maxFactsPerPredicate: 3,
+    });
+    expect(lastBody()).toMatchObject({
+      maxFacts: 25,
+      scope: 'support',
+      predicates: ['customer_tier'],
+      goals: [{ predicate: 'eligible_for_sla', args: ['acme_corp'] }],
+      relevanceBuckets: [{ name: 'support', predicates: ['customer_tier'], weight: 2 }],
+      sessionId: 'session-42',
+      autoResolveContradictions: false,
+      maxFactsPerPredicate: 3,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// diffContext
+// ---------------------------------------------------------------------------
+
+describe('diffContext', () => {
+  it('POSTs to /context/diff with sessionId', async () => {
+    const diff = {
+      previousWindowId: 'ctx-1',
+      currentWindowId: 'ctx-2',
+      added: [],
+      removed: [],
+      unchanged: 5,
+      fullRefreshRecommended: false,
+      reason: null,
+    };
+    mockFetch.mockResolvedValueOnce(mockResponse(diff));
+    const result = await makeClient().diffContext({ sessionId: 'session-42' });
+    expect(lastUrl()).toBe('http://localhost:9300/context/diff');
+    expect(lastMethod()).toBe('POST');
+    expect(lastBody()).toMatchObject({ sessionId: 'session-42' });
+    expect(result).toEqual(diff);
+  });
+
+  it('includes optional diff parameters when provided', async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse({
+      previousWindowId: 'ctx-2',
+      currentWindowId: 'ctx-3',
+      added: [],
+      removed: [],
+      unchanged: 4,
+      fullRefreshRecommended: false,
+      reason: null,
+    }));
+    await makeClient().diffContext({
+      sessionId: 'session-42',
+      maxFacts: 20,
+      scope: 'support',
+      predicates: ['customer_tier'],
+      goals: [{ predicate: 'eligible_for_sla', args: ['acme_corp'] }],
+      relevanceBuckets: [{ name: 'support', weight: 1.5 }],
+      autoResolveContradictions: false,
+      maxFactsPerPredicate: 2,
+    });
+    expect(lastBody()).toMatchObject({
+      sessionId: 'session-42',
+      maxFacts: 20,
+      scope: 'support',
+      predicates: ['customer_tier'],
+      goals: [{ predicate: 'eligible_for_sla', args: ['acme_corp'] }],
+      relevanceBuckets: [{ name: 'support', weight: 1.5 }],
+      autoResolveContradictions: false,
+      maxFactsPerPredicate: 2,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// summarizeContext
+// ---------------------------------------------------------------------------
+
+describe('summarizeContext', () => {
+  it('POSTs to /context/summary', async () => {
+    const summary = {
+      totalFacts: 12,
+      predicateCount: 3,
+      topPredicates: [],
+      factsWithTtl: 1,
+      factsExpiringWithin1h: 0,
+      contradictions: 0,
+      topSalientFacts: [],
+      totalCharCount: 250,
+      knowledgeGeneration: 9,
+      generatedAt: 1000,
+    };
+    mockFetch.mockResolvedValueOnce(mockResponse(summary));
+    const result = await makeClient().summarizeContext();
+    expect(lastUrl()).toBe('http://localhost:9300/context/summary');
+    expect(lastMethod()).toBe('POST');
+    expect(result).toEqual(summary);
+  });
+
+  it('includes scope when provided', async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse({
+      totalFacts: 0,
+      predicateCount: 0,
+      topPredicates: [],
+      factsWithTtl: 0,
+      factsExpiringWithin1h: 0,
+      contradictions: 0,
+      topSalientFacts: [],
+      totalCharCount: 0,
+      knowledgeGeneration: 0,
+      generatedAt: 0,
+    }));
+    await makeClient().summarizeContext('support');
+    expect(lastBody()).toMatchObject({ scope: 'support' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// clearContextSession
+// ---------------------------------------------------------------------------
+
+describe('clearContextSession', () => {
+  it('POSTs to /context/session/clear with sessionId', async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse("Session 'session-42' cleared"));
+    const result = await makeClient().clearContextSession('session-42');
+    expect(lastUrl()).toBe('http://localhost:9300/context/session/clear');
+    expect(lastMethod()).toBe('POST');
+    expect(lastBody()).toMatchObject({ sessionId: 'session-42' });
+    expect(result).toBe("Session 'session-42' cleared");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ingestAndOptimize
+// ---------------------------------------------------------------------------
+
+describe('ingestAndOptimize', () => {
+  it('POSTs to /context/ingest with text and optional optimization fields', async () => {
+    const resultBody = {
+      extracted: [{ predicate: 'customer_tier', args: ['acme_corp', 'enterprise'], confidence: 0.95 }],
+      extractionProvider: 'anthropic',
+      context: {
+        windowId: 'ctx-3',
+        entries: [],
+        relevantRules: [],
+        totalFactsAvailable: 1,
+        totalFactsIncluded: 1,
+        deduplicationSavings: 0,
+        contradictionsFound: 0,
+        contradictionsResolved: 0,
+        contradictions: [],
+        bucketStats: {},
+        totalCharCount: 32,
+        goalDriven: false,
+        knowledgeGeneration: 3,
+        generatedAt: 3000,
+      },
+    };
+    mockFetch.mockResolvedValueOnce(mockResponse(resultBody));
+    const result = await makeClient().ingestAndOptimize({
+      text: 'Acme Corp is enterprise.',
+      goals: [{ predicate: 'eligible_for_sla', args: ['acme_corp'] }],
+      maxFacts: 10,
+      maxFactsPerPredicate: 2,
+      autoResolveContradictions: false,
+      sessionId: 'session-42',
+      relevanceBuckets: [{ name: 'support', weight: 1.2 }],
+      scope: 'support',
+      contextHint: 'support ticket',
+    });
+    expect(lastUrl()).toBe('http://localhost:9300/context/ingest');
+    expect(lastMethod()).toBe('POST');
+    expect(lastBody()).toMatchObject({
+      text: 'Acme Corp is enterprise.',
+      goals: [{ predicate: 'eligible_for_sla', args: ['acme_corp'] }],
+      maxFacts: 10,
+      maxFactsPerPredicate: 2,
+      autoResolveContradictions: false,
+      sessionId: 'session-42',
+      relevanceBuckets: [{ name: 'support', weight: 1.2 }],
+      scope: 'support',
+      contextHint: 'support ticket',
+    });
+    expect(result).toEqual(resultBody);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // temporalQuery
 // ---------------------------------------------------------------------------
 

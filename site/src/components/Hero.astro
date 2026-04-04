@@ -17,26 +17,26 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
         <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
       </span>
-      OpenAI charges $15/M tokens. Your agents waste 95% of them.
+      Your agent already has the data. Your prompt is still too big.
     </div>
 
     <!-- Hero Title -->
     <h1 class="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 animate-fade-in-up delay-100">
-      97% Less Context.<br />
+      Large Turn Arrays In.<br />
       <span class="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-cyan-400 to-emerald-400 animate-gradient-x bg-300% pb-2">
-        Same Answers.
+        Lean Context Windows Out.
       </span>
     </h1>
 
     <!-- Positioning Statement -->
-    <p class="text-xl md:text-2xl font-semibold text-slate-200 max-w-3xl mx-auto mb-4 animate-fade-in-up delay-200">
-      GPT-4o is $15/M tokens. Claude is $15/M. Every request stuffs 150K tokens of irrelevant context.
+    <p class="text-xl md:text-2xl font-semibold text-slate-200 max-w-4xl mx-auto mb-4 animate-fade-in-up delay-200">
+      Chat turns, tool output, CRM notes, internal comments, retries, stale summaries. The model sees all of it unless you cut it down first.
     </p>
-    <p class="text-base md:text-lg text-slate-400 max-w-3xl mx-auto mb-4 animate-fade-in-up delay-200 leading-relaxed">
-      NocturnusAI's goal-driven engine delivers only the facts that matter — 500 facts in, 15 out, zero information loss. Stop subsidizing OpenAI with wasted tokens and start optimizing your context.
+    <p class="text-base md:text-lg text-slate-400 max-w-4xl mx-auto mb-4 animate-fade-in-up delay-200 leading-relaxed">
+      NocturnusAI sits between your raw thread state and your next model call. Send the messy turn array in. Get a smaller, structured context window out. Use diffs so later turns only pay for what changed.
     </p>
-    <p class="text-base md:text-lg text-slate-500 max-w-2xl mx-auto mb-12 animate-fade-in-up delay-200">
-      The context optimization engine for production AI agents.
+    <p class="text-base md:text-lg text-slate-500 max-w-3xl mx-auto mb-12 animate-fade-in-up delay-200">
+      The context reduction layer for production AI agents.
     </p>
 
     <!-- Framework compatibility — above the fold -->
@@ -68,23 +68,23 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <!-- CTAs -->
     <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 animate-fade-in-up delay-300">
       <a href={`${base}/docs`} class="px-8 py-4 rounded-full bg-gradient-to-r from-emerald-600 to-cyan-600 text-white font-bold hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all hover:-translate-y-1 transform">
-        Start Saving Tokens →
+        See The Workflow ->
       </a>
-      <a href={`${base}/features`} class="px-8 py-4 rounded-full bg-white/5 border border-white/10 text-slate-300 font-medium hover:bg-white/10 hover:border-white/20 transition-all hover:-translate-y-1 transform">
-        See How It Works
+      <a href={`${base}/docs/concepts`} class="px-8 py-4 rounded-full bg-white/5 border border-white/10 text-slate-300 font-medium hover:bg-white/10 hover:border-white/20 transition-all hover:-translate-y-1 transform">
+        Backend Mechanics
       </a>
     </div>
 
     <!-- Stack Summary Pills -->
     <div class="flex flex-wrap items-center justify-center gap-2 mb-12 animate-fade-in-up delay-300">
       {[
-        "97% Context Reduction",
-        "Goal-Driven Optimization",
-        "Backward + Forward Chaining",
-        "Hexastore — 6-way indexed",
-        "Truth Maintenance System",
-        "Salience Memory",
-        "MCP · A2A · REST",
+        "Turn Reduction First",
+        "Goal-Specific Context Windows",
+        "Incremental Context Diffs",
+        "Contradiction Checks",
+        "Memory Lifecycle",
+        "MCP · SDK · REST",
+        "Backend Mechanics In The Back",
       ].map(label => (
         <span class="px-3 py-1 rounded-full bg-white/5 border border-white/8 text-xs font-mono text-slate-500 hover:text-slate-300 hover:border-white/20 transition-colors cursor-default">
           {label}
@@ -99,40 +99,40 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
         <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
         <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
-        <div class="ml-4 text-xs font-mono text-slate-500">turns in, facts out — that's the whole API</div>
+        <div class="ml-4 text-xs font-mono text-slate-500">messy thread in, usable window out</div>
       </div>
 
       <!-- Terminal Body -->
       <div class="p-6 text-left font-mono text-sm space-y-3">
         <div class="text-slate-500">
-          # 1. Send your conversation turns
+          # 1. Send the raw thread state
         </div>
         <div class="flex items-start gap-2 text-slate-300">
           <span class="text-emerald-500 shrink-0">$</span>
-          <span>POST /context &nbsp;&#123; "turns": ["Acme is on enterprise plan", "They have 24/7 SLA"] &#125;</span>
+          <span>POST /context &nbsp;&#123; "turns": ["user msg", "crm lookup", "tool log", "internal note", "..."] &#125;</span>
         </div>
         <div class="text-emerald-400 text-sm">
-          ✓ 5 facts extracted &amp; ranked — 200 tokens
+          ✓ 8 context entries selected from a much larger thread
         </div>
 
         <div class="text-slate-500 mt-2">
-          # 2. Feed those facts to GPT-4o or Claude
+          # 2. Feed only the reduced window to the model
         </div>
         <div class="flex items-start gap-2 text-slate-300">
           <span class="text-emerald-500 shrink-0">$</span>
-          <span>openai.chat(system=facts, user="Is Acme eligible for premium SLA?")</span>
+          <span>openai.chat(system=context_window, user="Write the next support reply")</span>
         </div>
         <div class="text-emerald-400 text-sm">
-          ✓ "Yes — enterprise tier qualifies for 24/7 SLA support."
+          ✓ Same thread state, less noise, lower token cost
         </div>
         <div class="text-emerald-400/60 text-xs pl-4">
-          sourced from: customer_tier(acme, enterprise) · sla_tier(acme, 24_7)
+          keep sessionId -> later turns can use /context/diff instead of replaying everything
         </div>
 
         <div class="mt-4 pt-3 border-t border-white/5">
           <div class="flex items-center justify-between text-xs">
-            <span class="text-slate-500">Token cost for that answer:</span>
-            <span><span class="text-red-400 line-through">$2.25 (150K tokens)</span> <span class="text-slate-600">→</span> <span class="text-emerald-400 font-bold">$0.003 (200 tokens)</span></span>
+            <span class="text-slate-500">What changes in practice:</span>
+            <span><span class="text-red-400 line-through">full thread every turn</span> <span class="text-slate-600">-></span> <span class="text-emerald-400 font-bold">reduced window + diffs</span></span>
           </div>
         </div>
       </div>

@@ -1,13 +1,14 @@
-# NocturnusAI — Comprehensive Developer & User Guide
+# NocturnusAI User Guide
 
-## The Symbolic Cortex: A Logic Inference Engine and Knowledge Database
+## Start with turn reduction. Use backend mechanics later.
 
 ---
 
 ## Table of Contents
 
+0. [Start Here: Cut Down Turn Arrays First](#0-start-here-cut-down-turn-arrays-first)
 1. [What Is NocturnusAI and Why Does It Exist?](#1-what-is-nocturnusai-and-why-does-it-exist)
-2. [Core Concepts: How NocturnusAI Thinks](#2-core-concepts-how-nocturnusai-thinks)
+2. [Backend Concepts: How NocturnusAI Thinks](#2-backend-concepts-how-nocturnusai-thinks)
 3. [Architecture Overview](#3-architecture-overview)
 4. [Connecting Securely](#4-connecting-securely)
 5. [Authentication & Headers](#5-authentication--headers)
@@ -27,6 +28,27 @@
 19. [Limitations & Design Trade-Offs](#19-limitations--design-trade-offs)
 20. [Metadata: Optional Annotations](#20-metadata-optional-annotations)
 21. [Glossary](#21-glossary)
+
+---
+
+## 0. Start Here: Cut Down Turn Arrays First
+
+If your immediate problem is:
+
+- you have a large array of turns
+- your prompt is too large
+- your agent keeps replaying the same thread state
+
+start with the context workflow, not the logic model.
+
+Recommended loop:
+
+1. `POST /context` for the first compact pass over raw turns
+2. `POST /context/optimize` when the next question is goal-specific
+3. `POST /context/diff` on later turns with the same `sessionId`
+4. `POST /context/session/clear` when the thread ends
+
+Everything else in this guide explains the backend that makes that loop work: facts, rules, inference, truth maintenance, temporal state, and scopes.
 
 ---
 
@@ -77,7 +99,7 @@ If you are an AI agent using NocturnusAI as your symbolic backend:
 
 ---
 
-## 2. Core Concepts: How NocturnusAI Thinks
+## 2. Backend Concepts: How NocturnusAI Thinks
 
 Before diving into the API, you need to understand the four fundamental abstractions that NocturnusAI uses to represent and reason about knowledge. These are not arbitrary implementation details—they are the building blocks of formal logic, and understanding them is essential to using the system effectively.
 

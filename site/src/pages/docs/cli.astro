@@ -87,9 +87,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <span class="syn-var">$</span> ./gradlew :nocturnusai-cli:nativeCompile
 <span class="syn-var">$</span> ./nocturnusai-cli/build/native/nativeCompile/nocturnusai</code></pre>
 
-    <h3>Via Docker</h3>
-    <p>If you're running the server with Docker Compose, you can exec into it:</p>
-    <pre data-lang="bash"><code><span class="syn-var">$</span> docker compose exec server nocturnusai</code></pre>
+    <h3>With Docker Compose</h3>
+    <p>The Docker image runs the server, not the standalone CLI binary. Start the server with Docker Compose, then point the host-installed CLI at it:</p>
+    <pre data-lang="bash"><code><span class="syn-var">$</span> docker compose up -d
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">--server</span> http://localhost:9300 <span class="syn-flag">--db</span> default</code></pre>
 
     <hr />
 
@@ -327,6 +328,56 @@ default&gt; cleanup
 <span class="syn-comment"># Custom threshold</span>
 default&gt; cleanup 0.1
 <span class="syn-ok">Cleanup — 3 expired, 5 evicted (threshold=0.1)</span></code></pre>
+
+    <div class="callout callout-info">
+        <strong>Context optimization from CLI workflows.</strong> Use <code>context</code> for salience-ranked retrieval in interactive sessions, then run <code>compress</code> and <code>cleanup</code> regularly. For goal-driven context windows and diff sessions, call <code>/context/optimize</code> and <code>/context/diff</code> from the HTTP API alongside CLI usage.
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Workflow Step</th>
+                    <th class="py-2">CLI Command</th>
+                    <th class="py-2">HTTP Method + Endpoint</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Salience context window</td>
+                    <td class="py-2 font-mono"><code>context [max]</code></td>
+                    <td class="py-2 font-mono"><code>POST /memory/context</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Memory consolidation</td>
+                    <td class="py-2 font-mono"><code>compress</code></td>
+                    <td class="py-2 font-mono"><code>POST /memory/compress</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Memory cleanup/decay</td>
+                    <td class="py-2 font-mono"><code>cleanup [threshold]</code></td>
+                    <td class="py-2 font-mono"><code>POST /memory/cleanup</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Goal-driven context</td>
+                    <td class="py-2">API-only</td>
+                    <td class="py-2 font-mono"><code>POST /context/optimize</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Incremental context diff</td>
+                    <td class="py-2">API-only</td>
+                    <td class="py-2 font-mono"><code>POST /context/diff</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Session cleanup</td>
+                    <td class="py-2">API-only</td>
+                    <td class="py-2 font-mono"><code>POST /context/session/clear</code></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p class="text-slate-400 text-sm mt-4">The CLI uses the simplified REST aliases <code>/memory/compress</code> and <code>/memory/cleanup</code>. The lower-level API docs also show the canonical endpoints <code>/memory/consolidate</code> and <code>/memory/decay</code>.</p>
 
     <hr />
 

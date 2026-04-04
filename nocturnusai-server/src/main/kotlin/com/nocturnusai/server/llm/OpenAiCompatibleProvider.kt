@@ -72,7 +72,7 @@ class OpenAiCompatibleProvider(
         val requestBody = buildJsonObject {
             put("model", model)
             put("messages", messagesJson)
-            put("temperature", 0.1)
+            put("temperature", LlmConfig.temperature)
         }
 
         val response = client.post("${baseUrl.trimEnd('/')}/chat/completions") {

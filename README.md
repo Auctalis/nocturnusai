@@ -6,270 +6,235 @@
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2FAuctalis%2Fnocturnusai-blue?logo=docker)](https://github.com/Auctalis/nocturnusai/pkgs/container/nocturnusai)
 [![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-orange.svg)](LICENSE)
 
-**AI agents hallucinate. Give them a reasoning backend that doesn't.**
+**Large turn arrays in. Lean context windows out.**
 
-LLMs guess. NocturnusAI *proves*. It's a logic server that stores facts, applies rules, and returns deterministic answers with full proof chains — so your agent can know things instead of predicting them.
+If your agent keeps replaying chat history, tool output, CRM notes, retries, and stale summaries into every model call, NocturnusAI cuts that down first.
 
-```python
-pip install nocturnusai
+The primary workflow is not "learn predicates." It is:
+
+1. Send the raw turns you already have.
+2. Get back a smaller working set.
+3. Narrow that set for the next question.
+4. Reuse diffs so later turns only send what changed.
+
+Predicates, rules, inference, truth maintenance, scopes, and temporal logic are still there. They matter. They just belong behind the main story, not in front of it.
+
+---
+
+## The Working Loop
+
+### 1. First reduction: `POST /context`
+
+```bash
+curl -X POST http://localhost:9300/context \
+  -H 'Content-Type: application/json' \
+  -H 'X-Tenant-ID: default' \
+  -d '{
+    "turns": [
+      "user: Customer says they are enterprise and blocked on SLA credits.",
+      "tool: CRM says account is Acme Corp with a 2M ARR contract.",
+      "agent: Last week support promised to review SLA eligibility.",
+      "tool: Billing note says renewal is due next month."
+    ],
+    "maxFacts": 12
+  }'
 ```
+
+Response shape:
+
+```json
+{
+  "facts": [
+    {"predicate":"customer_tier","args":["acme_corp","enterprise"],"salience":0.96},
+    {"predicate":"contract_value","args":["acme_corp","2000000"],"salience":0.91},
+    {"predicate":"issue","args":["acme_corp","sla_credits"],"salience":0.88}
+  ],
+  "totalFactsInKB": 127,
+  "factsReturned": 3,
+  "contradictions": 0,
+  "newFactsExtracted": 3
+}
+```
+
+### 2. Goal-driven pass: `POST /context/optimize`
+
+```bash
+curl -X POST http://localhost:9300/context/optimize \
+  -H 'Content-Type: application/json' \
+  -H 'X-Tenant-ID: default' \
+  -d '{
+    "goals": [
+      {"predicate":"eligible_for_sla","args":["acme_corp"]}
+    ],
+    "maxFacts": 12,
+    "sessionId": "ticket-42"
+  }'
+```
+
+Use this when you know what the next model call is trying to answer.
+
+### 3. Later turns: `POST /context/diff`
+
+```bash
+curl -X POST http://localhost:9300/context/diff \
+  -H 'Content-Type: application/json' \
+  -H 'X-Tenant-ID: default' \
+  -d '{
+    "sessionId": "ticket-42",
+    "maxFacts": 12
+  }'
+```
+
+This returns only `added` and `removed` entries between snapshots.
+
+### 4. End of thread: `POST /context/session/clear`
+
+```bash
+curl -X POST http://localhost:9300/context/session/clear \
+  -H 'Content-Type: application/json' \
+  -H 'X-Tenant-ID: default' \
+  -d '{"sessionId":"ticket-42"}'
+```
+
+---
+
+## Choose Your Surface
+
+### Python SDK
 
 ```python
 from nocturnusai import SyncNocturnusAIClient
 
-with SyncNocturnusAIClient("http://localhost:9300") as ai:
-    ai.assert_fact("customer_tier", ["acme", "enterprise"])
-    ai.assert_rule(
-        head=("priority_support", ["?c"]),
-        body=[("customer_tier", ["?c", "enterprise"])]
+with SyncNocturnusAIClient("http://localhost:9300") as client:
+    ctx = client.ingest_and_optimize(
+        text="""
+        user: Customer says they are enterprise and blocked on SLA credits.
+        tool: CRM says account is Acme Corp with a 2M ARR contract.
+        """,
+        goals=[{"predicate": "eligible_for_sla", "args": ["acme_corp"]}],
+        max_facts=12,
+        session_id="ticket-42",
     )
-    results = ai.infer("priority_support", ["?who"])
-    print(results)  # [Atom(predicate='priority_support', args=['acme'], truth_val=True)]
+
+    diff = client.diff_context(session_id="ticket-42", max_facts=12)
+    client.clear_context_session("ticket-42")
+
+    print(ctx.total_facts_included, len(diff.added))
 ```
 
-No prompt engineering. No temperature tuning. The answer is `acme` because the rule says so.
+### TypeScript SDK
 
----
+```ts
+import { NocturnusAIClient } from 'nocturnusai-sdk';
 
-## Architecture
+const client = new NocturnusAIClient({
+  baseUrl: 'http://localhost:9300',
+  tenantId: 'default',
+});
 
-```
- ┌──────────────────────────────────────────────────────────┐
- │                      Your AI Agent                       │
- └──────┬──────────────────┬───────────────────┬────────────┘
-        │                  │                   │
-   Python SDK         MCP Protocol        REST / HTTP
-   (pip install)    (Cursor, Claude,     (any language)
-                     Windsurf, etc.)
-        │                  │                   │
-        └──────────────────┼───────────────────┘
-                           │
- ┌─────────────────────────▼───────────────────────────────┐
- │                   NocturnusAI Server                     │
- │                                                          │
- │  ┌─────────────┐ ┌──────────────┐ ┌──────────────────┐  │
- │  │  Hexastore   │ │  Inference   │ │ Truth Maintenance│  │
- │  │ (6-way index)│ │  Backward &  │ │    System        │  │
- │  │             │ │  Forward     │ │  (auto-retract)  │  │
- │  └─────────────┘ └──────────────┘ └──────────────────┘  │
- │  ┌─────────────┐ ┌──────────────┐ ┌──────────────────┐  │
- │  │   Agent     │ │  Temporal    │ │   Multi-Tenant   │  │
- │  │   Memory    │ │   Queries    │ │   + Scopes       │  │
- │  │  (salience) │ │  (TTL, time) │ │                  │  │
- │  └─────────────┘ └──────────────┘ └──────────────────┘  │
- └─────────────────────────────────────────────────────────┘
+const optimized = await client.optimizeContext({
+  goals: [{ predicate: 'eligible_for_sla', args: ['acme_corp'] }],
+  maxFacts: 12,
+  sessionId: 'ticket-42',
+});
+
+const diff = await client.diffContext({
+  sessionId: 'ticket-42',
+  maxFacts: 12,
+});
+
+await client.clearContextSession('ticket-42');
+console.log(optimized.totalFactsIncluded, diff.added.length);
 ```
 
----
+### MCP
 
-## Why NocturnusAI?
-
-| Capability | LLM context window | Vector RAG | LangGraph state | **NocturnusAI** |
-|---|---|---|---|---|
-| Answers are | Probabilistic | Approximate (top-k) | Deterministic* | **Deterministic with proof** |
-| Derives new facts | No | No | Only via code | **Yes (inference engine)** |
-| Detects contradictions | No | No | No | **Yes (TMS)** |
-| Temporal queries | No | No | Manual | **Built-in (TTL, time ranges)** |
-| Persists across sessions | No | Yes | Checkpoints | **Yes (WAL + snapshots)** |
-| Shows reasoning chain | Chain-of-thought (unreliable) | No | No | **Full proof trees** |
-| Sub-millisecond queries | No | ~10ms | Depends | **Yes (in-memory Hexastore)** |
-
-*LangGraph is deterministic for its graph execution, but doesn't perform logical inference.
-
-**Trade-offs to know about:** NocturnusAI is an in-memory store — not a replacement for your database. It excels at structured reasoning over hundreds of thousands of facts, not petabyte-scale storage. It complements LLMs; it doesn't replace them.
-
----
-
-## Quick Start
-
-### Path 1: I want to try it now
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
-```
-
-Checks for Docker, starts the server, installs the CLI binary. Done.
-
-```bash
-# With local LLM (Ollama)
-curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama
-
-# With Prometheus + Grafana monitoring
-curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --monitoring
-```
-
-### Path 2: I'm a Python developer
-
-```bash
-pip install nocturnusai
-docker run -d -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
-```
-
-```python
-from nocturnusai import SyncNocturnusAIClient
-
-with SyncNocturnusAIClient("http://localhost:9300") as ai:
-    ai.assert_fact("likes", ["alice", "logic"])
-    ai.assert_fact("likes", ["bob", "logic"])
-    results = ai.infer("likes", ["?who", "logic"])
-    # → [Atom(predicate='likes', args=['alice']), Atom(predicate='likes', args=['bob'])]
-```
-
-### Path 3: I use MCP (Cursor, Claude, Windsurf)
-
-Add to your MCP config (`.cursor/mcp.json`, `claude_desktop_config.json`, etc.):
+Add Nocturnus as an MCP server:
 
 ```json
 {
   "mcpServers": {
     "nocturnus": {
-      "url": "http://localhost:9300/mcp/sse"
+      "url": "http://localhost:9300/mcp/sse",
+      "transport": "sse"
     }
   }
 }
 ```
 
-Your agent immediately gets tools: `tell`, `teach`, `ask`, `forget`, `recall`, `context`, `compress`, `cleanup`, `predicates`.
+Use the `context` tool each turn for a salience-ranked working set. Pair MCP with the HTTP context endpoints when you need goal-driven assembly and diffs.
 
 ---
 
-## Framework Integrations
+## What Lives Behind The Workflow
 
-NocturnusAI works with every major agent framework:
+When you do need backend mechanics, NocturnusAI provides them:
+
+- Deterministic fact and rule storage
+- Backward-chaining inference with proof chains
+- Truth maintenance and contradiction handling
+- Temporal facts with `ttl`, `validFrom`, and `validUntil`
+- Multi-tenancy via `X-Database` and `X-Tenant-ID`
+- MCP, REST, Python SDK, TypeScript SDK, and CLI surfaces over the same engine
+
+That is the backend. The front-of-product story is still turn reduction.
+
+---
+
+## Quick Start
+
+### Path 1: Try it locally now
 
 ```bash
-pip install nocturnusai[langchain]       # LangChain tools
-pip install nocturnusai[crewai]          # CrewAI tools
-pip install nocturnusai[autogen]         # AutoGen tools
-pip install nocturnusai[langgraph]       # LangGraph checkpoint saver
-pip install nocturnusai[openai-agents]   # OpenAI Agents SDK tools
-pip install nocturnusai[all]             # Everything
-npm install nocturnusai-sdk              # TypeScript/Node.js SDK
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 ```
 
-### LangChain
+### Path 2: Python app
 
-```python
-from nocturnusai import SyncNocturnusAIClient
-from nocturnusai.langchain import get_nocturnusai_tools
-from langchain_anthropic import ChatAnthropic
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate
-
-client = SyncNocturnusAIClient("http://localhost:9300")
-tools = get_nocturnusai_tools(client)
-
-llm = ChatAnthropic(model="claude-sonnet-4-6")
-prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are an assistant with a verified knowledge base."),
-    ("human", "{input}"),
-    ("placeholder", "{agent_scratchpad}"),
-])
-
-agent = create_tool_calling_agent(llm, tools, prompt)
-executor = AgentExecutor(agent=agent, tools=tools)
-result = executor.invoke({"input": "Alice is Bob's parent. Who is Bob's parent?"})
+```bash
+pip install nocturnusai
 ```
 
-### CrewAI
+### Path 3: TypeScript app
 
-```python
-from nocturnusai import SyncNocturnusAIClient
-from nocturnusai.crewai import get_nocturnusai_tools
-from crewai import Agent, Task, Crew
-
-client = SyncNocturnusAIClient("http://localhost:9300")
-tools = get_nocturnusai_tools(client)
-
-reasoner = Agent(
-    role="Knowledge Reasoner",
-    goal="Answer questions using logical inference",
-    backstory="You are an expert at structured reasoning.",
-    tools=tools,
-)
-
-task = Task(
-    description="Alice is Bob's parent. Bob is Charlie's parent. Who is Charlie's grandparent?",
-    agent=reasoner,
-    expected_output="The grandparent relationship",
-)
-
-crew = Crew(agents=[reasoner], tasks=[task])
-result = crew.kickoff()
+```bash
+npm install nocturnusai-sdk
 ```
 
-### OpenAI Agents SDK
+### Path 4: MCP client
 
-```python
-from nocturnusai import SyncNocturnusAIClient
-from nocturnusai.openai_agents import get_nocturnusai_tools
-from agents import Agent, Runner
-
-client = SyncNocturnusAIClient("http://localhost:9300")
-tools = get_nocturnusai_tools(client)
-
-agent = Agent(name="reasoner", instructions="You are a knowledge reasoning agent.", tools=tools)
-result = Runner.run_sync(agent, "Store that socrates is human, then ask who is mortal.")
-```
-
-### Anthropic Claude
-
-```python
-from nocturnusai import SyncNocturnusAIClient
-from nocturnusai.anthropic_tools import get_nocturnusai_tool_definitions, handle_tool_call
-import anthropic
-
-client = SyncNocturnusAIClient("http://localhost:9300")
-tools = get_nocturnusai_tool_definitions()
-
-response = anthropic.Anthropic().messages.create(
-    model="claude-sonnet-4-6",
-    tools=tools,
-    messages=[{"role": "user", "content": "Alice likes Bob. Who likes Bob?"}],
-)
-
-for block in response.content:
-    if block.type == "tool_use":
-        result = handle_tool_call(client, block.name, block.input)
-```
-
-[Full integration docs →](https://auctalis.github.io/nocturnusai/docs/integrations)
-
----
-
-## Documentation
-
-Full docs at **[auctalis.github.io/nocturnusai](https://auctalis.github.io/nocturnusai)**
-
-| | |
-|---|---|
-| [Quickstart](https://auctalis.github.io/nocturnusai/docs) | Get a working agent in 5 minutes |
-| [MCP Integration](https://auctalis.github.io/nocturnusai/docs/mcp) | Connect Cursor, Claude, Windsurf, any MCP client |
-| [Python SDK](https://auctalis.github.io/nocturnusai/docs/sdks) | Async client + LangChain/CrewAI/AutoGen tools |
-| [API Reference](https://auctalis.github.io/nocturnusai/docs/api) | Every endpoint with request/response shapes |
-| [Core Concepts](https://auctalis.github.io/nocturnusai/docs/concepts) | Inference, TMS, temporal facts, salience, NAF |
-| [Security & Auth](https://auctalis.github.io/nocturnusai/docs/security) | API keys, RBAC, TLS, encryption at rest |
+Copy one of the configs from [`mcp-configs/`](./mcp-configs).
 
 ---
 
 ## CLI
 
-The installer downloads a native binary — no JVM required:
+The CLI is useful for interactive inspection and salience-window retrieval:
 
 ```bash
 nocturnusai                                # Interactive REPL
-nocturnusai -e "tell human(socrates)"      # Single command
-nocturnusai -e "ask mortal(?who)"          # Query
-
-# Manual install
-# macOS (Apple Silicon)
-curl -fsSL https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-macos-arm64 \
-  -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
-
-# Linux (x86_64)
-curl -fsSL https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-linux-x86_64 \
-  -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
+nocturnusai -e "context 10"               # Salience-ranked working set
+nocturnusai -e "compress"                 # Simplified alias: POST /memory/compress
+nocturnusai -e "cleanup 0.05"             # Simplified alias: POST /memory/cleanup
 ```
+
+For goal-driven context windows and diffs, use the REST API or SDKs alongside the CLI.
+
+---
+
+## Documentation
+
+Full docs: **[auctalis.github.io/nocturnusai](https://auctalis.github.io/nocturnusai)**
+
+| | |
+|---|---|
+| [Start Here](https://auctalis.github.io/nocturnusai/docs) | Begin with the turn-reduction workflow |
+| [Context Workflow](https://auctalis.github.io/nocturnusai/docs/context) | Raw turns -> optimize -> diff -> clear |
+| [API Reference](https://auctalis.github.io/nocturnusai/docs/api) | REST endpoints and response shapes |
+| [SDKs](https://auctalis.github.io/nocturnusai/docs/sdks) | Python and TypeScript client methods |
+| [MCP Integration](https://auctalis.github.io/nocturnusai/docs/mcp) | MCP config plus companion context API usage |
+| [How It Works on the Backend](https://auctalis.github.io/nocturnusai/docs/concepts) | Facts, rules, inference, salience, scopes |
+| [Security & Auth](https://auctalis.github.io/nocturnusai/docs/security) | API keys, RBAC, TLS, encryption at rest |
 
 ---
 
@@ -293,7 +258,7 @@ Requires JDK 17+.
 ./gradlew :nocturnusai-server:run              # HTTP server on :9300
 ./gradlew :nocturnusai-cli:run                 # Interactive REPL (JVM)
 ./gradlew :nocturnusai-cli:nativeCompile       # Build native binary
-./gradlew test                                  # All 764 tests
+./gradlew test                                 # Full test suite
 ```
 
 ---
@@ -308,7 +273,7 @@ Report vulnerabilities privately via [GitHub Security Advisories](https://github
 
 ## License
 
-Business Source License 1.1 — free for non-production use and internal production use within your organization. Offering NocturnusAI to third parties as a product or service requires a commercial license from [licensing@nocturnus.ai](mailto:licensing@nocturnus.ai). Converts to Apache 2.0 on 2030-02-19. See [LICENSE](LICENSE) and [DISCLAIMER.md](DISCLAIMER.md).
+Business Source License 1.1 - free for non-production use and internal production use within your organization. Offering NocturnusAI to third parties as a product or service requires a commercial license from [licensing@nocturnus.ai](mailto:licensing@nocturnus.ai). Converts to Apache 2.0 on 2030-02-19. See [LICENSE](LICENSE) and [DISCLAIMER.md](DISCLAIMER.md).
 
 ---
 
@@ -316,7 +281,7 @@ Business Source License 1.1 — free for non-production use and internal product
 >
 > NocturnusAI is a deterministic reasoning engine, but **its output is only as reliable as the facts provided to it.**
 >
-> 1. **No Warranty of Truth.** "Verified" refers to *logical consistency* of inference, not *accuracy* of real-world claims. If you assert false facts, the engine will derive false but logically consistent conclusions.
-> 2. **Not for Autonomous High-Stakes Decisions.** Do not use this engine for unsupervised medical, financial, legal, or physical-safety decisions without an independent human-in-the-loop verification step.
-> 3. **Logic Layer Only.** NocturnusAI provides information and inference; it does not execute actions. Any agent layer that acts upon NocturnusAI output is a separate system for which the authors bear no responsibility.
-> 4. **No Liability.** Under no circumstances shall the authors or contributors be liable for damages arising from decisions made using engine output. See [DISCLAIMER.md](DISCLAIMER.md) and [LICENSE](LICENSE).
+> 1. **No Warranty of Truth.** "Verified" refers to logical consistency of inference, not accuracy of real-world claims.
+> 2. **Not for Autonomous High-Stakes Decisions.** Do not use this engine for unsupervised medical, financial, legal, or physical-safety decisions without an independent human verification step.
+> 3. **Logic Layer Only.** NocturnusAI provides information and inference; it does not execute actions.
+> 4. **No Liability.** See [DISCLAIMER.md](DISCLAIMER.md) and [LICENSE](LICENSE).

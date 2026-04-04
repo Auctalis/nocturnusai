@@ -10,6 +10,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         Official client libraries for Python and TypeScript — with context optimization that cuts token costs by 97%. Plus native integrations for LangChain, CrewAI, AutoGen, LangGraph, OpenAI Agents SDK, and Anthropic SDK.
     </p>
 
+    <div class="callout callout-info">
+        <strong>Context optimization surface area.</strong> Python exposes both salience windows and goal-driven context helpers directly. TypeScript currently exposes salience windows in the SDK; pair it with the Context API endpoints for goal-driven windows and session diffs.
+    </div>
+
     <hr />
 
     <h2 id="python">Python SDK</h2>
@@ -62,17 +66,62 @@ async with NocturnusAIClient("http://localhost:9300") as client:
     <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
 
 with SyncNocturnusAIClient("http://localhost:9300") as client:
+    session_id = "session-42"
+
     # Goal-driven context optimization
     ctx = client.optimize_context(
         goals=[&#123;"predicate": "eligible_for_sla", "args": ["acme_corp"]&#125;],
-        max_facts=25
+        max_facts=25,
+        session_id=session_id
     )
-    print(f"&#123;len(ctx.entries)&#125; facts, &#123;ctx.token_estimate&#125; tokens")
-    # 15 facts, 820 tokens — vs. 150K unoptimized
+    approx_tokens = max(1, ctx.total_char_count // 4)
+    print(f"&#123;ctx.total_facts_included&#125; facts, ~&#123;approx_tokens&#125; tokens")
 
     # Incremental diffs for multi-turn conversations
-    diff = client.diff_context(session_id="session-42")
-    # Only sends what changed since last call</code></pre>
+    diff = client.diff_context(session_id=session_id)
+    # Only sends what changed since last call
+
+    # Clear diff state when the conversation ends
+    client.clear_context_session(session_id)</code></pre>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Context Capability</th>
+                    <th class="py-2">Python SDK</th>
+                    <th class="py-2">TypeScript SDK</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Salience-ranked window</td>
+                    <td class="py-2 font-mono"><code>context_window()</code></td>
+                    <td class="py-2 font-mono"><code>contextWindow()</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Goal-driven window</td>
+                    <td class="py-2 font-mono"><code>optimize_context()</code></td>
+                    <td class="py-2 font-mono"><code>optimizeContext()</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Incremental diff</td>
+                    <td class="py-2 font-mono"><code>diff_context()</code></td>
+                    <td class="py-2 font-mono"><code>diffContext()</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Clear diff session</td>
+                    <td class="py-2 font-mono"><code>clear_context_session()</code></td>
+                    <td class="py-2 font-mono"><code>clearContextSession()</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Ingest text + optimize</td>
+                    <td class="py-2 font-mono"><code>ingest_and_optimize()</code></td>
+                    <td class="py-2 font-mono"><code>ingestAndOptimize()</code></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
     <hr />
 
@@ -362,6 +411,47 @@ await client.assertRule(
 // Infer
 const results = await client.infer('grandparent', ['?who', 'charlie']);
 console.log(results);</code></pre>
+
+    <h3>Context Optimization with TypeScript</h3>
+    <p>
+        The TypeScript SDK now covers the full context-management loop directly: salience windows, goal-driven optimization,
+        incremental diffs, session cleanup, and one-shot text ingestion.
+    </p>
+    <pre><code class="language-typescript">// 1) Salience-ranked window
+const window = await client.contextWindow(&#123;
+  maxFacts: 25,
+  minSalience: 0.1,
+  scope: 'session_acme_42',
+&#125;);
+
+// 2) Goal-driven window
+const optimized = await client.optimizeContext(&#123;
+  goals: [&#123; predicate: 'eligible_for_sla', args: ['acme_corp'] &#125;],
+  maxFacts: 25,
+  sessionId: 'session-42',
+&#125;);
+
+// 3) Incremental diff for later turns
+const diff = await client.diffContext(&#123;
+  sessionId: 'session-42',
+  maxFacts: 25,
+&#125;);
+
+// 4) End session when thread closes
+await client.clearContextSession('session-42');
+
+// 5) One-shot ingestion from raw text
+const ingested = await client.ingestAndOptimize(&#123;
+  text: 'Customer says they are enterprise and blocked on SLA credits.',
+  goals: [&#123; predicate: 'eligible_for_sla', args: ['acme_corp'] &#125;],
+  maxFacts: 15,
+&#125;);
+
+console.log(
+  optimized.totalFactsIncluded,
+  diff.added?.length ?? 0,
+  ingested.context.totalCharCount,
+);</code></pre>
 
     <h3>MCP Client</h3>
     <p>The SDK also includes an MCP client for JSON-RPC 2.0 tool calls:</p>

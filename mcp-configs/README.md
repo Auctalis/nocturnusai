@@ -2,25 +2,35 @@
 
 Drop-in config files for connecting any MCP-compatible agent to NocturnusAI.
 
+Use MCP when your runtime already speaks tool calling and you want a fast working set every turn. The MCP `context` tool returns salience-ranked facts. For goal-driven windows and diffs, pair MCP with the HTTP context endpoints.
+
 **Endpoint**: `http://localhost:9300/mcp/sse`
 **Transport**: SSE (Server-Sent Events)
 **Protocol**: MCP 2025-11-25
 
 ---
 
-## Quick start (no auth, local server)
+## Recommended loop
 
-Start the server, then copy the right file for your agent:
+1. Connect your agent to `GET /mcp/sse`
+2. Call MCP tool `context` for the current working set
+3. Call `POST /context/optimize` from your app when the next question is goal-specific
+4. Call `POST /context/diff` on later turns with the same `sessionId`
+5. Call `POST /context/session/clear` when the thread ends
+
+---
+
+## Quick start (local, no auth)
 
 | Agent / IDE | Config file | Where it goes |
 |-------------|-------------|---------------|
 | Claude Desktop | `claude-desktop.json` | see below |
-| Cursor | `cursor.json` | `.cursor/mcp.json` in your project (or `~/.cursor/mcp.json` globally) |
+| Cursor | `cursor.json` | `.cursor/mcp.json` in your project or `~/.cursor/mcp.json` |
 | Windsurf | `windsurf.json` | `~/.codeium/windsurf/mcp_config.json` |
-| VS Code Copilot | `vscode.json` | `.vscode/mcp.json` in your project |
-| Claude Code CLI | — | `claude mcp add` (see below) |
+| VS Code Copilot | `vscode.json` | `.vscode/mcp.json` |
+| Claude Code CLI | - | `claude mcp add` |
 
-All files connect to `http://localhost:9300` with no API key (auth disabled by default).
+All files point to `http://localhost:9300/mcp/sse` with auth disabled.
 
 ---
 
@@ -28,47 +38,28 @@ All files connect to `http://localhost:9300` with no API key (auth disabled by d
 
 ### Claude Desktop
 
-Copy `claude-desktop.json` into the Claude Desktop config file, merging the
-`mcpServers` block with any existing entries:
-
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```bash
-# macOS — copy and open
 cp mcp-configs/claude-desktop.json \
-   ~/Library/Application\ Support/Claude/claude_desktop_config.json
+  ~/Library/Application\ Support/Claude/claude_desktop_config.json
 ```
 
-Then restart Claude Desktop. NocturnusAI tools appear as `tell`, `ask`, `teach`,
-`forget`, `recall`, `context`, `compress`, `cleanup`, `predicates`.
-
----
+Restart Claude Desktop.
 
 ### Cursor
 
 ```bash
-# Per-project (recommended)
 mkdir -p .cursor
 cp mcp-configs/cursor.json .cursor/mcp.json
-
-# Or globally
-cp mcp-configs/cursor.json ~/.cursor/mcp.json
 ```
-
-Reload the Cursor window. NocturnusAI will appear in the MCP tools panel.
-
----
 
 ### Windsurf
 
 ```bash
 cp mcp-configs/windsurf.json ~/.codeium/windsurf/mcp_config.json
 ```
-
-Restart Windsurf.
-
----
 
 ### VS Code (GitHub Copilot)
 
@@ -77,52 +68,90 @@ mkdir -p .vscode
 cp mcp-configs/vscode.json .vscode/mcp.json
 ```
 
-VS Code uses `"servers"` (not `"mcpServers"`) and `"type"` (not `"transport"`).
-The `vscode.json` file is already formatted correctly for this.
-
----
-
 ### Claude Code CLI
 
 ```bash
-# Add nocturnusai as an MCP server
 claude mcp add nocturnusai \
   --transport sse \
   --url http://localhost:9300/mcp/sse \
   --header "X-Database: default" \
   --header "X-Tenant-ID: default"
 
-# Verify
 claude mcp list
+```
+
+---
+
+## Goal-driven context is HTTP
+
+MCP gives you this directly:
+
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "context",
+    "arguments": {
+      "maxFacts": 25,
+      "minSalience": 0.15
+    }
+  }
+}
+```
+
+Notes:
+
+- `minSalience` is the primary threshold field.
+- `minRelevance` is accepted as a legacy alias for clients that still surface the older schema label.
+- MCP also accepts the legacy tool alias `context_window`.
+
+Use companion HTTP calls for the full optimization pipeline:
+
+```bash
+curl -X POST http://localhost:9300/context/optimize \
+  -H 'Content-Type: application/json' \
+  -H 'X-Tenant-ID: default' \
+  -d '{
+    "goals":[{"predicate":"eligible_for_sla","args":["acme_corp"]}],
+    "maxFacts":25,
+    "sessionId":"ticket-42"
+  }'
 ```
 
 ---
 
 ## Auth-enabled servers
 
-If your server has `AUTH_ENABLED=true`, use `with-auth.json` instead.
-Replace `YOUR_API_KEY_HERE` with a key obtained from:
+If your server has `AUTH_ENABLED=true`, use `with-auth.json`.
+
+Bootstrap the first admin key with the configured bootstrap credentials:
 
 ```bash
-# First time — bootstrap admin key
 curl -s -X POST http://localhost:9300/auth/bootstrap \
   -H 'Content-Type: application/json' \
-  -d '{"name":"my-agent"}' | jq .key
+  -d '{
+    "username":"admin",
+    "password":"nocturnusai",
+    "keyName":"my-agent"
+  }' | jq .key
+```
 
-# Subsequent keys — use admin key
+Create subsequent keys with the admin key:
+
+```bash
 curl -s -X POST http://localhost:9300/auth/keys \
   -H 'Content-Type: application/json' \
   -H 'X-API-Key: ADMIN_KEY' \
   -d '{"name":"cursor-agent","role":"writer"}' | jq .key
 ```
 
-Then edit `with-auth.json` and copy it to the right location for your agent.
+Then replace `YOUR_API_KEY_HERE` in `with-auth.json`.
 
 ---
 
 ## Production / remote server
 
-Edit `production.json` with your actual hostname and credentials:
+Edit `production.json` with your hostname and headers:
 
 ```json
 {
@@ -142,33 +171,28 @@ Edit `production.json` with your actual hostname and credentials:
 
 ---
 
-## Available tools
+## Core tools you will actually use first
 
-Once connected, your agent has access to:
+| Tool | Use it for |
+|------|------------|
+| `context` | Salience-ranked working set for the current turn |
+| `tell` | Store a fact |
+| `ask` | Run inference |
+| `teach` | Add a rule |
+| `forget` | Retract a fact |
+| `recall` | Time-travel query |
+| `compress` | Simplified alias for consolidation |
+| `cleanup` | Simplified alias for decay |
 
-| Tool | What it does |
-|------|-------------|
-| `tell` | Store a fact: `tell(predicate, args)` — supports TTL and temporal bounds |
-| `teach` | Define a rule: `teach(head, body)` — Horn clause, enables automatic inference |
-| `ask` | Run inference: `ask(predicate, args)` — multi-hop backward chaining, optional proof tree |
-| `forget` | Retract a fact: `forget(predicate, args)` — cascades via Truth Maintenance System |
-| `recall` | Time-travel query: `recall(predicate, args, timestamp)` — what was true at a given moment |
-| `context` | Working memory: `context(maxFacts, predicates)` — salience-ranked facts for reasoning |
-| `compress` | Consolidate: `compress()` — collapse episodic patterns into semantic memory |
-| `cleanup` | Decay: `cleanup(threshold)` — evict expired and low-salience facts |
-| `predicates` | Schema: `predicates()` — list all stored predicate types |
-
-Variable syntax: use `?x`, `?who`, `?anything` as wildcards in `args`.
+Variable syntax in tool args uses `?x`, `?who`, and similar wildcards.
 
 ---
 
 ## Verify the connection
 
 ```bash
-# Health check
 curl http://localhost:9300/health | jq .status
 
-# List MCP tools (JSON-RPC)
 curl -s -X POST http://localhost:9300/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \

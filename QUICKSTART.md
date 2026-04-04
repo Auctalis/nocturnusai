@@ -1,126 +1,102 @@
 # NocturnusAI Quickstart
 
-> Logic server for Agentic AI — deterministic reasoning, truth maintenance, and agent memory.
+> Start with the real problem: you have too many turns, and you need a smaller context window for the next model call.
 
-## One-liner install
+## One-line install
 
 ```bash
-# Works everywhere. Installs everything. You're welcome. 🦞
 curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 ```
 
-That's it. NocturnusAI is now running on `http://localhost:9300`.
+NocturnusAI now runs on `http://localhost:9300`.
 
 ### Install options
 
 ```bash
-# With local LLM (Ollama — no API key needed)
+# Local Ollama on your machine
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --host-ollama
+
+# Ollama in Docker
 curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama
 
-# With your own API key (auto-detects Anthropic/OpenAI/Google)
+# With your own provider key
 curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --key sk-ant-your-key
-
-# With monitoring (Prometheus + Grafana dashboards)
-curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --monitoring
 
 # Custom port
 curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --port 8080
-
-# Everything at once
-curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama --monitoring --port 8080
 ```
 
-The installer:
-1. Checks for Docker (tells you how to install it if missing)
-2. Downloads the docker-compose config
-3. Configures your LLM provider
-4. Starts the server
-5. Waits for healthy
-6. Prints a ready banner with example commands
-
----
-
-## Verify it's running
+## Verify health
 
 ```bash
 curl http://localhost:9300/health
+export NOCTURNUS_TENANT=default
 ```
+
+Most REST endpoints require `X-Tenant-ID`.
 
 ---
 
-## 60-second tutorial
+## 60-second turn reduction
 
-### Store facts
-
-```bash
-curl -sX POST http://localhost:9300/tell \
-  -H 'Content-Type: application/json' \
-  -d '{"predicate":"parent","args":["alice","bob"]}'
-
-curl -sX POST http://localhost:9300/tell \
-  -H 'Content-Type: application/json' \
-  -d '{"predicate":"parent","args":["bob","charlie"]}'
-```
-
-### Teach a rule
+### 1. Send the raw turns
 
 ```bash
-# grandparent(?x, ?z) :- parent(?x, ?y), parent(?y, ?z)
-curl -sX POST http://localhost:9300/teach \
+curl -sX POST http://localhost:9300/context \
   -H 'Content-Type: application/json' \
+  -H "X-Tenant-ID: ${NOCTURNUS_TENANT}" \
   -d '{
-    "head": {"predicate":"grandparent","args":["?x","?z"]},
-    "body": [
-      {"predicate":"parent","args":["?x","?y"]},
-      {"predicate":"parent","args":["?y","?z"]}
-    ]
-  }'
+    "turns": [
+      "user: Customer says they are enterprise and blocked on SLA credits.",
+      "tool: CRM says account is Acme Corp with a 2M ARR contract.",
+      "tool: Billing note says renewal is due next month.",
+      "agent: Last week support promised to review SLA eligibility."
+    ],
+    "maxFacts": 10
+  }' | jq .
 ```
 
-### Ask a question (inference)
+This is the first compact pass: turns in, reduced facts out.
+
+### 2. Narrow the window for the next question
 
 ```bash
-curl -sX POST http://localhost:9300/ask \
+curl -sX POST http://localhost:9300/context/optimize \
   -H 'Content-Type: application/json' \
-  -d '{"predicate":"grandparent","args":["?who","charlie"]}'
+  -H "X-Tenant-ID: ${NOCTURNUS_TENANT}" \
+  -d '{
+    "goals": [
+      {"predicate":"eligible_for_sla","args":["acme_corp"]}
+    ],
+    "maxFacts": 10,
+    "sessionId": "ticket-42"
+  }' | jq .
 ```
 
-Response:
-
-```json
-[{"predicate":"grandparent","args":["alice","charlie"]}]
-```
-
-NocturnusAI derived that Alice is Charlie's grandparent by chaining the two `parent` facts through the rule.
-
-### Forget a fact
+### 3. Reuse diffs on later turns
 
 ```bash
-curl -sX POST http://localhost:9300/forget \
+curl -sX POST http://localhost:9300/context/diff \
   -H 'Content-Type: application/json' \
-  -d '{"predicate":"parent","args":["bob","charlie"]}'
+  -H "X-Tenant-ID: ${NOCTURNUS_TENANT}" \
+  -d '{
+    "sessionId": "ticket-42",
+    "maxFacts": 10
+  }' | jq .
 ```
 
-The Truth Maintenance System automatically retracts any facts derived from the removed premise.
+### 4. Clear the session snapshot when the thread ends
+
+```bash
+curl -sX POST http://localhost:9300/context/session/clear \
+  -H 'Content-Type: application/json' \
+  -H "X-Tenant-ID: ${NOCTURNUS_TENANT}" \
+  -d '{"sessionId":"ticket-42"}'
+```
 
 ---
 
-## Connect your AI agent
-
-### MCP (Claude Desktop, Cursor, Windsurf)
-
-Add to your MCP config:
-
-```json
-{
-  "mcpServers": {
-    "nocturnusai": {
-      "url": "http://localhost:9300/mcp/sse",
-      "transport": "sse"
-    }
-  }
-}
-```
+## Connect your app or agent
 
 ### Python SDK
 
@@ -132,9 +108,13 @@ pip install nocturnusai
 from nocturnusai import SyncNocturnusAIClient
 
 with SyncNocturnusAIClient("http://localhost:9300") as client:
-    client.assert_fact("parent", ["alice", "bob"])
-    results = client.infer("parent", ["?who", "bob"])
-    print(results)
+    ctx = client.optimize_context(
+        goals=[{"predicate": "eligible_for_sla", "args": ["acme_corp"]}],
+        max_facts=10,
+        session_id="ticket-42",
+    )
+    diff = client.diff_context(session_id="ticket-42", max_facts=10)
+    client.clear_context_session("ticket-42")
 ```
 
 ### TypeScript SDK
@@ -143,21 +123,84 @@ with SyncNocturnusAIClient("http://localhost:9300") as client:
 npm install nocturnusai-sdk
 ```
 
-```typescript
+```ts
 import { NocturnusAIClient } from 'nocturnusai-sdk';
 
 const client = new NocturnusAIClient({ baseUrl: 'http://localhost:9300' });
-await client.assertFact('parent', ['alice', 'bob']);
-const results = await client.infer('parent', ['?who', 'bob']);
+const ctx = await client.optimizeContext({
+  goals: [{ predicate: 'eligible_for_sla', args: ['acme_corp'] }],
+  maxFacts: 10,
+  sessionId: 'ticket-42',
+});
+const diff = await client.diffContext({ sessionId: 'ticket-42', maxFacts: 10 });
+await client.clearContextSession('ticket-42');
 ```
+
+### MCP
+
+Add to your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "nocturnus": {
+      "url": "http://localhost:9300/mcp/sse",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+MCP gives your agent the `context` tool immediately. Use the HTTP context endpoints alongside MCP when you need goal-driven assembly and diffs.
+
+### CLI
+
+```bash
+nocturnusai
+# then inside the REPL:
+#   context 10
+#   compress
+#   cleanup 0.05
+```
+
+`compress` maps to `POST /memory/compress`, and `cleanup` maps to `POST /memory/cleanup`.
+
+---
+
+## If you need backend reasoning later
+
+When you are ready to model facts and rules directly, the low-level surfaces are still there:
+
+```bash
+curl -sX POST http://localhost:9300/tell \
+  -H 'Content-Type: application/json' \
+  -H "X-Tenant-ID: ${NOCTURNUS_TENANT}" \
+  -d '{"predicate":"parent","args":["alice","bob"]}'
+
+curl -sX POST http://localhost:9300/teach \
+  -H 'Content-Type: application/json' \
+  -H "X-Tenant-ID: ${NOCTURNUS_TENANT}" \
+  -d '{
+    "head": {"predicate":"grandparent","args":["?x","?z"]},
+    "body": [
+      {"predicate":"parent","args":["?x","?y"]},
+      {"predicate":"parent","args":["?y","?z"]}
+    ]
+  }'
+
+curl -sX POST http://localhost:9300/ask \
+  -H 'Content-Type: application/json' \
+  -H "X-Tenant-ID: ${NOCTURNUS_TENANT}" \
+  -d '{"predicate":"grandparent","args":["?who","bob"]}' | jq .
+```
+
+That is the backend layer. Start there only when you actually need it.
 
 ---
 
 ## Manage your server
 
 ```bash
-cd ~/nocturnusai              # or wherever you installed
-
 # Logs
 docker compose logs -f nocturnusai
 
@@ -167,7 +210,7 @@ docker compose down
 # Restart
 docker compose up -d
 
-# Update (re-run the installer)
+# Update
 curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 ```
 
@@ -177,8 +220,9 @@ curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.s
 
 | What | Where |
 |------|-------|
-| Complete API reference, SDKs, auth, production deployment | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) |
-| User guide with deep tutorials | [USERGUIDE.md](USERGUIDE.md) |
-| Auto-generated API docs | `curl http://localhost:9300/llm.txt` |
-| MCP tool reference | [mcp-config.json](mcp-config.json) |
-| Agent discovery card | `curl http://localhost:9300/.well-known/agent.json` |
+| Docs site | [auctalis.github.io/nocturnusai](https://auctalis.github.io/nocturnusai) |
+| Context workflow | [site docs](https://auctalis.github.io/nocturnusai/docs/context) |
+| Full API reference | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) |
+| Deep user guide | [USERGUIDE.md](USERGUIDE.md) |
+| MCP configs | [mcp-configs/README.md](mcp-configs/README.md) |
+| Agent card | `curl http://localhost:9300/.well-known/agent.json` |

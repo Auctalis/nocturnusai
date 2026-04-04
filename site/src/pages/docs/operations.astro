@@ -7,7 +7,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <DocsLayout title="Operations">
     <h1>Operations</h1>
     <p class="lead text-xl text-slate-400">
-        Monitoring, replication, backup, and deployment.
+        Monitoring, replication, backup, and deployment for production context optimization workloads.
     </p>
 
     <hr />
@@ -23,6 +23,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <li><strong>LLM</strong> — <code>nocturnusai_llm_call_duration_seconds</code>, <code>nocturnusai_llm_tokens_used</code></li>
         <li><strong>Memory</strong> — <code>nocturnusai_memory_facts_total</code>, <code>nocturnusai_memory_decay_evicted</code></li>
     </ul>
+    <p>Track context payload efficiency from API responses too: monitor <code>totalCharCount</code>, <code>totalFactsIncluded</code>, and diff churn (<code>added</code>/<code>removed</code>) over time.</p>
 
     <h3>Grafana Dashboards</h3>
     <p>The Docker Compose profile includes pre-built Grafana dashboards:</p>
@@ -60,8 +61,7 @@ LOG_FORMAT=json         # json or plain</code></pre>
     </ul>
 
     <pre><code class="language-bash"># .env
-DATA_DIR=/var/lib/nocturnusai/data   # WAL + snapshot directory
-SNAPSHOT_INTERVAL_MS=300000           # Snapshot every 5 minutes</code></pre>
+STORAGE_DIR=/var/lib/nocturnusai/data   # WAL + snapshot directory</code></pre>
 
     <hr />
 

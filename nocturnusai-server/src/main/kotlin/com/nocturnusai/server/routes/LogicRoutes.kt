@@ -20,6 +20,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.*
 
 fun Route.logicRoutes(dbManager: DatabaseManager) {
     post("/execute") {
@@ -209,24 +210,26 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
 
             // Build unified predicate list
             val allPredicates = (factsByPred.keys + rulesByHead.keys).distinct().sorted()
-            val predicateInfos = allPredicates.map { pred ->
-                val facts = factsByPred[pred] ?: emptyList()
-                val predRules = rulesByHead[pred] ?: emptyList()
-                mapOf(
-                    "predicate" to pred,
-                    "factCount" to facts.size,
-                    "ruleCount" to predRules.size,
-                    "arity" to (facts.firstOrNull()?.args?.size ?: predRules.firstOrNull()?.head?.args?.size ?: 0),
-                    "hasRules" to predRules.isNotEmpty()
-                )
+            val predicateInfos = buildJsonArray {
+                for (pred in allPredicates) {
+                    val facts = factsByPred[pred] ?: emptyList()
+                    val predRules = rulesByHead[pred] ?: emptyList()
+                    add(buildJsonObject {
+                        put("predicate", pred)
+                        put("factCount", facts.size)
+                        put("ruleCount", predRules.size)
+                        put("arity", facts.firstOrNull()?.args?.size ?: predRules.firstOrNull()?.head?.args?.size ?: 0)
+                        put("hasRules", predRules.isNotEmpty())
+                    })
+                }
             }
 
-            call.respond(mapOf(
-                "predicates" to predicateInfos,
-                "totalPredicates" to predicateInfos.size,
-                "totalFacts" to allFacts.size,
-                "totalRules" to rules.size
-            ))
+            call.respond(buildJsonObject {
+                put("predicates", predicateInfos)
+                put("totalPredicates", allPredicates.size)
+                put("totalFacts", allFacts.size)
+                put("totalRules", rules.size)
+            })
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: DatabaseNotFoundException) {

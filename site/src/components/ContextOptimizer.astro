@@ -14,16 +14,16 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
     <div class="text-center mb-16">
       <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-mono mb-6">
         <Minimize2 class="w-3.5 h-3.5" />
-        Context Management Engine
+        Turn Reduction Engine
       </div>
       <h2 class="text-3xl md:text-5xl font-black mb-5">
-        <span class="text-white">Pay for Signal.</span><br />
+        <span class="text-white">Keep The State.</span><br />
         <span class="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
-          Not Noise.
+          Drop The Noise.
         </span>
       </h2>
       <p class="text-slate-400 max-w-2xl mx-auto text-lg leading-relaxed">
-        OpenAI charges $15 per million tokens. Anthropic charges $15. Google charges $10. And your agents waste 95% of every request on irrelevant context. NocturnusAI uses goal-driven backward chaining to deliver <em class="text-emerald-400 not-italic font-medium">only what your agent actually needs</em> — slashing your LLM bill by 97%.
+        The hard part is not getting more context into the system. The hard part is stopping the next model call from seeing the whole thread again. NocturnusAI reduces raw turns into a smaller working set, then narrows it again for the specific question you are asking right now.
       </p>
     </div>
 
@@ -32,8 +32,8 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
       <!-- THE PROBLEM -->
       <div class="rounded-2xl overflow-hidden bg-[#020617] border border-red-500/20 shadow-2xl">
         <div class="px-5 py-3 bg-red-500/5 border-b border-red-500/10 flex items-center justify-between">
-          <span class="text-xs font-mono text-red-400">Without NocturnusAI</span>
-          <span class="text-xs font-mono text-red-400/50">Every RAG pipeline</span>
+          <span class="text-xs font-mono text-red-400">Without reduction</span>
+          <span class="text-xs font-mono text-red-400/50">full replay every turn</span>
         </div>
         <div class="p-6 space-y-4">
           <div class="flex items-start gap-3">
@@ -41,8 +41,8 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
               <DollarSign class="w-4 h-4 text-red-400" />
             </div>
             <div>
-              <div class="text-sm font-bold text-red-300 mb-1">$2.25 per request to OpenAI alone</div>
-              <div class="text-xs text-slate-500">150K tokens at GPT-4o's $15/M rate — and that's before Claude or Gemini costs</div>
+              <div class="text-sm font-bold text-red-300 mb-1">The whole thread gets replayed</div>
+              <div class="text-xs text-slate-500">Chat history, tool logs, internal notes, summaries, and stale retries all go back into the prompt</div>
             </div>
           </div>
           <div class="flex items-start gap-3">
@@ -50,8 +50,8 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
               <TrendingDown class="w-4 h-4 text-red-400" />
             </div>
             <div>
-              <div class="text-sm font-bold text-red-300 mb-1">$54,000/month at scale</div>
-              <div class="text-xs text-slate-500">1,000 requests/hr × 24hr = token spend that grows linearly with usage</div>
+              <div class="text-sm font-bold text-red-300 mb-1">Every later turn rebills old context</div>
+              <div class="text-xs text-slate-500">The model pays attention to things that did not change, and you keep paying for them anyway</div>
             </div>
           </div>
           <div class="flex items-start gap-3">
@@ -59,16 +59,16 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
               <TrendingDown class="w-4 h-4 text-red-400" />
             </div>
             <div>
-              <div class="text-sm font-bold text-red-300 mb-1">Worse accuracy, higher cost</div>
-              <div class="text-xs text-slate-500">Contradictory and stale facts in context degrade LLM reasoning quality</div>
+              <div class="text-sm font-bold text-red-300 mb-1">Noise wins over state</div>
+              <div class="text-xs text-slate-500">Repeated phrasing, stale summaries, and tool chatter crowd out the few things the next call actually needs</div>
             </div>
           </div>
           <!-- Cost visualization -->
           <div class="mt-4 p-4 rounded-xl bg-red-500/5 border border-red-500/10">
-            <div class="text-xs font-mono text-red-400/60 mb-2">Tokens billed per request</div>
+            <div class="text-xs font-mono text-red-400/60 mb-2">What the model sees</div>
             <div class="h-4 rounded-full bg-white/5 overflow-hidden">
               <div class="h-full rounded-full bg-gradient-to-r from-red-500 to-red-400 w-[95%] flex items-center justify-end pr-2">
-                <span class="text-[9px] font-mono text-white font-bold">95% wasted spend</span>
+                <span class="text-[9px] font-mono text-white font-bold">mostly replayed context</span>
               </div>
             </div>
           </div>
@@ -80,7 +80,7 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
         <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/3 to-cyan-500/3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
         <div class="px-5 py-3 bg-emerald-500/5 border-b border-emerald-500/10 flex items-center justify-between">
           <span class="text-xs font-mono text-emerald-400">With NocturnusAI</span>
-          <span class="text-xs font-mono text-emerald-400/50">Goal-driven optimization</span>
+          <span class="text-xs font-mono text-emerald-400/50">reduce -> focus -> diff</span>
         </div>
         <div class="p-6 space-y-4">
           <div class="flex items-start gap-3">
@@ -88,8 +88,8 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
               <DollarSign class="w-4 h-4 text-emerald-400" />
             </div>
             <div>
-              <div class="text-sm font-bold text-emerald-300 mb-1">$0.01 per request</div>
-              <div class="text-xs text-slate-500">820 tokens — only goal-relevant facts, ranked by salience, with full provenance</div>
+              <div class="text-sm font-bold text-emerald-300 mb-1">The model sees the reduced working set</div>
+              <div class="text-xs text-slate-500">Only the few entries that describe the current state, not the entire thread that produced it</div>
             </div>
           </div>
           <div class="flex items-start gap-3">
@@ -97,8 +97,8 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
               <Brain class="w-4 h-4 text-emerald-400" />
             </div>
             <div>
-              <div class="text-sm font-bold text-emerald-300 mb-1">Goal-driven backward chaining</div>
-              <div class="text-xs text-slate-500">Tell us the question — we trace exactly which facts matter via SLD resolution</div>
+              <div class="text-sm font-bold text-emerald-300 mb-1">Goal-specific narrowing</div>
+              <div class="text-xs text-slate-500">When you know the next question, the backend narrows the window again for that exact decision</div>
             </div>
           </div>
           <div class="flex items-start gap-3">
@@ -106,19 +106,19 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
               <Shield class="w-4 h-4 text-emerald-400" />
             </div>
             <div>
-              <div class="text-sm font-bold text-emerald-300 mb-1">Cheaper and more accurate</div>
-              <div class="text-xs text-slate-500">Contradictions caught before they reach the LLM — fewer tokens, better answers</div>
+              <div class="text-sm font-bold text-emerald-300 mb-1">Later turns pay for diffs</div>
+              <div class="text-xs text-slate-500">Stable session snapshots let the next request send only what changed</div>
             </div>
           </div>
           <!-- Efficiency visualization -->
           <div class="mt-4 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-            <div class="text-xs font-mono text-emerald-400/60 mb-2">Tokens billed per request</div>
+            <div class="text-xs font-mono text-emerald-400/60 mb-2">What the model sees</div>
             <div class="h-4 rounded-full bg-white/5 overflow-hidden">
               <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 w-[3%] min-w-[60px] flex items-center justify-end pr-2">
                 <span class="text-[9px] font-mono text-white font-bold">3%</span>
               </div>
             </div>
-            <div class="text-[10px] font-mono text-emerald-400/40 mt-1">97% cost reduction — every remaining token earns its keep</div>
+            <div class="text-[10px] font-mono text-emerald-400/40 mt-1">same thread, much smaller working set</div>
           </div>
         </div>
       </div>
@@ -127,15 +127,15 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
     <!-- The Pipeline — visual flow -->
     <div class="max-w-5xl mx-auto mb-16">
       <div class="text-center mb-8">
-        <h3 class="text-xl font-bold text-white mb-2">The Optimization Pipeline</h3>
-        <p class="text-slate-500 text-sm">Every call to <code class="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded text-xs font-mono">POST /context</code> runs this pipeline in under 50ms</p>
+        <h3 class="text-xl font-bold text-white mb-2">The Working Loop</h3>
+        <p class="text-slate-500 text-sm">Start with raw turns. Produce a smaller window. Reuse diffs on later turns.</p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
         {[
-          { label: "Send Turns", sub: "Array of strings", color: "cyan" },
-          { label: "Facts Ranked", sub: "Extract · dedupe · score", color: "purple" },
-          { label: "Feed to LLM", sub: "GPT-4o · Claude · any", color: "emerald" },
+          { label: "Send Turns", sub: "chat + tools + notes", color: "cyan" },
+          { label: "Reduce Window", sub: "extract · rank · focus", color: "purple" },
+          { label: "Reuse Diffs", sub: "later turns send less", color: "emerald" },
         ].map((step, i) => (
           <div class="relative flex items-stretch">
             <div class="p-5 rounded-xl bg-white/3 border border-white/8 text-center hover:bg-white/5 hover:border-emerald-500/20 transition-all group w-full">
@@ -174,9 +174,11 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
         <div class="p-5 font-mono text-sm overflow-x-auto">
 <pre class="!m-0 !p-0 !bg-transparent !border-0"><code>&#123;
   <span class="text-purple-400">"turns"</span>: [
-    <span class="text-green-400">"Acme Corp is on the enterprise plan."</span>,
-    <span class="text-green-400">"They have a $2M contract."</span>,
-    <span class="text-green-400">"24/7 SLA support included."</span>
+    <span class="text-green-400">"User cannot log in after Okta cutover."</span>,
+    <span class="text-green-400">"CRM: enterprise tier, billing current."</span>,
+    <span class="text-green-400">"Auth audit: issuer mismatch after IdP migration."</span>,
+    <span class="text-green-400">"Internal note: keep in support queue."</span>,
+    <span class="text-green-400">"Escalation: workaround is manual issuer override."</span>
   ]
 &#125;</code></pre>
         </div>
@@ -185,7 +187,7 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
       <!-- Response -->
       <div class="rounded-xl overflow-hidden bg-[#020617] border border-cyan-500/20 shadow-2xl">
         <div class="flex items-center justify-between px-4 py-3 bg-cyan-500/5 border-b border-cyan-500/10">
-          <span class="text-xs font-mono text-cyan-400">Ranked Facts</span>
+          <span class="text-xs font-mono text-cyan-400">Reduced Window</span>
           <span class="text-xs font-mono text-slate-600">response</span>
         </div>
         <div class="p-5 font-mono text-sm overflow-x-auto">
@@ -194,11 +196,11 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
     &#123; <span class="text-purple-400">"predicate"</span>: <span class="text-green-400">"customer_tier"</span>,
       <span class="text-purple-400">"args"</span>: [<span class="text-green-400">"acme_corp"</span>, <span class="text-green-400">"enterprise"</span>],
       <span class="text-purple-400">"salience"</span>: <span class="text-blue-400">0.95</span> &#125;,
-    &#123; <span class="text-purple-400">"predicate"</span>: <span class="text-green-400">"contract_value"</span>,
-      <span class="text-purple-400">"args"</span>: [<span class="text-green-400">"acme_corp"</span>, <span class="text-green-400">"2000000"</span>],
+    &#123; <span class="text-purple-400">"predicate"</span>: <span class="text-green-400">"current_issue"</span>,
+      <span class="text-purple-400">"args"</span>: [<span class="text-green-400">"acme_corp"</span>, <span class="text-green-400">"saml_issuer_mismatch"</span>],
       <span class="text-purple-400">"salience"</span>: <span class="text-blue-400">0.92</span> &#125;,
-    &#123; <span class="text-purple-400">"predicate"</span>: <span class="text-green-400">"sla_tier"</span>,
-      <span class="text-purple-400">"args"</span>: [<span class="text-green-400">"acme_corp"</span>, <span class="text-green-400">"24_7"</span>],
+    &#123; <span class="text-purple-400">"predicate"</span>: <span class="text-green-400">"workaround"</span>,
+      <span class="text-purple-400">"args"</span>: [<span class="text-green-400">"acme_corp"</span>, <span class="text-green-400">"manual_issuer_override"</span>],
       <span class="text-purple-400">"salience"</span>: <span class="text-blue-400">0.90</span> &#125;
   ],
   <span class="text-purple-400">"factsReturned"</span>: <span class="text-blue-400">3</span>,
@@ -212,10 +214,10 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
     <!-- Stats bar -->
     <div class="max-w-4xl mx-auto mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
       {[
-        { value: "$0.01", label: "Per Optimized Request", sub: "vs $2.25 unoptimized" },
-        { value: "97%", label: "Token Cost Reduction", sub: "500 → 15 facts" },
-        { value: "< 50ms", label: "Pipeline Latency", sub: "Full optimization pass" },
-        { value: "Diff", label: "Incremental Updates", sub: "Only bill for changes" },
+        { value: "Raw", label: "Thread State In", sub: "chat + tools + notes" },
+        { value: "Lean", label: "Window Out", sub: "only what matters next" },
+        { value: "Goal", label: "Focused Pass", sub: "narrow by the next question" },
+        { value: "Diff", label: "Later Turns", sub: "only bill for changes" },
       ].map(stat => (
         <div class="text-center p-5 rounded-xl bg-white/3 border border-white/8 hover:border-emerald-500/20 transition-all group">
           <div class="text-2xl md:text-3xl font-black bg-clip-text text-transparent bg-gradient-to-br from-emerald-400 to-cyan-400 mb-1">
@@ -231,23 +233,23 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
     <div class="max-w-3xl mx-auto mt-12 text-center">
       <div class="p-6 rounded-2xl bg-gradient-to-r from-emerald-500/5 to-cyan-500/5 border border-emerald-500/15">
         <p class="text-slate-300 text-sm mb-4">
-          <span class="font-bold text-white">Turns in, facts out, GPT-4o in.</span> Drop into any OpenAI workflow in minutes.
+          <span class="font-bold text-white">Your app owns the turns. Nocturnus owns the reduction.</span> Drop the smaller window into any OpenAI workflow in minutes.
         </p>
         <div class="inline-block text-left rounded-lg bg-[#020617] border border-white/10 px-5 py-3 font-mono text-sm">
           <div><span class="text-slate-500"># pip install nocturnusai openai</span></div>
           <div><span class="text-blue-400">import</span> <span class="text-slate-300">requests, openai</span></div>
-          <div class="mt-2"><span class="text-slate-500"># Turns in, facts out</span></div>
+          <div class="mt-2"><span class="text-slate-500"># Raw turns in, reduced window out</span></div>
           <div><span class="text-slate-300">resp</span> = <span class="text-yellow-400">requests</span>.<span class="text-yellow-400">post</span>(<span class="text-green-400">"http://localhost:9300/context"</span>, json=&#123;</div>
-          <div class="pl-4"><span class="text-green-400">"turns"</span>: [<span class="text-green-400">"Acme is enterprise tier"</span>, <span class="text-green-400">"They have 24/7 SLA"</span>]</div>
+          <div class="pl-4"><span class="text-green-400">"turns"</span>: [<span class="text-green-400">"user msg"</span>, <span class="text-green-400">"tool output"</span>, <span class="text-green-400">"internal note"</span>]</div>
           <div>&#125;)</div>
           <div><span class="text-slate-300">facts</span> = <span class="text-green-400">"\n"</span>.<span class="text-yellow-400">join</span>(<span class="text-yellow-400">f</span><span class="text-green-400">"- &#123;f['predicate']&#125;(&#123;', '.join(f['args'])&#125;)"</span> <span class="text-blue-400">for</span> <span class="text-slate-300">f</span> <span class="text-blue-400">in</span> <span class="text-slate-300">resp</span>.<span class="text-yellow-400">json</span>()[<span class="text-green-400">"facts"</span>])</div>
-          <div class="mt-2"><span class="text-slate-500"># Feed to GPT-4o — 200 tokens instead of 150K</span></div>
+          <div class="mt-2"><span class="text-slate-500"># Feed the reduced window to GPT-4o</span></div>
           <div><span class="text-slate-300">answer</span> = <span class="text-yellow-400">openai</span>.<span class="text-yellow-400">OpenAI</span>().<span class="text-slate-300">chat</span>.<span class="text-slate-300">completions</span>.<span class="text-yellow-400">create</span>(</div>
           <div class="pl-4"><span class="text-slate-300">model</span>=<span class="text-green-400">"gpt-4o"</span>,</div>
-          <div class="pl-4"><span class="text-slate-300">messages</span>=[&#123;<span class="text-green-400">"role"</span>: <span class="text-green-400">"system"</span>, <span class="text-green-400">"content"</span>: <span class="text-yellow-400">f</span><span class="text-green-400">"Facts:\n&#123;facts&#125;"</span>&#125;,</div>
-          <div class="pl-14">&#123;<span class="text-green-400">"role"</span>: <span class="text-green-400">"user"</span>, <span class="text-green-400">"content"</span>: <span class="text-green-400">"Is Acme eligible for SLA?"</span>&#125;]</div>
+          <div class="pl-4"><span class="text-slate-300">messages</span>=[&#123;<span class="text-green-400">"role"</span>: <span class="text-green-400">"system"</span>, <span class="text-green-400">"content"</span>: <span class="text-yellow-400">f</span><span class="text-green-400">"Context:\n&#123;facts&#125;"</span>&#125;,</div>
+          <div class="pl-14">&#123;<span class="text-green-400">"role"</span>: <span class="text-green-400">"user"</span>, <span class="text-green-400">"content"</span>: <span class="text-green-400">"Write the next support reply."</span>&#125;]</div>
           <div>)</div>
-          <div class="text-emerald-400 mt-1"># Correct. Sourced. $0.003 instead of $2.25 ✓</div>
+          <div class="text-emerald-400 mt-1"># Same thread state, fewer tokens, less prompt noise</div>
         </div>
       </div>
     </div>

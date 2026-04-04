@@ -582,41 +582,29 @@ class RoutesIntegrationTest {
 
     // ─────────────────────────────────────────────────────────────────────────
     // GET /predicates  (schema discovery)
-    //
-    // NOTE: The server builds the response as a Map<String, Any> (mixing String,
-    // List, and Int values) and passes it to call.respond(). kotlinx.serialization
-    // cannot handle heterogeneous Any values, so the endpoint currently throws a
-    // SerializationException and returns 500.
-    //
-    // The tests below document the current (failing) behaviour so a future fix
-    // (replace with a @Serializable PredicateSchemaResponse DTO) makes the change
-    // immediately visible.
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `GET predicates - endpoint is registered (not 404)`() = testApplication {
+    fun `GET predicates - returns 200 with predicate schema`() = testApplication {
         application { module() }
+
+        // Seed a fact so there's something to discover
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"color","args":["sky","blue"]}""")
+        }
 
         val response = client.get("/predicates") {
             header("X-Tenant-ID", "default")
         }
 
-        assertNotEquals(HttpStatusCode.NotFound, response.status,
-            "/predicates should be a registered route")
-    }
-
-    @Test
-    fun `GET predicates - serialization issue produces 500 (known bug)`() = testApplication {
-        application { module() }
-
-        val response = client.get("/predicates") {
-            header("X-Tenant-ID", "default")
-        }
-
-        // BUG: Map<String, Any> with mixed value types is not directly serializable.
-        // This test documents current behaviour. Fix: replace with a proper DTO.
-        assertEquals(HttpStatusCode.InternalServerError, response.status,
-            "Expected 500 due to untyped map serialization — update once the route is fixed")
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertTrue(body.contains("\"predicates\""), "Expected predicates array in response")
+        assertTrue(body.contains("\"totalPredicates\""), "Expected totalPredicates field")
+        assertTrue(body.contains("\"totalFacts\""), "Expected totalFacts field")
+        assertTrue(body.contains("\"color\""), "Expected 'color' predicate in results")
     }
 
     // ─────────────────────────────────────────────────────────────────────────

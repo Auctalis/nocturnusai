@@ -774,6 +774,30 @@ class McpRoutesTest {
         assertFalse(isToolError(obj["result"]!!.jsonObject))
     }
 
+    @Test
+    fun `tools-call context - legacy minRelevance alias is accepted`() = testApplication {
+        application { module() }
+
+        mcpCall("""{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tell","arguments":{"predicate":"priority_test","args":["alpha"]}}}""")
+
+        val obj = mcpCall("""
+            {
+              "jsonrpc": "2.0",
+              "id": 8,
+              "method": "tools/call",
+              "params": {
+                "name": "context",
+                "arguments": {"maxFacts": 5, "minRelevance": 0.0}
+              }
+            }
+        """.trimIndent())
+
+        assertJsonRpcSuccess(obj)
+        assertFalse(isToolError(obj["result"]!!.jsonObject))
+        val text = toolText(obj["result"]!!.jsonObject)
+        assertTrue(text.isNotBlank(), "Expected non-empty context response when using minRelevance alias")
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // tools/call — predicates
     // ─────────────────────────────────────────────────────────────────────────

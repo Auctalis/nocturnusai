@@ -63,7 +63,7 @@ class AnthropicProvider(
             if (systemMessage != null) {
                 put("system", systemMessage)
             }
-            put("temperature", 0.1)
+            put("temperature", LlmConfig.temperature)
         }
 
         val response = client.post("https://api.anthropic.com/v1/messages") {

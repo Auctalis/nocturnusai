@@ -25,6 +25,7 @@ import kotlin.test.*
  *   GET /predicates     — schema discovery (tested here as an observability surface)
  *   GET /.well-known/agent.json — A2A Agent Card
  *   GET /llm.txt        — machine-readable API description
+ *   GET /userguide      — repository user guide exposed by the server
  *
  * These endpoints are on the PUBLIC_PATHS list (no auth required) so they work
  * regardless of auth mode.
@@ -181,6 +182,17 @@ class ObservabilityRoutesTest {
         assertEquals(HttpStatusCode.OK, response.status)
         val body = response.bodyAsText()
         assertTrue(body.isNotBlank(), "Expected non-empty llm.txt content")
+    }
+
+    @Test
+    fun `GET userguide - returns 200 with markdown content`() = testApplication {
+        application { module() }
+
+        val response = client.get("/userguide")
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertTrue(body.contains("# NocturnusAI"), "Expected user guide markdown content: $body")
     }
 
     // ─────────────────────────────────────────────────────────────────────────

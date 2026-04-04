@@ -120,6 +120,287 @@ export interface ContextWindow {
 }
 
 /**
+ * A goal specification for context optimization.
+ */
+export interface GoalSpec {
+  /** Predicate to target. */
+  predicate: string;
+
+  /** Ordered list of arguments. */
+  args: string[];
+
+  /** Whether the goal is negated. */
+  negated?: boolean;
+}
+
+/**
+ * Weighted predicate bucket used during goal-driven context selection.
+ */
+export interface RelevanceBucket {
+  /** Bucket name used in response statistics. */
+  name: string;
+
+  /** Optional predicate names assigned to this bucket. */
+  predicates?: string[] | null;
+
+  /** Relative weight for allocation. Defaults to 1.0. */
+  weight?: number;
+}
+
+/**
+ * Provenance for a derived context entry.
+ */
+export interface DerivationInfo {
+  /** Rule used to derive the fact. */
+  rule: string;
+
+  /** Premises used in the derivation. */
+  premises: string[];
+}
+
+/**
+ * A single fact selected into a goal-driven context window.
+ */
+export interface ContextEntry {
+  /** Predicate name. */
+  predicate: string;
+
+  /** Ordered list of arguments. */
+  args: string[];
+
+  /** Whether this fact is negated. */
+  negated?: boolean;
+
+  /** Isolation scope. */
+  scope?: string | null;
+
+  /** Composite salience score. */
+  salience: number;
+
+  /** Selection category such as goal_relevant or bucket name. */
+  category: string;
+
+  /** Character count of the rendered fact. */
+  charCount: number;
+
+  /** Optional derivation chain. */
+  provenance?: DerivationInfo | null;
+
+  /** Epoch milliseconds when this atom was created. */
+  createdAt?: number | null;
+
+  /** Epoch milliseconds from which this atom is valid. */
+  validFrom?: number | null;
+
+  /** Epoch milliseconds until which this atom is valid. */
+  validUntil?: number | null;
+
+  /** Arbitrary key-value metadata. */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * A contradiction detected during goal-driven context assembly.
+ */
+export interface ContradictionInfo {
+  /** Contradicted predicate. */
+  predicate: string;
+
+  /** Arguments of the contradicted fact. */
+  args: string[];
+
+  /** Salience of the positive fact. */
+  positiveSalience: number;
+
+  /** Salience of the negative fact. */
+  negativeSalience: number;
+}
+
+/**
+ * Allocation statistics for a relevance bucket.
+ */
+export interface BucketStats {
+  /** Number of facts included from this bucket. */
+  factsIncluded: number;
+
+  /** Maximum allocated facts for this bucket. */
+  maxAllocation: number;
+
+  /** Minimum salience within this bucket. */
+  minSalience: number;
+
+  /** Maximum salience within this bucket. */
+  maxSalience: number;
+}
+
+/**
+ * Goal-driven optimized context window.
+ */
+export interface OptimizedContext {
+  /** Unique identifier for this context window. */
+  windowId: string;
+
+  /** Selected entries in the window. */
+  entries: ContextEntry[];
+
+  /** Relevant rules surfaced during optimization. */
+  relevantRules: string[];
+
+  /** Total facts available before selection. */
+  totalFactsAvailable: number;
+
+  /** Number of facts included in the output window. */
+  totalFactsIncluded: number;
+
+  /** Count of facts removed through deduplication. */
+  deduplicationSavings: number;
+
+  /** Number of contradictions detected. */
+  contradictionsFound: number;
+
+  /** Number of contradictions auto-resolved. */
+  contradictionsResolved: number;
+
+  /** Contradiction details. */
+  contradictions: ContradictionInfo[];
+
+  /** Per-bucket allocation statistics. */
+  bucketStats: Record<string, BucketStats>;
+
+  /** Character count of the selected window. */
+  totalCharCount: number;
+
+  /** Whether goal-driven selection was used. */
+  goalDriven: boolean;
+
+  /** Monotonic KB generation counter. */
+  knowledgeGeneration: number;
+
+  /** Epoch milliseconds when generated. */
+  generatedAt: number;
+}
+
+/**
+ * A fact removed between two context snapshots.
+ */
+export interface RemovedContextEntry {
+  /** Stable internal entry key. */
+  key: string;
+
+  /** Predicate name. */
+  predicate: string;
+
+  /** Ordered list of arguments. */
+  args: string[];
+
+  /** Whether this fact is negated. */
+  negated?: boolean;
+
+  /** Isolation scope. */
+  scope?: string | null;
+}
+
+/**
+ * Incremental changes between two optimized context windows.
+ */
+export interface ContextDiff {
+  /** Previous window ID, if one existed. */
+  previousWindowId?: string | null;
+
+  /** Current window ID. */
+  currentWindowId: string;
+
+  /** Facts added since the previous snapshot. */
+  added: ContextEntry[];
+
+  /** Facts removed since the previous snapshot. */
+  removed: RemovedContextEntry[];
+
+  /** Number of unchanged facts. */
+  unchanged: number;
+
+  /** Whether a full refresh is recommended instead of a diff. */
+  fullRefreshRecommended: boolean;
+
+  /** Optional explanation for a full refresh recommendation. */
+  reason?: string | null;
+}
+
+/**
+ * Predicate summary in a context overview response.
+ */
+export interface PredicateSummary {
+  /** Predicate name. */
+  predicate: string;
+
+  /** Count of facts using this predicate. */
+  count: number;
+}
+
+/**
+ * Summary of the context store for monitoring or dashboards.
+ */
+export interface ContextSummary {
+  /** Total facts in the knowledge base. */
+  totalFacts: number;
+
+  /** Number of distinct predicates. */
+  predicateCount: number;
+
+  /** Most common predicates. */
+  topPredicates: PredicateSummary[];
+
+  /** Number of facts with TTL. */
+  factsWithTtl: number;
+
+  /** Number of facts expiring within the next hour. */
+  factsExpiringWithin1h: number;
+
+  /** Number of contradictions currently present. */
+  contradictions: number;
+
+  /** Most salient facts in the store. */
+  topSalientFacts: ContextEntry[];
+
+  /** Approximate character footprint of the KB. */
+  totalCharCount: number;
+
+  /** Monotonic KB generation counter. */
+  knowledgeGeneration: number;
+
+  /** Epoch milliseconds when generated. */
+  generatedAt: number;
+}
+
+/**
+ * Fact extracted during a combined ingest-and-optimize request.
+ */
+export interface ExtractedFact {
+  /** Predicate name. */
+  predicate: string;
+
+  /** Ordered list of arguments. */
+  args: string[];
+
+  /** Extraction confidence score. */
+  confidence: number;
+}
+
+/**
+ * Result of POST /context/ingest.
+ */
+export interface IngestAndOptimizeResult {
+  /** Facts extracted from raw text. */
+  extracted: ExtractedFact[];
+
+  /** Extraction provider name when an LLM extractor is configured. */
+  extractionProvider?: string | null;
+
+  /** Goal-driven optimized context generated from the ingested text. */
+  context: OptimizedContext;
+}
+
+/**
  * Result of a memory consolidation operation.
  * Consolidation detects repeated episodic patterns and compresses them into
  * semantic summary facts.
@@ -320,6 +601,96 @@ export interface ContextWindowOptions {
 
   /** Isolation scope. */
   scope?: string;
+}
+
+/**
+ * Options for goal-driven context optimization.
+ */
+export interface OptimizeContextOptions {
+  /** Maximum facts to include. Defaults to 100. */
+  maxFacts?: number;
+
+  /** Isolation scope. */
+  scope?: string;
+
+  /** Restrict selection to these predicates. */
+  predicates?: string[];
+
+  /** Goal atoms that drive backward-chaining selection. */
+  goals?: GoalSpec[];
+
+  /** Optional weighted predicate buckets. */
+  relevanceBuckets?: RelevanceBucket[];
+
+  /** Session ID used for future diff calls. */
+  sessionId?: string;
+
+  /** Auto-resolve contradictions when possible. Defaults to true. */
+  autoResolveContradictions?: boolean;
+
+  /** Optional diversity cap per predicate. */
+  maxFactsPerPredicate?: number;
+}
+
+/**
+ * Options for incremental context diffs.
+ */
+export interface DiffContextOptions {
+  /** Session ID created by a prior optimizeContext() call. */
+  sessionId: string;
+
+  /** Maximum facts in the new window. */
+  maxFacts?: number;
+
+  /** Isolation scope. */
+  scope?: string;
+
+  /** Restrict selection to these predicates. */
+  predicates?: string[];
+
+  /** Goal atoms that drive backward-chaining selection. */
+  goals?: GoalSpec[];
+
+  /** Optional weighted predicate buckets. */
+  relevanceBuckets?: RelevanceBucket[];
+
+  /** Auto-resolve contradictions when possible. */
+  autoResolveContradictions?: boolean;
+
+  /** Optional diversity cap per predicate. */
+  maxFactsPerPredicate?: number;
+}
+
+/**
+ * Options for the combined ingest-and-optimize endpoint.
+ */
+export interface IngestAndOptimizeOptions {
+  /** Raw text to extract from. */
+  text: string;
+
+  /** Goal atoms that drive optimization. */
+  goals?: GoalSpec[];
+
+  /** Maximum facts to include. Defaults to 50. */
+  maxFacts?: number;
+
+  /** Optional diversity cap per predicate. */
+  maxFactsPerPredicate?: number;
+
+  /** Auto-resolve contradictions when possible. */
+  autoResolveContradictions?: boolean;
+
+  /** Session ID used for future diff calls. */
+  sessionId?: string;
+
+  /** Optional weighted predicate buckets. */
+  relevanceBuckets?: RelevanceBucket[];
+
+  /** Isolation scope. */
+  scope?: string;
+
+  /** Optional hint for the extractor. */
+  contextHint?: string;
 }
 
 /**

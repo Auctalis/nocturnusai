@@ -7,8 +7,9 @@
  *
  * - {@link NocturnusAIClient} — Full-featured client for the NocturnusAI HTTP API.
  *   Supports fact/rule assertion, querying, inference, retraction, memory
- *   management (context window, temporal queries, consolidation, decay),
- *   DSL execution, health checks, and SSE event subscriptions.
+ *   management (context windows, goal-driven optimization, diffs, temporal
+ *   queries, consolidation, decay), DSL execution, health checks, and SSE
+ *   event subscriptions.
  *
  * - {@link NocturnusAIMCPClient} — MCP (Model Context Protocol) client for
  *   tool discovery and invocation via JSON-RPC 2.0. Useful for integrating
@@ -59,6 +60,19 @@ export type {
   Atom,
   ScoredAtom,
   ContextWindow,
+  GoalSpec,
+  RelevanceBucket,
+  DerivationInfo,
+  ContextEntry,
+  ContradictionInfo,
+  BucketStats,
+  OptimizedContext,
+  RemovedContextEntry,
+  ContextDiff,
+  PredicateSummary,
+  ContextSummary,
+  ExtractedFact,
+  IngestAndOptimizeResult,
   ConsolidationResult,
   DecayResult,
 
@@ -77,6 +91,9 @@ export type {
   RuleOptions,
   InferOptions,
   ContextWindowOptions,
+  OptimizeContextOptions,
+  DiffContextOptions,
+  IngestAndOptimizeOptions,
   EventSubscriptionOptions,
 
   // Events

@@ -4,497 +4,156 @@ import NextSteps from '../../components/NextSteps.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<DocsLayout title="Quickstart">
-    <h1>Quickstart</h1>
+<DocsLayout title="Cut Down Turns">
+    <h1>Cut Down a Large Turn Array</h1>
     <p class="lead">
-        Cut your agent's token bill by 97% in under 5 minutes.<br/>
-        Start with natural language — no schemas, no structured queries required.
+        This product is for one problem: you already have too much conversation state, and you need a smaller context window before the next model call.
     </p>
 
     <div class="callout callout-info">
-        <strong>What is Nocturnus.AI?</strong> A context optimization engine that cuts your agent's token costs by 97%. Feed it plain English, it stores structured facts. Ask questions, get verified answers. Your agents connect via MCP, Python SDK, TypeScript SDK, or HTTP — and the Context Management Engine ensures they only pay for relevant tokens.
+        <strong>The primary use case.</strong> You have chat turns, tool output, CRM notes, internal comments, previous summaries, and partial retries all mixed together. You do not want to send that full pile back to GPT-4o or Claude on every turn. You want a smaller, usable context window that keeps the important state and drops the rest.
     </div>
 
-    <div class="callout callout-tip" id="prereqs">
-        <strong>Prerequisites</strong>
-        <ul style="margin: 0.5rem 0 0; padding-left: 1.25rem;">
-            <li>Docker Desktop 24+ with Compose V2 (<code>docker compose</code>, not <code>docker-compose</code>)</li>
-            <li><strong>For Steps 2–3</strong> (natural language): set one of <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, or <code>GOOGLE_API_KEY</code></li>
-            <li><strong>Steps 4–5</strong> (direct API and MCP) work without any LLM key</li>
-        </ul>
-    </div>
-
-    <!-- ============ FRAMEWORK INTEGRATIONS ============ -->
-    <div class="framework-strip">
-        <h3 style="margin-top:0; margin-bottom:0.75rem; font-size:1rem; color:white;">Works with your agent stack</h3>
-        <div class="framework-grid">
-            <a href={`${base}/docs/integrations#langchain`} class="fw-card">
-                <span class="fw-name">LangChain</span>
-                <code class="fw-install">pip install nocturnusai[langchain]</code>
-                <span class="fw-snippet">tools = get_nocturnusai_tools(client)</span>
-            </a>
-            <a href={`${base}/docs/integrations#crewai`} class="fw-card">
-                <span class="fw-name">CrewAI</span>
-                <code class="fw-install">pip install nocturnusai[crewai]</code>
-                <span class="fw-snippet">tools = get_nocturnusai_tools(client)</span>
-            </a>
-            <a href={`${base}/docs/integrations#autogen`} class="fw-card">
-                <span class="fw-name">AutoGen</span>
-                <code class="fw-install">pip install nocturnusai[autogen]</code>
-                <span class="fw-snippet">tools = get_nocturnusai_tools(client)</span>
-            </a>
-            <a href={`${base}/docs/integrations#openai-agents`} class="fw-card">
-                <span class="fw-name">OpenAI Agents</span>
-                <code class="fw-install">pip install nocturnusai[openai-agents]</code>
-                <span class="fw-snippet">tools = get_nocturnusai_tools(client)</span>
-            </a>
-            <a href={`${base}/docs/integrations#anthropic`} class="fw-card">
-                <span class="fw-name">Anthropic</span>
-                <code class="fw-install">pip install nocturnusai[anthropic]</code>
-                <span class="fw-snippet">tools = get_nocturnusai_tool_definitions()</span>
-            </a>
-            <a href={`${base}/docs/integrations#langgraph`} class="fw-card">
-                <span class="fw-name">LangGraph</span>
-                <code class="fw-install">pip install nocturnusai[langgraph]</code>
-                <span class="fw-snippet">saver = NocturnusAICheckpointSaver(client)</span>
-            </a>
-        </div>
-        <p style="margin:0.75rem 0 0; font-size:0.8rem; color:rgb(148,163,184);">
-            Also available via <a href={`${base}/docs/mcp`} style="color:#06b6d4;">MCP protocol</a> (Cursor, Claude, any MCP client) · <a href={`${base}/docs/sdks#typescript`} style="color:#06b6d4;">TypeScript SDK</a> · <a href={`${base}/docs/api`} style="color:#06b6d4;">REST API</a>
-        </p>
-    </div>
-
-    <style>
-        .framework-strip {
-            margin: 2rem 0;
-            padding: 1.5rem;
-            border: 1px solid rgba(6, 182, 212, 0.15);
-            border-radius: 12px;
-            background: linear-gradient(135deg, rgba(6, 182, 212, 0.05), rgba(139, 92, 246, 0.05));
-        }
-        .framework-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.75rem;
-        }
-        @media (max-width: 768px) {
-            .framework-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 480px) {
-            .framework-grid { grid-template-columns: 1fr; }
-        }
-        .fw-card {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-            padding: 0.75rem;
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 8px;
-            background: rgba(255,255,255,0.02);
-            text-decoration: none;
-            transition: border-color 0.2s, background 0.2s;
-        }
-        .fw-card:hover {
-            border-color: rgba(6, 182, 212, 0.3);
-            background: rgba(6, 182, 212, 0.05);
-        }
-        .fw-name {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: white;
-        }
-        .fw-install {
-            font-size: 0.7rem;
-            color: rgb(148, 163, 184);
-            background: none;
-            padding: 0;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        .fw-snippet {
-            font-size: 0.7rem;
-            color: #06b6d4;
-            font-family: 'JetBrains Mono', monospace;
-        }
-    </style>
-
-    <!-- ============ AI INSTALL ============ -->
-    <div class="ai-install">
-        <div class="ai-install-header">
-            <span class="ai-install-icon">✦</span>
-            <span>Install with AI</span>
-        </div>
-        <p class="ai-install-desc">Copy a prompt into your AI coding assistant and it will install NocturnusAI for you.</p>
-        <div class="ai-prompts">
-            <div class="ai-prompt-card">
-                <div class="ai-prompt-meta">
-                    <span class="ai-prompt-label">Claude Code</span>
-                    <button class="ai-copy-btn" data-copy="Install NocturnusAI on my machine. Run: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash — then verify with: curl http://localhost:9300/health">copy</button>
-                </div>
-                <div class="ai-prompt-text">Install NocturnusAI on my machine. Run: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash — then verify with: curl http://localhost:9300/health</div>
-            </div>
-            <div class="ai-prompt-card">
-                <div class="ai-prompt-meta">
-                    <span class="ai-prompt-label">GitHub Copilot</span>
-                    <button class="ai-copy-btn" data-copy="@terminal Install NocturnusAI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash">copy</button>
-                </div>
-                <div class="ai-prompt-text">@terminal Install NocturnusAI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</div>
-            </div>
-            <div class="ai-prompt-card">
-                <div class="ai-prompt-meta">
-                    <span class="ai-prompt-label">Cursor</span>
-                    <button class="ai-copy-btn" data-copy="Run this in my terminal to install NocturnusAI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash">copy</button>
-                </div>
-                <div class="ai-prompt-text">Run this in my terminal to install NocturnusAI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============ STEP 1 ============ -->
-    <div class="step-card" id="install">
-        <div style="position:absolute; top:-12px; left:24px; font-size:0.65rem; font-weight:700; font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; padding:4px 14px; border-radius:20px; color:white; background:linear-gradient(135deg,#06b6d4,#8b5cf6);">STEP 1 · INSTALL</div>
-        <h3>Start the Server</h3>
-        <p>One command. Installs Docker Compose stack, waits for healthy, and installs the native CLI binary:</p>
-
-        <pre data-lang="bash"><code><span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
-
-<span class="syn-comment"># With an API key for LLM features (enables /extract and /synthesize in Steps 2–3):</span>
-<span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --key sk-ant-...
-
-<span class="syn-comment"># With local Ollama (free, no API key needed — install Ollama first):</span>
-<span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --host-ollama</code></pre>
-
-        <p>Verify it's running:</p>
-        <pre data-lang="bash"><code><span class="syn-var">$</span> curl http://localhost:9300/health
-
-<span class="syn-ok">&#123; "status": "healthy" &#125;</span></code></pre>
-
-        <div class="callout callout-tip" style="margin-top:1.5rem;">
-            <strong>Data persistence</strong> — Facts survive container restarts. Docker Compose mounts a <code>./data</code> directory for WAL logs and snapshots. Delete that folder to wipe the knowledge base and start fresh.
-        </div>
-        <div class="callout callout-info" style="margin-top:1rem;">
-            <strong>CLI installed.</strong> The installer places the <code>nocturnusai</code> native binary on your PATH. Run <code>nocturnusai</code> for an interactive REPL, or use <code>nocturnusai -e "tell ..."</code> in scripts.
-        </div>
-    </div>
-
-    <!-- ============ STEP 2 ============ -->
-    <div class="step-card" id="natural-language">
-        <div style="position:absolute; top:-12px; left:24px; font-size:0.65rem; font-weight:700; font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; padding:4px 14px; border-radius:20px; color:white; background:linear-gradient(135deg,#06b6d4,#8b5cf6);">STEP 2 · NATURAL LANGUAGE</div>
-        <h3>Feed It Text, Ask It Questions</h3>
-        <p>
-            The fastest way to get started. Set an LLM API key — <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, or <code>GOOGLE_API_KEY</code> — and NocturnusAI handles fact extraction and Q&amp;A automatically.
-        </p>
-
-        <p><strong>Extract facts from plain text:</strong></p>
-        <pre data-lang="bash"><code><span class="syn-var">$</span> curl <span class="syn-flag">-X</span> <span class="syn-http">POST</span> http://localhost:9300/extract \
-    <span class="syn-flag">-H</span> <span class="syn-string">"Content-Type: application/json"</span> \
-    <span class="syn-flag">-d</span> <span class="syn-string">'&#123;
-    "text": "Acme Corp is on the enterprise plan and is based in Austin. They get 24/7 SLA support.",
-    "assert": true
-  &#125;'</span></code></pre>
-
-        <pre data-lang="json"><code>&#123;
-  <span class="syn-prop">"facts"</span>: [
-    &#123; <span class="syn-prop">"predicate"</span>: <span class="syn-string">"customer_tier"</span>, <span class="syn-prop">"args"</span>: [<span class="syn-string">"acme_corp"</span>, <span class="syn-string">"enterprise"</span>] &#125;,
-    &#123; <span class="syn-prop">"predicate"</span>: <span class="syn-string">"location"</span>, <span class="syn-prop">"args"</span>: [<span class="syn-string">"acme_corp"</span>, <span class="syn-string">"austin"</span>] &#125;,
-    &#123; <span class="syn-prop">"predicate"</span>: <span class="syn-string">"sla_tier"</span>, <span class="syn-prop">"args"</span>: [<span class="syn-string">"acme_corp"</span>, <span class="syn-string">"24_7"</span>] &#125;
-  ],
-  <span class="syn-prop">"asserted"</span>: <span class="syn-keyword">true</span>
-&#125;</code></pre>
-
-        <p><strong>Ask a natural language question — get a sourced answer:</strong></p>
-        <pre data-lang="bash"><code><span class="syn-var">$</span> curl <span class="syn-flag">-X</span> <span class="syn-http">POST</span> http://localhost:9300/synthesize \
-    <span class="syn-flag">-H</span> <span class="syn-string">"Content-Type: application/json"</span> \
-    <span class="syn-flag">-d</span> <span class="syn-string">'&#123;"question": "What support level does Acme Corp get?"&#125;'</span></code></pre>
-
-        <pre data-lang="json"><code>&#123;
-  <span class="syn-prop">"answer"</span>: <span class="syn-string">"Acme Corp gets 24/7 SLA support on their enterprise plan."</span>,
-  <span class="syn-prop">"derivation"</span>: [
-    &#123; <span class="syn-prop">"fact"</span>: <span class="syn-string">"sla_tier(acme_corp, 24_7)"</span> &#125;,
-    &#123; <span class="syn-prop">"fact"</span>: <span class="syn-string">"customer_tier(acme_corp, enterprise)"</span> &#125;
-  ],
-  <span class="syn-prop">"confidence"</span>: <span class="syn-num">0.97</span>
-&#125;</code></pre>
-
-        <div class="callout callout-success">
-            <strong>Not a guess.</strong> The <code>derivation</code> field shows the exact facts that produced this answer. This is verification — if the fact isn't in the KB, the answer says so rather than making something up.
-        </div>
-
-        <div class="callout callout-success" style="margin-top:1.5rem;">
-            <strong>Even simpler: POST /context</strong>
-            <p style="margin:0.5rem 0 0;">Skip extraction and synthesis — just send your conversation turns and get ranked facts back:</p>
-            <pre style="margin:0.5rem 0 0; font-size:0.8rem;"><code>POST /context
-&#123; "turns": ["Acme is on enterprise plan", "They have 24/7 SLA"] &#125;
-
-→ &#123; "facts": [
-    &#123;"predicate":"customer_tier", "args":["acme","enterprise"], "salience":0.95&#125;,
-    &#123;"predicate":"sla_tier", "args":["acme","24_7"], "salience":0.90&#125;
-  ],
-  "factsReturned": 2, "contradictions": 0
-&#125;</code></pre>
-            <p style="margin:0.5rem 0 0; font-size:0.85rem;">Feed these facts to GPT-4o or Claude — 200 tokens instead of 150K. <a href="/docs/context">Full guide →</a></p>
-        </div>
-    </div>
-
-    <!-- ============ STEP 3 ============ -->
-    <div class="step-card" id="mcp">
-        <div style="position:absolute; top:-12px; left:24px; font-size:0.65rem; font-weight:700; font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; padding:4px 14px; border-radius:20px; color:white; background:linear-gradient(135deg,#06b6d4,#8b5cf6);">STEP 3 · MCP CONNECT</div>
-        <h3>Connect Any Agent in 30 Seconds</h3>
-        <p>
-            NocturnusAI is an MCP server. Any MCP-compatible agent, IDE, or framework connects with a two-line config — no SDK, no API wrapper, no code changes required.
-        </p>
-
-        <p><strong>Cursor / Windsurf (<code>.cursor/mcp.json</code>):</strong></p>
-        <pre data-lang="json"><code>&#123;
-  <span class="syn-prop">"mcpServers"</span>: &#123;
-    <span class="syn-prop">"nocturnus"</span>: &#123;
-      <span class="syn-prop">"url"</span>: <span class="syn-string">"http://localhost:9300/mcp/sse"</span>
-    &#125;
-  &#125;
-&#125;</code></pre>
-
-        <p><strong>Claude Desktop (<code>claude_desktop_config.json</code>):</strong></p>
-        <pre data-lang="json"><code>&#123;
-  <span class="syn-prop">"mcpServers"</span>: &#123;
-    <span class="syn-prop">"nocturnus"</span>: &#123;
-      <span class="syn-prop">"url"</span>: <span class="syn-string">"http://localhost:9300/mcp/sse"</span>,
-      <span class="syn-prop">"transport"</span>: <span class="syn-string">"sse"</span>
-    &#125;
-  &#125;
-&#125;</code></pre>
-
-        <p>Your agent immediately gets 9 tools: <code>tell</code>, <code>ask</code>, <code>teach</code>, <code>forget</code>, <code>recall</code>, <code>context</code>, <code>compress</code>, <code>cleanup</code>, <code>predicates</code>.</p>
-
-        <div class="callout callout-tip">
-            <strong>That's it.</strong> No API wrappers, no schemas to define, no integration code. The MCP tools are backed by the full reasoning engine — your agent can ask questions in natural language and get verified answers.
-        </div>
-        <div class="callout callout-success" style="margin-top:1rem;">
-            <strong>Context optimization built in.</strong> Once connected, use <code>POST /context/optimize</code> with goals to get only the facts your agent needs — 97% fewer tokens billed per request. <a href="/docs/concepts#context-optimization">Learn about context optimization →</a>
-        </div>
-    </div>
-
-    <!-- ============ STEP 4 ============ -->
-    <div class="step-card" id="direct-api">
-        <div style="position:absolute; top:-12px; left:24px; font-size:0.65rem; font-weight:700; font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; padding:4px 14px; border-radius:20px; color:white; background:linear-gradient(135deg,#06b6d4,#8b5cf6);">STEP 4 · DIRECT API</div>
-        <h3>Structured Facts & Queries</h3>
-        <p>
-            Use the structured API directly — no LLM key required. Facts are stored as typed predicates, giving you deterministic pipelines without any LLM in the extraction path. These are the same endpoints the MCP tools call internally.
-        </p>
-
-        <p><strong>Store a structured fact:</strong></p>
-        <pre data-lang="bash"><code><span class="syn-var">$</span> curl <span class="syn-flag">-X</span> <span class="syn-http">POST</span> http://localhost:9300/tell \
-    <span class="syn-flag">-H</span> <span class="syn-string">"Content-Type: application/json"</span> \
-    <span class="syn-flag">-d</span> <span class="syn-string">'&#123;"predicate": "customer_tier", "args": ["acme_corp", "enterprise"]&#125;'</span>
-
-<span class="syn-ok">&#123; "status": "ok", "atom": "customer_tier(acme_corp, enterprise)" &#125;</span></code></pre>
-
-        <p><strong>Query with a variable (the <code>?</code> prefix marks unknowns):</strong></p>
-        <pre data-lang="bash"><code><span class="syn-var">$</span> curl <span class="syn-flag">-X</span> <span class="syn-http">POST</span> http://localhost:9300/ask \
-    <span class="syn-flag">-H</span> <span class="syn-string">"Content-Type: application/json"</span> \
-    <span class="syn-flag">-d</span> <span class="syn-string">'&#123;"predicate": "customer_tier", "args": ["acme_corp", "?tier"]&#125;'</span>
-
-<span class="syn-ok">&#123; "results": ["customer_tier(acme_corp, enterprise)"] &#125;</span></code></pre>
-
-        <div class="callout callout-tip">
-            <strong>Going deeper?</strong> Teach rules and watch the inference engine derive new facts automatically. See <a href={`${base}/docs/concepts`}>Core Concepts →</a> for the full picture on reasoning, scopes, and truth maintenance.
-        </div>
-    </div>
-
-    <!-- ============ STEP 5 ============ -->
-    <div class="step-card" id="connect">
-        <div style="position:absolute; top:-12px; left:24px; font-size:0.65rem; font-weight:700; font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; padding:4px 14px; border-radius:20px; color:white; background:linear-gradient(135deg,#06b6d4,#8b5cf6);">STEP 5 · BUILD AN AGENT</div>
-        <h3>LangChain Agent with Verified Knowledge</h3>
-        <p>Install the Python SDK with LangChain integration:</p>
-        <pre data-lang="bash"><code><span class="syn-var">$</span> pip install nocturnusai[langchain] langchain-anthropic</code></pre>
-
-        <p>A complete working agent in 20 lines:</p>
-        <pre data-lang="python"><code><span class="syn-keyword">from</span> nocturnusai <span class="syn-keyword">import</span> SyncNocturnusAIClient
-<span class="syn-keyword">from</span> nocturnusai.langchain <span class="syn-keyword">import</span> get_nocturnusai_tools
-<span class="syn-keyword">from</span> langchain_anthropic <span class="syn-keyword">import</span> ChatAnthropic
-<span class="syn-keyword">from</span> langchain.agents <span class="syn-keyword">import</span> AgentExecutor, create_tool_calling_agent
-<span class="syn-keyword">from</span> langchain_core.prompts <span class="syn-keyword">import</span> ChatPromptTemplate
-
-<span class="syn-comment"># Connect to Nocturnus — get 4 LangChain tools backed by the reasoning engine</span>
-client = <span class="syn-fn">SyncNocturnusAIClient</span>(<span class="syn-string">"http://localhost:9300"</span>)
-tools = <span class="syn-fn">get_nocturnusai_tools</span>(client)
-<span class="syn-comment"># → assert, query, infer, context</span>
-
-llm = <span class="syn-fn">ChatAnthropic</span>(model=<span class="syn-string">"claude-sonnet-4-6"</span>)
-prompt = ChatPromptTemplate.<span class="syn-fn">from_messages</span>([
-    (<span class="syn-string">"system"</span>, <span class="syn-string">"Use your tools to store and retrieve verified facts. Never guess."</span>),
-    (<span class="syn-string">"human"</span>, <span class="syn-string">"&#123;input&#125;"</span>),
-    (<span class="syn-string">"placeholder"</span>, <span class="syn-string">"&#123;agent_scratchpad&#125;"</span>),
-])
-agent = <span class="syn-fn">create_tool_calling_agent</span>(llm, tools, prompt)
-executor = <span class="syn-fn">AgentExecutor</span>(agent=agent, tools=tools)
-
-result = executor.<span class="syn-fn">invoke</span>(&#123;
-    <span class="syn-string">"input"</span>: <span class="syn-string">"Remember: Acme Corp is on the enterprise plan. Now — what plan are they on?"</span>
-&#125;)
-<span class="syn-fn">print</span>(result[<span class="syn-string">"output"</span>])</code></pre>
-
-        <pre data-lang="output"><code><span class="syn-comment"># Agent gets optimized facts from /context — 200 tokens, not 150K.</span>
-<span class="syn-comment"># Correct. Sourced. 750x cheaper than context stuffing.</span>
-<span class="syn-ok">Acme Corp is on the enterprise plan. (verified from knowledge base)</span></code></pre>
-
-        <div class="callout callout-success">
-            <strong>Your agent now reasons over facts, not token weights.</strong> The knowledge persists across sessions and is immediately shared with any other agent on the same server.
-        </div>
+    <div class="step-card">
+        <h3>What NocturnusAI actually does</h3>
+        <p><code>POST /context</code> takes an array of turns and returns a compact set of structured context entries. When you know the exact question, use <code>POST /context/optimize</code>. When the thread keeps going, use <code>POST /context/diff</code> so you stop re-sending old context every time.</p>
     </div>
 
     <hr />
 
-    <!-- ============ RUN FROM SOURCE ============ -->
-    <h2 id="from-source">Running From Source</h2>
-    <p>Skip Docker if you're contributing to the codebase or prefer to run the JVM directly. Requires JDK 17+.</p>
-    <pre data-lang="bash"><code><span class="syn-var">$</span> git clone https://github.com/Auctalis/nocturnusai.git
-<span class="syn-var">$</span> <span class="syn-keyword">cd</span> nocturnusai
+    <h2 id="real-example">A Real Example</h2>
+    <p>
+        This is the shape of a real production input. It is shortened for readability, but it reflects the actual problem: user chat mixed with tool traces, account metadata, previous promises, and internal notes.
+    </p>
 
-<span class="syn-comment"># Run the HTTP API server on :9300</span>
-<span class="syn-var">$</span> ./gradlew :nocturnusai-server:run
+    <pre data-lang="json"><code>&#123;
+  "turns": [
+    "User: We still cannot log in after yesterday's Okta cutover.",
+    "Agent: Pulling CRM account data and recent incident history.",
+    "Tool crm_lookup: account=acme_corp tier=enterprise renewal=2026-07-01 owner=sarah.ng",
+    "Tool auth_audit: 14 failed SAML assertions since 09:12 UTC; issuer mismatch after IdP migration.",
+    "Internal note: Billing is current. Do not route this to collections.",
+    "Slack escalation: Incident INC-4821 affects enterprise tenants still using legacy issuer URLs.",
+    "Previous ticket: Support promised a service credit if outage duration exceeds 4 hours.",
+    "User: We changed IdP metadata yesterday and lost admin access for three teams.",
+    "Tool statuspage: identity degraded in us-east-1; workaround is manual issuer override.",
+    "Agent: Need a compact handoff context for the next model call."
+  ]
+&#125;</code></pre>
 
-<span class="syn-comment"># Run the interactive REPL (connects to a running server)</span>
-<span class="syn-var">$</span> ./gradlew :nocturnusai-cli:run
+    <p>
+        The useful output is not "the same thread, but shorter." The useful output is the few stateful facts the next model call actually needs:
+    </p>
 
-<span class="syn-comment"># Run all tests</span>
-<span class="syn-var">$</span> ./gradlew test</code></pre>
+    <pre data-lang="json"><code>&#123;
+  "facts": [
+    &#123; "predicate": "customer_tier", "args": ["acme_corp", "enterprise"], "salience": 0.98 &#125;,
+    &#123; "predicate": "billing_status", "args": ["acme_corp", "current"], "salience": 0.82 &#125;,
+    &#123; "predicate": "current_issue", "args": ["acme_corp", "saml_issuer_mismatch"], "salience": 0.97 &#125;,
+    &#123; "predicate": "incident", "args": ["acme_corp", "INC-4821"], "salience": 0.93 &#125;,
+    &#123; "predicate": "workaround", "args": ["INC-4821", "manual_issuer_override"], "salience": 0.88 &#125;,
+    &#123; "predicate": "impact", "args": ["acme_corp", "admin_access_lost_for_three_teams"], "salience": 0.90 &#125;,
+    &#123; "predicate": "service_credit_promised", "args": ["acme_corp", "after_4_hours"], "salience": 0.74 &#125;
+  ],
+  "factsReturned": 7,
+  "contradictions": 0,
+  "newFactsExtracted": 7
+&#125;</code></pre>
 
-    <p>LLM keys work the same way — set them as environment variables before running Gradle, or add them to a <code>.env</code> file loaded by your shell.</p>
+    <div class="callout callout-success">
+        <strong>The point is reduction.</strong> Ten noisy turns become seven high-signal entries. In real threads, the reduction is usually much larger because the repeated greetings, tool chatter, retries, and stale summaries disappear.
+    </div>
 
     <hr />
 
-    <!-- ============ ENV VARS ============ -->
-    <h2 id="env-vars">Environment Variables</h2>
-    <p>Quick reference for all configuration variables. Copy into a <code>.env</code> file or pass directly to Docker Compose / Gradle.</p>
+    <h2 id="start-fast">Start Fast</h2>
+    <p>Start with the simplest path first.</p>
 
+    <pre data-lang="bash"><code>curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
+
+curl -X POST http://localhost:9300/context \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "turns": [
+      "User cannot log in after Okta cutover.",
+      "CRM says enterprise tier and billing current.",
+      "Audit log shows SAML issuer mismatch."
+    ]
+  &#125;'</code></pre>
+
+    <p>If this is your first week with the product, stay here. Do not start by designing predicate schemas or rules unless you actually need backend control.</p>
+
+    <hr />
+
+    <h2 id="production-loop">The Production Loop</h2>
+    <p>Most teams end up with this pattern:</p>
+
+    <ol>
+        <li><strong>First pass:</strong> call <code>POST /context</code> with raw turns.</li>
+        <li><strong>Question-specific pass:</strong> call <code>POST /context/optimize</code> when the next model call has a clear goal such as "what should the support agent say next?" or "is this customer eligible for a credit?"</li>
+        <li><strong>Ongoing thread:</strong> keep a stable <code>sessionId</code> and call <code>POST /context/diff</code> so only the changed context is sent on later turns.</li>
+        <li><strong>Thread end:</strong> call <code>POST /context/session/clear</code>.</li>
+    </ol>
+
+    <pre data-lang="bash"><code># Goal-specific window
+curl -X POST http://localhost:9300/context/optimize \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "sessionId": "support-thread-4821",
+    "maxFacts": 12,
+    "goals": [
+      &#123;"predicate":"next_best_action","args":["acme_corp"]&#125;
+    ]
+  &#125;'
+
+# Later turn: only fetch the delta
+curl -X POST http://localhost:9300/context/diff \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "sessionId": "support-thread-4821",
+    "maxFacts": 12
+  &#125;'</code></pre>
+
+    <hr />
+
+    <h2 id="where-to-plug-in">Where To Plug It In</h2>
     <div class="overflow-x-auto">
-        <table>
+        <table class="w-full text-left border-collapse">
             <thead>
-                <tr>
-                    <th>Variable</th>
-                    <th>Default</th>
-                    <th>Purpose</th>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Surface</th>
+                    <th class="py-2">Best For</th>
+                    <th class="py-2">Start Here</th>
                 </tr>
             </thead>
-            <tbody>
-                <tr>
-                    <td><code>PORT</code></td>
-                    <td><code>9300</code></td>
-                    <td>Server port</td>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2">HTTP API</td>
+                    <td class="py-2">Direct control over turn reduction and session diffs</td>
+                    <td class="py-2"><a href={`${base}/docs/api#context-management`}>Context endpoints</a></td>
                 </tr>
-                <tr>
-                    <td><code>HOST</code></td>
-                    <td><code>0.0.0.0</code></td>
-                    <td>Bind address</td>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Python SDK</td>
+                    <td class="py-2">Application code, orchestrators, agent runtimes</td>
+                    <td class="py-2"><a href={`${base}/docs/sdks`}>SDK docs</a></td>
                 </tr>
-                <tr>
-                    <td><code>API_KEY</code></td>
-                    <td><em>none</em></td>
-                    <td>Legacy single-key auth. Set this <em>or</em> use <code>AUTH_ENABLED=true</code> for full RBAC.</td>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">TypeScript SDK</td>
+                    <td class="py-2">Node/browser apps that need direct SDK methods for windows, optimization, diffs, and session cleanup</td>
+                    <td class="py-2"><a href={`${base}/docs/sdks#typescript`}>TypeScript SDK</a></td>
                 </tr>
-                <tr>
-                    <td><code>CORS_ALLOWED_ORIGINS</code></td>
-                    <td><em>localhost:3000, 5173, 8080</em></td>
-                    <td>Comma-separated allowed origins. Set to <code>*</code> only for fully public read-only APIs.</td>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">MCP</td>
+                    <td class="py-2">Cursor, Claude Desktop, Windsurf, tool-calling agents</td>
+                    <td class="py-2"><a href={`${base}/docs/mcp`}>MCP workflow</a></td>
                 </tr>
-                <tr>
-                    <td><code>MAX_REQUEST_BODY_BYTES</code></td>
-                    <td><code>10485760</code> (10 MB)</td>
-                    <td>Maximum allowed request body size. Requests exceeding this return 413.</td>
-                </tr>
-                <tr>
-                    <td><code>STORAGE_DIR</code></td>
-                    <td><code>./data</code></td>
-                    <td>WAL and snapshot directory</td>
-                </tr>
-                <tr>
-                    <td><code>ANTHROPIC_API_KEY</code></td>
-                    <td><em>none</em></td>
-                    <td>Enables <code>/extract</code> and <code>/synthesize</code> using Claude</td>
-                </tr>
-                <tr>
-                    <td><code>OPENAI_API_KEY</code></td>
-                    <td><em>none</em></td>
-                    <td>Enables LLM features using GPT-4o</td>
-                </tr>
-                <tr>
-                    <td><code>GOOGLE_API_KEY</code></td>
-                    <td><em>none</em></td>
-                    <td>Enables LLM features using Gemini</td>
-                </tr>
-                <tr>
-                    <td><code>OLLAMA_BASE_URL</code></td>
-                    <td><em>none</em></td>
-                    <td>Enables LLM features using a local Ollama instance</td>
-                </tr>
-                <tr>
-                    <td><code>EXTRACTION_ENABLED</code></td>
-                    <td><code>false</code> (<code>true</code> in Docker)</td>
-                    <td>Toggle <code>/extract</code> and <code>/synthesize</code> endpoints. The official Docker image sets this to <code>true</code> automatically.</td>
-                </tr>
-                <tr>
-                    <td><code>LLM_MODEL</code></td>
-                    <td><em>provider default</em></td>
-                    <td>Override the LLM model (e.g. <code>claude-sonnet-4-6</code>)</td>
-                </tr>
-                <tr>
-                    <td><code>LLM_TEMPERATURE</code></td>
-                    <td><code>0.1</code></td>
-                    <td>Lower = more deterministic fact extraction</td>
-                </tr>
-                <tr>
-                    <td><code>AUTH_ENABLED</code></td>
-                    <td><code>false</code></td>
-                    <td>Enable role-based auth. When true, requires admin bootstrap on first run.</td>
-                </tr>
-                <tr>
-                    <td><code>NOCTURNUSAI_ADMIN_USER</code></td>
-                    <td><code>admin</code></td>
-                    <td>Bootstrap admin username — change before exposing to any network</td>
-                </tr>
-                <tr>
-                    <td><code>NOCTURNUSAI_ADMIN_PASS</code></td>
-                    <td><code>nocturnusai</code></td>
-                    <td>Bootstrap admin password — change before exposing to any network</td>
-                </tr>
-                <tr>
-                    <td><code>API_KEY_DEFAULT_EXPIRY_DAYS</code></td>
-                    <td><em>none</em> (no expiry)</td>
-                    <td>Default expiry for new API keys in days. Recommended: <code>365</code> for production.</td>
-                </tr>
-                <tr>
-                    <td><code>ENCRYPTION_KEY</code></td>
-                    <td><em>none</em></td>
-                    <td>64 hex-char AES-256 key for at-rest encryption. Generate with <code>openssl rand -hex 32</code></td>
-                </tr>
-                <tr>
-                    <td><code>TLS_ENABLED</code></td>
-                    <td><code>false</code></td>
-                    <td>Enable HTTPS on <code>TLS_PORT</code></td>
-                </tr>
-                <tr>
-                    <td><code>TLS_PORT</code></td>
-                    <td><code>9443</code></td>
-                    <td>HTTPS port when TLS is enabled</td>
-                </tr>
-                <tr>
-                    <td><code>TLS_KEYSTORE_PATH</code></td>
-                    <td><em>none</em></td>
-                    <td>Path to JKS or PKCS12 keystore file</td>
-                </tr>
-                <tr>
-                    <td><code>TLS_KEYSTORE_PASSWORD</code></td>
-                    <td><em>none</em></td>
-                    <td>Keystore password</td>
-                </tr>
-                <tr>
-                    <td><code>REPLICATION_MODE</code></td>
-                    <td><code>LEADER</code></td>
-                    <td><code>LEADER</code> or <code>FOLLOWER</code></td>
-                </tr>
-                <tr>
-                    <td><code>LEADER_URL</code></td>
-                    <td><em>none</em></td>
-                    <td>Leader URL when running as a follower</td>
+                <tr class="border-b border-white/5">
+                    <td class="py-2">Framework integrations</td>
+                    <td class="py-2">LangChain, CrewAI, AutoGen, OpenAI Agents, Anthropic</td>
+                    <td class="py-2"><a href={`${base}/docs/integrations`}>Integrations</a></td>
                 </tr>
             </tbody>
         </table>
@@ -502,54 +161,18 @@ result = executor.<span class="syn-fn">invoke</span>(&#123;
 
     <hr />
 
-    <!-- ============ TROUBLESHOOTING ============ -->
-    <h2 id="troubleshooting">Troubleshooting</h2>
-
-    <h3>Port 9300 is already in use</h3>
-    <p>Another process is bound to that port. Either stop it, or start Nocturnus on a different port:</p>
-    <pre data-lang="bash"><code><span class="syn-var">$</span> <span class="syn-type">PORT</span>=9301 docker compose up -d
-<span class="syn-var">$</span> curl http://localhost:9301/health</code></pre>
-
-    <h3><code>docker-compose</code> command not found</h3>
-    <p>You're running Compose V1. The docs use Compose V2 syntax (<code>docker compose</code> with a space). Update Docker Desktop to 24+ or install the <a href="https://docs.docker.com/compose/install/" target="_blank">Compose plugin</a>.</p>
-
-    <h3><code>/extract</code> returns <code>"LLM provider not configured"</code></h3>
-    <p>The server started without an LLM API key. Stop the container, then restart with the key:</p>
-    <pre data-lang="bash"><code><span class="syn-var">$</span> docker compose down
-<span class="syn-var">$</span> <span class="syn-type">ANTHROPIC_API_KEY</span>=sk-ant-... docker compose up -d</code></pre>
-
-    <h3><code>/ask</code> returns empty results</h3>
-    <p>Two common causes:</p>
-    <ul>
-        <li>The fact hasn't been stored yet — call <code>/tell</code> first, then <code>/ask</code></li>
-        <li>Predicate names are <strong>case-sensitive</strong> — <code>customer_tier</code> and <code>Customer_Tier</code> are different predicates</li>
-    </ul>
-    <p>Check what's actually stored:</p>
-    <pre data-lang="bash"><code><span class="syn-var">$</span> curl http://localhost:9300/predicates</code></pre>
-
-    <h3>Facts are gone after restart</h3>
-    <p>The <code>./data</code> directory holds all WAL logs and snapshots. If it was deleted, facts won't survive a restart. Make sure Docker Compose mounts it as a volume — the default <code>docker-compose.yml</code> already does this. If you're running from source, ensure <code>STORAGE_DIR</code> points to a persistent path.</p>
-
-    <hr />
+    <h2 id="backend-note">About Predicates, Rules, and Backend Mechanics</h2>
+    <p>
+        Those pieces are real, and they matter, but they are not the first thing most teams need. If your immediate problem is "my model keeps seeing too many turns," you can treat them as backend implementation details at first.
+    </p>
+    <p>
+        When you need to understand the machinery underneath the reduction pipeline, start with <a href={`${base}/docs/concepts`}>How It Works on the Backend</a>. That is where the lower-level concepts live.
+    </p>
 
     <NextSteps links={[
-        { title: "Integrations", description: "Connect to LangChain, CrewAI, AutoGen, and more", href: `${base}/docs/integrations` },
-        { title: "Core Concepts", description: "Facts, rules, inference, scopes, and salience scoring", href: `${base}/docs/concepts` },
-        { title: "API Reference", description: "Every endpoint with full request/response shapes", href: `${base}/docs/api` },
-        { title: "FAQ", description: "Common questions about NocturnusAI", href: `${base}/docs/faq` },
+        { title: "Real Workflow", description: "See the full turn-reduction flow with optimize and diff", href: `${base}/docs/context` },
+        { title: "API Reference", description: "Every context endpoint and request shape", href: `${base}/docs/api#context-management` },
+        { title: "SDKs", description: "Call the same workflow from Python or TypeScript", href: `${base}/docs/sdks` },
+        { title: "How It Works", description: "Backend mechanics, predicates, rules, and memory internals", href: `${base}/docs/concepts` },
     ]} />
-
-    <script>
-        document.querySelectorAll('.ai-copy-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const text = (btn as HTMLElement).dataset.copy || '';
-                try {
-                    await navigator.clipboard.writeText(text);
-                    const orig = btn.textContent;
-                    btn.textContent = 'copied!';
-                    setTimeout(() => { btn.textContent = orig; }, 1500);
-                } catch { /* clipboard not available */ }
-            });
-        });
-    </script>
 </DocsLayout>

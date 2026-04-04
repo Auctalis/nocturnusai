@@ -11,26 +11,25 @@ const { title } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const navItems = [
-    { title: "Getting Started", links: [
-        { text: "Quickstart", href: `${base}/docs` },
-        { text: "Context Optimization", href: `${base}/docs/context` },
+    { title: "Start Here", links: [
+        { text: "Cut Down Turns", href: `${base}/docs` },
+        { text: "Real Workflow", href: `${base}/docs/context` },
         { text: "Integrations", href: `${base}/docs/integrations` },
         { text: "FAQ", href: `${base}/docs/faq` },
     ]},
-    { title: "SDKs & Protocols", links: [
+    { title: "Use It From", links: [
+        { text: "API Reference", href: `${base}/docs/api` },
         { text: "Python SDK", href: `${base}/docs/sdks` },
         { text: "TypeScript SDK", href: `${base}/docs/sdks#typescript` },
         { text: "MCP Integration", href: `${base}/docs/mcp` },
+        { text: "OpenClaw Context", href: `${base}/docs/openclaw` },
         { text: "CLI Reference", href: `${base}/docs/cli` },
     ]},
-    { title: "Reference", links: [
-        { text: "API Reference", href: `${base}/docs/api` },
-        { text: "Core Concepts", href: `${base}/docs/concepts` },
+    { title: "Backend", links: [
+        { text: "How It Works", href: `${base}/docs/concepts` },
         { text: "LLM Integration", href: `${base}/docs/llm` },
-    ]},
-    { title: "Operations", links: [
-        { text: "Security & Auth", href: `${base}/docs/security` },
         { text: "Multi-Tenancy", href: `${base}/docs/multi-tenancy` },
+        { text: "Security & Auth", href: `${base}/docs/security` },
         { text: "Operations", href: `${base}/docs/operations` },
     ]},
 ];
@@ -72,6 +71,16 @@ const navItems = [
                         </div>
                     ))}
                 </nav>
+                <div class="mt-8 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+                    <h4 class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-emerald-300">Turn Reduction Loop</h4>
+                    <ol class="mt-2 space-y-1 text-[0.76rem] leading-5 text-slate-300">
+                        <li>1. Send raw turns to <a href={`${base}/docs/context`} class="text-cyan-400 hover:text-cyan-300"><code>POST /context</code></a>.</li>
+                        <li>2. Narrow by the next question with <a href={`${base}/docs/api#context-optimize`} class="text-cyan-400 hover:text-cyan-300"><code>POST /context/optimize</code></a>.</li>
+                        <li>3. Reuse <code>sessionId</code> + <a href={`${base}/docs/api#context-diff`} class="text-cyan-400 hover:text-cyan-300"><code>POST /context/diff</code></a>.</li>
+                        <li>4. Keep old state from piling up with <a href={`${base}/docs/api#memory`} class="text-cyan-400 hover:text-cyan-300"><code>/memory/consolidate</code> + <code>/memory/decay</code></a>.</li>
+                        <li>5. Clear thread state with <a href={`${base}/docs/api#context-session-clear`} class="text-cyan-400 hover:text-cyan-300"><code>POST /context/session/clear</code></a>.</li>
+                    </ol>
+                </div>
             </aside>
 
             <!-- Main Content -->

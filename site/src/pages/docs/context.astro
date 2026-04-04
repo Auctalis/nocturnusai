@@ -4,303 +4,200 @@ import NextSteps from '../../components/NextSteps.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<DocsLayout title="Context Optimization">
-    <h1>Context Optimization</h1>
+<DocsLayout title="Real Workflow">
+    <h1>The Real Context Workflow</h1>
     <p class="lead">
-        Pass in your conversation turns. Get back relevant facts. That's it.
+        Think in terms of turn reduction, not knowledge modeling. Your input is a big array of turns. Your output is a smaller context window for the next model call.
     </p>
 
     <div class="callout callout-success">
-        <strong>The simplest API in the product.</strong> <code>POST /context</code> takes an array of strings (your conversation turns) and returns the facts your agent needs. No query language, no predicates to learn, no configuration required. NocturnusAI extracts, stores, and optimizes automatically — cutting your token bill by 97%.
+        <strong>Do not optimize the wrong thing.</strong> Most teams lose time trying to make the raw transcript "better." The practical problem is simpler: too many turns go into the prompt, so the model pays attention to noise and you pay for the noise too.
     </div>
 
     <hr />
 
-    <h2 id="the-api">The API</h2>
+    <h2 id="problem-shape">What The Problem Actually Looks Like</h2>
+    <p>
+        In production, a thread is rarely just user and assistant messages. It also includes tool results, CRM data, system events, previous summaries, internal guidance, and repeated restatements of the same issue.
+    </p>
 
-    <h3>Request</h3>
-    <pre><code class="language-bash">curl -X POST http://localhost:9300/context \
+    <pre data-lang="json"><code>&#123;
+  "turns": [
+    "User: We still cannot log in after yesterday's Okta cutover.",
+    "Agent: Pulling account metadata and auth logs.",
+    "Tool crm_lookup: account=acme_corp tier=enterprise billing=current renewal=2026-07-01",
+    "Tool auth_audit: 14 failed SAML assertions since 09:12 UTC; issuer mismatch detected.",
+    "Internal note: Customer is not delinquent. Keep ticket in support queue.",
+    "Previous ticket: promised service credit if outage exceeds 4 hours.",
+    "Slack escalation: INC-4821 open; workaround is manual issuer override.",
+    "User: Three teams lost admin access after yesterday's metadata change.",
+    "Tool statuspage: degraded identity service in us-east-1.",
+    "Agent: Need a concise handoff context before the next model call."
+  ]
+&#125;</code></pre>
+
+    <p>
+        That array is still far smaller than what many teams send in reality. The important point is that it already contains overlap, stale details, and the same issue stated in different ways.
+    </p>
+
+    <hr />
+
+    <h2 id="first-pass">Step 1: First Reduction With <code>POST /context</code></h2>
+    <p>
+        Use <code>POST /context</code> when you want the first compact pass. Send raw turns. Get back the normalized state that seems most important.
+    </p>
+
+    <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context \
   -H "Content-Type: application/json" \
   -H "X-Tenant-ID: default" \
   -d '&#123;
     "turns": [
-      "Acme Corp is on the enterprise plan and based in Austin.",
-      "They have a $2M contract with 24/7 SLA support.",
-      "Their contract includes an arbitration clause."
+      "User: We still cannot log in after yesterday's Okta cutover.",
+      "Tool crm_lookup: account=acme_corp tier=enterprise billing=current",
+      "Tool auth_audit: issuer mismatch detected after IdP migration.",
+      "Slack escalation: workaround is manual issuer override."
+    ],
+    "maxFacts": 12
+  &#125;'</code></pre>
+
+    <pre data-lang="json"><code>&#123;
+  "facts": [
+    &#123; "predicate": "customer_tier", "args": ["acme_corp", "enterprise"], "salience": 0.98 &#125;,
+    &#123; "predicate": "billing_status", "args": ["acme_corp", "current"], "salience": 0.80 &#125;,
+    &#123; "predicate": "current_issue", "args": ["acme_corp", "saml_issuer_mismatch"], "salience": 0.97 &#125;,
+    &#123; "predicate": "workaround", "args": ["acme_corp", "manual_issuer_override"], "salience": 0.88 &#125;
+  ],
+  "factsReturned": 4,
+  "contradictions": 0,
+  "newFactsExtracted": 4
+&#125;</code></pre>
+
+    <div class="callout callout-info">
+        <strong>Important:</strong> you do not need to invent predicate names up front to use this flow. The product can extract and normalize structure from turns. The predicate-style output is the backend representation of the reduced window.
+    </div>
+
+    <hr />
+
+    <h2 id="goal-pass">Step 2: Ask The Next Question With <code>POST /context/optimize</code></h2>
+    <p>
+        The first pass is broad. The next pass should be question-specific. Once you know what the next model call is trying to do, use <code>/context/optimize</code> to narrow the window further.
+    </p>
+
+    <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context/optimize \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "sessionId": "support-thread-4821",
+    "maxFacts": 10,
+    "goals": [
+      &#123;"predicate":"next_best_action","args":["acme_corp"]&#125;,
+      &#123;"predicate":"service_credit_applicable","args":["acme_corp"]&#125;
     ]
   &#125;'</code></pre>
 
-    <p>That's the entire request. An array of strings — one per conversation turn, document chunk, or piece of context.</p>
-
-    <h3>Response</h3>
-    <pre><code class="language-json">&#123;
-  "facts": [
-    &#123;
-      "predicate": "customer_tier",
-      "args": ["acme_corp", "enterprise"],
-      "salience": 0.95,
-      "provenance": null
-    &#125;,
-    &#123;
-      "predicate": "location",
-      "args": ["acme_corp", "austin"],
-      "salience": 0.88,
-      "provenance": null
-    &#125;,
-    &#123;
-      "predicate": "contract_value",
-      "args": ["acme_corp", "2000000"],
-      "salience": 0.92,
-      "provenance": null
-    &#125;,
-    &#123;
-      "predicate": "sla_tier",
-      "args": ["acme_corp", "24_7"],
-      "salience": 0.90,
-      "provenance": null
-    &#125;,
-    &#123;
-      "predicate": "has_clause",
-      "args": ["acme_corp", "arbitration"],
-      "salience": 0.85,
-      "provenance": null
-    &#125;
-  ],
-  "totalFactsInKB": 127,
-  "factsReturned": 5,
-  "contradictions": 0,
-  "newFactsExtracted": 5
-&#125;</code></pre>
-
-    <p>Clean, flat, simple. Each fact has a predicate, args, and a salience score. Feed these directly into your LLM's system prompt.</p>
-
-    <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-emerald-500 text-slate-300">
-        <strong>The math:</strong> Without NocturnusAI, those 3 turns become part of a 150K-token system prompt ($2.25 at OpenAI's $15/M rate). With NocturnusAI, the 5 returned facts are ~200 tokens ($0.003). Same information, 97% cheaper.
-    </div>
+    <p>
+        This is where the context window becomes operational instead of merely descriptive. The model stops seeing the whole incident and starts seeing the subset needed to answer the next action question.
+    </p>
 
     <hr />
 
-    <h2 id="with-openai">With OpenAI (GPT-4o)</h2>
-    <p>The full pattern: feed your conversation turns to NocturnusAI, get back facts, pass only those facts to GPT-4o.</p>
+    <h2 id="diffs">Step 3: Stop Re-Sending The Same Context With <code>POST /context/diff</code></h2>
+    <p>
+        This is the step most teams miss. If the conversation continues, do not send the whole optimized window again. Keep the same <code>sessionId</code> and ask for the delta.
+    </p>
 
-    <pre><code class="language-python">import openai
-import requests
+    <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context/diff \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "sessionId": "support-thread-4821",
+    "maxFacts": 10
+  &#125;'</code></pre>
 
-nocturnus = "http://localhost:9300"
-oai = openai.OpenAI()
+    <pre data-lang="json"><code>&#123;
+  "previousWindowId": "ctx-01",
+  "currentWindowId": "ctx-02",
+  "added": [
+    &#123; "predicate": "temporary_access_restored", "args": ["acme_corp", "true"], "salience": 0.92 &#125;
+  ],
+  "removed": [],
+  "unchanged": 9,
+  "fullRefreshRecommended": false
+&#125;</code></pre>
 
-# Step 1: Send conversation turns to NocturnusAI
-resp = requests.post(f"&#123;nocturnus&#125;/context", json=&#123;
-    "turns": [
-        "Acme Corp is on the enterprise plan.",
-        "They have 24/7 SLA support.",
-        "Is Acme eligible for premium support?"
-    ]
-&#125;, headers=&#123;"X-Tenant-ID": "default"&#125;)
+    <p>
+        That is the production benefit: later model calls pay for the change, not for the entire thread history again.
+    </p>
 
-facts = resp.json()["facts"]
+    <hr />
 
-# Step 2: Build a minimal prompt from the facts
-fact_lines = "\n".join(
-    f"- &#123;f['predicate']&#125;(&#123;', '.join(f['args'])&#125;)"
-    for f in facts
-)
+    <h2 id="cleanup">Step 4: End The Thread Cleanly</h2>
+    <p>When the thread is finished, clear the diff snapshot:</p>
 
-# Step 3: Call GPT-4o with just the relevant facts
-response = oai.chat.completions.create(
+    <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context/session/clear \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"sessionId":"support-thread-4821"&#125;'</code></pre>
+
+    <hr />
+
+    <h2 id="prompting">Formatting For The Model</h2>
+    <p>
+        Most teams take the returned entries and flatten them into a short system or tool message. The model does not need the original transcript if the compact context already captures the operational state.
+    </p>
+
+    <pre data-lang="python"><code>import requests
+from openai import OpenAI
+
+client = OpenAI()
+
+ctx = requests.post(
+    "http://localhost:9300/context/optimize",
+    headers=&#123;"X-Tenant-ID": "default"&#125;,
+    json=&#123;
+        "sessionId": "support-thread-4821",
+        "maxFacts": 10,
+        "goals": [&#123;"predicate": "next_best_action", "args": ["acme_corp"]&#125;],
+    &#125;,
+).json()
+
+context_lines = [
+    f"- &#123;entry['predicate']&#125;(&#123;', '.join(entry['args'])&#125;)"
+    for entry in ctx["entries"]
+]
+
+response = client.chat.completions.create(
     model="gpt-4o",
     messages=[
-        &#123;"role": "system", "content": f"Answer based on these verified facts:\n&#123;fact_lines&#125;"&#125;,
-        &#123;"role": "user", "content": "Is Acme eligible for premium support?"&#125;
-    ]
-)
-
-print(response.choices[0].message.content)
-# Correct answer. ~500 tokens billed instead of 150K.</code></pre>
+        &#123;"role": "system", "content": "Use only this reduced context:\n" + "\n".join(context_lines)&#125;,
+        &#123;"role": "user", "content": "Write the next support reply."&#125;,
+    ],
+)</code></pre>
 
     <hr />
 
-    <h2 id="with-claude">With Claude (Anthropic)</h2>
-
-    <pre><code class="language-python">import anthropic
-import requests
-
-nocturnus = "http://localhost:9300"
-claude = anthropic.Anthropic()
-
-# Get optimized facts
-resp = requests.post(f"&#123;nocturnus&#125;/context", json=&#123;
-    "turns": [
-        "Acme Corp is on the enterprise plan.",
-        "They have 24/7 SLA support."
-    ]
-&#125;, headers=&#123;"X-Tenant-ID": "default"&#125;)
-
-facts = resp.json()["facts"]
-fact_lines = "\n".join(f"- &#123;f['predicate']&#125;(&#123;', '.join(f['args'])&#125;)" for f in facts)
-
-response = claude.messages.create(
-    model="claude-sonnet-4-20250514",
-    max_tokens=1024,
-    system=f"Answer based on these verified facts:\n&#123;fact_lines&#125;",
-    messages=[&#123;"role": "user", "content": "What plan is Acme on?"&#125;]
-)
-
-print(response.content[0].text)
-# $0.003 instead of $2.25.</code></pre>
-
-    <hr />
-
-    <h2 id="python-sdk">With the Python SDK</h2>
-
-    <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
-
-client = SyncNocturnusAIClient("http://localhost:9300")
-
-# One call: turns in, facts out
-result = client.post("/context", json=&#123;
-    "turns": [
-        "Acme Corp is on the enterprise plan.",
-        "They have 24/7 SLA support.",
-        "Their contract includes an arbitration clause."
-    ]
-&#125;)
-
-for fact in result["facts"]:
-    print(f"&#123;fact['predicate']&#125;(&#123;', '.join(fact['args'])&#125;) — salience: &#123;fact['salience']&#125;")</code></pre>
-
-    <hr />
-
-    <h2 id="langchain">With LangChain</h2>
-
-    <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
-from nocturnusai.langchain import get_nocturnusai_tools
-from langchain_anthropic import ChatAnthropic
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate
-
-client = SyncNocturnusAIClient("http://localhost:9300")
-tools = get_nocturnusai_tools(client)
-
-llm = ChatAnthropic(model="claude-sonnet-4-20250514")
-prompt = ChatPromptTemplate.from_messages([
-    ("system", "You have access to a verified knowledge base. "
-               "Use the context tool to get relevant facts before answering."),
-    ("human", "&#123;input&#125;"),
-    ("placeholder", "&#123;agent_scratchpad&#125;"),
-])
-
-agent = create_tool_calling_agent(llm, tools, prompt)
-executor = AgentExecutor(agent=agent, tools=tools)
-
-result = executor.invoke(&#123;
-    "input": "Is Acme Corp eligible for premium SLA?"
-&#125;)</code></pre>
-
-    <hr />
-
-    <h2 id="mcp">With MCP (Cursor, Claude Desktop)</h2>
-
-    <pre><code class="language-json">// .cursor/mcp.json — that's the entire setup
-&#123;
-  "mcpServers": &#123;
-    "nocturnus": &#123;
-      "url": "http://localhost:9300/mcp/sse"
-    &#125;
-  &#125;
-&#125;</code></pre>
-
-    <p>Then tell your agent: <em>"Use the context tool to find relevant facts about Acme Corp, then answer my question."</em></p>
-
-    <hr />
-
-    <h2 id="optional">Optional Parameters</h2>
-    <p>The <code>/context</code> endpoint accepts two optional fields for tuning:</p>
-    <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-            <thead>
-                <tr class="border-b border-white/10 text-white">
-                    <th class="py-2">Field</th>
-                    <th class="py-2">Type</th>
-                    <th class="py-2">Default</th>
-                    <th class="py-2">Description</th>
-                </tr>
-            </thead>
-            <tbody class="text-slate-400">
-                <tr class="border-b border-white/5">
-                    <td class="py-2 font-mono text-cyan-400">turns</td>
-                    <td class="py-2">string[]</td>
-                    <td class="py-2">(required)</td>
-                    <td class="py-2">Array of conversation turns, document chunks, or context strings</td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2 font-mono text-cyan-400">maxFacts</td>
-                    <td class="py-2">int?</td>
-                    <td class="py-2">50</td>
-                    <td class="py-2">Maximum facts to return</td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2 font-mono text-cyan-400">scope</td>
-                    <td class="py-2">string?</td>
-                    <td class="py-2">null</td>
-                    <td class="py-2">Isolate facts to a scope (e.g., a session or document ID)</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <hr />
-
-    <h2 id="advanced">Need More Control?</h2>
-    <p>The <code>/context</code> endpoint covers 90% of use cases. For advanced scenarios, NocturnusAI also offers:</p>
+    <h2 id="where-surfaces-fit">Where The Other Surfaces Fit</h2>
     <ul>
-        <li><strong><a href={`${base}/docs/api#context-optimize`}>/context/optimize</a></strong> — goal-driven backward chaining, relevance buckets, diversity caps, contradiction control</li>
-        <li><strong><a href={`${base}/docs/api#context-diff`}>/context/diff</a></strong> — incremental diffs for multi-turn conversations (only send what changed)</li>
-        <li><strong><a href={`${base}/docs/api#context-ingest`}>/context/ingest</a></strong> — extract + optimize in one call with LLM context hints</li>
-        <li><strong><a href={`${base}/docs/api#context-summary`}>/context/summary</a></strong> — knowledge base overview for dashboards</li>
+        <li><strong>API:</strong> best when your app already owns the turn array and prompt assembly.</li>
+        <li><strong>Python SDK:</strong> best when you want <code>optimize_context()</code>, <code>diff_context()</code>, and session cleanup in app code.</li>
+        <li><strong>TypeScript SDK:</strong> best when you want <code>contextWindow()</code>, <code>optimizeContext()</code>, <code>diffContext()</code>, and <code>clearContextSession()</code> directly in app code.</li>
+        <li><strong>MCP:</strong> best when your agent runtime already uses tool calling. Use MCP <code>context</code> for salience retrieval and pair it with the HTTP context endpoints when you need goal-specific windows.</li>
     </ul>
-    <p>See the <a href={`${base}/docs/api#context-management`}>full API reference</a> for details.</p>
 
     <hr />
 
-    <h2 id="cost">The Cost Math</h2>
-    <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-            <thead>
-                <tr class="border-b border-white/10 text-white">
-                    <th class="py-2"></th>
-                    <th class="py-2">Without NocturnusAI</th>
-                    <th class="py-2">With NocturnusAI</th>
-                </tr>
-            </thead>
-            <tbody class="text-slate-400">
-                <tr class="border-b border-white/5">
-                    <td class="py-2 font-bold text-white">Tokens per request</td>
-                    <td class="py-2 text-red-400">~150,000</td>
-                    <td class="py-2 text-emerald-400">~500</td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2 font-bold text-white">Cost per request (GPT-4o)</td>
-                    <td class="py-2 text-red-400">$2.25</td>
-                    <td class="py-2 text-emerald-400">$0.0075</td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2 font-bold text-white">1,000 req/hr × 24/7 × 30 days</td>
-                    <td class="py-2 text-red-400">$54,000/month</td>
-                    <td class="py-2 text-emerald-400">$180/month</td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2 font-bold text-white">Accuracy</td>
-                    <td class="py-2 text-red-400">LLM guessing from noise</td>
-                    <td class="py-2 text-emerald-400">Verified facts with provenance</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+    <h2 id="backend-note">If You Want The Backend Details</h2>
+    <p>
+        Predicates, rules, scopes, salience scoring, truth maintenance, and memory lifecycle still exist. They just belong in the backend explanation, not at the front of the product story.
+    </p>
+    <p>
+        If that is what you need next, go to <a href={`${base}/docs/concepts`}>How It Works on the Backend</a>.
+    </p>
 
     <NextSteps links={[
-        { title: "Quickstart", description: "Install NocturnusAI and load your first facts", href: `${base}/docs` },
-        { title: "API Reference", description: "Full Context Management endpoint docs", href: `${base}/docs/api#context-management` },
-        { title: "Integrations", description: "LangChain, CrewAI, AutoGen, and more", href: `${base}/docs/integrations` },
+        { title: "API Reference", description: "Every context endpoint and request shape", href: `${base}/docs/api#context-management` },
+        { title: "SDKs", description: "Call the same workflow from Python or TypeScript", href: `${base}/docs/sdks` },
+        { title: "MCP", description: "Use the context tool from Cursor, Claude Desktop, or any MCP client", href: `${base}/docs/mcp` },
+        { title: "How It Works", description: "Backend mechanics, memory lifecycle, predicates, and rules", href: `${base}/docs/concepts` },
     ]} />
 </DocsLayout>

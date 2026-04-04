@@ -4,224 +4,153 @@ import NextSteps from '../../components/NextSteps.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<DocsLayout title="Core Concepts">
-    <h1>Core Concepts</h1>
+<DocsLayout title="How It Works">
+    <h1>How It Works on the Backend</h1>
     <p class="lead text-xl text-slate-400">
-        How Nocturnus.AI represents knowledge, reasons about it, and optimizes context to cut your token costs by 97%.
+        This page is the machinery behind the turn-reduction workflow. If your immediate problem is "my prompt is too big," read <a href={`${base}/docs/context`}>Real Workflow</a> first and come back here later.
+    </p>
+
+    <div class="callout callout-info">
+        <strong>Why this page exists.</strong> The product leads with context reduction. Underneath that, there is a structured backend: extraction, ranking, contradiction handling, inference, memory lifecycle, scopes, and persistence. This page explains that layer.
+    </div>
+
+    <hr />
+
+    <h2 id="pipeline">Backend Pipeline</h2>
+    <p>The backend path from raw turns to a smaller context window is roughly:</p>
+    <ol>
+        <li><strong>Turns arrive</strong> as raw text, tool output, or already-structured facts.</li>
+        <li><strong>Structure is normalized</strong> so repeated or overlapping statements can be compared.</li>
+        <li><strong>Relevant state is selected</strong> via salience scoring or goal-driven optimization.</li>
+        <li><strong>Contradictions are detected</strong> before the final window is returned.</li>
+        <li><strong>Session snapshots are stored</strong> so later turns can use <code>/context/diff</code> instead of sending everything again.</li>
+    </ol>
+
+    <pre><code class="language-bash"># Broad first pass
+POST /context
+
+# Goal-specific pass
+POST /context/optimize
+
+# Later turns
+POST /context/diff
+
+# End of thread
+POST /context/session/clear</code></pre>
+
+    <hr />
+
+    <h2 id="selection">How The Backend Chooses What Stays</h2>
+    <p>
+        Nocturnus uses two related selection modes:
+    </p>
+    <ul>
+        <li><strong>Salience-ranked selection</strong> for the "what is broadly most important right now?" case.</li>
+        <li><strong>Goal-driven selection</strong> for the "what does the next model call need to answer this specific question?" case.</li>
+    </ul>
+
+    <p>
+        Salience combines recency, frequency, and explicit priority. Goal-driven selection goes further by tracing which stored state is actually relevant to the requested goal.
     </p>
 
     <hr />
 
-    <h2 id="facts">Facts</h2>
-    <p>A <strong>fact</strong> is the fundamental unit of knowledge: a predicate applied to arguments.</p>
-    <pre><code class="language-prolog">parent(alice, bob)          # alice is bob's parent
-likes(bob, pizza)           # bob likes pizza
-NOT allergic(alice, cats)   # alice is not allergic to cats</code></pre>
-    
-    <p>Facts are stored as typed <code>Atom</code> objects in a <strong>Hexastore</strong> — a 6-way indexed data structure that makes any query pattern fast regardless of which arguments you're searching by.</p>
-
-    <h3>Temporal Metadata</h3>
-    <p>Every fact can carry time-related fields:</p>
+    <h2 id="memory">Memory Lifecycle</h2>
+    <p>
+        Long-running systems do not just need retrieval. They need old context to stop accumulating forever.
+    </p>
     <ul>
-        <li><code>validFrom</code> — epoch ms when this fact becomes valid</li>
-        <li><code>validUntil</code> — epoch ms when this fact expires</li>
-        <li><code>ttl</code> — auto-expire after this many milliseconds</li>
-        <li><code>createdAt</code> — when the fact was stored (set automatically)</li>
-    </ul>
-    <p>These enable <strong>temporal queries</strong> — ask "what was true at 3pm yesterday?" via <code>POST /memory/query/temporal</code>.</p>
-
-    <h3>Negation</h3>
-    <p>Set <code>truthVal: false</code> (or <code>negated: true</code> via MCP) to store explicit negation. This is different from absence — "we don't know if X" vs. "we know X is false."</p>
-
-    <hr />
-
-    <h2 id="rules">Rules</h2>
-    <p>A <strong>rule</strong> is a Horn clause: a head (conclusion) that is derived when all body conditions are satisfied.</p>
-    <pre><code class="language-prolog">grandparent(?x, ?z) :- parent(?x, ?y), parent(?y, ?z)</code></pre>
-    <p>Variables use the <code>?</code> prefix: <code>?x</code>, <code>?who</code>, <code>?name</code>. When Nocturnus evaluates a rule, it finds all variable bindings that satisfy every body atom, then derives the head with those bindings.</p>
-
-    <h3>Multi-Body Rules</h3>
-    <p>Rules can have multiple conditions:</p>
-    <pre><code class="language-prolog">eligible_discount(?customer) :-
-    subscription_tier(?customer, enterprise),
-    location(?customer, ?city),
-    partner_city(?city)</code></pre>
-    <p>All three conditions must be satisfied for the discount to apply.</p>
-
-    <hr />
-
-    <h2 id="inference">Inference</h2>
-    <p>Nocturnus.AI has two inference engines:</p>
-    
-    <h3>Backward Chaining (Primary)</h3>
-    <p>Prolog-style <strong>SLD resolution</strong>. Given a goal like <code>grandparent(?who, charlie)</code>, the engine works <em>backward</em>: it finds rules whose heads match the goal, then recursively proves each body atom. This is efficient for answering specific questions.</p>
-    
-    <h3>Forward Chaining (Rete Engine)</h3>
-    <p>When a new fact is asserted, the <strong>Rete engine</strong> automatically fires any matching rules and derives new conclusions. This is useful for reactive patterns — "whenever X happens, derive Y."</p>
-
-    <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-purple-500 text-slate-300">
-        <strong>Key difference from LLMs:</strong> Inference here is <em>deterministic</em>. Given the same facts and rules, you always get the same results. There's no temperature, no randomness, no "maybe." A fact either follows from the rules or it doesn't.
-    </div>
-
-    <hr />
-
-    <h2 id="scopes">Scopes</h2>
-    <p>Facts and rules can be isolated into <strong>scopes</strong> using a string label. A query in a scope sees both scoped facts and unscoped (global) facts. This is different from <a href={`${base}/docs/multi-tenancy`}>multi-tenancy</a> — scopes operate <em>within</em> a tenant for logical isolation.</p>
-    
-    <p>Common use cases:</p>
-    <ul>
-        <li><strong>Per-document knowledge</strong> — scope facts to a specific document ID</li>
-        <li><strong>External system linking</strong> — scope facts to an external record ID</li>
-        <li><strong>Hypothetical reasoning</strong> — test rule outcomes without affecting production data</li>
-        <li><strong>Session isolation</strong> — each user session gets its own scope</li>
-        <li><strong>A/B testing</strong> — different scopes hold different rule sets</li>
+        <li><strong><code>POST /memory/context</code></strong> returns the current salience-ranked working set.</li>
+        <li><strong><code>POST /memory/consolidate</code></strong> compresses repeated episodic patterns into smaller summaries.</li>
+        <li><strong><code>POST /memory/decay</code></strong> removes expired or low-value context.</li>
     </ul>
 
-    <h3>Example: Scope as a Document ID</h3>
-    <p>Store facts about a specific document and query them in isolation:</p>
-    <pre><code class="language-bash"># Store facts scoped to a specific invoice
-curl -X POST http://localhost:9300/tell \
-  -H "Content-Type: application/json" \
-  -d '&#123;
-    "predicate": "line_item",
-    "args": ["widget_a", "500"],
-    "scope": "doc_invoice_2024_001"
-  &#125;'
-
-curl -X POST http://localhost:9300/tell \
-  -H "Content-Type: application/json" \
-  -d '&#123;
-    "predicate": "vendor",
-    "args": ["acme_corp"],
-    "scope": "doc_invoice_2024_001"
-  &#125;'
-
-# Query only facts about this invoice
-curl -X POST http://localhost:9300/ask \
-  -H "Content-Type: application/json" \
-  -d '&#123;
-    "predicate": "vendor",
-    "args": ["?who"],
-    "scope": "doc_invoice_2024_001"
-  &#125;'
-
-# Returns: &#123; "results": ["vendor(acme_corp)"] &#125;</code></pre>
-
-    <h3>Example: Scope as an External ID</h3>
-    <p>Link knowledge to records in external systems (CRM, JIRA, Salesforce):</p>
-    <pre><code class="language-bash"># Store facts linked to a Salesforce lead
-curl -X POST http://localhost:9300/tell \
-  -H "Content-Type: application/json" \
-  -d '&#123;
-    "predicate": "lead_status",
-    "args": ["qualified"],
-    "scope": "ext_salesforce_lead_42"
-  &#125;'
-
-curl -X POST http://localhost:9300/tell \
-  -H "Content-Type: application/json" \
-  -d '&#123;
-    "predicate": "contact_name",
-    "args": ["jane_doe"],
-    "scope": "ext_salesforce_lead_42"
-  &#125;'
-
-# Query all facts about this lead
-curl -X POST http://localhost:9300/ask \
-  -H "Content-Type: application/json" \
-  -d '&#123;
-    "predicate": "lead_status",
-    "args": ["?status"],
-    "scope": "ext_salesforce_lead_42"
-  &#125;'</code></pre>
-
-    <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-purple-500 text-slate-300">
-        <strong>Tip:</strong> Scopes compose with global facts. If you teach a rule <em>without</em> a scope, it applies everywhere — but scoped facts are only visible when querying within that scope. This lets you define global rules that reason over document-specific or session-specific data.
-    </div>
+    <p>
+        This is how a long-running agent avoids dragging months of stale context into every new prompt.
+    </p>
 
     <hr />
 
-    <h2 id="truth-maintenance">Truth Maintenance</h2>
-    <p>When a fact is retracted, the <strong>Truth Maintenance System (TMS)</strong> automatically cascade-retracts any facts that were derived from it. The <code>ProvenanceTracker</code> maintains a dependency graph of which facts support which derived conclusions.</p>
-    
-    <p>Example: if you retract <code>parent(alice, bob)</code>, then <code>grandparent(alice, charlie)</code> — which was derived from it — is also automatically retracted. No manual cleanup needed.</p>
+    <h2 id="contradictions">Contradictions and Trust</h2>
+    <p>
+        Reduction is only useful if the reduced window is trustworthy. The backend checks for conflicting state and can auto-resolve contradictions before the window is returned.
+    </p>
+    <p>
+        That matters because smaller context is not enough by itself. Smaller and wrong is still wrong.
+    </p>
 
     <hr />
 
-    <h2 id="salience">Salience & Memory</h2>
-    <p>In long-running agent sessions, facts accumulate fast. Nocturnus scores every fact with a <strong>salience</strong> value, combining three signals:</p>
+    <h2 id="sessions">Session Snapshots and Diffs</h2>
+    <p>
+        When you call <code>/context/optimize</code> with a <code>sessionId</code>, the backend stores a snapshot of that window. Later, <code>/context/diff</code> compares the new window to the old one and returns only the additions and removals.
+    </p>
+
+    <p>
+        This is the operational mechanism behind "stop paying for the same context twice."
+    </p>
+
+    <hr />
+
+    <h2 id="scopes">Scopes and Multi-Tenancy</h2>
+    <p>
+        Context reduction often needs partitioning.
+    </p>
     <ul>
-        <li><strong>Recency</strong> — how recently the fact was accessed</li>
-        <li><strong>Frequency</strong> — how often it's been queried</li>
-        <li><strong>Priority</strong> — explicit importance weight</li>
+        <li><strong>Database</strong> separates environments or large knowledge domains.</li>
+        <li><strong>Tenant</strong> separates customers or agents.</li>
+        <li><strong>Scope</strong> separates threads, documents, hypotheses, or other logical slices inside a tenant.</li>
     </ul>
-    <p>The <code>/memory/context</code> endpoint returns the top-K most salient facts — this is your agent's "working memory." Low-salience facts can be automatically evicted via <code>/memory/decay</code>, and repetitive patterns can be compressed into summaries via <code>/memory/consolidate</code>. For goal-driven optimization that goes further — backward chaining, contradiction detection, and 97% token reduction — see <a href="#context-optimization">Context Optimization</a> below.</p>
+
+    <p>
+        In practice, many teams map a conversation or document to a scope so the reducer only looks at the relevant slice.
+    </p>
 
     <hr />
 
-    <h2 id="memory-lifecycle">Memory Lifecycle</h2>
-    <p>For long-running agents, Nocturnus manages memory automatically through four stages:</p>
+    <h2 id="low-level">Low-Level Backend Concepts</h2>
+    <p>
+        These are the lower-level building blocks. They matter when you want deeper control, debugging, or custom reasoning behavior.
+    </p>
 
-    <h3>1. Salience Scoring</h3>
-    <p>Every fact gets a composite salience score: <code>recency × frequency × priority</code>. Facts that are accessed often and recently score higher.</p>
+    <h3 id="facts">Facts</h3>
+    <p>
+        A fact is a structured statement stored in the backend. Internally it is an <code>Atom</code> with a predicate name, ordered arguments, truth value, optional scope, time metadata, and optional confidence.
+    </p>
 
-    <h3>2. Context Window</h3>
-    <p>The <code>/memory/context</code> endpoint returns the top-K most salient facts — effectively your agent's "working memory."</p>
+    <pre><code class="language-prolog">customer_tier(acme_corp, enterprise)
+current_issue(acme_corp, saml_issuer_mismatch)
+NOT billing_blocked(acme_corp)</code></pre>
 
-    <h3>3. Consolidation</h3>
-    <p>After many interactions, call <code>/memory/consolidate</code> to detect episodic patterns (e.g., "user asked about X five times") and compress them into semantic summaries.</p>
+    <h3 id="rules">Rules</h3>
+    <p>
+        Rules define derived relationships. They are useful when you want the backend to infer higher-level state instead of storing every conclusion directly.
+    </p>
 
-    <h3>4. Decay</h3>
-    <p>Call <code>/memory/decay</code> to evict expired facts (past TTL) and low-salience facts (below threshold). Keeps memory lean without manual curation.</p>
+    <pre><code class="language-prolog">service_credit_applicable(?account) :-
+    outage_duration_hours(?account, ?hours),
+    promised_credit_threshold(?account, 4),
+    exceeds(?hours, 4)</code></pre>
 
-    <pre><code class="language-bash"># Get agent's context window (top 50 most relevant facts)
-curl http://localhost:9300/memory/context?maxFacts=50
+    <h3 id="inference">Inference</h3>
+    <p>
+        The backend supports backward chaining for question-driven proof and forward chaining for reactive derivation. This is why <code>/context/optimize</code> can work from goals instead of only from surface frequency.
+    </p>
 
-# Compress episodic patterns into semantic summaries
-curl -X POST http://localhost:9300/memory/consolidate
+    <h3 id="temporal">Temporal State</h3>
+    <p>
+        Facts can have <code>createdAt</code>, <code>validFrom</code>, <code>validUntil</code>, and <code>ttl</code>. That lets the backend reconstruct what was true at a given moment and drop expired state automatically.
+    </p>
 
-# Evict stale facts
-curl -X POST http://localhost:9300/memory/decay \
-  -H "Content-Type: application/json" \
-  -d '&#123;"threshold": 0.05&#125;'</code></pre>
-
-    <hr />
-
-    <h2 id="context-optimization">Context Optimization</h2>
-    <p>The <strong>Context Management Engine</strong> is what makes NocturnusAI a cost optimization tool, not just a knowledge base. Instead of stuffing your entire KB into every LLM prompt, the engine delivers only the facts that matter.</p>
-
-    <h3>How It Works</h3>
-    <ol>
-        <li><strong>Goal resolution</strong> — you specify what your agent needs to know (e.g., "is this contract enforceable?"). Backward chaining traces exactly which facts are relevant.</li>
-        <li><strong>Salience ranking</strong> — relevant facts are scored by recency, frequency, and priority. The most important facts bubble to the top.</li>
-        <li><strong>Contradiction detection</strong> — conflicting facts are flagged or auto-resolved before reaching the LLM.</li>
-        <li><strong>Deduplication</strong> — cross-source duplicates are merged to avoid wasting tokens.</li>
-        <li><strong>Token-optimized output</strong> — the final context window contains only goal-relevant, deduplicated, consistent facts with full provenance.</li>
-    </ol>
-
-    <h3>The Cost Impact</h3>
-    <p>A typical knowledge base with 500 facts produces a 150K-token context window when stuffed into a prompt. After optimization, the same query returns 15 goal-relevant facts in ~820 tokens — a <strong>97% reduction</strong> in tokens billed to OpenAI, Anthropic, or any LLM provider.</p>
-    <pre><code class="language-bash"># Optimize context for a specific goal
-curl -X POST http://localhost:9300/context/optimize \
-  -H "Content-Type: application/json" \
-  -d '&#123;
-    "goals": [&#123;"predicate": "eligible_for_sla", "args": ["acme_corp"]&#125;],
-    "maxFacts": 25
-  &#125;'
-
-# Response: 15 facts, 820 tokens, full provenance
-# vs. 150K tokens without optimization</code></pre>
-
-    <h3>Incremental Diffs</h3>
-    <p>For multi-turn conversations, use <code>POST /context/diff</code> with a <code>sessionId</code> to get only what changed since the last call — further reducing token spend on subsequent requests.</p>
-
-    <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-emerald-500 text-slate-300">
-        <strong>Key insight:</strong> Context optimization isn't just about saving money — less noise means better LLM reasoning. Fewer irrelevant facts = fewer hallucinations, fewer contradictions, more accurate answers.
-    </div>
+    <h3 id="truth-maintenance">Truth Maintenance</h3>
+    <p>
+        Derived facts keep provenance. If a supporting fact is removed, dependent conclusions can be retracted automatically. That is how the backend keeps the reduced context aligned with the underlying state.
+    </p>
 
     <NextSteps links={[
-        { title: "API Reference", description: "Every endpoint with full request/response shapes", href: `${base}/docs/api` },
-        { title: "CLI Reference", description: "Interactive REPL for exploring facts and rules", href: `${base}/docs/cli` },
-        { title: "Integrations", description: "Connect NocturnusAI to your agent framework", href: `${base}/docs/integrations` },
+        { title: "Real Workflow", description: "Go back to the turn-reduction path", href: `${base}/docs/context` },
+        { title: "API Reference", description: "See the context and memory endpoints", href: `${base}/docs/api#context-management` },
+        { title: "Multi-Tenancy", description: "See how tenant and scope boundaries shape context selection", href: `${base}/docs/multi-tenancy` },
+        { title: "Operations", description: "Monitor and run the backend in production", href: `${base}/docs/operations` },
     ]} />
 </DocsLayout>

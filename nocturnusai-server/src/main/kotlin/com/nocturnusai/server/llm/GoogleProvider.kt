@@ -72,7 +72,7 @@ class GoogleProvider(
                 })
             }
             put("generationConfig", buildJsonObject {
-                put("temperature", 0.1)
+                put("temperature", LlmConfig.temperature)
                 put("maxOutputTokens", 8192)
                 put("responseMimeType", "application/json")
             })

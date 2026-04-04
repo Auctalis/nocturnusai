@@ -30,6 +30,9 @@ object LlmConfig {
     val anthropicApiKey: String? = System.getenv("ANTHROPIC_API_KEY")?.ifBlank { null }
     val googleApiKey: String? = System.getenv("GOOGLE_API_KEY")?.ifBlank { null }
 
+    // LLM behavior
+    val temperature: Double = System.getenv("LLM_TEMPERATURE")?.toDoubleOrNull() ?: 0.1
+
     // Extraction config
     val extractionEnabled: Boolean = System.getenv("EXTRACTION_ENABLED")?.toBoolean() ?: false
     val extractionModel: String? = System.getenv("EXTRACTION_MODEL")

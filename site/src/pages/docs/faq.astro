@@ -60,6 +60,14 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <hr />
 
+    <h3 id="sdk-vs-mcp-context">Should I use SDK context APIs or MCP context tools?</h3>
+    <p>
+        Use MCP when you want plug-and-play tool access from an MCP-compatible agent. Use SDK/HTTP context APIs when you need goal-driven windows, <code>sessionId</code>-based diffs, and explicit orchestration. A common production setup is MCP for tool calling plus <code>/context/optimize</code> + <code>/context/diff</code> from your orchestrator.
+    </p>
+    <p><a href={`${base}/docs/sdks`}>See SDK details &rarr;</a> · <a href={`${base}/docs/mcp`}>See MCP details &rarr;</a></p>
+
+    <hr />
+
     <h3 id="license">Is it open source? What's the license?</h3>
     <p>
         NocturnusAI uses the <strong>Business Source License 1.1</strong>. It's free for non-production use, evaluation, and development. Contact <a href="https://github.com/Auctalis/nocturnusai">Auctalis</a> for production licensing.
