@@ -1,40 +1,54 @@
 ---
-import { MessageSquare, Search, Sparkles, Brain, Clock, GitMerge, Zap, Shield, Network, Minimize2 } from 'lucide-astro';
+import { MessageSquare, Search, Sparkles, Brain, Clock, GitMerge, Zap, Shield, Network, Minimize2, DollarSign } from 'lucide-astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-// Agent-first features — NL and agent usability first, then infrastructure depth
+// Lead with context optimization, then agent usability, then infrastructure
+const costFeatures = [
+  {
+    Icon: Minimize2,
+    title: "97% Context Reduction",
+    desc: "500 facts in, 15 out. Goal-driven backward chaining extracts only what your agent needs. Salience ranking, contradiction detection, and provenance chains — 97% fewer tokens billed with zero information loss.",
+    tag: "Context optimizer",
+    highlight: true
+  },
+  {
+    Icon: DollarSign,
+    title: "From $2.25 to $0.01 Per Request",
+    desc: "Stop stuffing 150K tokens into every prompt. NocturnusAI's optimization pipeline delivers goal-relevant facts in under 50ms. Incremental diffs mean subsequent requests cost even less.",
+    tag: "Cost reduction",
+    highlight: true
+  },
+  {
+    Icon: Shield,
+    title: "Cheaper and More Accurate",
+    desc: "Less context doesn't mean worse answers — it means better ones. Contradictions are caught before reaching the LLM. Every fact has provenance. Your agent reasons over signal, not noise.",
+    tag: "Quality + savings",
+    highlight: true
+  },
+];
+
 const agentFeatures = [
   {
     Icon: MessageSquare,
     title: "Plain English In, Verified Facts Out",
-    desc: "POST /extract with any text. NocturnusAI calls your LLM to pull out structured facts and stores them automatically. No schema design, no parsing code, no mapping logic — your agent just feeds it context.",
+    desc: "POST /extract with any text. NocturnusAI calls your LLM to pull out structured facts and stores them automatically. No schema design, no parsing code, no mapping logic.",
     tag: "Natural language",
-    highlight: true,
   },
   {
     Icon: Search,
     title: "Ask Questions, Get Grounded Answers",
-    desc: "POST /synthesize with a natural language question. NocturnusAI queries its fact store, runs inference, and returns a sourced answer with a derivation trail — not a hallucinated guess from token probabilities.",
+    desc: "POST /synthesize with a natural language question. NocturnusAI queries its fact store, runs inference, and returns a sourced answer — not a hallucinated guess from token probabilities.",
     tag: "Q&A",
-    highlight: true,
   },
   {
     Icon: Sparkles,
     title: "9 MCP Tools, Zero Integration Work",
-    desc: "Connect any MCP-compatible agent, IDE, or framework with a two-line config. tell, ask, teach, forget, recall, context — your agent gets a complete reasoning toolkit without writing any integration code.",
+    desc: "Connect any MCP-compatible agent, IDE, or framework with a two-line config. tell, ask, teach, forget, recall, context — a complete reasoning toolkit with no integration code.",
     tag: "MCP native",
-    highlight: true,
   },
 ];
 
 const infraFeatures = [
-  {
-    Icon: Minimize2,
-    title: "Context Management Engine",
-    desc: "500 facts in, 15 out. Goal-driven backward chaining extracts only what your agent needs. Salience ranking, contradiction detection, provenance chains, and incremental diffs — 97% token reduction with zero information loss.",
-    tag: "Context optimizer",
-    highlight: true
-  },
   {
     Icon: Brain,
     title: "Salience-Ranked Memory",
@@ -77,35 +91,58 @@ const infraFeatures = [
 <section id="features" class="py-24 relative z-10">
   <div class="max-w-7xl mx-auto px-6">
 
-    <!-- Agent-first headline -->
+    <!-- Cost-first headline -->
     <div class="text-center mb-12">
-      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm font-mono mb-6">
-        Built for agentic developers
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-mono mb-6">
+        Stop overpaying for context
       </div>
       <h2 class="text-3xl md:text-4xl font-bold mb-4">
-        <span class="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">
-          Your Agent Asks. NocturnusAI Knows.
+        <span class="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
+          Pay for Signal. Not Noise.
         </span>
       </h2>
       <p class="text-slate-400 max-w-2xl mx-auto">
-        Start with natural language — feed it text, ask it questions, connect via MCP. The logic engine, inference, and memory management all happen beneath the surface.
+        Every token costs money. NocturnusAI's context engine ensures you only pay for facts that matter — then adds verified reasoning, memory lifecycle, and consistency on top.
       </p>
     </div>
 
-    <!-- Agent-first tier — 3 highlighted cards -->
+    <!-- Cost optimization tier — 3 highlighted cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-      {agentFeatures.map(({ Icon, title, desc, tag }) => (
-        <div class="relative p-8 rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-purple-500/5 group hover:-translate-y-2 transition-transform duration-300 overflow-hidden">
+      {costFeatures.map(({ Icon, title, desc, tag }) => (
+        <div class="relative p-8 rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 to-cyan-500/5 group hover:-translate-y-2 transition-transform duration-300 overflow-hidden">
           <!-- Subtle glow -->
-          <div class="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-500/0 to-purple-500/0 group-hover:from-cyan-500/8 group-hover:to-purple-500/8 transition-all duration-300 pointer-events-none"></div>
-          <div class="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-mono text-cyan-500">
+          <div class="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-500/0 to-cyan-500/0 group-hover:from-emerald-500/8 group-hover:to-cyan-500/8 transition-all duration-300 pointer-events-none"></div>
+          <div class="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-500">
             {tag}
           </div>
-          <div class="w-12 h-12 rounded-lg bg-cyan-500/15 flex items-center justify-center mb-6 group-hover:bg-cyan-500/25 transition-colors">
-            <Icon class="w-6 h-6 text-cyan-400" />
+          <div class="w-12 h-12 rounded-lg bg-emerald-500/15 flex items-center justify-center mb-6 group-hover:bg-emerald-500/25 transition-colors">
+            <Icon class="w-6 h-6 text-emerald-400" />
           </div>
           <h3 class="text-xl font-bold text-white mb-3 pr-12">{title}</h3>
           <p class="text-slate-400 text-sm leading-relaxed relative z-10">{desc}</p>
+        </div>
+      ))}
+    </div>
+
+    <!-- Agent usability divider -->
+    <div class="flex items-center gap-4 mb-6 mt-14">
+      <div class="flex-1 h-px bg-white/5"></div>
+      <span class="text-xs font-mono text-slate-600 uppercase tracking-widest">How your agents connect</span>
+      <div class="flex-1 h-px bg-white/5"></div>
+    </div>
+
+    <!-- Agent features — 3 cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      {agentFeatures.map(({ Icon, title, desc, tag }) => (
+        <div class="p-6 rounded-xl glass group hover:-translate-y-1 transition-transform duration-300 relative overflow-hidden">
+          <div class="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-mono text-cyan-500 group-hover:text-cyan-400 transition-colors">
+            {tag}
+          </div>
+          <div class="w-10 h-10 rounded-lg bg-cyan-500/15 flex items-center justify-center mb-4 group-hover:bg-cyan-500/25 transition-colors">
+            <Icon class="w-5 h-5 text-cyan-400" />
+          </div>
+          <h3 class="text-base font-bold text-slate-200 mb-2 group-hover:text-white transition-colors pr-10">{title}</h3>
+          <p class="text-slate-500 text-sm leading-relaxed">{desc}</p>
         </div>
       ))}
     </div>
@@ -119,40 +156,22 @@ const infraFeatures = [
 
     <!-- Infrastructure tier — 6 cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {infraFeatures.map(({ Icon, title, desc, tag, highlight }) => (
-        <div class={`p-6 rounded-xl group hover:-translate-y-1 transition-transform duration-300 relative overflow-hidden ${
-          highlight
-            ? 'bg-gradient-to-br from-emerald-500/8 to-cyan-500/5 border border-emerald-500/20 md:col-span-2 lg:col-span-1'
-            : 'glass'
-        }`}>
-          <div class={`absolute top-3 right-3 px-2 py-0.5 rounded-full text-[10px] font-mono transition-colors ${
-            highlight
-              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 group-hover:text-emerald-400'
-              : 'bg-white/5 border border-white/10 text-slate-600 group-hover:text-slate-400'
-          }`}>
+      {infraFeatures.map(({ Icon, title, desc, tag }) => (
+        <div class="p-6 rounded-xl glass group hover:-translate-y-1 transition-transform duration-300 relative overflow-hidden">
+          <div class="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono text-slate-600 group-hover:text-slate-400 transition-colors">
             {tag}
           </div>
-          <div class={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 transition-colors ${
-            highlight
-              ? 'bg-emerald-500/15 group-hover:bg-emerald-500/25'
-              : 'bg-white/5 group-hover:bg-purple-500/15'
-          }`}>
-            <Icon class={`w-5 h-5 transition-colors ${
-              highlight
-                ? 'text-emerald-400 group-hover:text-emerald-300'
-                : 'text-slate-500 group-hover:text-purple-400'
-            }`} />
+          <div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4 group-hover:bg-purple-500/15 transition-colors">
+            <Icon class="w-5 h-5 text-slate-500 group-hover:text-purple-400 transition-colors" />
           </div>
-          <h3 class={`text-base font-bold mb-2 transition-colors pr-10 ${
-            highlight ? 'text-emerald-200 group-hover:text-white' : 'text-slate-200 group-hover:text-white'
-          }`}>{title}</h3>
+          <h3 class="text-base font-bold text-slate-200 mb-2 group-hover:text-white transition-colors pr-10">{title}</h3>
           <p class="text-slate-500 text-sm leading-relaxed">{desc}</p>
         </div>
       ))}
     </div>
 
     <div class="mt-12 text-center">
-      <a href={`${base}/features`} class="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 font-medium transition-colors group">
+      <a href={`${base}/features`} class="inline-flex items-center gap-2 text-emerald-400 hover:text-emerald-300 font-medium transition-colors group">
         Deep dive into every feature
         <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />

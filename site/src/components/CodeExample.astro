@@ -4,19 +4,21 @@
 <section class="py-24 bg-[#0f172a]/30 border-y border-white/5 relative z-10">
   <div class="max-w-7xl mx-auto px-6">
     <div class="text-center mb-16">
-      <h2 class="text-3xl md:text-4xl font-bold mb-4">The Difference</h2>
-      <p class="text-slate-400">What happens when your agent needs to know a customer's subscription tier?</p>
+      <h2 class="text-3xl md:text-4xl font-bold mb-4">The Token Bill, Side by Side</h2>
+      <p class="text-slate-400">Same question. Same correct answer. Radically different cost.</p>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
       <!-- WITHOUT Nocturnus -->
       <div class="rounded-xl overflow-hidden bg-[#020617] border border-red-500/20 shadow-2xl flex flex-col">
           <div class="flex items-center justify-between px-4 py-3 bg-red-500/5 border-b border-red-500/10">
-            <span class="text-xs font-mono text-red-400">❌ Without Nocturnus</span>
-            <span class="text-xs font-mono text-red-400/60">LLM guessing</span>
+            <span class="text-xs font-mono text-red-400">Without NocturnusAI</span>
+            <span class="text-xs font-mono text-red-400/60">150K tokens billed</span>
           </div>
           <div class="p-6 font-mono text-sm overflow-x-auto flex-1">
-<pre><code><span class="text-slate-500">// Agent prompt stuffing...</span>
+<pre><code><span class="text-slate-500">// Agent dumps entire KB into system prompt</span>
+<span class="text-slate-500">// 500 facts, 47 rules, 12 scopes = 150K tokens</span>
+
 <span class="text-slate-400">"Based on the conversation, I <span class="text-red-400">believe</span></span>
 <span class="text-slate-400"> the customer is on the <span class="text-red-400">premium</span> plan.</span>
 <span class="text-slate-400"> <span class="text-red-400">I'm not entirely sure</span>, but they</span>
@@ -24,7 +26,8 @@
 <span class="text-slate-400"> features in a previous message..."</span>
 
 <span class="text-red-400">// Wrong. The customer is on "starter".</span>
-<span class="text-red-400">// Your agent just offered a 50% discount</span>
+<span class="text-red-400">// Cost: $2.25 for a wrong answer.</span>
+<span class="text-red-400">// Your agent just offered a discount</span>
 <span class="text-red-400">// to the wrong tier. 💸</span></code></pre>
           </div>
       </div>
@@ -33,27 +36,41 @@
       <div class="rounded-xl overflow-hidden bg-[#020617] border border-emerald-500/20 shadow-2xl flex flex-col relative group">
           <div class="absolute inset-0 bg-gradient-to-tr from-cyan-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
           <div class="flex items-center justify-between px-4 py-3 bg-emerald-500/5 border-b border-emerald-500/10">
-            <span class="text-xs font-mono text-emerald-400">✓ With Nocturnus</span>
-            <span class="text-xs font-mono text-emerald-400/60">Fact-grounded answer</span>
+            <span class="text-xs font-mono text-emerald-400">With NocturnusAI</span>
+            <span class="text-xs font-mono text-emerald-400/60">820 tokens billed</span>
           </div>
           <div class="p-6 font-mono text-sm overflow-x-auto flex-1">
-<pre><code><span class="text-slate-500">// 1. Ingest plain English → facts extracted</span>
-<span class="text-blue-400">POST</span> <span class="text-slate-300">/extract</span>
-&#123; <span class="text-purple-400">"text"</span>: <span class="text-green-400">"Acme Corp is on the starter plan"</span>,
-  <span class="text-purple-400">"assert"</span>: <span class="text-blue-400">true</span> &#125;
+<pre><code><span class="text-slate-500">// Context engine selects 15 relevant facts</span>
+<span class="text-slate-500">// Goal-driven: only what answers the question</span>
 
-<span class="text-emerald-400">// ✓ Extracted: subscription_tier(acme_corp, starter)</span>
+<span class="text-blue-400">POST</span> <span class="text-slate-300">/context/optimize</span>
+&#123; <span class="text-purple-400">"goals"</span>: [&#123;<span class="text-green-400">"predicate"</span>: <span class="text-green-400">"subscription_tier"</span>,
+              <span class="text-green-400">"args"</span>: [<span class="text-green-400">"acme_corp"</span>, <span class="text-green-400">"?tier"</span>]&#125;] &#125;
 
-<span class="text-slate-500">// 2. Agent asks in natural language</span>
-<span class="text-blue-400">POST</span> <span class="text-slate-300">/synthesize</span>
-&#123; <span class="text-purple-400">"question"</span>: <span class="text-green-400">"What plan is Acme on?"</span> &#125;
-
+<span class="text-emerald-400">// ✓ 820 tokens · $0.01 · correct answer</span>
 &#123; <span class="text-purple-400">"answer"</span>: <span class="text-green-400">"Acme Corp is on the starter plan."</span>,
   <span class="text-purple-400">"derivation"</span>: [<span class="text-green-400">"subscription_tier(acme_corp, starter)"</span>],
   <span class="text-purple-400">"confidence"</span>: <span class="text-blue-400">0.95</span> &#125;
 
-<span class="text-emerald-400">// Correct. Sourced. Provable. ✓</span></code></pre>
+<span class="text-emerald-400">// Correct. Sourced. Provable. 225x cheaper. ✓</span></code></pre>
           </div>
+      </div>
+    </div>
+
+    <!-- Cost comparison strip -->
+    <div class="max-w-3xl mx-auto mt-10">
+      <div class="grid grid-cols-3 gap-4 text-center">
+        <div class="p-4 rounded-xl bg-red-500/5 border border-red-500/10">
+          <div class="text-lg font-black text-red-400">$2.25</div>
+          <div class="text-[10px] text-slate-500 mt-1">per request, unoptimized</div>
+        </div>
+        <div class="p-4 rounded-xl bg-white/3 border border-white/8 flex items-center justify-center">
+          <span class="text-2xl text-slate-600">→</span>
+        </div>
+        <div class="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+          <div class="text-lg font-black text-emerald-400">$0.01</div>
+          <div class="text-[10px] text-slate-500 mt-1">per request, with NocturnusAI</div>
+        </div>
       </div>
     </div>
   </div>

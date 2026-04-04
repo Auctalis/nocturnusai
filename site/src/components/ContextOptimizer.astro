@@ -1,5 +1,5 @@
 ---
-import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shield, Layers } from 'lucide-astro';
+import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shield, Layers, DollarSign } from 'lucide-astro';
 ---
 
 <section id="context-optimizer" class="py-28 relative overflow-hidden">
@@ -17,13 +17,13 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
         Context Management Engine
       </div>
       <h2 class="text-3xl md:text-5xl font-black mb-5">
-        <span class="text-white">500 Facts In.</span><br />
+        <span class="text-white">Pay for Signal.</span><br />
         <span class="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
-          15 Facts Out. Zero Lost.
+          Not Noise.
         </span>
       </h2>
       <p class="text-slate-400 max-w-2xl mx-auto text-lg leading-relaxed">
-        LLMs waste tokens on irrelevant context. NocturnusAI's Context Management Engine uses goal-driven backward chaining to deliver <em class="text-emerald-400 not-italic font-medium">only the facts your agent needs</em> — with full inference chains, contradiction detection, and provenance.
+        OpenAI charges $15 per million tokens. Anthropic charges $15. Google charges $10. And your agents waste 95% of every request on irrelevant context. NocturnusAI uses goal-driven backward chaining to deliver <em class="text-emerald-400 not-italic font-medium">only what your agent actually needs</em> — slashing your LLM bill by 97%.
       </p>
     </div>
 
@@ -32,17 +32,17 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
       <!-- THE PROBLEM -->
       <div class="rounded-2xl overflow-hidden bg-[#020617] border border-red-500/20 shadow-2xl">
         <div class="px-5 py-3 bg-red-500/5 border-b border-red-500/10 flex items-center justify-between">
-          <span class="text-xs font-mono text-red-400">The Context Problem</span>
+          <span class="text-xs font-mono text-red-400">Without NocturnusAI</span>
           <span class="text-xs font-mono text-red-400/50">Every RAG pipeline</span>
         </div>
         <div class="p-6 space-y-4">
           <div class="flex items-start gap-3">
             <div class="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <TrendingDown class="w-4 h-4 text-red-400" />
+              <DollarSign class="w-4 h-4 text-red-400" />
             </div>
             <div>
-              <div class="text-sm font-bold text-red-300 mb-1">150K+ token system prompts</div>
-              <div class="text-xs text-slate-500">Agents stuff everything into context hoping the LLM figures it out</div>
+              <div class="text-sm font-bold text-red-300 mb-1">$2.25 per request to OpenAI alone</div>
+              <div class="text-xs text-slate-500">150K tokens at GPT-4o's $15/M rate — and that's before Claude or Gemini costs</div>
             </div>
           </div>
           <div class="flex items-start gap-3">
@@ -50,8 +50,8 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
               <TrendingDown class="w-4 h-4 text-red-400" />
             </div>
             <div>
-              <div class="text-sm font-bold text-red-300 mb-1">6.2M tokens/hour burned</div>
-              <div class="text-xs text-slate-500">Most of it irrelevant context that degrades accuracy and inflates cost</div>
+              <div class="text-sm font-bold text-red-300 mb-1">$54,000/month at scale</div>
+              <div class="text-xs text-slate-500">1,000 requests/hr × 24hr = token spend that grows linearly with usage</div>
             </div>
           </div>
           <div class="flex items-start gap-3">
@@ -59,16 +59,16 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
               <TrendingDown class="w-4 h-4 text-red-400" />
             </div>
             <div>
-              <div class="text-sm font-bold text-red-300 mb-1">Context poisoning</div>
-              <div class="text-xs text-slate-500">Contradictory or stale facts silently corrupt agent reasoning</div>
+              <div class="text-sm font-bold text-red-300 mb-1">Worse accuracy, higher cost</div>
+              <div class="text-xs text-slate-500">Contradictory and stale facts in context degrade LLM reasoning quality</div>
             </div>
           </div>
           <!-- Cost visualization -->
           <div class="mt-4 p-4 rounded-xl bg-red-500/5 border border-red-500/10">
-            <div class="text-xs font-mono text-red-400/60 mb-2">Token waste per request</div>
+            <div class="text-xs font-mono text-red-400/60 mb-2">Tokens billed per request</div>
             <div class="h-4 rounded-full bg-white/5 overflow-hidden">
               <div class="h-full rounded-full bg-gradient-to-r from-red-500 to-red-400 w-[95%] flex items-center justify-end pr-2">
-                <span class="text-[9px] font-mono text-white font-bold">95% irrelevant</span>
+                <span class="text-[9px] font-mono text-white font-bold">95% wasted spend</span>
               </div>
             </div>
           </div>
@@ -79,10 +79,19 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
       <div class="rounded-2xl overflow-hidden bg-[#020617] border border-emerald-500/20 shadow-2xl relative group">
         <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/3 to-cyan-500/3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
         <div class="px-5 py-3 bg-emerald-500/5 border-b border-emerald-500/10 flex items-center justify-between">
-          <span class="text-xs font-mono text-emerald-400">NocturnusAI Context Engine</span>
+          <span class="text-xs font-mono text-emerald-400">With NocturnusAI</span>
           <span class="text-xs font-mono text-emerald-400/50">Goal-driven optimization</span>
         </div>
         <div class="p-6 space-y-4">
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <DollarSign class="w-4 h-4 text-emerald-400" />
+            </div>
+            <div>
+              <div class="text-sm font-bold text-emerald-300 mb-1">$0.01 per request</div>
+              <div class="text-xs text-slate-500">820 tokens — only goal-relevant facts, ranked by salience, with full provenance</div>
+            </div>
+          </div>
           <div class="flex items-start gap-3">
             <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
               <Brain class="w-4 h-4 text-emerald-400" />
@@ -94,31 +103,22 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
           </div>
           <div class="flex items-start gap-3">
             <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <Filter class="w-4 h-4 text-emerald-400" />
-            </div>
-            <div>
-              <div class="text-sm font-bold text-emerald-300 mb-1">Salience-ranked, deduplicated</div>
-              <div class="text-xs text-slate-500">Recency, frequency, and priority scoring with diversity caps per predicate</div>
-            </div>
-          </div>
-          <div class="flex items-start gap-3">
-            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
               <Shield class="w-4 h-4 text-emerald-400" />
             </div>
             <div>
-              <div class="text-sm font-bold text-emerald-300 mb-1">Contradictions caught, not hidden</div>
-              <div class="text-xs text-slate-500">Detects conflicting facts before they reach the LLM — auto-resolve or flag</div>
+              <div class="text-sm font-bold text-emerald-300 mb-1">Cheaper and more accurate</div>
+              <div class="text-xs text-slate-500">Contradictions caught before they reach the LLM — fewer tokens, better answers</div>
             </div>
           </div>
           <!-- Efficiency visualization -->
           <div class="mt-4 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-            <div class="text-xs font-mono text-emerald-400/60 mb-2">Context after optimization</div>
+            <div class="text-xs font-mono text-emerald-400/60 mb-2">Tokens billed per request</div>
             <div class="h-4 rounded-full bg-white/5 overflow-hidden">
               <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 w-[3%] min-w-[60px] flex items-center justify-end pr-2">
                 <span class="text-[9px] font-mono text-white font-bold">3%</span>
               </div>
             </div>
-            <div class="text-[10px] font-mono text-emerald-400/40 mt-1">97% reduction — every remaining token is relevant</div>
+            <div class="text-[10px] font-mono text-emerald-400/40 mt-1">97% cost reduction — every remaining token earns its keep</div>
           </div>
         </div>
       </div>
@@ -226,10 +226,10 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
     <!-- Stats bar -->
     <div class="max-w-4xl mx-auto mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
       {[
-        { value: "97%", label: "Context Reduction", sub: "500 → 15 facts" },
+        { value: "$0.01", label: "Per Optimized Request", sub: "vs $2.25 unoptimized" },
+        { value: "97%", label: "Token Cost Reduction", sub: "500 → 15 facts" },
         { value: "< 50ms", label: "Pipeline Latency", sub: "Full optimization pass" },
-        { value: "0", label: "Lost Facts", sub: "Goal-relevant guaranteed" },
-        { value: "Diff", label: "Incremental Updates", sub: "Only send changes" },
+        { value: "Diff", label: "Incremental Updates", sub: "Only bill for changes" },
       ].map(stat => (
         <div class="text-center p-5 rounded-xl bg-white/3 border border-white/8 hover:border-emerald-500/20 transition-all group">
           <div class="text-2xl md:text-3xl font-black bg-clip-text text-transparent bg-gradient-to-br from-emerald-400 to-cyan-400 mb-1">
@@ -245,8 +245,7 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
     <div class="max-w-3xl mx-auto mt-12 text-center">
       <div class="p-6 rounded-2xl bg-gradient-to-r from-emerald-500/5 to-cyan-500/5 border border-emerald-500/15">
         <p class="text-slate-300 text-sm mb-4">
-          <span class="font-bold text-white">Plug and play.</span> Works with LangChain, CrewAI, or any framework.
-          Two lines of Python to optimize your agent's context window:
+          <span class="font-bold text-white">Two lines to cut your token bill.</span> Works with LangChain, CrewAI, or any framework.
         </p>
         <div class="inline-block text-left rounded-lg bg-[#020617] border border-white/10 px-5 py-3 font-mono text-sm">
           <div><span class="text-slate-500"># pip install nocturnusai</span></div>
@@ -254,7 +253,7 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
           <div><span class="text-slate-300">ctx</span> = <span class="text-yellow-400">SyncNocturnusAIClient</span>().<span class="text-yellow-400">optimize_context</span>(</div>
           <div class="pl-4"><span class="text-slate-300">goals</span>=[&#123;<span class="text-green-400">"predicate"</span>: <span class="text-green-400">"enforceable"</span>, <span class="text-green-400">"args"</span>: [<span class="text-green-400">"contract_001"</span>]&#125;]</div>
           <div>)</div>
-          <div class="text-emerald-400 mt-1"># ctx.entries → 15 facts, 820 tokens, full provenance ✓</div>
+          <div class="text-emerald-400 mt-1"># 15 facts, 820 tokens, $0.01 — down from $2.25 ✓</div>
         </div>
       </div>
     </div>

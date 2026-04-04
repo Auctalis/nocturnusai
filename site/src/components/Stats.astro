@@ -1,11 +1,11 @@
 ---
-import { Gauge, Database, HardDrive, Network, Minimize2 } from 'lucide-astro';
+import { DollarSign, Gauge, Database, HardDrive, Network } from 'lucide-astro';
 
 const stats = [
-  { Icon: Minimize2, value: "97%", label: "Context Reduction", sub: "Goal-driven optimization" },
-  { Icon: Gauge, value: "< 100ms", label: "Fact Retrieval", sub: "6-way Hexastore indexing" },
-  { Icon: Database, value: "ACID", label: "Transactional Truth", sub: "Commit or rollback atomically" },
-  { Icon: HardDrive, value: "WAL", label: "Crash Recovery", sub: "Write-ahead log + snapshots" },
+  { Icon: DollarSign, value: "$0.01", label: "Per Optimized Request", sub: "Down from $2.25 unoptimized" },
+  { Icon: Gauge, value: "97%", label: "Token Cost Reduction", sub: "Pay for 3%, get 100% of the answer" },
+  { Icon: Database, value: "< 50ms", label: "Optimization Pipeline", sub: "Goal-driven context in milliseconds" },
+  { Icon: HardDrive, value: "ACID", label: "Transactional Truth", sub: "Commit or rollback atomically" },
   { Icon: Network, value: "MCP", label: "Protocol Native", sub: "9 tools, any agent framework" },
 ];
 ---
@@ -13,16 +13,16 @@ const stats = [
 <section class="py-24 relative z-10">
   <div class="max-w-7xl mx-auto px-6">
     <div class="text-center mb-16">
-      <p class="text-slate-500 text-sm uppercase tracking-widest font-medium">Built for production from day one</p>
+      <p class="text-slate-500 text-sm uppercase tracking-widest font-medium">Stop paying for tokens your agent doesn't need</p>
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-5 gap-6 md:gap-8">
       {stats.map(({ Icon, value, label, sub }) => (
         <div class="text-center group glass rounded-2xl p-6 hover:-translate-y-1 transition-all duration-300">
           <div class="flex justify-center mb-3">
-            <Icon class="w-6 h-6 text-slate-600 group-hover:text-cyan-400 transition-colors" />
+            <Icon class="w-6 h-6 text-slate-600 group-hover:text-emerald-400 transition-colors" />
           </div>
-          <div class="text-4xl md:text-5xl font-black bg-clip-text text-transparent bg-gradient-to-br from-white to-slate-500 mb-2 group-hover:from-cyan-400 group-hover:to-purple-500 transition-all duration-300">
+          <div class="text-4xl md:text-5xl font-black bg-clip-text text-transparent bg-gradient-to-br from-white to-slate-500 mb-2 group-hover:from-emerald-400 group-hover:to-cyan-500 transition-all duration-300">
             {value}
           </div>
           <div class="text-sm font-bold text-slate-300 mb-1 group-hover:text-white transition-colors">
