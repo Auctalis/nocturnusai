@@ -34,8 +34,12 @@ from nocturnusai.exceptions import (
 from nocturnusai.models import (
     Atom,
     ConsolidationResult,
+    ContextDiff,
+    ContextEntry,
+    ContextSummary,
     ContextWindow,
     DecayResult,
+    OptimizedContext,
     ProofTree,
     ScoredAtom,
 )
@@ -533,6 +537,251 @@ class NocturnusAIClient:
 
         result = await self._request("POST", "/memory/context", json_body=body)
         return _parse_context_window(result)
+
+    async def optimize_context(
+        self,
+        goals: list[dict[str, Any]] | None = None,
+        max_facts: int = 100,
+        max_facts_per_predicate: int | None = None,
+        auto_resolve_contradictions: bool = True,
+        session_id: str | None = None,
+        relevance_buckets: list[dict[str, Any]] | None = None,
+        predicates: list[str] | None = None,
+        scope: str | None = None,
+    ) -> "OptimizedContext":
+        """Get a goal-driven optimized context window.
+
+        Unlike context_window() which does flat salience ranking, this uses
+        backward chaining to find facts reachable from your goals, deduplicates,
+        checks for contradictions, and applies relevance buckets.
+
+        Args:
+            goals: List of goal specs, e.g. [{"predicate": "recommend", "args": ["?x"]}].
+                   Each can include "negated": True for negative goals.
+            max_facts: Maximum facts to return.
+            max_facts_per_predicate: Optional diversity cap per predicate.
+            auto_resolve_contradictions: If True, auto-resolve by salience. If False, keep both sides.
+            session_id: Session ID for incremental diffing.
+            relevance_buckets: List of buckets, e.g. [{"name": "prefs", "predicates": ["likes"], "weight": 3.0}].
+            predicates: Filter by these predicates (non-goal mode).
+            scope: Scope filter.
+
+        Returns:
+            An OptimizedContext with ranked facts, rules, contradictions, and metadata.
+
+        Example::
+
+            ctx = await client.optimize_context(
+                goals=[{"predicate": "recommend", "args": ["?product"]}],
+                max_facts=30,
+                session_id="session_42",
+                relevance_buckets=[
+                    {"name": "prefs", "predicates": ["likes", "dislikes"], "weight": 3},
+                    {"name": "products", "predicates": ["available", "price"], "weight": 5},
+                ],
+            )
+            for entry in ctx.entries:
+                print(f"[{entry.salience:.2f}] {entry.predicate}({', '.join(entry.args)})")
+        """
+        body: dict[str, Any] = {"maxFacts": max_facts}
+        if goals is not None:
+            body["goals"] = goals
+        if max_facts_per_predicate is not None:
+            body["maxFactsPerPredicate"] = max_facts_per_predicate
+        if not auto_resolve_contradictions:
+            body["autoResolveContradictions"] = False
+        if session_id is not None:
+            body["sessionId"] = session_id
+        if relevance_buckets is not None:
+            body["relevanceBuckets"] = relevance_buckets
+        if predicates is not None:
+            body["predicates"] = predicates
+        if scope is not None:
+            body["scope"] = scope
+
+        result = await self._request("POST", "/context/optimize", json_body=body)
+        return OptimizedContext.model_validate(result)
+
+    async def diff_context(
+        self,
+        session_id: str,
+        goals: list[dict[str, Any]] | None = None,
+        max_facts: int | None = None,
+        relevance_buckets: list[dict[str, Any]] | None = None,
+        predicates: list[str] | None = None,
+        scope: str | None = None,
+    ) -> "ContextDiff":
+        """Get incremental diff since the last optimized context window.
+
+        Returns only what changed: added facts, removed facts, and count of unchanged.
+        Recommends a full refresh when churn exceeds 50%.
+
+        Args:
+            session_id: The session ID used in the previous optimize_context call.
+            goals: Goal specs (same format as optimize_context).
+            max_facts: Maximum facts in the new window.
+            relevance_buckets: Relevance buckets.
+            predicates: Predicate filter.
+            scope: Scope filter.
+
+        Returns:
+            A ContextDiff with added/removed entries and refresh recommendation.
+
+        Example::
+
+            diff = await client.diff_context(session_id="session_42")
+            print(f"Added: {len(diff.added)}, Removed: {len(diff.removed)}, Unchanged: {diff.unchanged}")
+            if diff.full_refresh_recommended:
+                print(f"Full refresh recommended: {diff.reason}")
+        """
+        body: dict[str, Any] = {"sessionId": session_id}
+        if goals is not None:
+            body["goals"] = goals
+        if max_facts is not None:
+            body["maxFacts"] = max_facts
+        if relevance_buckets is not None:
+            body["relevanceBuckets"] = relevance_buckets
+        if predicates is not None:
+            body["predicates"] = predicates
+        if scope is not None:
+            body["scope"] = scope
+
+        result = await self._request("POST", "/context/diff", json_body=body)
+        return ContextDiff.model_validate(result)
+
+    async def summarize_context(self, scope: str | None = None) -> "ContextSummary":
+        """Get a compact summary of the knowledge base.
+
+        Returns predicate counts, contradiction count, top salient facts,
+        TTL stats, and the knowledge generation counter.
+
+        Args:
+            scope: Optional scope filter.
+
+        Returns:
+            A ContextSummary with KB statistics.
+
+        Example::
+
+            summary = await client.summarize_context()
+            print(f"Total facts: {summary.total_facts}, Contradictions: {summary.contradictions}")
+            print(f"Knowledge generation: {summary.knowledge_generation}")
+        """
+        body: dict[str, Any] = {}
+        if scope is not None:
+            body["scope"] = scope
+
+        result = await self._request("POST", "/context/summary", json_body=body)
+        return ContextSummary.model_validate(result)
+
+    async def clear_context_session(self, session_id: str) -> str:
+        """Clear a context session's snapshot data.
+
+        Args:
+            session_id: The session ID to clear.
+
+        Returns:
+            Confirmation message.
+        """
+        body = {"sessionId": session_id}
+        result = await self._request("POST", "/context/session/clear", json_body=body)
+        if isinstance(result, str):
+            return result
+        return str(result)
+
+    async def extract_facts(
+        self,
+        text: str,
+        context: str | None = None,
+        assert_facts: bool = False,
+        extract_rules: bool = False,
+        scope: str | None = None,
+    ) -> dict[str, Any]:
+        """Extract structured facts from raw text using LLM.
+
+        Send free-form text and get structured predicate-argument facts back.
+        Optionally auto-assert them into the knowledge base.
+
+        Args:
+            text: The raw text to extract facts from.
+            context: Optional context hint for the LLM.
+            assert_facts: If True, extracted facts are automatically asserted.
+            extract_rules: If True, also extract rules from the text.
+            scope: Optional scope for asserted facts.
+
+        Returns:
+            Dict with 'facts', 'rules', 'asserted', 'provider', 'model' keys.
+
+        Example::
+
+            result = await client.extract_facts(
+                text="Alice likes Bob. Bob is a student at MIT.",
+                assert_facts=True,
+            )
+            for fact in result["facts"]:
+                print(f"{fact['predicate']}({', '.join(fact['args'])})")
+        """
+        body: dict[str, Any] = {"text": text}
+        if context is not None:
+            body["context"] = context
+        if assert_facts:
+            body["assert"] = True
+        if extract_rules:
+            body["rules"] = True
+        if scope is not None:
+            body["scope"] = scope
+
+        return await self._request("POST", "/extract", json_body=body)
+
+    async def ingest_and_optimize(
+        self,
+        text: str,
+        goals: list[dict[str, Any]] | None = None,
+        max_facts: int = 50,
+        session_id: str | None = None,
+        relevance_buckets: list[dict[str, Any]] | None = None,
+        scope: str | None = None,
+        context_hint: str | None = None,
+    ) -> "OptimizedContext":
+        """Extract facts from text, assert them, then return an optimized context.
+
+        This is the one-call developer workflow: send raw text (conversation
+        transcript, document chunk, tool output) and get back a minimal,
+        structured, goal-driven context window.
+
+        Args:
+            text: Raw text to extract facts from.
+            goals: Goal specs for context optimization.
+            max_facts: Maximum facts in optimized output.
+            session_id: Session ID for diffing.
+            relevance_buckets: Relevance buckets for the optimization.
+            scope: Scope filter.
+            context_hint: Optional hint for the LLM extractor.
+
+        Returns:
+            An OptimizedContext after ingestion.
+
+        Example::
+
+            ctx = await client.ingest_and_optimize(
+                text="The user likes electronics and has a budget of $1000. Product X costs $899 and has 4.5 stars.",
+                goals=[{"predicate": "recommend", "args": ["?product"]}],
+                max_facts=20,
+                session_id="session_42",
+            )
+            print(f"Ingested and optimized: {ctx.total_facts_included} facts from {ctx.total_facts_available}")
+        """
+        # Step 1: Extract and assert
+        await self.extract_facts(text=text, context=context_hint, assert_facts=True, scope=scope)
+
+        # Step 2: Optimize
+        return await self.optimize_context(
+            goals=goals,
+            max_facts=max_facts,
+            session_id=session_id,
+            relevance_buckets=relevance_buckets,
+            scope=scope,
+        )
 
     async def temporal_query(
         self,
@@ -1090,6 +1339,88 @@ class SyncNocturnusAIClient:
                 args=args,
                 priority=priority,
                 scope=scope,
+            )
+        )
+
+    def optimize_context(
+        self,
+        goals: list[dict[str, Any]] | None = None,
+        max_facts: int = 100,
+        max_facts_per_predicate: int | None = None,
+        auto_resolve_contradictions: bool = True,
+        session_id: str | None = None,
+        relevance_buckets: list[dict[str, Any]] | None = None,
+        predicates: list[str] | None = None,
+        scope: str | None = None,
+    ) -> "OptimizedContext":
+        """Get goal-driven optimized context. See :meth:`NocturnusAIClient.optimize_context`."""
+        return self._run(
+            self._async_client.optimize_context(
+                goals=goals, max_facts=max_facts,
+                max_facts_per_predicate=max_facts_per_predicate,
+                auto_resolve_contradictions=auto_resolve_contradictions,
+                session_id=session_id, relevance_buckets=relevance_buckets,
+                predicates=predicates, scope=scope,
+            )
+        )
+
+    def diff_context(
+        self,
+        session_id: str,
+        goals: list[dict[str, Any]] | None = None,
+        max_facts: int | None = None,
+        relevance_buckets: list[dict[str, Any]] | None = None,
+        predicates: list[str] | None = None,
+        scope: str | None = None,
+    ) -> "ContextDiff":
+        """Get incremental context diff. See :meth:`NocturnusAIClient.diff_context`."""
+        return self._run(
+            self._async_client.diff_context(
+                session_id=session_id, goals=goals, max_facts=max_facts,
+                relevance_buckets=relevance_buckets, predicates=predicates, scope=scope,
+            )
+        )
+
+    def summarize_context(self, scope: str | None = None) -> "ContextSummary":
+        """Get KB summary. See :meth:`NocturnusAIClient.summarize_context`."""
+        return self._run(self._async_client.summarize_context(scope=scope))
+
+    def clear_context_session(self, session_id: str) -> str:
+        """Clear context session. See :meth:`NocturnusAIClient.clear_context_session`."""
+        return self._run(self._async_client.clear_context_session(session_id=session_id))
+
+    def extract_facts(
+        self,
+        text: str,
+        context: str | None = None,
+        assert_facts: bool = False,
+        extract_rules: bool = False,
+        scope: str | None = None,
+    ) -> dict[str, Any]:
+        """Extract facts from text. See :meth:`NocturnusAIClient.extract_facts`."""
+        return self._run(
+            self._async_client.extract_facts(
+                text=text, context=context, assert_facts=assert_facts,
+                extract_rules=extract_rules, scope=scope,
+            )
+        )
+
+    def ingest_and_optimize(
+        self,
+        text: str,
+        goals: list[dict[str, Any]] | None = None,
+        max_facts: int = 50,
+        session_id: str | None = None,
+        relevance_buckets: list[dict[str, Any]] | None = None,
+        scope: str | None = None,
+        context_hint: str | None = None,
+    ) -> "OptimizedContext":
+        """Extract facts from text then optimize. See :meth:`NocturnusAIClient.ingest_and_optimize`."""
+        return self._run(
+            self._async_client.ingest_and_optimize(
+                text=text, goals=goals, max_facts=max_facts,
+                session_id=session_id, relevance_buckets=relevance_buckets,
+                scope=scope, context_hint=context_hint,
             )
         )
 

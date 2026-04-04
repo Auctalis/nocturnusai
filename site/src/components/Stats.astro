@@ -1,7 +1,8 @@
 ---
-import { Gauge, Database, HardDrive, Network } from 'lucide-astro';
+import { Gauge, Database, HardDrive, Network, Minimize2 } from 'lucide-astro';
 
 const stats = [
+  { Icon: Minimize2, value: "97%", label: "Context Reduction", sub: "Goal-driven optimization" },
   { Icon: Gauge, value: "< 100ms", label: "Fact Retrieval", sub: "6-way Hexastore indexing" },
   { Icon: Database, value: "ACID", label: "Transactional Truth", sub: "Commit or rollback atomically" },
   { Icon: HardDrive, value: "WAL", label: "Crash Recovery", sub: "Write-ahead log + snapshots" },
@@ -15,7 +16,7 @@ const stats = [
       <p class="text-slate-500 text-sm uppercase tracking-widest font-medium">Built for production from day one</p>
     </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-6 md:gap-8">
       {stats.map(({ Icon, value, label, sub }) => (
         <div class="text-center group glass rounded-2xl p-6 hover:-translate-y-1 transition-all duration-300">
           <div class="flex justify-center mb-3">
