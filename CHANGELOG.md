@@ -7,6 +7,26 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.2.1] — 2026-04-04
+
+### Added
+- Context-management REST smoke tests for `/context`, `/context/optimize`, `/context/diff`, `/context/summary`, `/context/session/clear`, and `/context/ingest`
+- Explicit `/userguide` route coverage in server observability tests
+- A curl-based value proof demo for goal-driven context reduction
+
+### Changed
+- Repositioned the docs site and GitHub-facing Markdown around context optimization as the primary workflow
+- Added first-class TypeScript SDK methods for goal-driven context optimization, diffs, summaries, session clearing, and one-shot ingestion
+- Expanded API, CLI, SDK, MCP, integration, and multi-tenancy docs to map real methods and endpoints for context workflows
+
+### Fixed
+- TypeScript SDK docs and examples now match the shipped client methods
+- MCP context docs and server implementation now accept the legacy `minRelevance` alias alongside `minSalience`
+- CLI docs now reflect the actual Docker-compose/server workflow instead of a non-existent CLI container
+- Public install and monitoring docs now point to the current repository installer and compose commands
+
+---
+
 ## [0.1.19] — 2026-02-26
 
 ### Added

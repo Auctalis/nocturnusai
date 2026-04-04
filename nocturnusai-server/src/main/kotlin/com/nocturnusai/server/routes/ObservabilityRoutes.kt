@@ -74,7 +74,7 @@ fun Route.observabilityRoutes(appMicrometerRegistry: PrometheusMeterRegistry, db
             "name" to "NocturnusAI",
             "description" to "The knowledge and reasoning backend for AI agents. Tell it facts, teach it rules, ask it questions — and get deterministic, provable answers. Manages agent memory with temporal awareness, relevance scoring, and automatic cleanup.",
             "url" to baseUrl,
-            "version" to "2.0.0",
+            "version" to "0.2.1",
             "documentationUrl" to "$baseUrl/userguide",
             "provider" to mapOf(
                 "organization" to "NocturnusAI"
