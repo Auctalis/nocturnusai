@@ -61,6 +61,32 @@ data class ClearSessionApiRequest(
     val sessionId: String
 )
 
+// --- Simplified "just give me facts" interface ---
+
+@Serializable
+data class SimpleContextRequest(
+    val turns: List<String>,
+    val maxFacts: Int? = null,
+    val scope: String? = null
+)
+
+@Serializable
+data class SimpleFactResponse(
+    val predicate: String,
+    val args: List<String>,
+    val salience: Double,
+    val provenance: String? = null
+)
+
+@Serializable
+data class SimpleContextResponse(
+    val facts: List<SimpleFactResponse>,
+    val totalFactsInKB: Int,
+    val factsReturned: Int,
+    val contradictions: Int,
+    val newFactsExtracted: Int
+)
+
 @Serializable
 data class IngestAndOptimizeApiRequest(
     val text: String,
@@ -230,6 +256,81 @@ private fun RemovedEntry.toResponse() = RemovedEntryResponse(
 // --- Routes ---
 
 fun Route.contextManagementRoutes(dbManager: DatabaseManager, extractor: FactExtractor? = null, extractionProvider: String? = null) {
+
+    // ==========================================
+    // Simplified interface: turns in, facts out
+    // ==========================================
+    post("/context") {
+        try {
+            val (db, tenantId) = call.getContext(dbManager)
+            val req = call.receive<SimpleContextRequest>()
+
+            if (req.turns.isEmpty()) {
+                call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", "turns must not be empty"))
+                return@post
+            }
+
+            // Step 1: Extract facts from each turn
+            val allText = req.turns.joinToString("\n")
+            var newFactsExtracted = 0
+
+            if (extractor != null) {
+                try {
+                    val facts = extractor.extract(allText)
+                    for (fact in facts) {
+                        val terms = fact.args.map { com.nocturnusai.core.Term.Identifier(it) }
+                        val atom = com.nocturnusai.core.Atom(fact.predicate, terms, scope = req.scope)
+                        try { db.assertFact(atom, tenantId); newFactsExtracted++ } catch (_: Exception) { }
+                    }
+                } catch (e: Exception) {
+                    call.application.environment.log.warn("Extraction failed in /context: ${e.message}")
+                }
+            } else {
+                // No LLM — try predicate syntax lines
+                for (line in allText.lines()) {
+                    val trimmed = line.trim()
+                    if (trimmed.isBlank() || trimmed.startsWith("#") || trimmed.startsWith("//")) continue
+                    val match = Regex("""^(\w+)\((.+)\)$""").find(trimmed) ?: continue
+                    val predicate = match.groupValues[1]
+                    val args = match.groupValues[2].split(",").map { it.trim().trim('"', '\'') }
+                    val terms = args.map { com.nocturnusai.core.Term.Identifier(it) }
+                    val atom = com.nocturnusai.core.Atom(predicate, terms, scope = req.scope)
+                    try { db.assertFact(atom, tenantId); newFactsExtracted++ } catch (_: Exception) { }
+                }
+            }
+
+            // Step 2: Optimize — return the most relevant facts
+            val result = db.optimizeContext(
+                request = OptimizeContextRequest(
+                    maxFacts = req.maxFacts ?: 50,
+                    scope = req.scope
+                ),
+                tenantId = tenantId
+            )
+
+            // Step 3: Flatten to simple response
+            call.respond(SimpleContextResponse(
+                facts = result.entries.map { entry ->
+                    SimpleFactResponse(
+                        predicate = entry.atom.predicate,
+                        args = entry.atom.args.map { it.toString() },
+                        salience = entry.salience,
+                        provenance = entry.provenance?.let { "${it.rule} ← ${it.premises.joinToString(", ")}" }
+                    )
+                },
+                totalFactsInKB = result.totalFactsAvailable,
+                factsReturned = result.totalFactsIncluded,
+                contradictions = result.contradictionsFound,
+                newFactsExtracted = newFactsExtracted
+            ))
+        } catch (e: ValidationException) {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
+        } catch (e: DatabaseNotFoundException) {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
+        } catch (e: Exception) {
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("CONTEXT_ERROR", e.message ?: "Error"))
+        }
+    }
 
     // Goal-driven context optimization
     post("/context/optimize") {

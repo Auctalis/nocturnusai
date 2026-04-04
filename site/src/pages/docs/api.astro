@@ -70,8 +70,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
             </thead>
             <tbody class="text-slate-400">
                 <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-emerald-400">POST /context</td>
+                    <td class="py-2"><strong>Simplest API</strong> — turns in, facts out. Array of strings → optimized facts</td>
+                </tr>
+                <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-emerald-400">POST /context/optimize</td>
-                    <td class="py-2">Goal-driven context window — 97% token reduction</td>
+                    <td class="py-2">Advanced: goal-driven context window with buckets, diversity caps</td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-emerald-400">POST /context/diff</td>
@@ -255,6 +259,37 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
     <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-emerald-500 text-slate-300">
         <strong>This is the money saver.</strong> Instead of stuffing 150K tokens into every LLM prompt ($2.25/request at GPT-4o rates), these endpoints deliver ~820 tokens of goal-relevant facts ($0.01/request). Same correct answer, 97% lower bill.
     </div>
+
+    <h3 id="context-simple">POST /context</h3>
+    <p>The simplest way to use NocturnusAI. Pass an array of conversation turns (strings), get back relevant facts. NocturnusAI extracts, stores, deduplicates, and ranks automatically.</p>
+    <h4>Request</h4>
+    <pre><code class="language-json">&#123;
+  "turns": [
+    "Acme Corp is on the enterprise plan and based in Austin.",
+    "They have a $2M contract with 24/7 SLA support."
+  ],
+  "maxFacts": 50,
+  "scope": null
+&#125;</code></pre>
+    <p>Only <code>turns</code> is required. <code>maxFacts</code> defaults to 50. <code>scope</code> is optional for data isolation.</p>
+
+    <h4>Response</h4>
+    <pre><code class="language-json">&#123;
+  "facts": [
+    &#123; "predicate": "customer_tier", "args": ["acme_corp", "enterprise"], "salience": 0.95, "provenance": null &#125;,
+    &#123; "predicate": "location", "args": ["acme_corp", "austin"], "salience": 0.88, "provenance": null &#125;,
+    &#123; "predicate": "contract_value", "args": ["acme_corp", "2000000"], "salience": 0.92, "provenance": null &#125;,
+    &#123; "predicate": "sla_tier", "args": ["acme_corp", "24_7"], "salience": 0.90, "provenance": null &#125;
+  ],
+  "totalFactsInKB": 127,
+  "factsReturned": 4,
+  "contradictions": 0,
+  "newFactsExtracted": 4
+&#125;</code></pre>
+
+    <p>Feed the <code>facts</code> array directly into your LLM's system prompt. See the <a href={`${base}/docs/context`}>Context Optimization guide</a> for full integration examples with OpenAI, Claude, LangChain, and MCP.</p>
+
+    <hr />
 
     <h3 id="context-optimize">POST /context/optimize</h3>
     <p>Build an optimized context window. Optionally goal-driven via backward chaining.</p>
