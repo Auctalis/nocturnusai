@@ -4,6 +4,9 @@
 *.DS_Store
 *.swp
 
+# Legacy build artifacts (old project name)
+axiombase-*/
+
 # Gradle
 .gradle/
 build/
@@ -19,6 +22,16 @@ logs/
 
 # Env / Secrets
 .env
+nocturnusai/.env
+
+# Claude Code (worktrees, caches — skills are kept)
+.claude/worktrees/
+.claude/projects/
+.claude/todos*
+
+# Generated
+llm.txt
+**/llm.txt
 
 # Data
 data/
@@ -47,3 +60,8 @@ client.py
 reproduce_logic.py
 verify_*.py
 generate_llm_txt.py
+
+# Dev scratch / generated artefacts
+hexastore_debug.log
+database_analysis.md
+legal_logic.logiql

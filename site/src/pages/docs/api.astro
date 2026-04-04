@@ -1,5 +1,7 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="API Reference">
@@ -14,7 +16,7 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
     <ul>
         <li><code>Content-Type: application/json</code> — required for all POST requests</li>
         <li><code>X-Database: default</code> — selects the logical database (optional, defaults to "default")</li>
-        <li><code>X-Tenant-ID: default</code> — selects the tenant within that database (optional)</li>
+        <li><code>X-Tenant-ID: &lt;name&gt;</code> — selects the tenant within that database (<strong>required</strong> on most endpoints; MCP routes default to "default")</li>
         <li><code>Authorization: Bearer &lt;key&gt;</code> — required when auth is enabled</li>
     </ul>
 
@@ -161,7 +163,7 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
     <hr />
 
     <h2 id="extract">POST /extract</h2>
-    <p>LLM-powered fact extraction from natural language text. See <a href="/docs/llm">LLM Integration</a> for details.</p>
+    <p>LLM-powered fact extraction from natural language text. See <a href={`${base}/docs/llm`}>LLM Integration</a> for details.</p>
     <h3>Request</h3>
     <pre><code class="language-json">&#123;
   "text": "Acme Corp is on the enterprise plan.",
@@ -174,7 +176,7 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
     <hr />
 
     <h2 id="synthesize">POST /synthesize</h2>
-    <p>LLM-powered natural language question answering grounded in facts. See <a href="/docs/llm">LLM Integration</a>.</p>
+    <p>LLM-powered natural language question answering grounded in facts. See <a href={`${base}/docs/llm`}>LLM Integration</a>.</p>
     <h3>Request</h3>
     <pre><code class="language-json">&#123;
   "question": "What plan is Acme Corp on?",
@@ -260,8 +262,100 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
                     <td class="py-2 font-mono text-cyan-400">POST /tx/rollback/:id</td>
                     <td class="py-2">Rollback transaction</td>
                 </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">GET /admin/databases/:name/tenants</td>
+                    <td class="py-2">List tenants in a database</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /admin/databases/:name/tenants</td>
+                    <td class="py-2">Create a tenant</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">DELETE /admin/databases/:name/tenants/:id</td>
+                    <td class="py-2">Delete a tenant and all its data</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /admin/databases/:name/nuke</td>
+                    <td class="py-2">Delete all data in a database</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /admin/databases/:name/tenants/:id/nuke</td>
+                    <td class="py-2">Delete all data in a tenant</td>
+                </tr>
             </tbody>
         </table>
     </div>
 
+    <hr />
+
+    <h2 id="scope">Scope Management</h2>
+    <p>Scopes are logical partitions within a tenant for hypothetical reasoning, versioning, and A/B testing. Use Git-like fork/diff/merge operations to branch knowledge.</p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Endpoint</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /scope/fork</td>
+                    <td class="py-2">Fork a scope — copies all facts from source to a new scope</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /scope/diff</td>
+                    <td class="py-2">Diff two scopes — shows added/removed/modified facts</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /scope/merge</td>
+                    <td class="py-2">Merge scopes with strategy: <code>SOURCE_WINS</code>, <code>TARGET_WINS</code>, <code>KEEP_BOTH</code>, <code>REJECT</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">DELETE /scope/:name</td>
+                    <td class="py-2">Delete a scope and all its facts</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">GET /scopes</td>
+                    <td class="py-2">List all scopes in the current tenant</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr />
+
+    <h2 id="aggregate">Aggregation & Bulk Operations</h2>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Endpoint</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /aggregate</td>
+                    <td class="py-2">Aggregation queries: <code>COUNT</code>, <code>SUM</code>, <code>MIN</code>, <code>MAX</code>, <code>AVG</code> on fact arguments</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /assert/facts</td>
+                    <td class="py-2">Bulk assert — submit an array of facts in a single request</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /retract/pattern</td>
+                    <td class="py-2">Pattern-based retraction — remove all facts matching a pattern</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <NextSteps links={[
+        { title: "SDKs", description: "Python and TypeScript client libraries", href: `${base}/docs/sdks` },
+        { title: "MCP Integration", description: "JSON-RPC 2.0 protocol for agent tools", href: `${base}/docs/mcp` },
+        { title: "Core Concepts", description: "Understand the logic model behind the API", href: `${base}/docs/concepts` },
+    ]} />
 </DocsLayout>

@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.server.auth
 
 import com.nocturnusai.server.ErrorResponse
@@ -21,6 +35,10 @@ import org.slf4j.LoggerFactory
  */
 object AuthInterceptor {
     private val log = LoggerFactory.getLogger(AuthInterceptor::class.java)
+
+    // Rate limit failed API-key validation: 20 attempts/minute, 1-minute lockout.
+    // Higher threshold than bootstrap because legitimate clients may retry quickly.
+    private val authRateLimiter = RateLimiter(maxAttempts = 20, windowMs = 60_000L, lockoutMs = 60_000L)
 
     /** Endpoints that never require authentication */
     private val PUBLIC_PATHS = setOf(
@@ -155,6 +173,21 @@ object AuthInterceptor {
                         return@intercept finish()
                     }
 
+                    // Check rate limit before any key work
+                    val clientIp = call.request.local.remoteHost
+                    when (val rate = authRateLimiter.check(clientIp)) {
+                        is RateLimiter.Result.LockedOut -> {
+                            log.warn("Auth rate limit exceeded from $clientIp — locked out for ${rate.retryAfterSeconds}s")
+                            call.response.header("Retry-After", rate.retryAfterSeconds.toString())
+                            call.respond(
+                                HttpStatusCode.TooManyRequests,
+                                ErrorResponse("RATE_LIMITED", "Too many failed auth attempts. Try again in ${rate.retryAfterSeconds}s")
+                            )
+                            return@intercept finish()
+                        }
+                        RateLimiter.Result.Allowed -> { /* proceed */ }
+                    }
+
                     // Require key
                     val rawKey = extractKey(call)
                     if (rawKey == null) {
@@ -168,12 +201,16 @@ object AuthInterceptor {
                     // Validate key
                     val principal = keyManager.validate(rawKey)
                     if (principal == null) {
+                        log.warn("Auth failed: invalid/expired key from $clientIp (prefix=${rawKey.take(8)}...)")
                         call.respond(
                             HttpStatusCode.Unauthorized,
                             ErrorResponse("UNAUTHORIZED", "Invalid, disabled, or expired API key")
                         )
                         return@intercept finish()
                     }
+
+                    // Successful auth — clear failure counter
+                    authRateLimiter.reset(clientIp)
 
                     // Check permission for this route
                     val method = call.request.httpMethod.value

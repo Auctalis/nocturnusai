@@ -6,7 +6,7 @@
 
 ```bash
 # Works everywhere. Installs everything. You're welcome. 🦞
-curl -fsSL https://openclaw.ai/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 ```
 
 That's it. NocturnusAI is now running on `http://localhost:9300`.
@@ -15,19 +15,19 @@ That's it. NocturnusAI is now running on `http://localhost:9300`.
 
 ```bash
 # With local LLM (Ollama — no API key needed)
-curl -fsSL https://openclaw.ai/install.sh | bash -s -- --ollama
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama
 
 # With your own API key (auto-detects Anthropic/OpenAI/Google)
-curl -fsSL https://openclaw.ai/install.sh | bash -s -- --key sk-ant-your-key
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --key sk-ant-your-key
 
 # With monitoring (Prometheus + Grafana dashboards)
-curl -fsSL https://openclaw.ai/install.sh | bash -s -- --monitoring
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --monitoring
 
 # Custom port
-curl -fsSL https://openclaw.ai/install.sh | bash -s -- --port 8080
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --port 8080
 
 # Everything at once
-curl -fsSL https://openclaw.ai/install.sh | bash -s -- --ollama --monitoring --port 8080
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama --monitoring --port 8080
 ```
 
 The installer:
@@ -140,11 +140,11 @@ with SyncNocturnusAIClient("http://localhost:9300") as client:
 ### TypeScript SDK
 
 ```bash
-npm install @nocturnusai/sdk
+npm install nocturnusai-sdk
 ```
 
 ```typescript
-import { NocturnusAIClient } from '@nocturnusai/sdk';
+import { NocturnusAIClient } from 'nocturnusai-sdk';
 
 const client = new NocturnusAIClient({ baseUrl: 'http://localhost:9300' });
 await client.assertFact('parent', ['alice', 'bob']);
@@ -168,7 +168,7 @@ docker compose down
 docker compose up -d
 
 # Update (re-run the installer)
-curl -fsSL https://openclaw.ai/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 ```
 
 ---

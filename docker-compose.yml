@@ -3,19 +3,17 @@
 #
 # Quick start:
 #   cp .env.example .env        # configure provider & keys
-#   docker compose up -d        # server only (bring your own LLM)
-#   docker compose --profile ollama up -d   # server + local Ollama
+#   docker compose up -d        # start the server
 #
 # Shortcuts via Makefile:
-#   make up                     # server only
-#   make up-ollama              # server + Ollama sidecar
+#   make up                     # start server
 #   make down / make logs / make health
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
   # ── NocturnusAI Logic Server ─────────────────────────────────────────────────
   nocturnusai:
-    image: nocturnusai:latest
+    image: ghcr.io/auctalis/nocturnusai:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -26,75 +24,45 @@ services:
       # - "${TLS_PORT:-9443}:${TLS_PORT:-9443}"  # Uncomment for TLS
     volumes:
       - nocturnusai-data:/data
-    env_file:
-      - path: .env
-        required: false
     environment:
-      # These are always set — .env overrides take precedence
+      # Server
       - PORT=${PORT:-9300}
       - HOST=0.0.0.0
       - STORAGE_DIR=/data
+      # Authentication
+      - API_KEY=${API_KEY:-}
+      - AUTH_ENABLED=${AUTH_ENABLED:-false}
+      - NOCTURNUSAI_ADMIN_USER=${NOCTURNUSAI_ADMIN_USER:-admin}
+      - NOCTURNUSAI_ADMIN_PASS=${NOCTURNUSAI_ADMIN_PASS:-nocturnusai}
+      # LLM provider (auto-detected from keys, or set LLM_PROVIDER explicitly)
+      - LLM_PROVIDER=${LLM_PROVIDER:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - EXTRACTION_ENABLED=${EXTRACTION_ENABLED:-false}
+      # Networking
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-localhost:3000,localhost:5173,localhost:8080}
+      - MAX_REQUEST_BODY_BYTES=${MAX_REQUEST_BODY_BYTES:-10485760}
+      # Data
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      # Replication
+      - REPLICATION_MODE=${REPLICATION_MODE:-LEADER}
+      - LEADER_URL=${LEADER_URL:-}
     networks:
       - nocturnusai-net
+    # Allows the container to reach Ollama (or any service) running on the host.
+    # On Docker Desktop (Mac/Windows) this is auto-injected; on Linux it requires the entry below.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-    depends_on:
-      ollama:
-        condition: service_started
-        required: false
-
-  # ── Ollama (local LLM — opt-in via profile) ───────────────────────────────
-  # Activated with:  docker compose --profile ollama up -d
-  # Or:  make up-ollama
-  #
-  # On first start, pulls the model (~2GB for llama3.2).
-  # GPU passthrough: uncomment the deploy section below.
-  ollama:
-    image: ollama/ollama:latest
-    container_name: nocturnusai-ollama
-    profiles:
-      - ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama-models:/root/.ollama
-    networks:
-      - nocturnusai-net
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
-    # ── GPU support (uncomment for NVIDIA) ──
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-
-  # ── Ollama model bootstrap ────────────────────────────────────────────────
-  # Pulls the configured model on first start, then exits.
-  ollama-pull:
-    image: curlimages/curl:latest
-    container_name: nocturnusai-ollama-pull
-    profiles:
-      - ollama
-    depends_on:
-      ollama:
-        condition: service_healthy
-    networks:
-      - nocturnusai-net
-    restart: "no"
-    entrypoint: >
-      sh -c "curl -sf http://ollama:11434/api/pull -d '{\"name\": \"${LLM_MODEL:-llama3.2}\"}' && echo 'Model ready.'"
 
   # ── Monitoring Stack (opt-in via profile) ──────────────────────────────
   # Activated with:  docker compose --profile monitoring up -d
@@ -132,7 +100,8 @@ services:
       - grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-nocturnusai}
+      # GRAFANA_PASSWORD must be set in .env — no default to prevent weak credentials
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?Set GRAFANA_PASSWORD in .env}
       - GF_USERS_ALLOW_SIGN_UP=false
     networks:
       - nocturnusai-net
@@ -141,8 +110,6 @@ services:
 
 volumes:
   nocturnusai-data:
-    driver: local
-  ollama-models:
     driver: local
   prometheus-data:
     driver: local

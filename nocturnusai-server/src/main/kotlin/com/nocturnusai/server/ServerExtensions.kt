@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.server
 
 import com.nocturnusai.NocturnusAI
@@ -26,7 +40,11 @@ data class FactRequest(
     // Temporal fields for agent memory management
     val validFrom: Long? = null,
     val validUntil: Long? = null,
-    val ttl: Long? = null // time-to-live in milliseconds
+    val ttl: Long? = null, // time-to-live in milliseconds
+    // Optional confidence score (0.0–1.0). null means unknown confidence.
+    val confidence: Double? = null,
+    // Conflict resolution strategy. null means use database default.
+    val conflictStrategy: com.nocturnusai.core.ConflictStrategy? = null
 )
 
 @Serializable
@@ -35,20 +53,27 @@ data class AtomDto(
     val args: List<String>,
     val negated: Boolean = false,
     val scope: String? = null,
-    val metadata: Map<String, JsonElement> = emptyMap()
+    val metadata: Map<String, JsonElement> = emptyMap(),
+    // When true on a rule body atom, this condition uses Negation-as-Failure:
+    // it succeeds iff the atom CANNOT be proven (closed-world assumption).
+    // Distinct from negated=true which is classical explicit negation.
+    val naf: Boolean = false,
+    val confidence: Double? = null
 )
 
 @Serializable
 data class RuleRequest(
     val head: AtomDto,
     val body: List<AtomDto>,
-    val scope: String? = null
+    val scope: String? = null,
+    val confidence: Double? = null
 )
 
 @Serializable
 data class CreateDbRequest(
     val name: String,
-    val isMultiTenant: Boolean = false
+    val isMultiTenant: Boolean = false,
+    val defaultConflictStrategy: com.nocturnusai.core.ConflictStrategy = com.nocturnusai.core.ConflictStrategy.REJECT
 )
 
 @Serializable
@@ -75,7 +100,8 @@ data class AtomResponse(
     val createdAt: Long? = null,
     val validFrom: Long? = null,
     val validUntil: Long? = null,
-    val ttl: Long? = null
+    val ttl: Long? = null,
+    val confidence: Double? = null
 ) {
     companion object {
         fun from(atom: Atom): AtomResponse = AtomResponse(
@@ -87,7 +113,8 @@ data class AtomResponse(
             createdAt = atom.createdAt,
             validFrom = atom.validFrom,
             validUntil = atom.validUntil,
-            ttl = atom.ttl
+            ttl = atom.ttl,
+            confidence = atom.confidence
         )
     }
 }
@@ -305,10 +332,16 @@ object Validator {
         for (arg in req.args) {
             if (arg.length > ValidationLimits.MAX_STRING_LENGTH) throw ValidationException("Argument exceeds max length of ${ValidationLimits.MAX_STRING_LENGTH}")
         }
+        if (req.confidence != null && (req.confidence < 0.0 || req.confidence > 1.0)) {
+            throw ValidationException("Confidence must be between 0.0 and 1.0")
+        }
         validateMetadata(req.metadata, "fact")
     }
 
     fun validateRuleRequest(req: RuleRequest) {
+        if (req.confidence != null && (req.confidence < 0.0 || req.confidence > 1.0)) {
+            throw ValidationException("Rule confidence must be between 0.0 and 1.0")
+        }
         validateAtomDto(req.head, "head")
         if (req.body.isEmpty()) throw ValidationException("Rule body must not be empty")
         req.body.forEachIndexed { i, atom ->
@@ -322,6 +355,9 @@ object Validator {
         if (atom.args.size > ValidationLimits.MAX_ARG_COUNT) throw ValidationException("$label argument count exceeds max of ${ValidationLimits.MAX_ARG_COUNT}")
         for (arg in atom.args) {
             if (arg.length > ValidationLimits.MAX_STRING_LENGTH) throw ValidationException("$label argument exceeds max length of ${ValidationLimits.MAX_STRING_LENGTH}")
+        }
+        if (atom.confidence != null && (atom.confidence < 0.0 || atom.confidence > 1.0)) {
+            throw ValidationException("$label confidence must be between 0.0 and 1.0")
         }
         validateMetadata(atom.metadata, label)
     }

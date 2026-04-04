@@ -3,8 +3,8 @@ const steps = [
   {
     step: "01",
     title: "Deploy the Logic Engine",
-    desc: "Clone and run docker compose up. Nocturnus is live on port 9300 in under 30 seconds — WAL initialised, Hexastore ready, inference engines running. Your infrastructure is up.",
-    tag: "30 seconds"
+    desc: "One curl command. Requires Docker with Compose V2 already installed. The installer pulls the image, starts the server via Docker Compose, waits for healthy, and installs the native CLI binary. Nocturnus is live on port 9300 in under 30 seconds.",
+    tag: "Requires Docker"
   },
   {
     step: "02",
@@ -67,9 +67,9 @@ const steps = [
         <span class="ml-2 text-xs font-mono text-slate-600">bash</span>
       </div>
       <div class="p-5 font-mono text-sm space-y-2">
-        <div><span class="text-cyan-500">$</span> <span class="text-slate-300">git clone https://github.com/Auctalis/nocturnusai</span></div>
-        <div><span class="text-cyan-500">$</span> <span class="text-slate-300">docker compose up -d</span></div>
+        <div><span class="text-cyan-500">$</span> <span class="text-slate-300">curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</span></div>
         <div class="text-emerald-400">✓ Nocturnus live on :9300 — WAL ready · Hexastore ready · Inference ready</div>
+        <div class="text-emerald-400">✓ CLI installed → nocturnusai</div>
         <div class="mt-2"><span class="text-cyan-500">$</span> <span class="text-slate-300">curl localhost:9300/health</span></div>
         <div class="text-emerald-400">&#123; "status": "ok", "ready": true &#125;</div>
       </div>

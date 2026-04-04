@@ -1,0 +1,23 @@
+{
+  "name": "nocturnusai-demos-ts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TypeScript SDK demos for NocturnusAI",
+  "scripts": {
+    "basics":          "ts-node 01_basics.ts",
+    "rules":           "ts-node 02_rules_and_inference.ts",
+    "memory":          "ts-node 03_memory_management.ts",
+    "transactions":    "ts-node 04_transactions.ts",
+    "auth":            "ts-node 05_auth_and_keys.ts",
+    "events":          "ts-node 06_events_sse.ts",
+    "agent":           "ts-node 07_agent_workflow.ts"
+  },
+  "dependencies": {
+    "nocturnusai-sdk": "file:../../sdks/typescript"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
+  }
+}

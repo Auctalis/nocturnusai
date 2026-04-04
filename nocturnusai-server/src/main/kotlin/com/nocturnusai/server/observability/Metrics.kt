@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.server.observability
 
 import io.micrometer.core.instrument.Counter
@@ -6,6 +20,7 @@ import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Central metrics registry for NocturnusAI.
@@ -47,6 +62,11 @@ object Metrics {
         // ── MCP gauges ──────────────────────────────────────────────────
         Gauge.builder("nocturnusai_mcp_sse_subscribers", mcpSseSubscribers) { it.toDouble() }
             .description("Active MCP SSE subscribers")
+            .register(registry)
+
+        // ── Replication gauges ──────────────────────────────────────
+        Gauge.builder("nocturnusai_replication_lag", replicationLag) { it.toDouble() }
+            .description("Replication lag (leader WAL entries ahead of follower)")
             .register(registry)
     }
 
@@ -167,6 +187,30 @@ object Metrics {
             .description("Facts evicted by low salience")
             .register(registry).increment(evicted.toDouble())
     }
+
+    // ── Replication ──────────────────────────────────────────────────────
+
+    // Overall lag gauge (sum across all databases for simplicity)
+    val replicationLag = AtomicLong(0)
+
+    // Per-database last synced WAL ID (for health endpoint)
+    private val lastSyncedWalIds = ConcurrentHashMap<String, AtomicLong>()
+    private val consecutiveFailures = ConcurrentHashMap<String, AtomicInteger>()
+
+    fun replicationLastSyncedWalId(dbName: String, walId: Long) {
+        lastSyncedWalIds.getOrPut(dbName) { AtomicLong(0) }.set(walId)
+        consecutiveFailures.getOrPut(dbName) { AtomicInteger(0) }.set(0)
+    }
+
+    fun replicationConsecutiveFailures(dbName: String) {
+        consecutiveFailures.getOrPut(dbName) { AtomicInteger(0) }.incrementAndGet()
+    }
+
+    fun getLastSyncedWalId(dbName: String): Long =
+        lastSyncedWalIds[dbName]?.get() ?: 0L
+
+    fun getConsecutiveFailures(dbName: String): Int =
+        consecutiveFailures[dbName]?.get() ?: 0
 
     // ── MCP ──────────────────────────────────────────────────────────────
 

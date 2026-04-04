@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+    <!--
+        CVE-2023-35116 — jackson-databind "StackOverflow" via deeply-nested structures.
+        Status: DISPUTED. The Jackson maintainers reject this as a vulnerability:
+        https://github.com/FasterXML/jackson-databind/issues/3973
+        NVD has marked it as "DISPUTED". Not exploitable in practice without untrusted
+        deeply-nested input AND recursion without depth limit, which our codebase does not do.
+    -->
+    <suppress>
+        <notes>CVE-2023-35116 is disputed by Jackson maintainers — not a real vulnerability in practice</notes>
+        <cve>CVE-2023-35116</cve>
+    </suppress>
+
+    <!--
+        CVE-2022-31530 matched against ktor-server-call-logging via CPE heuristic
+        for "csm_server_project:csm_server". This is a false positive — the CVE is for
+        an unrelated C-language CSM Server project, not JetBrains Ktor.
+    -->
+    <suppress>
+        <notes>False positive — CVE-2022-31530 is for an unrelated C project (csm_server), not Ktor</notes>
+        <cve>CVE-2022-31530</cve>
+    </suppress>
+
+    <!--
+        CVE-2010-1151 / CVE-2002-1178 matched against ktor-network-tls-certificates via
+        CPE heuristics misidentifying the 2.3.7 version string as Apache httpd or Jetty.
+        These are ancient CVEs for unrelated products — clear false positives.
+    -->
+    <suppress>
+        <notes>False positive — ancient Apache/Jetty CVEs mismatched to Ktor via CPE version heuristic</notes>
+        <cve>CVE-2010-1151</cve>
+    </suppress>
+    <suppress>
+        <notes>False positive — ancient Apache/Jetty CVEs mismatched to Ktor via CPE version heuristic</notes>
+        <cve>CVE-2002-1178</cve>
+    </suppress>
+
+
+    <!--
+        CVE-2025-55163 / CVE-2025-58056 / CVE-2025-58057 — Netty 4.1.x HTTP/2 CVEs.
+        These are 2025 CVEs with NO fix available in the Netty 4.1.x branch.
+        We force Netty to 4.1.121.Final (latest available), which is still affected.
+        A fix requires Netty 4.2.x or higher, which is a major version change that
+        Ktor 2.x does not support. Tracked for resolution via Ktor 3.x migration.
+        NVD status: awaiting analysis / no fix version published as of 2026-02.
+    -->
+    <suppress>
+        <notes>No fix in Netty 4.1.x — requires Netty 4.2.x (blocked by Ktor 2.x). Tracked for Ktor 3.x migration.</notes>
+        <cve>CVE-2025-55163</cve>
+    </suppress>
+    <suppress>
+        <notes>No fix in Netty 4.1.x — requires Netty 4.2.x (blocked by Ktor 2.x). Tracked for Ktor 3.x migration.</notes>
+        <cve>CVE-2025-58056</cve>
+    </suppress>
+    <suppress>
+        <notes>No fix in Netty 4.1.x — requires Netty 4.2.x (blocked by Ktor 2.x). Tracked for Ktor 3.x migration.</notes>
+        <cve>CVE-2025-58057</cve>
+    </suppress>
+
+</suppressions>

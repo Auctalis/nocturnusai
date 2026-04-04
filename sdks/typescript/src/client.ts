@@ -7,7 +7,7 @@
  *
  * @example
  * ```ts
- * import { NocturnusAIClient } from '@nocturnusai/sdk';
+ * import { NocturnusAIClient } from 'nocturnusai-sdk';
  *
  * const client = new NocturnusAIClient({
  *   baseUrl: 'http://localhost:9300',

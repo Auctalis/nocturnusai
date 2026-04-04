@@ -1,11 +1,13 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="SDKs">
     <h1>SDKs & Agents</h1>
     <p class="lead text-xl text-slate-400">
-        Official client libraries for Python and TypeScript — plus LangChain integration.
+        Official client libraries for Python and TypeScript — plus native integrations for LangChain, CrewAI, AutoGen, LangGraph, OpenAI Agents SDK, and Anthropic SDK.
     </p>
 
     <hr />
@@ -16,8 +18,15 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
     <h3>Installation</h3>
     <pre><code class="language-bash">pip install nocturnusai
 
-# With LangChain integration
-pip install nocturnusai[langchain]</code></pre>
+# With framework integrations
+pip install nocturnusai[langchain]
+pip install nocturnusai[crewai]
+pip install nocturnusai[autogen]
+pip install nocturnusai[langgraph]
+pip install nocturnusai[openai-agents]
+
+# Install all integrations
+pip install nocturnusai[all]</code></pre>
 
     <h3>Sync Client</h3>
     <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
@@ -118,14 +127,201 @@ print(result["output"])
 
     <hr />
 
+    <h2 id="crewai">CrewAI Integration</h2>
+    <p>Five <code>BaseTool</code> subclasses and a <code>Storage</code> backend for CrewAI agents. Each tool has a Pydantic input schema for structured argument validation.</p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Tool</th>
+                    <th class="py-2">Purpose</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">NocturnusAITellTool</td>
+                    <td class="py-2">Assert a fact into the knowledge base</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">NocturnusAIAskTool</td>
+                    <td class="py-2">Run logical inference queries</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">NocturnusAITeachTool</td>
+                    <td class="py-2">Define logical rules</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">NocturnusAIForgetTool</td>
+                    <td class="py-2">Retract facts</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">NocturnusAIContextTool</td>
+                    <td class="py-2">Get salience-ranked context window</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Quick Start</h3>
+    <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
+from nocturnusai.crewai import get_nocturnusai_tools, NocturnusAIStorage
+
+client = SyncNocturnusAIClient("http://localhost:9300")
+tools = get_nocturnusai_tools(client)
+storage = NocturnusAIStorage(client=client)</code></pre>
+
+    <h3>With a CrewAI Agent</h3>
+    <pre><code class="language-python">from crewai import Agent, Task, Crew
+
+reasoner = Agent(
+    role="Knowledge Reasoner",
+    goal="Store facts and answer questions using logical inference",
+    backstory="You are an expert at structured reasoning.",
+    tools=tools,
+)
+
+task = Task(
+    description="Alice is Bob's parent. Bob is Charlie's parent. "
+                "Who is Charlie's grandparent?",
+    agent=reasoner,
+    expected_output="The grandparent relationship",
+)
+
+crew = Crew(agents=[reasoner], tasks=[task])
+result = crew.kickoff()</code></pre>
+
+    <hr />
+
+    <h2 id="autogen">AutoGen Integration</h2>
+    <p>Five plain Python tool functions and an async <code>Memory</code> protocol implementation for AutoGen agents.</p>
+
+    <h3>Quick Start</h3>
+    <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
+from nocturnusai.autogen import get_nocturnusai_tools, NocturnusAIMemory
+
+client = SyncNocturnusAIClient("http://localhost:9300")
+
+# Get tool functions: tell, ask, teach, forget, context
+tools = get_nocturnusai_tools(client)
+
+# Or use as agent memory
+memory = NocturnusAIMemory(client=client)</code></pre>
+
+    <h3>Tool Functions</h3>
+    <p>The five tool functions work with or without <code>autogen-agentchat</code> installed:</p>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Function</th>
+                    <th class="py-2">Purpose</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">nocturnusai_tell</td>
+                    <td class="py-2">Assert a fact (predicate + JSON args)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">nocturnusai_ask</td>
+                    <td class="py-2">Query via inference (use <code>?</code>-prefixed variables)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">nocturnusai_teach</td>
+                    <td class="py-2">Define a logical rule (JSON head + body)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">nocturnusai_forget</td>
+                    <td class="py-2">Retract a fact</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">nocturnusai_context</td>
+                    <td class="py-2">Get salience-ranked context window</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Memory Protocol</h3>
+    <p><code>NocturnusAIMemory</code> implements the AutoGen Memory interface (<code>add</code>, <code>query</code>, <code>update_context</code>, <code>clear</code>, <code>close</code>), storing messages as NocturnusAI facts with salience-ranked retrieval.</p>
+
+    <hr />
+
+    <h2 id="langgraph">LangGraph Integration</h2>
+    <p>A checkpoint saver that persists LangGraph graph state as NocturnusAI facts, using scopes for thread isolation.</p>
+
+    <h3>Quick Start</h3>
+    <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
+from nocturnusai.langgraph import NocturnusAICheckpointSaver
+
+client = SyncNocturnusAIClient("http://localhost:9300")
+saver = NocturnusAICheckpointSaver(client=client)
+
+# Use with a LangGraph compiled graph
+app = graph.compile(checkpointer=saver)</code></pre>
+
+    <h3>How It Works</h3>
+    <p>Each checkpoint is stored as a fact with predicate <code>lg_checkpoint</code> and args <code>[thread_id, state_json, metadata_json]</code>. LangGraph threads map to NocturnusAI scopes for isolation. The saver implements <code>put</code>, <code>get_tuple</code>, and <code>list</code> for full checkpoint lifecycle management.</p>
+
+    <hr />
+
+    <h2 id="openai-agents">OpenAI Agents SDK Integration</h2>
+    <p>Five tool functions that work with or without the <code>openai-agents</code> package. When the package is installed, functions are automatically decorated with <code>@function_tool</code>.</p>
+
+    <h3>Quick Start</h3>
+    <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
+from nocturnusai.openai_agents import get_nocturnusai_tools
+
+client = SyncNocturnusAIClient("http://localhost:9300")
+tools = get_nocturnusai_tools(client)
+
+# Use with an OpenAI Agent
+from agents import Agent
+
+agent = Agent(
+    name="reasoner",
+    instructions="You are a knowledge reasoning agent.",
+    tools=tools,
+)</code></pre>
+
+    <hr />
+
+    <h2 id="anthropic">Anthropic SDK Integration</h2>
+    <p>JSON schema tool definitions and a dispatcher function for use with the Anthropic Messages API. Zero framework dependencies — works with the raw <code>anthropic</code> SDK.</p>
+
+    <h3>Quick Start</h3>
+    <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
+from nocturnusai.anthropic_tools import get_nocturnusai_tool_definitions, handle_tool_call
+
+client = SyncNocturnusAIClient("http://localhost:9300")
+tools = get_nocturnusai_tool_definitions()
+
+# Pass tool definitions to Claude
+response = anthropic_client.messages.create(
+    model="claude-sonnet-4-6",
+    tools=tools,
+    messages=[&#123;"role": "user", "content": "Alice likes Bob. Who likes Bob?"&#125;],
+)
+
+# Handle tool calls from Claude's response
+for block in response.content:
+    if block.type == "tool_use":
+        result = handle_tool_call(client, block.name, block.input)</code></pre>
+
+    <h3>Tool Definitions</h3>
+    <p>Returns 5 Anthropic-compatible tool definitions with full JSON schemas: <code>nocturnusai_tell</code>, <code>nocturnusai_ask</code>, <code>nocturnusai_teach</code>, <code>nocturnusai_forget</code>, and <code>nocturnusai_context</code>. The <code>handle_tool_call()</code> dispatcher routes tool names to the appropriate client methods.</p>
+
+    <hr />
+
     <h2 id="typescript">TypeScript SDK</h2>
-    <p>Zero-dependency typed client. Works in Node.js 18+ and modern browsers. Published on <a href="https://www.npmjs.com/package/@nocturnusai/sdk" target="_blank">npm</a>.</p>
+    <p>Zero-dependency typed client. Works in Node.js 18+ and modern browsers. Published on <a href="https://www.npmjs.com/package/nocturnusai-sdk" target="_blank">npm</a>.</p>
 
     <h3>Installation</h3>
-    <pre><code class="language-bash">npm install @nocturnusai/sdk</code></pre>
+    <pre><code class="language-bash">npm install nocturnusai-sdk</code></pre>
 
     <h3>Usage</h3>
-    <pre><code class="language-typescript">import &#123; NocturnusAIClient &#125; from '@nocturnusai/sdk';
+    <pre><code class="language-typescript">import &#123; NocturnusAIClient &#125; from 'nocturnusai-sdk';
 
 const client = new NocturnusAIClient(&#123;
   baseUrl: 'http://localhost:9300',
@@ -152,7 +348,7 @@ console.log(results);</code></pre>
 
     <h3>MCP Client</h3>
     <p>The SDK also includes an MCP client for JSON-RPC 2.0 tool calls:</p>
-    <pre><code class="language-typescript">import &#123; NocturnusAIMCPClient &#125; from '@nocturnusai/sdk';
+    <pre><code class="language-typescript">import &#123; NocturnusAIMCPClient &#125; from 'nocturnusai-sdk';
 
 const mcp = new NocturnusAIMCPClient(&#123;
   baseUrl: 'http://localhost:9300'
@@ -170,4 +366,9 @@ const result = await mcp.callTool('ask', &#123;
   args: ['?who', 'charlie']
 &#125;);</code></pre>
 
+    <NextSteps links={[
+        { title: "Integrations", description: "Quick-start cards for all 6 framework integrations", href: `${base}/docs/integrations` },
+        { title: "API Reference", description: "Every endpoint with full request/response shapes", href: `${base}/docs/api` },
+        { title: "MCP Integration", description: "Connect via Model Context Protocol in 30 seconds", href: `${base}/docs/mcp` },
+    ]} />
 </DocsLayout>

@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.server.routes
 
 import com.nocturnusai.server.*
@@ -208,7 +222,9 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
                 "scope" to propString("Optional isolation scope (e.g., 'session_123', 'hypothesis_a')"),
                 "negated" to propBool("Set true to store the negation of this fact"),
                 "ttl" to propNumber("Auto-expire after this many milliseconds"),
-                "validUntil" to propNumber("Epoch ms when this fact stops being valid")
+                "validUntil" to propNumber("Epoch ms when this fact stops being valid"),
+                "confidence" to propNumber("Optional confidence score 0.0–1.0 (e.g., 0.9 = high confidence from LLM extraction)"),
+                "conflictStrategy" to propString("How to handle contradictions: REJECT (default), NEWEST_WINS, CONFIDENCE, KEEP_BOTH")
             ),
             required = listOf("predicate", "args")
         ))
@@ -232,7 +248,8 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
                 "predicate" to propString("What you're asking about (e.g., 'grandparent')"),
                 "args" to propArray("Use ?x, ?who etc. for unknowns, concrete values to constrain (e.g., ['?who', 'charlie'])"),
                 "scope" to propString("Optional scope filter"),
-                "withProof" to propBool("If true, include the full reasoning chain showing how each answer was derived")
+                "withProof" to propBool("If true, include the full reasoning chain showing how each answer was derived"),
+                "minConfidence" to propNumber("Optional minimum confidence threshold 0.0–1.0. Filters out facts below this confidence.")
             ),
             required = listOf("predicate", "args")
         ))
@@ -290,6 +307,69 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
             ),
             required = emptyList()
         ))
+        add(toolSchema(
+            name = "aggregate",
+            description = "Compute COUNT, SUM, MIN, MAX, or AVG over facts matching a pattern. Use COUNT to count matches, or SUM/MIN/MAX/AVG to aggregate a numeric argument at a specific position. Example: COUNT all score(player, ?) facts, or SUM the scores at argIndex=1.",
+            properties = mapOf(
+                "predicate" to propString("The predicate to aggregate over"),
+                "args" to propArray("Pattern arguments. Use ?x, ?who etc. for wildcards, concrete values to constrain"),
+                "operation" to propString("Aggregation operation: COUNT, SUM, MIN, MAX, or AVG"),
+                "argIndex" to propNumber("Argument position (0-based) to aggregate for SUM/MIN/MAX/AVG (ignored for COUNT)"),
+                "scope" to propString("Optional scope filter")
+            ),
+            required = listOf("predicate", "args", "operation")
+        ))
+        add(toolSchema(
+            name = "bulk_assert",
+            description = "Assert multiple facts in a single call. Non-transactional: each fact is attempted independently — contradictions are reported as errors rather than aborting the batch. Returns counts of successful and failed assertions.",
+            properties = mapOf(
+                "facts" to propArray("Array of fact objects, each with 'predicate', 'args', optional 'negated', 'scope', 'ttl', 'validUntil'")
+            ),
+            required = listOf("facts")
+        ))
+        add(toolSchema(
+            name = "retract_pattern",
+            description = "Retract all facts matching a pattern in a single call. Use ?x, ?y etc. as wildcards to retract multiple facts at once. Returns the count and list of retracted facts.",
+            properties = mapOf(
+                "predicate" to propString("The predicate pattern to match for retraction"),
+                "args" to propArray("Arguments. Use ?x, ?who etc. as wildcards to match multiple facts"),
+                "scope" to propString("Optional scope filter")
+            ),
+            required = listOf("predicate", "args")
+        ))
+        add(toolSchema(
+            name = "fork_scope",
+            description = "Fork a knowledge base scope. Creates an independent copy of all facts in sourceScope under targetScope. Use this to safely explore hypothetical scenarios ('What if Alice moves to London?') without modifying the main knowledge base. sourceScope=null forks from the global (unscoped) partition.",
+            properties = mapOf(
+                "sourceScope" to propString("Scope to copy from. Omit or pass null for the global partition."),
+                "targetScope" to propString("New scope name to copy all facts into.")
+            ),
+            required = listOf("targetScope")
+        ))
+        add(toolSchema(
+            name = "merge_scope",
+            description = "Merge facts from sourceScope back into targetScope (default: global). Useful for committing hypothetical reasoning back into the main knowledge base. Choose a conflict strategy: SOURCE_WINS overwrites, TARGET_WINS keeps existing, KEEP_BOTH retains both, REJECT aborts if conflicts found.",
+            properties = mapOf(
+                "sourceScope" to propString("Scope to merge facts from."),
+                "targetScope" to propString("Destination scope. Omit or pass null for the global partition."),
+                "strategy" to propString("Conflict strategy: SOURCE_WINS | TARGET_WINS | KEEP_BOTH | REJECT (default: SOURCE_WINS)")
+            ),
+            required = listOf("sourceScope")
+        ))
+        add(toolSchema(
+            name = "list_scopes",
+            description = "List all named scopes currently in the knowledge base. Useful for discovering what hypothetical contexts or reasoning branches exist.",
+            properties = emptyMap(),
+            required = emptyList()
+        ))
+        add(toolSchema(
+            name = "delete_scope",
+            description = "Delete a knowledge base scope and all facts within it. Use this to clean up completed or abandoned hypothetical reasoning branches.",
+            properties = mapOf(
+                "scope" to propString("The scope name to delete.")
+            ),
+            required = listOf("scope")
+        ))
     }
 
     val result = JsonObject(mapOf("tools" to tools))
@@ -319,6 +399,15 @@ private fun handleToolCall(
             "compress" -> callConsolidate(db, tenantId)
             "cleanup" -> callDecay(db, tenantId, arguments)
             "predicates" -> callPredicates(db, tenantId, arguments)
+            // Aggregation and bulk tools
+            "aggregate" -> callAggregate(db, tenantId, arguments)
+            "bulk_assert" -> callBulkAssert(db, tenantId, arguments)
+            "retract_pattern" -> callRetractPattern(db, tenantId, arguments)
+            // Scope management tools
+            "fork_scope" -> callForkScope(db, tenantId, arguments)
+            "merge_scope" -> callMergeScope(db, tenantId, arguments)
+            "list_scopes" -> callListScopes(db, tenantId)
+            "delete_scope" -> callDeleteScope(db, tenantId, arguments)
             // Legacy names (backward compatible)
             "assert_fact" -> callAssertFact(db, tenantId, arguments)
             "assert_rule" -> callAssertRule(db, tenantId, arguments)
@@ -385,6 +474,12 @@ private fun callAssertFact(db: com.nocturnusai.NocturnusAI, tenantId: String, ar
     val negated = args["negated"]?.jsonPrimitive?.booleanOrNull ?: false
     val ttl = args["ttl"]?.jsonPrimitive?.longOrNull
     val validUntil = args["validUntil"]?.jsonPrimitive?.longOrNull
+    val confidence = args["confidence"]?.jsonPrimitive?.doubleOrNull
+    val conflictStrategyStr = args["conflictStrategy"]?.jsonPrimitive?.contentOrNull
+    val conflictStrategy = conflictStrategyStr?.let {
+        try { com.nocturnusai.core.ConflictStrategy.valueOf(it) }
+        catch (_: IllegalArgumentException) { throw IllegalArgumentException("Invalid conflictStrategy: $it. Valid values: REJECT, NEWEST_WINS, CONFIDENCE, KEEP_BOTH") }
+    } ?: db.defaultConflictStrategy
 
     val terms = argsList.map { parseTerm(it) }
     val atom = com.nocturnusai.core.Atom(
@@ -393,9 +488,10 @@ private fun callAssertFact(db: com.nocturnusai.NocturnusAI, tenantId: String, ar
         truthVal = !negated,
         scope = scope,
         ttl = ttl,
-        validUntil = validUntil
+        validUntil = validUntil,
+        confidence = confidence
     )
-    db.assertFact(atom, tenantId)
+    db.assertFact(atom, tenantId, conflictStrategy = conflictStrategy)
     return "Stored: $atom"
 }
 
@@ -413,7 +509,8 @@ private fun callAssertRule(db: com.nocturnusai.NocturnusAI, tenantId: String, ar
         val bp = obj["predicate"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing body predicate")
         val ba = obj["args"]?.jsonArray?.map { parseTerm(it.jsonPrimitive.content) } ?: emptyList()
         val negated = obj["negated"]?.jsonPrimitive?.booleanOrNull ?: false
-        com.nocturnusai.core.Atom(bp, ba, truthVal = !negated, scope = scope)
+        val naf = obj["naf"]?.jsonPrimitive?.booleanOrNull ?: false
+        com.nocturnusai.core.Atom(bp, ba, truthVal = !negated, scope = scope, naf = naf)
     }
 
     val allTerms = headArgs + bodyAtoms.flatMap { it.args }
@@ -446,6 +543,7 @@ private fun callInfer(db: com.nocturnusai.NocturnusAI, tenantId: String, args: J
     val argsList = args["args"]?.jsonArray?.map { it.jsonPrimitive.content } ?: throw IllegalArgumentException("Missing args")
     val scope = args["scope"]?.jsonPrimitive?.contentOrNull
     val withProof = args["withProof"]?.jsonPrimitive?.booleanOrNull ?: false
+    val minConfidence = args["minConfidence"]?.jsonPrimitive?.doubleOrNull
 
     val terms = argsList.map { parseTerm(it) }
     val pattern = com.nocturnusai.core.Atom(predicate, terms, scope = scope)
@@ -461,12 +559,13 @@ private fun callInfer(db: com.nocturnusai.NocturnusAI, tenantId: String, args: J
         }
         return sb.toString()
     } else {
-        val results = db.infer(pattern, tenantId).toList()
+        val results = db.infer(pattern, tenantId, minConfidence = minConfidence).toList()
         if (results.isEmpty()) return "No results could be inferred."
 
         val sb = StringBuilder("Inferred ${results.size} result(s):\n")
         for (atom in results) {
-            sb.append("  ${atom}\n")
+            val confStr = if (atom.confidence != null) " [confidence=${String.format("%.2f", atom.confidence)}]" else ""
+            sb.append("  ${atom}$confStr\n")
         }
         return sb.toString()
     }
@@ -581,6 +680,138 @@ private fun callPredicates(db: com.nocturnusai.NocturnusAI, tenantId: String, ar
         sb.append("  $pred/$arity — $count fact(s)$hasRules\n")
     }
     return sb.toString()
+}
+
+// --- Aggregation & Bulk Tool Implementations ---
+
+private fun callAggregate(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
+    val predicate = args["predicate"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing predicate")
+    val argsList = args["args"]?.jsonArray?.map { it.jsonPrimitive.content } ?: throw IllegalArgumentException("Missing args")
+    val operationStr = args["operation"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing operation")
+    val argIndex = args["argIndex"]?.jsonPrimitive?.intOrNull ?: 0
+    val scope = args["scope"]?.jsonPrimitive?.contentOrNull
+
+    val op = try {
+        com.nocturnusai.storage.AggregateOp.valueOf(operationStr.uppercase())
+    } catch (_: IllegalArgumentException) {
+        throw IllegalArgumentException("Unknown operation '$operationStr'. Allowed: COUNT, SUM, MIN, MAX, AVG")
+    }
+
+    val terms = argsList.map { parseTerm(it) }
+    val pattern = com.nocturnusai.core.Atom(predicate, terms, scope = scope)
+
+    return if (op == com.nocturnusai.storage.AggregateOp.COUNT) {
+        val count = db.countFacts(pattern, tenantId, scope)
+        "COUNT($predicate) = $count"
+    } else {
+        val matchedFacts = db.countFacts(pattern, tenantId, scope)
+        val result = db.aggregateFacts(pattern, argIndex, op, tenantId, scope)
+        if (result == null) {
+            "${op.name}($predicate, argIndex=$argIndex) = null (no numeric values found among $matchedFacts matched facts)"
+        } else {
+            "${op.name}($predicate, argIndex=$argIndex) = $result (over $matchedFacts matched facts)"
+        }
+    }
+}
+
+private fun callBulkAssert(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
+    val factsArray = args["facts"]?.jsonArray ?: throw IllegalArgumentException("Missing facts array")
+
+    val atoms = factsArray.mapIndexed { index, elem ->
+        val obj = elem.jsonObject
+        val predicate = obj["predicate"]?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("facts[$index]: Missing predicate")
+        val argsList = obj["args"]?.jsonArray?.map { it.jsonPrimitive.content }
+            ?: throw IllegalArgumentException("facts[$index]: Missing args")
+        val negated = obj["negated"]?.jsonPrimitive?.booleanOrNull ?: false
+        val scope = obj["scope"]?.jsonPrimitive?.contentOrNull
+        val ttl = obj["ttl"]?.jsonPrimitive?.longOrNull
+        val validUntil = obj["validUntil"]?.jsonPrimitive?.longOrNull
+
+        val terms = argsList.map { parseTerm(it) }
+        com.nocturnusai.core.Atom(
+            predicate = predicate,
+            args = terms,
+            truthVal = !negated,
+            scope = scope,
+            ttl = ttl,
+            validUntil = validUntil
+        )
+    }
+
+    val result = db.bulkAssertFacts(atoms, tenantId)
+
+    val sb = StringBuilder("Bulk assert: ${result.asserted} stored, ${result.failed} failed.\n")
+    if (result.errors.isNotEmpty()) {
+        sb.append("Errors:\n")
+        result.errors.forEach { sb.append("  - $it\n") }
+    }
+    return sb.toString()
+}
+
+private fun callRetractPattern(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
+    val predicate = args["predicate"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing predicate")
+    val argsList = args["args"]?.jsonArray?.map { it.jsonPrimitive.content } ?: throw IllegalArgumentException("Missing args")
+    val scope = args["scope"]?.jsonPrimitive?.contentOrNull
+
+    val terms = argsList.map { parseTerm(it) }
+    val pattern = com.nocturnusai.core.Atom(predicate, terms, scope = scope)
+
+    val result = db.retractByPattern(pattern, tenantId, scope)
+
+    if (result.retracted == 0) {
+        return "No facts matched the pattern $predicate(${argsList.joinToString(", ")})."
+    }
+
+    val sb = StringBuilder("Retracted ${result.retracted} fact(s):\n")
+    result.atoms.forEach { atom -> sb.append("  $atom\n") }
+    return sb.toString()
+}
+
+// --- Scope Tool Implementations ---
+
+private fun callForkScope(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
+    val sourceScope = args["sourceScope"]?.jsonPrimitive?.contentOrNull
+    val targetScope = args["targetScope"]?.jsonPrimitive?.content
+        ?: throw IllegalArgumentException("Missing targetScope")
+    if (targetScope.isBlank()) throw IllegalArgumentException("targetScope must not be blank")
+
+    val copied = db.forkScope(sourceScope, targetScope, tenantId)
+    val sourceName = sourceScope ?: "<global>"
+    return "Forked $copied atom(s) from scope '$sourceName' into scope '$targetScope'."
+}
+
+private fun callMergeScope(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
+    val sourceScope = args["sourceScope"]?.jsonPrimitive?.content
+        ?: throw IllegalArgumentException("Missing sourceScope")
+    if (sourceScope.isBlank()) throw IllegalArgumentException("sourceScope must not be blank")
+    val targetScope = args["targetScope"]?.jsonPrimitive?.contentOrNull
+    val strategyStr = args["strategy"]?.jsonPrimitive?.contentOrNull ?: "SOURCE_WINS"
+    val strategy = try {
+        com.nocturnusai.core.MergeStrategy.valueOf(strategyStr)
+    } catch (_: IllegalArgumentException) {
+        throw IllegalArgumentException("Unknown merge strategy '$strategyStr'. Valid values: SOURCE_WINS, TARGET_WINS, KEEP_BOTH, REJECT")
+    }
+
+    val result = db.mergeScope(sourceScope, targetScope, strategy, tenantId)
+    val targetName = targetScope ?: "<global>"
+    return "Merged scope '$sourceScope' into '$targetName': " +
+        "${result.merged} atom(s) merged, ${result.conflictsResolved} conflict(s) resolved (strategy: ${result.strategy})."
+}
+
+private fun callListScopes(db: com.nocturnusai.NocturnusAI, tenantId: String): String {
+    val scopes = db.listScopes(tenantId).sorted()
+    if (scopes.isEmpty()) return "No named scopes found. Only the global (unscoped) partition exists."
+    return "Found ${scopes.size} scope(s): ${scopes.joinToString(", ") { "'$it'" }}"
+}
+
+private fun callDeleteScope(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
+    val scope = args["scope"]?.jsonPrimitive?.content
+        ?: throw IllegalArgumentException("Missing scope")
+    if (scope.isBlank()) throw IllegalArgumentException("scope must not be blank")
+
+    val deleted = db.deleteScope(scope, tenantId)
+    return "Deleted scope '$scope': $deleted atom(s) removed."
 }
 
 // --- Helpers ---

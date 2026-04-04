@@ -1,31 +1,18 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # NocturnusAI Installer
-# Works everywhere. Installs everything. You're welcome. 🦞
+# Downloads the CLI binary and runs the interactive setup wizard.
 #
 # Usage:
-#   curl -fsSL https://openclaw.ai/install.sh | bash
-#   curl -fsSL https://openclaw.ai/install.sh | bash -s -- --ollama
-#   curl -fsSL https://openclaw.ai/install.sh | bash -s -- --key sk-ant-...
-#   curl -fsSL https://openclaw.ai/install.sh | bash -s -- --port 8080
+#   curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
+#   curl -fsSL ... | bash -s -- --ollama
+#   curl -fsSL ... | bash -s -- --key sk-ant-...
+#   curl -fsSL ... | bash -s -- --port 8080
 #
-# Options:
-#   --ollama    Include local Ollama (no API key needed)
-#   --monitoring Include Prometheus + Grafana dashboards
-#   --dir DIR   Install directory (default: ./nocturnusai)
-#   --port PORT Server port (default: 9300)
-#   --key KEY   LLM API key (Anthropic/OpenAI/Google — auto-detected)
+# All flags are forwarded to `nocturnusai setup`. See `nocturnusai setup --help`.
 # ─────────────────────────────────────────────────────────────────────────────
-set -e
+set -eo pipefail
 
-VERSION="latest"
-INSTALL_DIR="./nocturnusai"
-PORT=9300
-USE_OLLAMA=false
-USE_MONITORING=false
-LLM_KEY=""
-
-# Colors
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 RED='\033[0;31m'
@@ -34,286 +21,289 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
-# ── Parse args ───────────────────────────────────────────────────────────────
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --ollama)      USE_OLLAMA=true; shift ;;
-        --monitoring)  USE_MONITORING=true; shift ;;
-        --dir)         INSTALL_DIR="$2"; shift 2 ;;
-        --port)        PORT="$2"; shift 2 ;;
-        --key)         LLM_KEY="$2"; shift 2 ;;
-        --help|-h)
-            echo "Usage: curl -fsSL https://openclaw.ai/install.sh | bash -s -- [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  --ollama       Include local Ollama LLM (no API key needed)"
-            echo "  --monitoring   Include Prometheus + Grafana dashboards"
-            echo "  --port PORT    Server port (default: 9300)"
-            echo "  --dir PATH     Install directory (default: ./nocturnusai)"
-            echo "  --key KEY      LLM API key (auto-detects provider)"
-            echo "  --help         Show this help"
-            exit 0
-            ;;
-        *) echo -e "${RED}Unknown option: $1${NC}"; exit 1 ;;
-    esac
-done
+trap 'echo ""; echo -e "${RED}${BOLD}Install failed at line $LINENO${NC}"; exit 1' ERR
 
-# ── Banner ───────────────────────────────────────────────────────────────────
-echo ""
-echo -e "${CYAN}${BOLD}"
-cat << 'BANNER'
-     _          _                 ____
-    / \   __  _(_) ___  _ __ ___ | __ )  __ _ ___  ___
-   / _ \  \ \/ / |/ _ \| '_ ` _ \|  _ \ / _` / __|/ _ \
-  / ___ \  >  <| | (_) | | | | | | |_) | (_| \__ \  __/
- /_/   \_\/_/\_\_|\___/|_| |_| |_|____/ \__,_|___/\___|
-BANNER
-echo -e "${NC}"
-echo -e "${DIM}Logic server for Agentic AI${NC}"
-echo ""
+# ── Docker-only fallback ─────────────────────────────────────────────────────
+# When CLI binary isn't available, pull the Docker image directly and
+# generate a minimal compose file so the user gets a running server.
+docker_fallback() {
+    local port=9300
+    local install_dir="./nocturnusai"
+    local use_ollama=false
 
-# ── Check prerequisites ─────────────────────────────────────────────────────
-check_cmd() {
-    if ! command -v "$1" &>/dev/null; then
-        return 1
+    # Parse --port, --dir, --ollama from forwarded args
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --port)   port="$2"; shift 2 ;;
+            --dir)    install_dir="$2"; shift 2 ;;
+            --ollama) use_ollama=true; shift ;;
+            *)        shift ;;
+        esac
+    done
+
+    # Detect container runtime
+    local compose_cmd="" container_cmd=""
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        if docker compose version >/dev/null 2>&1; then
+            compose_cmd="docker compose"; container_cmd="docker"
+        elif command -v docker-compose >/dev/null 2>&1; then
+            compose_cmd="docker-compose"; container_cmd="docker"
+        fi
     fi
-    return 0
+    if [ -z "$compose_cmd" ] && command -v podman >/dev/null 2>&1 && podman info >/dev/null 2>&1; then
+        if command -v podman-compose >/dev/null 2>&1; then
+            compose_cmd="podman-compose"; container_cmd="podman"
+        fi
+    fi
+
+    if [ -z "$compose_cmd" ]; then
+        echo -e "${RED}${BOLD}Docker or Podman is required.${NC}"
+        echo ""
+        echo -e "Install Docker:"
+        echo -e "  macOS:   brew install --cask docker"
+        echo -e "  Ubuntu:  curl -fsSL https://get.docker.com | sh"
+        exit 1
+    fi
+
+    echo -e "${GREEN}Found:${NC} $compose_cmd"
+
+    # Pull image
+    echo -e "Pulling ${BOLD}ghcr.io/auctalis/nocturnusai:latest${NC}..."
+    if ! $container_cmd pull ghcr.io/auctalis/nocturnusai:latest; then
+        echo -e "${RED}Failed to pull Docker image.${NC}"
+        exit 1
+    fi
+
+    # Create install directory and compose file
+    mkdir -p "$install_dir/data"
+
+    if [ "$use_ollama" = true ]; then
+        cat > "$install_dir/docker-compose.yml" <<'COMPOSE'
+services:
+  nocturnusai:
+    image: ghcr.io/auctalis/nocturnusai:latest
+    container_name: nocturnusai
+    restart: unless-stopped
+    ports:
+      - "${PORT:-9300}:${PORT:-9300}"
+    volumes:
+      - ./data:/data
+    environment:
+      - PORT=${PORT:-9300}
+      - HOST=0.0.0.0
+      - STORAGE_DIR=/data
+      - API_KEY=${API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_MODEL=${LLM_MODEL:-llama3.2}
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://ollama:11434/v1}
+      - EXTRACTION_ENABLED=${EXTRACTION_ENABLED:-true}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nocturnusai-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+COMPOSE
+    else
+        cat > "$install_dir/docker-compose.yml" <<'COMPOSE'
+services:
+  nocturnusai:
+    image: ghcr.io/auctalis/nocturnusai:latest
+    container_name: nocturnusai
+    restart: unless-stopped
+    ports:
+      - "${PORT:-9300}:${PORT:-9300}"
+    volumes:
+      - ./data:/data
+    environment:
+      - PORT=${PORT:-9300}
+      - HOST=0.0.0.0
+      - STORAGE_DIR=/data
+      - API_KEY=${API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - EXTRACTION_ENABLED=${EXTRACTION_ENABLED:-false}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+COMPOSE
+    fi
+
+    # Create .env with port
+    if [ ! -f "$install_dir/.env" ]; then
+        echo "PORT=$port" > "$install_dir/.env"
+    fi
+
+    # Start
+    echo ""
+    echo -e "${BOLD}Starting NocturnusAI...$NC"
+    (cd "$install_dir" && $compose_cmd up -d)
+
+    # Wait for health
+    echo ""
+    printf "Waiting for server"
+    for i in $(seq 1 30); do
+        if curl -sf "http://localhost:$port/health" >/dev/null 2>&1; then
+            echo ""
+            echo -e "${GREEN}${BOLD}Ready!${NC}"
+            break
+        fi
+        printf "."
+        sleep 2
+    done
+
+    # Pull Ollama model if needed
+    if [ "$use_ollama" = true ]; then
+        echo ""
+        printf "Waiting for Ollama"
+        for i in $(seq 1 15); do
+            if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
+                echo " ready"
+                echo -e "${DIM}Pulling model (llama3.2)... runs in background.${NC}"
+                curl -sf http://localhost:11434/api/pull -d '{"name":"llama3.2"}' >/dev/null 2>&1 &
+                break
+            fi
+            printf "."
+            sleep 2
+        done
+    fi
+
+    # Banner
+    echo ""
+    echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}${BOLD}  NocturnusAI is running!${NC}"
+    echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "  ${BOLD}Server${NC}       http://localhost:$port"
+    if [ "$use_ollama" = true ]; then
+        echo -e "  ${BOLD}Ollama${NC}       http://localhost:11434 ${DIM}(Docker)${NC}"
+    fi
+    echo -e "  ${BOLD}Health${NC}       http://localhost:$port/health"
+    echo -e "  ${BOLD}API Docs${NC}     http://localhost:$port/llm.txt"
+    echo -e "  ${BOLD}MCP${NC}          http://localhost:$port/mcp"
+    echo ""
+    echo -e "  ${CYAN}# Quick start${NC}"
+    echo -e "  curl -s http://localhost:$port/assert/fact \\"
+    echo -e "    -H 'Content-Type: application/json' \\"
+    echo -e "    -H 'X-Tenant-ID: default' \\"
+    echo -e "    -d '{\"predicate\":\"human\",\"args\":[\"socrates\"]}'"
+    echo ""
+    echo -e "  ${BOLD}Manage${NC}"
+    echo -e "  cd $(cd "$install_dir" && pwd)"
+    echo -e "  $compose_cmd logs -f nocturnusai   ${DIM}# tail logs${NC}"
+    echo -e "  $compose_cmd down                   ${DIM}# stop${NC}"
+    echo -e "  $compose_cmd up -d                  ${DIM}# restart${NC}"
+    echo ""
+    echo -e "  ${DIM}Config: $(cd "$install_dir" && pwd)/.env${NC}"
+    echo -e "  ${DIM}Note: Install the CLI binary for the full setup wizard with LLM config.${NC}"
+    echo ""
 }
 
-HAS_DOCKER=false
-HAS_COMPOSE=false
-COMPOSE_CMD=""
+# ── Banner ──────────────────────────────────────────────────────────────────
+echo ""
+echo -e "${CYAN}${BOLD}NocturnusAI${NC} — Logic server for Agentic AI"
+echo ""
 
-if check_cmd docker; then
-    HAS_DOCKER=true
-    if docker compose version &>/dev/null 2>&1; then
-        HAS_COMPOSE=true
-        COMPOSE_CMD="docker compose"
-    fi
-fi
+# ── Detect platform ─────────────────────────────────────────────────────────
+os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+arch="$(uname -m)"
+if [ "$os" = "darwin" ]; then os="macos"; fi
+if [ "$arch" = "aarch64" ]; then arch="arm64"; fi
 
-if ! $HAS_COMPOSE && check_cmd docker-compose; then
-    HAS_COMPOSE=true
-    COMPOSE_CMD="docker-compose"
-fi
+binary="nocturnusai-${os}-${arch}"
+url="https://github.com/Auctalis/nocturnusai/releases/latest/download/${binary}"
 
-if ! $HAS_COMPOSE && check_cmd podman-compose; then
-    HAS_COMPOSE=true
-    COMPOSE_CMD="podman-compose"
-fi
-
-if ! $HAS_COMPOSE; then
-    echo -e "${RED}Docker (with compose) is required.${NC}"
-    echo ""
-    echo "Install Docker:"
-    echo "  macOS:   brew install --cask docker"
-    echo "  Ubuntu:  curl -fsSL https://get.docker.com | sh"
-    echo "  Windows: https://docs.docker.com/desktop/install/windows-install/"
-    exit 1
-fi
-
-echo -e "${GREEN}Found:${NC} $COMPOSE_CMD"
-
-# ── Create install directory ─────────────────────────────────────────────────
-mkdir -p "$INSTALL_DIR"
-cd "$INSTALL_DIR"
-echo -e "${GREEN}Installing to:${NC} $(pwd)"
-
-# ── Download compose file and .env ───────────────────────────────────────────
-REPO_RAW="https://raw.githubusercontent.com/essaouirallc/logic-server/main"
-
-echo -e "${DIM}Downloading configuration...${NC}"
-
-# docker-compose.yml
-curl -fsSL "$REPO_RAW/docker-compose.yml" -o docker-compose.yml
-
-# monitoring config (if requested)
-if $USE_MONITORING; then
-    mkdir -p monitoring/prometheus monitoring/grafana/provisioning/datasources monitoring/grafana/dashboards
-    curl -fsSL "$REPO_RAW/monitoring/prometheus/prometheus.yml" -o monitoring/prometheus/prometheus.yml 2>/dev/null || true
-    curl -fsSL "$REPO_RAW/monitoring/grafana/provisioning/datasources/datasource.yml" -o monitoring/grafana/provisioning/datasources/datasource.yml 2>/dev/null || true
-fi
-
-# .env.example → .env
-curl -fsSL "$REPO_RAW/.env.example" -o .env.example
-cp .env.example .env
-
-# ── Configure .env ───────────────────────────────────────────────────────────
-# Set port
-sed -i.bak "s/^PORT=.*/PORT=$PORT/" .env && rm -f .env.bak
-
-# Configure LLM provider
-if [ -n "$LLM_KEY" ]; then
-    # Auto-detect provider from key format
-    if [[ "$LLM_KEY" == sk-ant-* ]]; then
-        echo -e "${GREEN}Detected:${NC} Anthropic Claude"
-        sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
-        sed -i.bak "s/^LLM_MODEL=.*/# LLM_MODEL=llama3.2/" .env && rm -f .env.bak
-        sed -i.bak "s/^LLM_BASE_URL=.*/# LLM_BASE_URL=http:\/\/ollama:11434\/v1/" .env && rm -f .env.bak
-        sed -i.bak "s/^# ANTHROPIC_API_KEY=.*/ANTHROPIC_API_KEY=$LLM_KEY/" .env && rm -f .env.bak
-    elif [[ "$LLM_KEY" == sk-* ]]; then
-        echo -e "${GREEN}Detected:${NC} OpenAI"
-        sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
-        sed -i.bak "s/^LLM_MODEL=.*/# LLM_MODEL=llama3.2/" .env && rm -f .env.bak
-        sed -i.bak "s/^LLM_BASE_URL=.*/# LLM_BASE_URL=http:\/\/ollama:11434\/v1/" .env && rm -f .env.bak
-        sed -i.bak "s/^# OPENAI_API_KEY=.*/OPENAI_API_KEY=$LLM_KEY/" .env && rm -f .env.bak
-    elif [[ "$LLM_KEY" == AIza* ]]; then
-        echo -e "${GREEN}Detected:${NC} Google Gemini"
-        sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
-        sed -i.bak "s/^LLM_MODEL=.*/# LLM_MODEL=llama3.2/" .env && rm -f .env.bak
-        sed -i.bak "s/^LLM_BASE_URL=.*/# LLM_BASE_URL=http:\/\/ollama:11434\/v1/" .env && rm -f .env.bak
-        sed -i.bak "s/^# GOOGLE_API_KEY=.*/GOOGLE_API_KEY=$LLM_KEY/" .env && rm -f .env.bak
-    else
-        echo -e "${YELLOW}Unknown key format — setting as generic LLM_API_KEY.${NC}"
-        echo "LLM_API_KEY=$LLM_KEY" >> .env
-    fi
-    USE_OLLAMA=false  # cloud provider, no need for Ollama
-elif $USE_OLLAMA; then
-    echo -e "${GREEN}Using:${NC} Ollama (local LLM — no API key needed)"
-elif [ -t 0 ]; then
-    # Interactive terminal — ask the user
-    echo ""
-    echo -e "${BOLD}Choose your LLM provider:${NC}"
-    echo ""
-    echo "  1) Ollama (local, free, private — recommended to start)"
-    echo "  2) Anthropic Claude"
-    echo "  3) OpenAI GPT"
-    echo "  4) Google Gemini"
-    echo "  5) Skip (configure later in .env)"
-    echo ""
-    read -rp "Choice [1]: " CHOICE
-    CHOICE="${CHOICE:-1}"
-
-    case $CHOICE in
-        1)
-            USE_OLLAMA=true
-            echo -e "${GREEN}Using Ollama.${NC} Model will download on first start (~2GB)."
-            ;;
-        2)
-            read -rp "Anthropic API key (sk-ant-...): " KEY
-            if [ -n "$KEY" ]; then
-                sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
-                sed -i.bak "s/^LLM_MODEL=.*/# LLM_MODEL=llama3.2/" .env && rm -f .env.bak
-                sed -i.bak "s/^LLM_BASE_URL=.*/# LLM_BASE_URL=http:\/\/ollama:11434\/v1/" .env && rm -f .env.bak
-                sed -i.bak "s/^# ANTHROPIC_API_KEY=.*/ANTHROPIC_API_KEY=$KEY/" .env && rm -f .env.bak
-            fi
-            ;;
-        3)
-            read -rp "OpenAI API key (sk-...): " KEY
-            if [ -n "$KEY" ]; then
-                sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
-                sed -i.bak "s/^LLM_MODEL=.*/# LLM_MODEL=llama3.2/" .env && rm -f .env.bak
-                sed -i.bak "s/^LLM_BASE_URL=.*/# LLM_BASE_URL=http:\/\/ollama:11434\/v1/" .env && rm -f .env.bak
-                sed -i.bak "s/^# OPENAI_API_KEY=.*/OPENAI_API_KEY=$KEY/" .env && rm -f .env.bak
-            fi
-            ;;
-        4)
-            read -rp "Google API key (AIza...): " KEY
-            if [ -n "$KEY" ]; then
-                sed -i.bak "s/^LLM_PROVIDER=.*/# LLM_PROVIDER=ollama/" .env && rm -f .env.bak
-                sed -i.bak "s/^LLM_MODEL=.*/# LLM_MODEL=llama3.2/" .env && rm -f .env.bak
-                sed -i.bak "s/^LLM_BASE_URL=.*/# LLM_BASE_URL=http:\/\/ollama:11434\/v1/" .env && rm -f .env.bak
-                sed -i.bak "s/^# GOOGLE_API_KEY=.*/GOOGLE_API_KEY=$KEY/" .env && rm -f .env.bak
-            fi
-            ;;
-        5)
-            echo -e "${YELLOW}Skipped. Edit .env later to configure LLM provider.${NC}"
-            ;;
-    esac
+# ── Determine install location ──────────────────────────────────────────────
+# Prefer /usr/local/bin only if already writable (no sudo prompts).
+# Otherwise use ~/.local/bin — standard user-space location.
+SUDO=""
+if [ -w "/usr/local/bin" ]; then
+    install_path="/usr/local/bin/nocturnusai"
 else
-    # Non-interactive (piped) and no --key — default to Ollama
-    echo -e "${GREEN}Defaulting to Ollama${NC} (local LLM, no API key needed)"
-    USE_OLLAMA=true
+    mkdir -p "$HOME/.local/bin"
+    install_path="$HOME/.local/bin/nocturnusai"
 fi
 
-# ── Launch ───────────────────────────────────────────────────────────────────
-echo ""
-echo -e "${BOLD}Starting NocturnusAI...${NC}"
+# ── Download CLI binary ────────────────────────────────────────────────────
+echo -e "Downloading ${BOLD}${binary}${NC}..."
+tmp_path=$(mktemp)
 
-PROFILE_FLAGS=""
-if $USE_OLLAMA; then
-    PROFILE_FLAGS="--profile ollama"
+if ! curl -fL --progress-bar "$url" -o "$tmp_path"; then
+    rm -f "$tmp_path"
+    echo -e "${YELLOW}No CLI binary for ${os}/${arch} — falling back to Docker.$NC"
+    echo ""
+    docker_fallback "$@"
+    exit 0
 fi
-if $USE_MONITORING; then
-    PROFILE_FLAGS="$PROFILE_FLAGS --profile monitoring"
-fi
 
-$COMPOSE_CMD $PROFILE_FLAGS up -d
+chmod +x "$tmp_path"
 
-# ── Wait for healthy ─────────────────────────────────────────────────────────
-echo ""
-echo -n "Waiting for server"
-HEALTHY=false
-for i in $(seq 1 30); do
-    if curl -sf "http://localhost:$PORT/health" &>/dev/null; then
+# Verify binary runs (background + kill guards against hangs on older builds)
+"$tmp_path" --help >/dev/null 2>&1 &
+_pid=$!
+sleep 2
+if ! kill -0 "$_pid" 2>/dev/null; then
+    # Process exited — check if it succeeded
+    wait "$_pid" 2>/dev/null || {
+        rm -f "$tmp_path"
+        echo -e "${YELLOW}Binary not compatible — falling back to Docker.$NC"
         echo ""
-        HEALTHY=true
-        break
-    fi
-    echo -n "."
-    sleep 2
-done
-
-if $HEALTHY; then
-    echo -e "${GREEN}${BOLD}Ready!${NC}"
+        docker_fallback "$@"
+        exit 0
+    }
 else
-    echo ""
-    echo -e "${YELLOW}Server still starting — check logs:${NC} $COMPOSE_CMD logs -f nocturnusai"
+    # Still running after 2s (old build with --help bug) — kill it, it's fine
+    kill "$_pid" 2>/dev/null; wait "$_pid" 2>/dev/null || true
 fi
 
-# ── Success banner ───────────────────────────────────────────────────────────
-echo ""
-echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}${BOLD}  NocturnusAI is running! 🦞${NC}"
-echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
-echo -e "  ${BOLD}API${NC}        http://localhost:$PORT"
-echo -e "  ${BOLD}Health${NC}     http://localhost:$PORT/health"
-echo -e "  ${BOLD}API Docs${NC}   http://localhost:$PORT/llm.txt"
-echo -e "  ${BOLD}MCP${NC}        http://localhost:$PORT/mcp"
-echo -e "  ${BOLD}Agent Card${NC} http://localhost:$PORT/.well-known/agent.json"
-if $USE_OLLAMA; then
-echo -e "  ${BOLD}Ollama${NC}     http://localhost:11434"
+# Move to install path
+mv "$tmp_path" "$install_path"
+
+echo -e "${GREEN}CLI installed:${NC} $install_path"
+
+# ── Add ~/.local/bin to PATH if needed ──────────────────────────────────────
+if [[ "$install_path" == *".local/bin"* ]]; then
+    added_to_rc=false
+    for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+        if [ -f "$rc" ] && ! grep -q '\.local/bin' "$rc"; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
+            added_to_rc=true
+        fi
+    done
+    export PATH="$HOME/.local/bin:$PATH"
+    if $added_to_rc; then
+        echo -e "${YELLOW}Note:${NC} Installed to ~/.local/bin — run ${BOLD}source ~/.zshrc${NC} or open a new terminal to use ${BOLD}nocturnusai${NC}"
+    fi
 fi
-if $USE_MONITORING; then
-echo -e "  ${BOLD}Grafana${NC}    http://localhost:3000  (admin / nocturnusai)"
-echo -e "  ${BOLD}Prometheus${NC} http://localhost:9090"
+
+# ── Run setup wizard ────────────────────────────────────────────────────────
+# Redirect stdin from /dev/tty so interactive prompts work even when
+# the script itself was piped from curl. All flags ($@) are forwarded.
+echo ""
+if [ -e /dev/tty ]; then
+    exec "$install_path" setup "$@" < /dev/tty
+else
+    exec "$install_path" setup --non-interactive "$@"
 fi
-echo ""
-echo -e "  ${BOLD}Try it:${NC}"
-echo ""
-echo -e "    ${CYAN}# Store a fact${NC}"
-echo "    curl -sX POST http://localhost:$PORT/tell \\"
-echo "      -H 'Content-Type: application/json' \\"
-echo "      -d '{\"predicate\":\"human\",\"args\":[\"socrates\"]}'"
-echo ""
-echo -e "    ${CYAN}# Teach a rule${NC}"
-echo "    curl -sX POST http://localhost:$PORT/teach \\"
-echo "      -H 'Content-Type: application/json' \\"
-echo "      -d '{\"head\":{\"predicate\":\"mortal\",\"args\":[\"?x\"]},\"body\":[{\"predicate\":\"human\",\"args\":[\"?x\"]}]}'"
-echo ""
-echo -e "    ${CYAN}# Ask a question${NC}"
-echo "    curl -sX POST http://localhost:$PORT/ask \\"
-echo "      -H 'Content-Type: application/json' \\"
-echo "      -d '{\"predicate\":\"mortal\",\"args\":[\"?who\"]}'"
-echo ""
-echo -e "  ${BOLD}Manage:${NC}"
-echo -e "    cd $(pwd)"
-echo -e "    $COMPOSE_CMD logs -f nocturnusai   ${DIM}# tail logs${NC}"
-echo -e "    $COMPOSE_CMD $PROFILE_FLAGS down  ${DIM}# stop${NC}"
-echo -e "    $COMPOSE_CMD $PROFILE_FLAGS up -d ${DIM}# restart${NC}"
-echo ""
-echo -e "  ${BOLD}MCP config${NC} (Claude Desktop, Cursor, Windsurf, etc.):"
-echo ""
-echo "    {"
-echo "      \"mcpServers\": {"
-echo "        \"nocturnusai\": {"
-echo "          \"url\": \"http://localhost:$PORT/mcp/sse\","
-echo "          \"transport\": \"sse\""
-echo "        }"
-echo "      }"
-echo "    }"
-echo ""
-echo -e "  ${DIM}Config: $(pwd)/.env${NC}"
-echo -e "  ${DIM}Docs:   https://github.com/essaouirallc/logic-server${NC}"
-echo ""

@@ -3,33 +3,11 @@
     "nocturnusai": {
       "url": "http://localhost:9300/mcp/sse",
       "transport": "sse",
-      "description": "NocturnusAI Logic Server — deterministic reasoning, truth maintenance, and agent memory management for AI agents",
       "headers": {
         "X-Database": "default",
         "X-Tenant-ID": "default",
-        "X-API-Key": "${NOCTURNUSAI_API_KEY}"
-      },
-      "_comment": {
-        "env_vars": {
-          "NOCTURNUSAI_API_KEY": "Your NocturnusAI API key. Generate via POST /auth/bootstrap (first time) or POST /auth/keys (admin). Required when AUTH_ENABLED=true.",
-          "NOCTURNUSAI_URL": "Override the server URL (default: http://localhost:9300)"
-        },
-        "auth_modes": {
-          "disabled": "No API key needed. Set no env vars.",
-          "legacy": "Set API_KEY on the server. Use the same key in X-API-Key header.",
-          "rbac": "Set AUTH_ENABLED=true on server. Bootstrap first key via POST /auth/bootstrap, then use that key."
-        },
-        "tools": [
-          "tell — Store facts (with optional TTL/temporal bounds)",
-          "teach — Define logical rules (Horn clauses)",
-          "ask — Run backward-chaining inference with optional proofs",
-          "forget — Retract facts (cascading via TMS)",
-          "recall — Time-travel queries at specific timestamps",
-          "context — Salience-ranked context window for agent reasoning",
-          "compress — Memory consolidation (episodic → semantic)",
-          "cleanup — Decay and eviction of stale/low-salience facts",
-          "predicates — Schema discovery (list all predicate types)"
-        ]
+        "_comment_auth_legacy": "For legacy auth, add: \"X-API-Key\": \"your-shared-secret\"",
+        "_comment_auth_rbac": "For RBAC auth, add: \"Authorization\": \"Bearer nai_your-key-here\""
       }
     }
   }

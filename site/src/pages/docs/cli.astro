@@ -1,8 +1,10 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<DocsLayout title="CLI">
+<DocsLayout title="CLI Reference">
     <h1>CLI Reference</h1>
     <p class="lead text-xl text-slate-400">
         A full-featured terminal client for managing knowledge, running queries, and administering your Nocturnus.AI server — interactively or from scripts.
@@ -14,26 +16,80 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
 
     <hr />
 
+    <!-- ============ AI INSTALL ============ -->
+    <div class="ai-install">
+        <div class="ai-install-header">
+            <span class="ai-install-icon">✦</span>
+            <span>Install with AI</span>
+        </div>
+        <p class="ai-install-desc">Copy a prompt and paste it into your AI coding assistant — it will run the installer for you.</p>
+        <div class="ai-prompts">
+            <div class="ai-prompt-card">
+                <div class="ai-prompt-meta">
+                    <span class="ai-prompt-label">Claude Code</span>
+                    <button class="ai-copy-btn" data-copy="Install the NocturnusAI CLI on my machine using the official installer: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash — then verify it works by running: nocturnusai --version">copy</button>
+                </div>
+                <div class="ai-prompt-text">Install the NocturnusAI CLI on my machine using the official installer: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash — then verify it works by running: nocturnusai --version</div>
+            </div>
+            <div class="ai-prompt-card">
+                <div class="ai-prompt-meta">
+                    <span class="ai-prompt-label">GitHub Copilot</span>
+                    <button class="ai-copy-btn" data-copy="@terminal Install the NocturnusAI CLI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash">copy</button>
+                </div>
+                <div class="ai-prompt-text">@terminal Install the NocturnusAI CLI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</div>
+            </div>
+            <div class="ai-prompt-card">
+                <div class="ai-prompt-meta">
+                    <span class="ai-prompt-label">Cursor</span>
+                    <button class="ai-copy-btn" data-copy="Run this in my terminal to install the NocturnusAI CLI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash">copy</button>
+                </div>
+                <div class="ai-prompt-text">Run this in my terminal to install the NocturnusAI CLI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</div>
+            </div>
+        </div>
+    </div>
+
     <!-- ============ INSTALLATION ============ -->
     <h2 id="install">Installation</h2>
 
+    <div class="callout callout-tip">
+        <strong>Recommended.</strong> The native binary is a single self-contained executable — no JVM, no Docker, instant startup. Install it with the one-liner installer or download directly from GitHub Releases.
+    </div>
+
+    <h3>One-liner installer (recommended)</h3>
+    <p>The standard install script automatically downloads and installs the native CLI binary for your platform:</p>
+
+    <pre data-lang="bash"><code><span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</code></pre>
+
+    <p>The CLI is placed at <code>/usr/local/bin/nocturnusai</code> (or <code>~/.local/bin/nocturnusai</code> if that isn't writable) and added to your PATH automatically.</p>
+
+    <h3>Download directly from GitHub Releases</h3>
+    <p>Download the pre-built binary for your platform from the <a href="https://github.com/Auctalis/nocturnusai/releases/latest">latest release</a>:</p>
+
+    <pre data-lang="bash"><code><span class="syn-comment"># macOS (Apple Silicon)</span>
+<span class="syn-var">$</span> curl -fsSL https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-macos-arm64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
+
+<span class="syn-comment"># macOS (Intel)</span>
+<span class="syn-var">$</span> curl -fsSL https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-macos-x86_64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
+
+<span class="syn-comment"># Linux (x86_64)</span>
+<span class="syn-var">$</span> curl -fsSL https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-linux-x86_64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
+
+<span class="syn-comment"># Linux (ARM64)</span>
+<span class="syn-var">$</span> curl -fsSL https://github.com/Auctalis/nocturnusai/releases/latest/download/nocturnusai-linux-arm64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai</code></pre>
+
     <h3>Build from Source</h3>
-    <p>The CLI is a Kotlin application in the <code>nocturnusai-cli</code> module. Build and run with Gradle:</p>
+    <p>Requires JDK 17+ and GraalVM for native compilation:</p>
 
-    <pre data-lang="bash"><code><span class="syn-comment"># Build the distribution</span>
-<span class="syn-var">$</span> ./gradlew :nocturnusai-cli:installDist
+    <pre data-lang="bash"><code><span class="syn-comment"># Run via Gradle (JVM — no native build needed)</span>
+<span class="syn-var">$</span> ./gradlew :nocturnusai-cli:run
 
-<span class="syn-comment"># Run it</span>
-<span class="syn-var">$</span> ./nocturnusai-cli/bin/nocturnusai-cli</code></pre>
+<span class="syn-comment"># Build a native binary</span>
+<span class="syn-var">$</span> ./gradlew :nocturnusai-cli:nativeCompile
+<span class="syn-var">$</span> ./nocturnusai-cli/build/native/nativeCompile/nocturnusai</code></pre>
 
     <h3>Via Docker</h3>
     <p>If you're running the server with Docker Compose, you can exec into it:</p>
-    <pre data-lang="bash"><code><span class="syn-var">$</span> docker compose exec server nocturnusai-cli</code></pre>
-
-    <h3>Quick Alias</h3>
-    <p>Add to your shell profile for convenience:</p>
-    <pre data-lang="bash"><code><span class="syn-comment"># ~/.zshrc or ~/.bashrc</span>
-<span class="syn-keyword">alias</span> nai="./nocturnusai-cli/bin/nocturnusai-cli"</code></pre>
+    <pre data-lang="bash"><code><span class="syn-var">$</span> docker compose exec server nocturnusai</code></pre>
 
     <hr />
 
@@ -87,10 +143,10 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
     </div>
 
     <pre data-lang="bash"><code><span class="syn-comment"># Connect to a remote server with specific database and API key</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-s</span> https://api.example.com <span class="syn-flag">-d</span> production <span class="syn-flag">-k</span> nai_abc123
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-s</span> https://api.example.com <span class="syn-flag">-d</span> production <span class="syn-flag">-k</span> nai_abc123
 
 <span class="syn-comment"># Connect to a specific tenant</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-t</span> tenant_acme</code></pre>
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-d</span> mydb <span class="syn-flag">-t</span> tenant_acme</code></pre>
 
     <hr />
 
@@ -98,7 +154,7 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
     <h2 id="repl">Interactive REPL</h2>
     <p>Launch the CLI without <code>-e</code> to enter interactive mode. You'll see a connection banner and a prompt showing the active database:</p>
 
-    <pre data-lang="bash"><code><span class="syn-var">$</span> nocturnusai-cli
+    <pre data-lang="bash"><code><span class="syn-var">$</span> nocturnusai
 
 <span class="syn-ok">NocturnusAI CLI — logic server for agentic AI
 Server:   http://localhost:9300
@@ -165,7 +221,19 @@ Confidence: 95%  anthropic/claude-sonnet-4-20250514</span></code></pre>
 
 <span class="syn-comment"># Multi-body rules</span>
 default&gt; teach grandparent(?x, ?z) :- parent(?x, ?y), parent(?y, ?z)
-<span class="syn-ok">OK Rule added</span></code></pre>
+<span class="syn-ok">OK Rule added</span>
+
+<span class="syn-comment"># Negation-as-Failure (NAF) — use NOT in rule bodies</span>
+default&gt; teach can_fly(?x) :- bird(?x), NOT penguin(?x)
+<span class="syn-ok">OK Rule added</span>
+
+<span class="syn-comment"># NAF means "not provable" (closed-world assumption)</span>
+<span class="syn-comment"># can_fly(robin) succeeds if bird(robin) exists and penguin(robin) does not</span></code></pre>
+
+    <div class="callout callout-info">
+        <strong>NOT vs explicit negation.</strong> <code>NOT</code> in rule bodies uses Negation-as-Failure: the condition succeeds when the atom <em>cannot be proven</em> from known facts. This is different from asserting that something is explicitly false.
+    </div>
+
     <p>Shortcut: <code>++</code></p>
 
     <h3 id="forget">forget — Retract a Fact</h3>
@@ -264,6 +332,14 @@ default&gt; cleanup 0.1
 
     <!-- ============ ADMIN ============ -->
     <h2 id="admin">Administration</h2>
+
+    <h3>tenant — Switch Tenant</h3>
+    <p>Switch the active tenant within the current database. Multi-tenant databases isolate knowledge per tenant:</p>
+    <pre data-lang="bash"><code>default&gt; tenant acme
+<span class="syn-ok">Switched to tenant acme</span>
+
+default&gt; tenant
+<span class="syn-ok">Current tenant: acme</span></code></pre>
 
     <h3>dbs — List Databases</h3>
     <p>Show all databases on the server. An arrow marks the active one:</p>
@@ -376,31 +452,29 @@ default&gt; keys revoke 661f9500-e29b-41d4-a716-446655440000
     <p>Pass <code>-e</code> to run a single command and exit — perfect for shell scripts, CI/CD, and automation:</p>
 
     <pre data-lang="bash"><code><span class="syn-comment"># Store a fact</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"tell human(socrates)"</span>
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"tell human(socrates)"</span>
 
 <span class="syn-comment"># Query</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"ask mortal(?who)"</span>
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"ask mortal(?who)"</span>
 
 <span class="syn-comment"># Export a database</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"export backup.ab"</span>
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"export backup.ab"</span>
 
 <span class="syn-comment"># Import into a database</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"import knowledge.ab"</span>
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-d</span> mydb <span class="syn-flag">-e</span> <span class="syn-string">"import knowledge.ab"</span>
 
 <span class="syn-comment"># Health check in CI</span>
-<span class="syn-var">$</span> nocturnusai-cli <span class="syn-flag">-e</span> <span class="syn-string">"health"</span></code></pre>
+<span class="syn-var">$</span> nocturnusai <span class="syn-flag">-e</span> <span class="syn-string">"health"</span></code></pre>
 
     <h3>Shell Scripting Examples</h3>
     <pre data-lang="bash"><code><span class="syn-comment">#!/bin/bash</span>
 <span class="syn-comment"># Seed a database with a knowledge file</span>
-CLI="./nocturnusai-cli/bin/nocturnusai-cli"
-
-<span class="syn-var">$</span>CLI <span class="syn-flag">-d</span> production <span class="syn-flag">-e</span> <span class="syn-string">"import seed_data.ab"</span>
-<span class="syn-var">$</span>CLI <span class="syn-flag">-d</span> production <span class="syn-flag">-e</span> <span class="syn-string">"inspect"</span>
+nocturnusai <span class="syn-flag">-d</span> production <span class="syn-flag">-e</span> <span class="syn-string">"import seed_data.ab"</span>
+nocturnusai <span class="syn-flag">-d</span> production <span class="syn-flag">-e</span> <span class="syn-string">"inspect"</span>
 
 <span class="syn-comment"># Backup all databases</span>
 <span class="syn-keyword">for</span> db <span class="syn-keyword">in</span> default production staging; <span class="syn-keyword">do</span>
-    <span class="syn-var">$</span>CLI <span class="syn-flag">-d</span> <span class="syn-var">$</span>db <span class="syn-flag">-e</span> <span class="syn-string">"export backups/backup.ab"</span>
+    nocturnusai <span class="syn-flag">-d</span> <span class="syn-var">$</span>db <span class="syn-flag">-e</span> <span class="syn-string">"export backups/backup.ab"</span>
 <span class="syn-keyword">done</span></code></pre>
 
     <h3>Raw DSL Mode</h3>
@@ -408,6 +482,70 @@ CLI="./nocturnusai-cli/bin/nocturnusai-cli"
     <pre data-lang="bash"><code>default&gt; dsl ASSERT human(socrates).
 default&gt; dsl QUERY mortal(?who).</code></pre>
     <p>Shortcut: <code>exec</code></p>
+
+    <hr />
+
+    <!-- ============ API-ONLY FEATURES ============ -->
+    <h2 id="api-only">Advanced Features (API Only)</h2>
+    <p>Several advanced features are available through the <a href={`${base}/docs/api`}>HTTP API</a> and <a href={`${base}/docs/mcp`}>MCP protocol</a> but not yet exposed as CLI commands. Use these via direct API calls or MCP-connected agents:</p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Feature</th>
+                    <th class="py-2">API Endpoint</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">Confidence</td>
+                    <td class="py-2 font-mono">POST /assert/fact</td>
+                    <td class="py-2">Attach confidence scores (0.0–1.0) to facts, filter queries with <code>minConfidence</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">Conflict Strategy</td>
+                    <td class="py-2 font-mono">POST /assert/fact</td>
+                    <td class="py-2">Control duplicate handling: NEWEST_WINS, CONFIDENCE, KEEP_BOTH, REJECT</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">Scope Fork</td>
+                    <td class="py-2 font-mono">POST /scope/fork</td>
+                    <td class="py-2">Copy all atoms from one scope to another for hypothetical reasoning</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">Scope Diff</td>
+                    <td class="py-2 font-mono">POST /scope/diff</td>
+                    <td class="py-2">Compare two scopes — see what's only in A, only in B, or in both</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">Scope Merge</td>
+                    <td class="py-2 font-mono">POST /scope/merge</td>
+                    <td class="py-2">Merge scopes with strategy (SOURCE_WINS, TARGET_WINS, KEEP_BOTH, REJECT)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">Aggregation</td>
+                    <td class="py-2 font-mono">POST /aggregate</td>
+                    <td class="py-2">COUNT, SUM, MIN, MAX, AVG over matched facts</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">Bulk Assert</td>
+                    <td class="py-2 font-mono">POST /assert/facts</td>
+                    <td class="py-2">Assert multiple facts in a single request (best-effort)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">Retract Pattern</td>
+                    <td class="py-2 font-mono">POST /retract/pattern</td>
+                    <td class="py-2">Retract all facts matching a pattern with variable wildcards</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="callout callout-tip">
+        <strong>Full details.</strong> See the <a href={`${base}/docs/api#aggregation`}>Aggregation</a>, <a href={`${base}/docs/multi-tenancy#scopes`}>Scope Management</a>, and <a href={`${base}/docs/api#assert-fact`}>Confidence &amp; Conflict</a> sections in the API and Multi-Tenancy docs.
+    </div>
 
     <hr />
 
@@ -490,6 +628,11 @@ default&gt; dsl QUERY mortal(?who).</code></pre>
                     <td class="py-2">Switch active database</td>
                 </tr>
                 <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">tenant [name]</td>
+                    <td class="py-2 font-mono">—</td>
+                    <td class="py-2">Switch or show active tenant</td>
+                </tr>
+                <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-cyan-400">dbs</td>
                     <td class="py-2 font-mono">—</td>
                     <td class="py-2">List all databases</td>
@@ -538,4 +681,33 @@ default&gt; dsl QUERY mortal(?who).</code></pre>
         </table>
     </div>
 
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.ai-copy-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const text = (btn as HTMLElement).dataset.copy ?? '';
+                try {
+                    await navigator.clipboard.writeText(text);
+                } catch {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    ta.remove();
+                }
+                btn.textContent = 'copied!';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 2000);
+            });
+        });
+    });
+</script>
+
+    <NextSteps links={[
+        { title: "API Reference", description: "Full HTTP endpoint documentation", href: `${base}/docs/api` },
+        { title: "Core Concepts", description: "Facts, rules, inference, and salience scoring", href: `${base}/docs/concepts` },
+        { title: "Operations", description: "Monitoring, persistence, and deployment", href: `${base}/docs/operations` },
+    ]} />
 </DocsLayout>

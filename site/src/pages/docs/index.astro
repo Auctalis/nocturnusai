@@ -1,5 +1,7 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="Quickstart">
@@ -22,20 +24,144 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
         </ul>
     </div>
 
+    <!-- ============ FRAMEWORK INTEGRATIONS ============ -->
+    <div class="framework-strip">
+        <h3 style="margin-top:0; margin-bottom:0.75rem; font-size:1rem; color:white;">Works with your agent stack</h3>
+        <div class="framework-grid">
+            <a href={`${base}/docs/integrations#langchain`} class="fw-card">
+                <span class="fw-name">LangChain</span>
+                <code class="fw-install">pip install nocturnusai[langchain]</code>
+                <span class="fw-snippet">tools = get_nocturnusai_tools(client)</span>
+            </a>
+            <a href={`${base}/docs/integrations#crewai`} class="fw-card">
+                <span class="fw-name">CrewAI</span>
+                <code class="fw-install">pip install nocturnusai[crewai]</code>
+                <span class="fw-snippet">tools = get_nocturnusai_tools(client)</span>
+            </a>
+            <a href={`${base}/docs/integrations#autogen`} class="fw-card">
+                <span class="fw-name">AutoGen</span>
+                <code class="fw-install">pip install nocturnusai[autogen]</code>
+                <span class="fw-snippet">tools = get_nocturnusai_tools(client)</span>
+            </a>
+            <a href={`${base}/docs/integrations#openai-agents`} class="fw-card">
+                <span class="fw-name">OpenAI Agents</span>
+                <code class="fw-install">pip install nocturnusai[openai-agents]</code>
+                <span class="fw-snippet">tools = get_nocturnusai_tools(client)</span>
+            </a>
+            <a href={`${base}/docs/integrations#anthropic`} class="fw-card">
+                <span class="fw-name">Anthropic</span>
+                <code class="fw-install">pip install nocturnusai[anthropic]</code>
+                <span class="fw-snippet">tools = get_nocturnusai_tool_definitions()</span>
+            </a>
+            <a href={`${base}/docs/integrations#langgraph`} class="fw-card">
+                <span class="fw-name">LangGraph</span>
+                <code class="fw-install">pip install nocturnusai[langgraph]</code>
+                <span class="fw-snippet">saver = NocturnusAICheckpointSaver(client)</span>
+            </a>
+        </div>
+        <p style="margin:0.75rem 0 0; font-size:0.8rem; color:rgb(148,163,184);">
+            Also available via <a href={`${base}/docs/mcp`} style="color:#06b6d4;">MCP protocol</a> (Cursor, Claude, any MCP client) · <a href={`${base}/docs/sdks#typescript`} style="color:#06b6d4;">TypeScript SDK</a> · <a href={`${base}/docs/api`} style="color:#06b6d4;">REST API</a>
+        </p>
+    </div>
+
+    <style>
+        .framework-strip {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            border: 1px solid rgba(6, 182, 212, 0.15);
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.05), rgba(139, 92, 246, 0.05));
+        }
+        .framework-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+        @media (max-width: 768px) {
+            .framework-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 480px) {
+            .framework-grid { grid-template-columns: 1fr; }
+        }
+        .fw-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding: 0.75rem;
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.02);
+            text-decoration: none;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .fw-card:hover {
+            border-color: rgba(6, 182, 212, 0.3);
+            background: rgba(6, 182, 212, 0.05);
+        }
+        .fw-name {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: white;
+        }
+        .fw-install {
+            font-size: 0.7rem;
+            color: rgb(148, 163, 184);
+            background: none;
+            padding: 0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .fw-snippet {
+            font-size: 0.7rem;
+            color: #06b6d4;
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+
+    <!-- ============ AI INSTALL ============ -->
+    <div class="ai-install">
+        <div class="ai-install-header">
+            <span class="ai-install-icon">✦</span>
+            <span>Install with AI</span>
+        </div>
+        <p class="ai-install-desc">Copy a prompt into your AI coding assistant and it will install NocturnusAI for you.</p>
+        <div class="ai-prompts">
+            <div class="ai-prompt-card">
+                <div class="ai-prompt-meta">
+                    <span class="ai-prompt-label">Claude Code</span>
+                    <button class="ai-copy-btn" data-copy="Install NocturnusAI on my machine. Run: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash — then verify with: curl http://localhost:9300/health">copy</button>
+                </div>
+                <div class="ai-prompt-text">Install NocturnusAI on my machine. Run: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash — then verify with: curl http://localhost:9300/health</div>
+            </div>
+            <div class="ai-prompt-card">
+                <div class="ai-prompt-meta">
+                    <span class="ai-prompt-label">GitHub Copilot</span>
+                    <button class="ai-copy-btn" data-copy="@terminal Install NocturnusAI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash">copy</button>
+                </div>
+                <div class="ai-prompt-text">@terminal Install NocturnusAI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</div>
+            </div>
+            <div class="ai-prompt-card">
+                <div class="ai-prompt-meta">
+                    <span class="ai-prompt-label">Cursor</span>
+                    <button class="ai-copy-btn" data-copy="Run this in my terminal to install NocturnusAI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash">copy</button>
+                </div>
+                <div class="ai-prompt-text">Run this in my terminal to install NocturnusAI: curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</div>
+            </div>
+        </div>
+    </div>
+
     <!-- ============ STEP 1 ============ -->
     <div class="step-card" id="install">
         <div style="position:absolute; top:-12px; left:24px; font-size:0.65rem; font-weight:700; font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; padding:4px 14px; border-radius:20px; color:white; background:linear-gradient(135deg,#06b6d4,#8b5cf6);">STEP 1 · INSTALL</div>
         <h3>Start the Server</h3>
-        <p>Two commands and you're live:</p>
+        <p>One command. Installs Docker Compose stack, waits for healthy, and installs the native CLI binary:</p>
 
-        <pre data-lang="bash"><code><span class="syn-var">$</span> git clone https://github.com/Auctalis/nocturnusai.git
-<span class="syn-var">$</span> <span class="syn-keyword">cd</span> nocturnusai
+        <pre data-lang="bash"><code><span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 
-<span class="syn-comment"># With LLM support (enables /extract and /synthesize in Steps 2–3):</span>
-<span class="syn-var">$</span> <span class="syn-type">ANTHROPIC_API_KEY</span>=sk-ant-... docker compose up -d
+<span class="syn-comment"># With an API key for LLM features (enables /extract and /synthesize in Steps 2–3):</span>
+<span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --key sk-ant-...
 
-<span class="syn-comment"># Without an LLM key (direct API only — Steps 4–5 still fully work):</span>
-<span class="syn-var">$</span> docker compose up -d</code></pre>
+<span class="syn-comment"># With local Ollama (free, no API key needed — install Ollama first):</span>
+<span class="syn-var">$</span> curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --host-ollama</code></pre>
 
         <p>Verify it's running:</p>
         <pre data-lang="bash"><code><span class="syn-var">$</span> curl http://localhost:9300/health
@@ -44,6 +170,9 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
 
         <div class="callout callout-tip" style="margin-top:1.5rem;">
             <strong>Data persistence</strong> — Facts survive container restarts. Docker Compose mounts a <code>./data</code> directory for WAL logs and snapshots. Delete that folder to wipe the knowledge base and start fresh.
+        </div>
+        <div class="callout callout-info" style="margin-top:1rem;">
+            <strong>CLI installed.</strong> The installer places the <code>nocturnusai</code> native binary on your PATH. Run <code>nocturnusai</code> for an interactive REPL, or use <code>nocturnusai -e "tell ..."</code> in scripts.
         </div>
     </div>
 
@@ -148,7 +277,7 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
 <span class="syn-ok">&#123; "results": ["customer_tier(acme_corp, enterprise)"] &#125;</span></code></pre>
 
         <div class="callout callout-tip">
-            <strong>Going deeper?</strong> Teach rules and watch the inference engine derive new facts automatically. See <a href="/docs/concepts">Core Concepts →</a> for the full picture on reasoning, scopes, and truth maintenance.
+            <strong>Going deeper?</strong> Teach rules and watch the inference engine derive new facts automatically. See <a href={`${base}/docs/concepts`}>Core Concepts →</a> for the full picture on reasoning, scopes, and truth maintenance.
         </div>
     </div>
 
@@ -242,7 +371,17 @@ result = executor.<span class="syn-fn">invoke</span>(&#123;
                 <tr>
                     <td><code>API_KEY</code></td>
                     <td><em>none</em></td>
-                    <td>Enable bearer token auth — all requests require <code>Authorization: Bearer &lt;key&gt;</code></td>
+                    <td>Legacy single-key auth. Set this <em>or</em> use <code>AUTH_ENABLED=true</code> for full RBAC.</td>
+                </tr>
+                <tr>
+                    <td><code>CORS_ALLOWED_ORIGINS</code></td>
+                    <td><em>localhost:3000, 5173, 8080</em></td>
+                    <td>Comma-separated allowed origins. Set to <code>*</code> only for fully public read-only APIs.</td>
+                </tr>
+                <tr>
+                    <td><code>MAX_REQUEST_BODY_BYTES</code></td>
+                    <td><code>10485760</code> (10 MB)</td>
+                    <td>Maximum allowed request body size. Requests exceeding this return 413.</td>
                 </tr>
                 <tr>
                     <td><code>STORAGE_DIR</code></td>
@@ -292,12 +431,17 @@ result = executor.<span class="syn-fn">invoke</span>(&#123;
                 <tr>
                     <td><code>NOCTURNUSAI_ADMIN_USER</code></td>
                     <td><code>admin</code></td>
-                    <td>Admin username (only used when <code>AUTH_ENABLED=true</code>)</td>
+                    <td>Bootstrap admin username — change before exposing to any network</td>
                 </tr>
                 <tr>
                     <td><code>NOCTURNUSAI_ADMIN_PASS</code></td>
                     <td><code>nocturnusai</code></td>
-                    <td>Admin password — change this in production</td>
+                    <td>Bootstrap admin password — change before exposing to any network</td>
+                </tr>
+                <tr>
+                    <td><code>API_KEY_DEFAULT_EXPIRY_DAYS</code></td>
+                    <td><em>none</em> (no expiry)</td>
+                    <td>Default expiry for new API keys in days. Recommended: <code>365</code> for production.</td>
                 </tr>
                 <tr>
                     <td><code>ENCRYPTION_KEY</code></td>
@@ -370,42 +514,24 @@ result = executor.<span class="syn-fn">invoke</span>(&#123;
 
     <hr />
 
-    <!-- ============ NEXT STEPS ============ -->
-    <h2 id="next">What's Next?</h2>
-    <p>You've got an agent connected to verified knowledge. Here's where to go from here:</p>
+    <NextSteps links={[
+        { title: "Integrations", description: "Connect to LangChain, CrewAI, AutoGen, and more", href: `${base}/docs/integrations` },
+        { title: "Core Concepts", description: "Facts, rules, inference, scopes, and salience scoring", href: `${base}/docs/concepts` },
+        { title: "API Reference", description: "Every endpoint with full request/response shapes", href: `${base}/docs/api` },
+        { title: "FAQ", description: "Common questions about NocturnusAI", href: `${base}/docs/faq` },
+    ]} />
 
-    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1.5rem;">
-        <a href="/docs/mcp" class="next-card">
-            <h4>MCP Integration →</h4>
-            <p>All 9 MCP tools, SSE streaming, A2A discovery</p>
-        </a>
-        <a href="/docs/sdks" class="next-card">
-            <h4>SDKs & Agents →</h4>
-            <p>Python, TypeScript, and LangChain integration</p>
-        </a>
-        <a href="/docs/llm" class="next-card">
-            <h4>LLM Integration →</h4>
-            <p>Fact extraction, answer synthesis, provider configuration</p>
-        </a>
-        <a href="/docs/concepts" class="next-card">
-            <h4>Core Concepts →</h4>
-            <p>Inference engines, truth maintenance, temporal facts, salience scoring</p>
-        </a>
-        <a href="/docs/api" class="next-card">
-            <h4>API Reference →</h4>
-            <p>Every endpoint with full request/response shapes</p>
-        </a>
-        <a href="/docs/security" class="next-card">
-            <h4>Security & Auth →</h4>
-            <p>API keys, roles, encryption, and TLS</p>
-        </a>
-        <a href="/docs/multi-tenancy" class="next-card">
-            <h4>Multi-Tenancy →</h4>
-            <p>Isolate data across organizations and environments</p>
-        </a>
-        <a href="/docs/cli" class="next-card">
-            <h4>CLI Reference →</h4>
-            <p>Interactive REPL, scripting, and administration from your terminal</p>
-        </a>
-    </div>
+    <script>
+        document.querySelectorAll('.ai-copy-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const text = (btn as HTMLElement).dataset.copy || '';
+                try {
+                    await navigator.clipboard.writeText(text);
+                    const orig = btn.textContent;
+                    btn.textContent = 'copied!';
+                    setTimeout(() => { btn.textContent = orig; }, 1500);
+                } catch { /* clipboard not available */ }
+            });
+        });
+    </script>
 </DocsLayout>

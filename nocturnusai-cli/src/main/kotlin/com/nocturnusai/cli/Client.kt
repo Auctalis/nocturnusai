@@ -1,7 +1,22 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.cli
 
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -13,13 +28,19 @@ class Client(
     private val serverUrl: String,
     var database: String,
     private val apiKey: String?,
-    var tenantId: String? = null,
+    var tenantId: String = "default",
 ) {
     val server: String get() = serverUrl
+    val hasApiKey: Boolean get() = apiKey != null
 
     private val http = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true; prettyPrint = true })
+        }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 300_000   // 5 min — Ollama model loading can be slow
+            connectTimeoutMillis = 15_000    // 15s connect
+            socketTimeoutMillis = 300_000    // 5 min socket idle
         }
     }
 
@@ -27,7 +48,7 @@ class Client(
         val resp = http.post("$serverUrl$path") {
             contentType(ContentType.Application.Json)
             header("X-Database", database)
-            tenantId?.let { header("X-Tenant-ID", it) }
+            header("X-Tenant-ID", tenantId)
             apiKey?.let { header("X-API-Key", it) }
             setBody(body)
         }
@@ -37,7 +58,7 @@ class Client(
     private suspend fun get(path: String): String {
         val resp = http.get("$serverUrl$path") {
             header("X-Database", database)
-            tenantId?.let { header("X-Tenant-ID", it) }
+            header("X-Tenant-ID", tenantId)
             apiKey?.let { header("X-API-Key", it) }
         }
         return resp.bodyAsText()

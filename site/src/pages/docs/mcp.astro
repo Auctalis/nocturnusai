@@ -1,5 +1,7 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="MCP Integration">
@@ -56,7 +58,47 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
 &#125;</code></pre>
 
     <div class="callout callout-tip">
-        <strong>💡 Production deployment?</strong> Replace <code>localhost:9300</code> with your server's URL. Add <code>"headers": &#123;"Authorization": "Bearer YOUR_KEY"&#125;</code> when auth is enabled — see <a href="/docs/security">Security & Auth</a>.
+        <strong>💡 Production deployment?</strong> Replace <code>localhost:9300</code> with your server's URL. Add <code>"headers": &#123;"Authorization": "Bearer YOUR_KEY"&#125;</code> when auth is enabled — see <a href={`${base}/docs/security`}>Security & Auth</a>.
+    </div>
+
+    <hr />
+
+    <h2 id="auth">MCP with Authentication</h2>
+    <p>MCP respects the same three auth modes as the REST API. Configure your MCP client headers accordingly:</p>
+
+    <h3>Disabled mode (default)</h3>
+    <p>No auth headers needed — just the SSE URL.</p>
+
+    <h3>Legacy mode (<code>API_KEY</code> env var set)</h3>
+    <pre><code class="language-json">&#123;
+  "mcpServers": &#123;
+    "nocturnus": &#123;
+      "url": "http://localhost:9300/mcp/sse",
+      "transport": "sse",
+      "headers": &#123;
+        "X-API-Key": "your-shared-secret"
+      &#125;
+    &#125;
+  &#125;
+&#125;</code></pre>
+
+    <h3>Managed / RBAC mode (<code>AUTH_ENABLED=true</code>)</h3>
+    <pre><code class="language-json">&#123;
+  "mcpServers": &#123;
+    "nocturnus": &#123;
+      "url": "http://localhost:9300/mcp/sse",
+      "transport": "sse",
+      "headers": &#123;
+        "Authorization": "Bearer nai_a1b2c3d4...",
+        "X-Database": "production",
+        "X-Tenant-ID": "acme_corp"
+      &#125;
+    &#125;
+  &#125;
+&#125;</code></pre>
+
+    <div class="callout callout-info">
+        <strong>MCP permissions.</strong> MCP requires the <code>INFERENCE</code> permission — all roles (reader, writer, admin) have it by default. Note: MCP routes default <code>X-Tenant-ID</code> to <code>"default"</code> if not specified, unlike REST endpoints which require it explicitly.
     </div>
 
     <hr />
@@ -136,4 +178,9 @@ curl -N http://localhost:9300/mcp/sse</code></pre>
     <h2 id="a2a">Agent-to-Agent Discovery</h2>
     <p>Nocturnus serves an <a href="https://google.github.io/A2A/" target="_blank">Agent2Agent Protocol</a> discovery card at <code>GET /.well-known/agent.json</code>. Other agents can automatically discover and interact with your fact database without manual configuration.</p>
 
+    <NextSteps links={[
+        { title: "Integrations", description: "LangChain, CrewAI, AutoGen, and more framework integrations", href: `${base}/docs/integrations` },
+        { title: "API Reference", description: "Full HTTP endpoint documentation", href: `${base}/docs/api` },
+        { title: "CLI Reference", description: "Interactive REPL and command reference", href: `${base}/docs/cli` },
+    ]} />
 </DocsLayout>

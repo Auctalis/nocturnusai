@@ -96,6 +96,31 @@ jobs:
         working-directory: sdks/typescript
         run: npm run build
 
+      - name: Test
+        working-directory: sdks/typescript
+        run: npm test
+
+  # ── Security: Trivy vulnerability scan ─────────────────────────────────────
+  security:
+    name: Security (Trivy)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: "."
+          scanners: "vuln,secret"
+          format: table
+          exit-code: "1"
+          severity: CRITICAL
+          ignore-unfixed: true
+
   # ── Docs site ───────────────────────────────────────────────────────────────
   build-site:
     name: Docs site

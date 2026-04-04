@@ -1,6 +1,23 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai
 
 import com.nocturnusai.core.*
+import com.nocturnusai.core.MergeResult
+import com.nocturnusai.core.MergeStrategy
+import com.nocturnusai.core.ScopeDiff
 import com.nocturnusai.inference.BackwardChainer
 import com.nocturnusai.inference.ReteEngine
 import com.nocturnusai.inference.Unifier
@@ -29,10 +46,24 @@ import com.nocturnusai.extraction.FactExtractor
 import com.nocturnusai.extraction.RuleExtractor
 import com.nocturnusai.context.*
 import com.nocturnusai.memory.*
+import com.nocturnusai.storage.AggregateOp
 import com.nocturnusai.testing.TestRunner
 import com.nocturnusai.transaction.TransactionManager
 
 class TenantNotFoundException(val tenantId: String) : RuntimeException("Tenant '$tenantId' not found")
+
+/** Result of a bulk-assert operation. */
+data class BulkResult(
+    val asserted: Int,
+    val failed: Int,
+    val errors: List<String>
+)
+
+/** Result of a pattern-based retract operation. */
+data class RetractResult(
+    val retracted: Int,
+    val atoms: List<Atom>
+)
 
 class NocturnusAI(
     val storageDir: File = File("data"),
@@ -40,7 +71,10 @@ class NocturnusAI(
     val dbName: String = "default",
     val encryption: EncryptionService? = null,
     val factExtractor: FactExtractor? = null,
-    val ruleExtractor: RuleExtractor? = null
+    val ruleExtractor: RuleExtractor? = null,
+    /** Database-level default conflict strategy. Individual requests can override via assertFact(). */
+    val defaultConflictStrategy: com.nocturnusai.core.ConflictStrategy = com.nocturnusai.core.ConflictStrategy.REJECT,
+    val semanticContext: SemanticContext = DummySemanticContext
 ) {
 
     private val logger = org.slf4j.LoggerFactory.getLogger(NocturnusAI::class.java)
@@ -63,16 +97,59 @@ class NocturnusAI(
         if (isMultiTenant && key != "default" && !tenants.contains(key)) {
             throw TenantNotFoundException(key)
         }
-        return contexts.getOrPut(key) { LogicContext() }
+        return contexts.getOrPut(key) { LogicContext(semanticContext) }
     }
 
     // Helper for internal use where we know we want a specific context
     private fun getContextByKey(key: String): LogicContext {
-        return contexts.getOrPut(key) { LogicContext() }
+        return contexts.getOrPut(key) { LogicContext(semanticContext) }
     }
 
     private val tenants = ConcurrentHashMap.newKeySet<String>()
     private val tenantsFile = File(storageDir, "tenants.json")
+
+    // ── Counterfactual Scope DAG (Item 4) ────────────────────────────────────
+    // Maps childScope -> parentScopeId. Null parent = root (inherits from global).
+    private val scopeParents = ConcurrentHashMap<String, String>()
+
+    /**
+     * Set a parent scope for [child], creating a DAG inheritance relationship.
+     * When querying [child], facts from [parent] (and its ancestors) are also visible
+     * unless overridden by facts in [child] itself.
+     *
+     * Throws if the relationship would create a cycle.
+     */
+    fun setScopeParent(child: String, parent: String) {
+        require(child != parent) { "A scope cannot be its own parent" }
+        // Cycle detection: walk parent chain from `parent` upward
+        var cursor: String? = parent
+        val visited = mutableSetOf<String>()
+        while (cursor != null) {
+            if (!visited.add(cursor)) break  // loop guard
+            if (cursor == child) throw IllegalArgumentException("Setting scope parent '$parent' for '$child' would create a cycle")
+            cursor = scopeParents[cursor]
+        }
+        scopeParents[child] = parent
+        logger.info("Scope DAG: '$child' now inherits from '$parent'")
+    }
+
+    /** Remove a scope's parent (make it a root scope). */
+    fun removeScopeParent(child: String) { scopeParents.remove(child) }
+
+    /** Returns the ordered ancestry chain for [scope]: [scope, parent, grandparent, ...].*/
+    fun getScopeAncestors(scope: String): List<String> {
+        val chain = mutableListOf(scope)
+        var cursor: String? = scopeParents[scope]
+        val seen = mutableSetOf(scope)
+        while (cursor != null && seen.add(cursor)) {
+            chain.add(cursor)
+            cursor = scopeParents[cursor]
+        }
+        return chain
+    }
+
+    /** Returns the current scope-parent map for inspection. */
+    fun getScopeParentMap(): Map<String, String> = scopeParents.toMap()
 
     init {
         // Load tenants
@@ -190,7 +267,12 @@ class NocturnusAI(
 
 
     // Public API
-    fun assertFact(fact: Atom, tenantId: String? = null, scope: String? = null) {
+    fun assertFact(
+        fact: Atom,
+        tenantId: String? = null,
+        scope: String? = null,
+        conflictStrategy: com.nocturnusai.core.ConflictStrategy = defaultConflictStrategy
+    ) {
         val ctx = getContext(tenantId)
         val limitTenant = tenantId ?: "default"
 
@@ -206,31 +288,56 @@ class NocturnusAI(
             finalFact = finalFact.copy(validFrom = finalFact.createdAt)
         }
 
-        internalAssertFact(ctx, finalFact, logging = true, tenantId = limitTenant)
+        internalAssertFact(ctx, finalFact, logging = true, tenantId = limitTenant, conflictStrategy = conflictStrategy)
     }
 
-    private fun internalAssertFact(ctx: LogicContext, fact: Atom, logging: Boolean, tenantId: String?) {
-        // 0. Enforce logical consistency (Layer 6) within context AND scope?
-        // Contradiction: If I assert A in Scope1, and !A exists in Scope1.
+    private fun internalAssertFact(
+        ctx: LogicContext,
+        fact: Atom,
+        logging: Boolean,
+        tenantId: String?,
+        conflictStrategy: com.nocturnusai.core.ConflictStrategy = defaultConflictStrategy
+    ) {
+        // 0. Enforce logical consistency within context AND scope.
+        // Contradiction: asserting A when !A already exists in the same scope (or vice versa).
 
-        // Unified Storage: Check ctx.store for the opposite fact.
-        // We construct the opposite atom (same scope, same args, inverted truthVal)
         val oppositeFact = fact.copy(truthVal = !fact.truthVal)
+        val opposingAtoms = ctx.store.match(oppositeFact, scope = fact.scope)
+            .filter { it.predicate == oppositeFact.predicate && it.args == oppositeFact.args }
+            .toList()
 
-        // Check if opposite exists in the store (Unified Store contains both Pos and Neg)
-        // match(oppositeFact) will look for the effective predicate of the opposite fact.
-        // e.g. if fact is P, opposite is !P. We look for !P.
-        // e.g. if fact is !P, opposite is P. We look for P.
-        val oppositeExists = ctx.store.match(oppositeFact, scope = fact.scope).any {
-            it.predicate == oppositeFact.predicate && it.args == oppositeFact.args
-        }
-
-        if (oppositeExists) {
-            if (!logging) {
-                 // Replay warning
-                 return
+        if (opposingAtoms.isNotEmpty()) {
+            when (conflictStrategy) {
+                com.nocturnusai.core.ConflictStrategy.REJECT -> {
+                    if (!logging) {
+                        // Replay: silently skip contradictions to allow WAL recovery
+                        return
+                    }
+                    throw IllegalArgumentException("Contradiction detected: Cannot assert $fact because its negation exists in the same scope.")
+                }
+                com.nocturnusai.core.ConflictStrategy.NEWEST_WINS -> {
+                    // Retract the existing contradictory fact(s), then assert the new one below
+                    for (old in opposingAtoms) {
+                        internalRetractFact(ctx, old, logging = logging, tenantId = tenantId)
+                    }
+                }
+                com.nocturnusai.core.ConflictStrategy.CONFIDENCE -> {
+                    // Keep the higher-confidence fact; new fact wins on tie or when confidence is null
+                    val existingMaxConfidence = opposingAtoms.mapNotNull { it.confidence }.maxOrNull()
+                    val newConfidence = fact.confidence
+                    if (existingMaxConfidence != null && newConfidence != null && existingMaxConfidence > newConfidence) {
+                        // Existing fact has strictly higher confidence — discard the new one
+                        return
+                    }
+                    // Otherwise new fact wins: retract old, assert new below
+                    for (old in opposingAtoms) {
+                        internalRetractFact(ctx, old, logging = logging, tenantId = tenantId)
+                    }
+                }
+                com.nocturnusai.core.ConflictStrategy.KEEP_BOTH -> {
+                    // Skip contradiction check — fall through and assert both
+                }
             }
-            throw IllegalArgumentException("Contradiction detected: Cannot assert $fact because its negation exists in the same scope.")
         }
 
         // 1. Check external constraints
@@ -302,14 +409,115 @@ class NocturnusAI(
         ctx.memoryManager.onRuleAsserted(rule, tenantId)
     }
 
-    fun query(pattern: Atom, tenantId: String? = null, scope: String? = null): Sequence<Atom> {
+    fun query(
+        pattern: Atom,
+        tenantId: String? = null,
+        scope: String? = null,
+        minConfidence: Double? = null,
+        inheritParentScopes: Boolean = false
+    ): Sequence<Atom> {
         val ctx = getContext(tenantId)
-        return ctx.store.match(pattern, scope = scope)
+        val base = ctx.store.match(pattern, scope = scope)
+        val filtered = if (minConfidence == null) base
+                       else base.filter { it.confidence == null || it.confidence >= minConfidence }
+
+        // Scope inheritance: if the scope has parents and inheritance is requested,
+        // union facts from parent scopes — skipping any whose args already appear in child.
+        if (scope != null && inheritParentScopes) {
+            val ancestors = getScopeAncestors(scope).drop(1)  // skip self
+            if (ancestors.isEmpty()) return filtered
+            val childArgSets = mutableSetOf<List<com.nocturnusai.core.Term>>()
+            val resultList = filtered.onEach { childArgSets.add(it.args) }.toMutableList()
+            for (ancestor in ancestors) {
+                val ancestorFacts = ctx.store.match(pattern, scope = ancestor)
+                ancestorFacts.forEach { fact ->
+                    if (!childArgSets.contains(fact.args)) {
+                        childArgSets.add(fact.args)
+                        resultList.add(fact.copy(scope = scope))  // surface as if from child scope
+                    }
+                }
+            }
+            return resultList.asSequence()
+        }
+        return filtered
     }
 
-    fun infer(pattern: Atom, tenantId: String? = null): Sequence<Atom> {
+    // --- Aggregation API ---
+
+    /**
+     * Count facts matching [pattern] in [tenantId]'s store, optionally filtered by [scope].
+     */
+    fun countFacts(pattern: Atom, tenantId: String, scope: String? = null): Int {
         val ctx = getContext(tenantId)
-        return ctx.backwardChainer.solve(pattern)
+        return ctx.store.count(pattern, scope)
+    }
+
+    /**
+     * Apply [op] over the numeric value at [argIndex] for all facts matching [pattern]
+     * in [tenantId]'s store, optionally filtered by [scope].
+     */
+    fun aggregateFacts(pattern: Atom, argIndex: Int, op: AggregateOp, tenantId: String, scope: String? = null): Double? {
+        val ctx = getContext(tenantId)
+        return ctx.store.aggregate(pattern, argIndex, op, scope)
+    }
+
+    // --- Bulk Operations API ---
+
+    /**
+     * Assert all [atoms] for [tenantId].  Non-all-or-nothing: each atom is attempted
+     * independently.  Contradictions and constraint violations are collected as errors
+     * rather than aborting the entire batch.
+     */
+    fun bulkAssertFacts(atoms: List<Atom>, tenantId: String): BulkResult {
+        val ctx = getContext(tenantId)
+        val limitTenant = tenantId
+        var asserted = 0
+        var failed = 0
+        val errors = mutableListOf<String>()
+
+        for (atom in atoms) {
+            var finalAtom = atom
+            if (finalAtom.createdAt == null) {
+                finalAtom = finalAtom.copy(createdAt = System.currentTimeMillis())
+            }
+            if (finalAtom.validFrom == null) {
+                finalAtom = finalAtom.copy(validFrom = finalAtom.createdAt)
+            }
+            try {
+                internalAssertFact(ctx, finalAtom, logging = true, tenantId = limitTenant)
+                asserted++
+            } catch (e: Exception) {
+                failed++
+                errors.add("${atom.predicate}(${atom.args.joinToString(",")}): ${e.message}")
+            }
+        }
+
+        return BulkResult(asserted, failed, errors)
+    }
+
+    /**
+     * Retract all facts that match [pattern] in [tenantId]'s store, optionally
+     * filtered by [scope].  Returns the count and list of retracted atoms.
+     */
+    fun retractByPattern(pattern: Atom, tenantId: String, scope: String? = null): RetractResult {
+        val ctx = getContext(tenantId)
+        val limitTenant = tenantId
+        val matches = ctx.store.match(pattern, scope).toList()
+        for (atom in matches) {
+            internalRetractFact(ctx, atom, logging = true, tenantId = limitTenant)
+        }
+        return RetractResult(matches.size, matches)
+    }
+
+    fun infer(
+        pattern: Atom,
+        tenantId: String? = null,
+        minConfidence: Double? = null
+    ): Sequence<Atom> {
+        val ctx = getContext(tenantId)
+        val results = ctx.backwardChainer.solve(pattern)
+        return if (minConfidence == null) results
+        else results.filter { it.confidence == null || it.confidence >= minConfidence }
     }
 
     fun inferWithProof(pattern: Atom, tenantId: String? = null): Sequence<ProofTree> {
@@ -516,7 +724,7 @@ class NocturnusAI(
         logger.warn("NUKE: Clearing all data for tenant '$key' in database '$dbName'")
 
         // Replace the context with a fresh one
-        contexts[key] = LogicContext()
+        contexts[key] = LogicContext(semanticContext)
 
         createSnapshot()
     }
@@ -532,7 +740,7 @@ class NocturnusAI(
         contexts.clear()
 
         // Reinitialize default context
-        contexts["default"] = LogicContext()
+        contexts["default"] = LogicContext(semanticContext)
 
         // Clear WAL and create fresh snapshot
         wal.clear()
@@ -695,6 +903,60 @@ class NocturnusAI(
         return schema
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Scope management — delegate to Hexastore with tenant context
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Fork [sourceScope] into [targetScope] for the given tenant.
+     * [sourceScope] == null means the global (unscoped) partition.
+     * Returns the count of atoms copied.
+     */
+    fun forkScope(sourceScope: String?, targetScope: String, tenantId: String): Int {
+        val ctx = getContext(tenantId)
+        return ctx.store.forkScope(sourceScope, targetScope)
+    }
+
+    /**
+     * Compare [scopeA] and [scopeB] for the given tenant and return a [ScopeDiff].
+     */
+    fun diffScopes(scopeA: String?, scopeB: String?, tenantId: String): ScopeDiff {
+        val ctx = getContext(tenantId)
+        return ctx.store.diffScopes(scopeA, scopeB)
+    }
+
+    /**
+     * Merge [sourceScope] into [targetScope] for the given tenant.
+     * Uses [strategy] to handle conflicts.
+     */
+    fun mergeScope(
+        sourceScope: String,
+        targetScope: String?,
+        strategy: MergeStrategy,
+        tenantId: String
+    ): MergeResult {
+        val ctx = getContext(tenantId)
+        return ctx.store.mergeScope(sourceScope, targetScope, strategy)
+    }
+
+    /**
+     * Delete all atoms in [scope] for the given tenant.
+     * Returns the count of atoms deleted.
+     */
+    fun deleteScope(scope: String, tenantId: String): Int {
+        val ctx = getContext(tenantId)
+        return ctx.store.deleteScope(scope)
+    }
+
+    /**
+     * List all named scopes present for the given tenant.
+     * The global (null) scope is never included.
+     */
+    fun listScopes(tenantId: String): Set<String> {
+        val ctx = getContext(tenantId)
+        return ctx.store.listScopes()
+    }
+
     // Accessor for default store (legacy/tests)
     fun getStore(tenantId: String? = null): Hexastore = getContext(tenantId).store
 
@@ -787,7 +1049,7 @@ class NocturnusAI(
                                     output.append("Extracted ${facts.size} facts:\n")
                                     for (f in facts) {
                                         val terms = f.args.map { Term.Identifier(it) }
-                                        val atom = Atom(f.predicate, terms)
+                                        val atom = Atom(f.predicate, terms, confidence = f.confidence.toDouble())
                                         try {
                                             assertFact(atom, tenantId)
                                             output.append("  ASSERTED: ${f.predicate}(${f.args.joinToString(", ")})\n")

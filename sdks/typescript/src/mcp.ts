@@ -12,7 +12,7 @@
  *
  * @example
  * ```ts
- * import { NocturnusAIMCPClient } from '@nocturnusai/sdk';
+ * import { NocturnusAIMCPClient } from 'nocturnusai-sdk';
  *
  * const mcp = new NocturnusAIMCPClient({
  *   baseUrl: 'http://localhost:9300',
@@ -120,7 +120,7 @@ export class NocturnusAIMCPClient {
       protocolVersion: '2025-11-25',
       capabilities: {},
       clientInfo: {
-        name: '@nocturnusai/sdk',
+        name: 'nocturnusai-sdk',
         version: '0.1.0',
       },
     });

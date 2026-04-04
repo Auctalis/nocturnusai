@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.core
 
 import kotlinx.serialization.Serializable
@@ -21,7 +35,17 @@ data class Atom(
     val createdAt: Long? = null,
     val validFrom: Long? = null,
     val validUntil: Long? = null,
-    val ttl: Long? = null
+    val ttl: Long? = null,
+    // Confidence score — metadata, excluded from equals/hashCode.
+    // Valid range: 0.0 (no confidence) to 1.0 (certainty). null means unknown.
+    val confidence: Double? = null,
+    // Negation-as-Failure flag.
+    // When true on a rule body condition, the condition succeeds iff the atom
+    // CANNOT be proven — i.e., the closed-world assumption / Prolog \+.
+    // Distinct from truthVal=false (explicit / classical negation).
+    // naf=true has no meaning on head atoms or asserted facts; it is only
+    // meaningful in rule bodies.
+    val naf: Boolean = false
 ) {
     /** Returns true if this atom is temporally valid at the given timestamp. */
     fun isValidAt(timestamp: Long): Boolean {
@@ -45,7 +69,8 @@ data class Atom(
                args == other.args &&
                truthVal == other.truthVal &&
                source == other.source &&
-               scope == other.scope
+               scope == other.scope &&
+               naf == other.naf
     }
 
     override fun hashCode(): Int {
@@ -54,12 +79,17 @@ data class Atom(
         result = 31 * result + truthVal.hashCode()
         result = 31 * result + source.hashCode()
         result = 31 * result + (scope?.hashCode() ?: 0)
+        result = 31 * result + naf.hashCode()
         return result
     }
 
     override fun toString(): String {
         val argsStr = args.joinToString(", ")
-        val negation = if (truthVal) "" else "NOT "
+        val negation = when {
+            naf -> "NAF "
+            !truthVal -> "NOT "
+            else -> ""
+        }
         val scopeStr = if (scope != null) " @$scope" else ""
         return "$negation$predicate($argsStr)$scopeStr"
     }

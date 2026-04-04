@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.server
 
 import com.nocturnusai.TenantNotFoundException
@@ -70,9 +84,33 @@ fun main() {
     server.start(wait = true)
 }
 
-fun Application.module() {
+fun Application.module() = moduleWithStorageDir(ServerConfig.storageDir)
+
+/**
+ * Core application module that accepts an explicit storage directory.
+ *
+ * This is the canonical implementation. [module] delegates here using
+ * [ServerConfig.storageDir]. Tests can call this directly with a fresh
+ * temporary directory to guarantee per-test isolation.
+ */
+fun Application.moduleWithStorageDir(storageDir: File) {
     install(ContentNegotiation) {
         json()
+    }
+
+    // ── Request body size limit ──────────────────────────────────────────
+    // Reject oversized payloads before reading them into memory.
+    // Default: 10 MB. Override with MAX_REQUEST_BODY_BYTES env var.
+    val maxBodyBytes = System.getenv("MAX_REQUEST_BODY_BYTES")?.toLongOrNull() ?: (10L * 1024 * 1024)
+    intercept(ApplicationCallPipeline.Plugins) {
+        val contentLength = call.request.header(HttpHeaders.ContentLength)?.toLongOrNull()
+        if (contentLength != null && contentLength > maxBodyBytes) {
+            call.respond(
+                HttpStatusCode.PayloadTooLarge,
+                ErrorResponse("PAYLOAD_TOO_LARGE", "Request body exceeds ${maxBodyBytes / 1024 / 1024} MB limit")
+            )
+            return@intercept finish()
+        }
     }
 
     install(StatusPages) {
@@ -109,7 +147,16 @@ fun Application.module() {
     }
 
     install(CORS) {
-        anyHost()
+        // Configure allowed origins via CORS_ALLOWED_ORIGINS env var (comma-separated).
+        // Default: localhost origins only. Set to "*" only if you understand the risks.
+        val corsOrigins = System.getenv("CORS_ALLOWED_ORIGINS")
+        if (corsOrigins == "*") {
+            anyHost()
+        } else {
+            val origins = corsOrigins?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
+                ?: listOf("http://localhost:3000", "http://localhost:5173", "http://localhost:8080")
+            origins.forEach { allowHost(it.removePrefix("http://").removePrefix("https://"), schemes = listOf("http", "https")) }
+        }
         allowHeader(HttpHeaders.ContentType)
         allowHeader("X-Transaction-ID")
         allowHeader("Authorization")
@@ -144,8 +191,22 @@ fun Application.module() {
         null
     }
 
+    // Embedding provider — separate from completion LLM (e.g. Ollama nomic-embed-text)
+    val embedProvider = try {
+        LlmConfig.createEmbedProvider()
+    } catch (e: Exception) {
+        environment.log.warn("Failed to initialize embedding provider: ${e.message}")
+        null
+    }
+    val semanticContext = com.nocturnusai.server.core.CachedSemanticContext(embedProvider)
+    if (embedProvider != null) {
+        environment.log.info("Semantic similarity: enabled (embed provider=${embedProvider.name}, model=${embedProvider.model})")
+    } else {
+        environment.log.info("Semantic similarity: disabled (no embedding provider configured)")
+    }
+
     // Database Manager
-    val dbManager = DatabaseManager(ServerConfig.storageDir, factExtractor, ruleExtractor)
+    val dbManager = DatabaseManager(storageDir, factExtractor, ruleExtractor, semanticContext)
     Metrics.activeDatabases.set(dbManager.getDatabaseNames().size)
 
     // ── MDC enrichment — correlation ID + context per request ────────
@@ -179,19 +240,97 @@ fun Application.module() {
         }
     }
 
+    // ── Security headers ─────────────────────────────────────────────────
+    intercept(ApplicationCallPipeline.Call) {
+        call.response.header("X-Content-Type-Options", "nosniff")
+        call.response.header("X-Frame-Options", "DENY")
+        call.response.header("X-XSS-Protection", "1; mode=block")
+        if (ServerConfig.tlsEnabled) {
+            call.response.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        }
+    }
+
     // ── Authentication & Authorization ──────────────────────────────────
     val keyManager = if (ServerConfig.authMode == AuthMode.RBAC) {
-        val km = ApiKeyManager(ServerConfig.storageDir)
+        val km = ApiKeyManager(storageDir)
         environment.log.info("Auth mode: RBAC (${km.listKeys().size} keys loaded)")
         if (!km.hasKeys()) {
             environment.log.warn("No API keys found — POST /auth/bootstrap to create the first admin key")
         }
+        if (ServerConfig.usingDefaultAdminCredentials) {
+            environment.log.warn("⚠️  Using default admin credentials. Set NOCTURNUSAI_ADMIN_USER and NOCTURNUSAI_ADMIN_PASS before exposing this server.")
+        }
         km
     } else {
         environment.log.info("Auth mode: ${ServerConfig.authMode.name}")
+        if (ServerConfig.authMode == AuthMode.DISABLED) {
+            environment.log.warn("⚠️  Authentication is DISABLED. Set AUTH_ENABLED=true or API_KEY for production use.")
+        }
         null
     }
     AuthInterceptor.install(this, keyManager)
+
+    // ── Legal & safety notice ─────────────────────────────────────────────
+    environment.log.info("──────────────────────────────────────────────────────────────────")
+    environment.log.info("NocturnusAI v${BuildInfo.version} — Logic Server for Agentic AI")
+    environment.log.info("Licensed under BSL 1.1 — (c) 2026 Auctalis LLC")
+    environment.log.info("")
+    environment.log.info("NOTICE: Engine output reflects logical consistency of inference,")
+    environment.log.info("not real-world accuracy. Do not use for autonomous high-stakes")
+    environment.log.info("decisions without human-in-the-loop verification.")
+    environment.log.info("See DISCLAIMER.md — provided AS-IS, no warranty.")
+    environment.log.info("──────────────────────────────────────────────────────────────────")
+
+    // ── Production readiness warnings ────────────────────────────────────
+    if (!ServerConfig.tlsEnabled && ServerConfig.host != "127.0.0.1" && ServerConfig.host != "localhost") {
+        environment.log.warn("⚠️  TLS is disabled and server is bound to ${ServerConfig.host}. " +
+            "Traffic is unencrypted. Set TLS_ENABLED=true for production.")
+    }
+    if (ServerConfig.encryptionKey == null) {
+        environment.log.warn("⚠️  Encryption at rest is disabled. " +
+            "Set ENCRYPTION_KEY (64 hex chars) to protect stored data. " +
+            "Generate with: openssl rand -hex 32")
+    }
+
+    // ── Follower write rejection ─────────────────────────────────────────
+    // When this node is a read-only follower, reject all mutating endpoints
+    // so agents are immediately redirected to the leader rather than causing
+    // silent split-brain divergence.
+    if (ServerConfig.replicationMode == ReplicationMode.FOLLOWER) {
+        val writeMethodPrefixes = setOf(
+            "/tell", "/teach", "/forget",
+            "/assert/", "/retract", "/execute",
+            "/tx/", "/memory/consolidate", "/memory/decay", "/memory/priority",
+            "/memory/compress", "/memory/cleanup", "/memory/prioritize"
+        )
+        val writeAdminPaths = setOf("/admin/databases")
+
+        intercept(ApplicationCallPipeline.Plugins) {
+            val method = call.request.httpMethod
+            val path = call.request.uri.substringBefore('?')
+
+            val isWriteMethod = method == HttpMethod.Post || method == HttpMethod.Put ||
+                    method == HttpMethod.Delete || method == HttpMethod.Patch
+
+            val isBlockedPath = isWriteMethod && (
+                writeMethodPrefixes.any { prefix -> path.startsWith(prefix) } ||
+                (writeAdminPaths.any { admin -> path.startsWith(admin) } &&
+                    (method == HttpMethod.Post || method == HttpMethod.Delete))
+            )
+
+            if (isBlockedPath) {
+                call.respond(
+                    HttpStatusCode.Conflict,
+                    ErrorResponse(
+                        code = "FOLLOWER_READ_ONLY",
+                        message = "This server is a read-only follower. Send writes to the leader.",
+                        details = mapOf("leader" to (ServerConfig.leaderUrl ?: "unknown"))
+                    )
+                )
+                return@intercept finish()
+            }
+        }
+    }
 
     // Graceful shutdown: close all databases when application stops
     environment.monitor.subscribe(ApplicationStopping) {
@@ -210,12 +349,14 @@ fun Application.module() {
         // Full routes (advanced / backward-compatible)
         adminRoutes(dbManager)
         logicRoutes(dbManager)
+        aggregateRoutes(dbManager)
         transactionRoutes(dbManager)
         testRoutes(dbManager)
         memoryRoutes(dbManager)
         contextManagementRoutes(dbManager, factExtractor, llmProvider?.name)
+        scopeRoutes(dbManager)
         mcpRoutes(dbManager)
-        observabilityRoutes(appMicrometerRegistry, dbManager, ServerConfig.storageDir, llmProvider != null)
+        observabilityRoutes(appMicrometerRegistry, dbManager, storageDir, llmProvider != null)
         replicationRoutes(dbManager)
         extractionRoutes(dbManager, factExtractor, ruleExtractor, llmProvider)
         synthesisRoutes(dbManager, llmProvider)
@@ -225,14 +366,16 @@ fun Application.module() {
     if (ServerConfig.replicationMode == ReplicationMode.FOLLOWER) {
         val leader = ServerConfig.leaderUrl
         if (leader != null) {
-            // Replicate Default DB
-            val db = dbManager.getDatabase("default")
-            if (db != null) {
-                val client = ReplicationClient(db, leader)
-                client.start()
+            val replicationClient = ReplicationClient(dbManager, leader)
+            replicationClient.start()
+
+            // Stop the replication client cleanly when the server shuts down
+            environment.monitor.subscribe(ApplicationStopping) {
+                environment.log.info("Application stopping — stopping replication client...")
+                replicationClient.stop()
             }
         } else {
-            System.err.println("Replication Mode is FOLLOWER but LEADER_URL is missing!")
+            environment.log.error("REPLICATION_MODE=FOLLOWER but LEADER_URL is not set!")
         }
     }
 

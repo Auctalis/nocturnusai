@@ -63,15 +63,13 @@ def _parse_json_list(value: str) -> list[str]:
 # The public entry point is get_nocturnusai_tools(), which checks availability.
 
 if _LANGCHAIN_AVAILABLE:
-    from typing import Type
 
-    from nocturnusai.client import SyncNocturnusAIClient as _SyncClient
 
     # ------------------------------------------------------------------
     # Input schemas (Pydantic v2 models for LangChain tool args)
     # ------------------------------------------------------------------
 
-    class AssertFactInput(BaseModel):  # type: ignore[misc]
+    class AssertFactInput(BaseModel):
         """Input schema for the NocturnusAI assert_fact tool."""
 
         predicate: str = Field(description="The predicate name (e.g., 'parent', 'likes').")
@@ -90,7 +88,7 @@ if _LANGCHAIN_AVAILABLE:
             description="Set true to assert the negation of this fact.",
         )
 
-    class QueryInput(BaseModel):  # type: ignore[misc]
+    class QueryInput(BaseModel):
         """Input schema for the NocturnusAI query tool."""
 
         predicate: str = Field(description="The predicate to query.")
@@ -105,7 +103,7 @@ if _LANGCHAIN_AVAILABLE:
             description="Optional scope filter.",
         )
 
-    class InferInput(BaseModel):  # type: ignore[misc]
+    class InferInput(BaseModel):
         """Input schema for the NocturnusAI infer tool."""
 
         predicate: str = Field(description="The goal predicate to prove.")
@@ -124,7 +122,7 @@ if _LANGCHAIN_AVAILABLE:
             description="If true, include full proof trees showing the derivation chain.",
         )
 
-    class ContextInput(BaseModel):  # type: ignore[misc]
+    class ContextInput(BaseModel):
         """Input schema for the NocturnusAI context_window tool."""
 
         max_facts: int = Field(
@@ -198,7 +196,7 @@ if _LANGCHAIN_AVAILABLE:
     # Tool definitions
     # ------------------------------------------------------------------
 
-    class NocturnusAIAssertTool(BaseTool):  # type: ignore[misc]
+    class NocturnusAIAssertTool(BaseTool):
         """LangChain tool for asserting facts into NocturnusAI.
 
         Asserts a predicate-argument fact into the knowledge base. Facts are
@@ -217,7 +215,7 @@ if _LANGCHAIN_AVAILABLE:
             "Use this to store information like 'parent(alice, bob)' or "
             "'likes(alice, pizza)'. Arguments should be a JSON array of strings."
         )
-        args_schema: Type[BaseModel] = AssertFactInput  # type: ignore[assignment]
+        args_schema: type[BaseModel] = AssertFactInput
         client: Any = None  # SyncNocturnusAIClient, typed as Any for Pydantic compat
 
         model_config = {"arbitrary_types_allowed": True}
@@ -240,7 +238,7 @@ if _LANGCHAIN_AVAILABLE:
                     scope=scope,
                     negated=negated,
                 )
-                return result.get("result", str(result))
+                return str(result.get("result", result))
             except Exception as e:
                 return f"Error asserting fact: {e}"
 
@@ -256,7 +254,7 @@ if _LANGCHAIN_AVAILABLE:
                 predicate=predicate, args=args, scope=scope, negated=negated,
             )
 
-    class NocturnusAIQueryTool(BaseTool):  # type: ignore[misc]
+    class NocturnusAIQueryTool(BaseTool):
         """LangChain tool for querying facts from NocturnusAI.
 
         Queries the knowledge base for facts matching a pattern. Use
@@ -274,7 +272,7 @@ if _LANGCHAIN_AVAILABLE:
             "Use ?-prefixed variables (like ?x, ?who) for wildcard positions. "
             "Returns all matching facts. Arguments should be a JSON array of strings."
         )
-        args_schema: Type[BaseModel] = QueryInput  # type: ignore[assignment]
+        args_schema: type[BaseModel] = QueryInput
         client: Any = None
 
         model_config = {"arbitrary_types_allowed": True}
@@ -314,7 +312,7 @@ if _LANGCHAIN_AVAILABLE:
             """Async execution delegates to sync."""
             return self._run(predicate=predicate, args=args, scope=scope)
 
-    class NocturnusAIInferTool(BaseTool):  # type: ignore[misc]
+    class NocturnusAIInferTool(BaseTool):
         """LangChain tool for running logical inference on NocturnusAI.
 
         Runs backward-chaining SLD resolution to derive conclusions from
@@ -335,7 +333,7 @@ if _LANGCHAIN_AVAILABLE:
             "Use ?-prefixed variables for unknowns. Arguments should be a JSON "
             "array of strings."
         )
-        args_schema: Type[BaseModel] = InferInput  # type: ignore[assignment]
+        args_schema: type[BaseModel] = InferInput
         client: Any = None
 
         model_config = {"arbitrary_types_allowed": True}
@@ -394,7 +392,7 @@ if _LANGCHAIN_AVAILABLE:
                 with_proof=with_proof,
             )
 
-    class NocturnusAIContextTool(BaseTool):  # type: ignore[misc]
+    class NocturnusAIContextTool(BaseTool):
         """LangChain tool for retrieving the NocturnusAI context window.
 
         Gets the most salient (relevant) facts for the current reasoning
@@ -415,7 +413,7 @@ if _LANGCHAIN_AVAILABLE:
             "context with the most important knowledge. Optionally filter by "
             "predicate names and minimum salience."
         )
-        args_schema: Type[BaseModel] = ContextInput  # type: ignore[assignment]
+        args_schema: type[BaseModel] = ContextInput
         client: Any = None
 
         model_config = {"arbitrary_types_allowed": True}

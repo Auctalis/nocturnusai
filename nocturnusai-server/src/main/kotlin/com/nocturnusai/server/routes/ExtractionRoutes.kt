@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.server.routes
 
 import com.nocturnusai.extraction.ExtractedRule
@@ -6,11 +20,13 @@ import com.nocturnusai.extraction.RuleExtractor
 import com.nocturnusai.server.*
 import com.nocturnusai.server.llm.LlmProvider
 import com.nocturnusai.server.observability.Metrics
+import io.ktor.client.plugins.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import java.net.ConnectException
 
 fun Route.extractionRoutes(dbManager: DatabaseManager, extractor: FactExtractor?, ruleExtractor: RuleExtractor?, provider: LlmProvider?) {
 
@@ -63,7 +79,11 @@ fun Route.extractionRoutes(dbManager: DatabaseManager, extractor: FactExtractor?
             if (req.assert && facts.isNotEmpty()) {
                 for (fact in facts) {
                     val terms = fact.args.map { com.nocturnusai.core.Term.Identifier(it) }
-                    val atom = com.nocturnusai.core.Atom(fact.predicate, terms, scope = req.scope)
+                    val atom = com.nocturnusai.core.Atom(
+                        fact.predicate, terms,
+                        scope = req.scope,
+                        confidence = fact.confidence.toDouble()
+                    )
                     try {
                         db.assertFact(atom, tenantId)
                     } catch (e: Exception) {
@@ -107,8 +127,26 @@ fun Route.extractionRoutes(dbManager: DatabaseManager, extractor: FactExtractor?
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: DatabaseNotFoundException) {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
+        } catch (e: HttpRequestTimeoutException) {
+            call.respond(HttpStatusCode.GatewayTimeout, ErrorResponse(
+                "LLM_TIMEOUT",
+                "LLM request timed out. If using Ollama, the model may still be loading — try again in a moment."
+            ))
+        } catch (e: ConnectException) {
+            call.respond(HttpStatusCode.BadGateway, ErrorResponse(
+                "LLM_UNREACHABLE",
+                "Cannot reach LLM provider. Check that Ollama is running and the LLM_BASE_URL is correct."
+            ))
         } catch (e: Exception) {
-            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("EXTRACTION_ERROR", e.message ?: "Extraction failed"))
+            val msg = e.message ?: "Extraction failed"
+            val hint = when {
+                "timeout" in msg.lowercase() || "timed out" in msg.lowercase() ->
+                    "$msg — If using Ollama, the model may still be loading. Try again shortly."
+                "refused" in msg.lowercase() || "unreachable" in msg.lowercase() ->
+                    "$msg — Check that the LLM provider is running."
+                else -> msg
+            }
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("EXTRACTION_ERROR", "LLM extraction failed: $hint"))
         }
     }
 
@@ -164,7 +202,11 @@ fun Route.extractionRoutes(dbManager: DatabaseManager, extractor: FactExtractor?
                 if (req.assert && facts.isNotEmpty()) {
                     for (fact in facts) {
                         val terms = fact.args.map { com.nocturnusai.core.Term.Identifier(it) }
-                        val atom = com.nocturnusai.core.Atom(fact.predicate, terms, scope = req.scope)
+                        val atom = com.nocturnusai.core.Atom(
+                            fact.predicate, terms,
+                            scope = req.scope,
+                            confidence = fact.confidence.toDouble()
+                        )
                         try {
                             db.assertFact(atom, tenantId)
                         } catch (e: Exception) {

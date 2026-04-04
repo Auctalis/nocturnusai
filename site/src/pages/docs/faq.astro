@@ -1,0 +1,74 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<DocsLayout title="FAQ">
+    <h1>Frequently Asked Questions</h1>
+    <p class="lead text-xl text-slate-400">
+        Common questions from developers evaluating NocturnusAI.
+    </p>
+
+    <hr />
+
+    <h3 id="vs-rag">How is NocturnusAI different from RAG / vector search?</h3>
+    <p>
+        RAG retrieves text that <em>looks</em> related based on embedding similarity. NocturnusAI <em>derives</em> what must be true using logical inference. They're complementary: use RAG for unstructured retrieval, NocturnusAI for verified reasoning over structured facts. NocturnusAI can prove <em>why</em> an answer is correct and trace the inference path.
+    </p>
+    <p><a href={`${base}/docs/concepts#inference`}>Learn about inference &rarr;</a></p>
+
+    <hr />
+
+    <h3 id="logic-programming">Do I need to learn Prolog or logic programming?</h3>
+    <p>
+        No. The simplified API (<code>/tell</code>, <code>/ask</code>, <code>/teach</code>, <code>/forget</code>) and natural language extraction handle most use cases. You feed NocturnusAI plain text and ask questions in natural language — the logic runs under the hood. Power users can use the DSL for advanced rules, but it's entirely optional.
+    </p>
+    <p><a href={`${base}/docs#natural-language`}>See natural language mode &rarr;</a></p>
+
+    <hr />
+
+    <h3 id="contradictions">What happens if my agent asserts contradictory facts?</h3>
+    <p>
+        Configurable conflict resolution handles this. The default is <code>REJECT</code> (error on contradiction), but you can also use <code>NEWEST_WINS</code>, <code>CONFIDENCE</code> (highest confidence score wins), or <code>KEEP_BOTH</code>. The Truth Maintenance System automatically retracts derived facts when their premises are removed.
+    </p>
+    <p><a href={`${base}/docs/concepts#truth-maintenance`}>Learn about truth maintenance &rarr;</a></p>
+
+    <hr />
+
+    <h3 id="production">Can I run this in production?</h3>
+    <p>
+        Yes. NocturnusAI is built for production agent workloads: in-memory store with sub-100ms retrieval, ACID transactions, Write-Ahead Log for crash recovery, periodic snapshots, multi-tenant isolation, Prometheus metrics, and health check endpoints. It runs as a single Docker container or native binary.
+    </p>
+    <p><a href={`${base}/docs/operations`}>See operations guide &rarr;</a></p>
+
+    <hr />
+
+    <h3 id="license">Is it open source? What's the license?</h3>
+    <p>
+        NocturnusAI uses the <strong>Business Source License 1.1</strong>. It's free for non-production use, evaluation, and development. Contact <a href="https://github.com/Auctalis/nocturnusai">Auctalis</a> for production licensing.
+    </p>
+
+    <hr />
+
+    <h3 id="models">Can I use this with OpenAI / Anthropic / local models?</h3>
+    <p>
+        Yes — NocturnusAI is model-agnostic. Use it with any LLM via the <a href={`${base}/docs/integrations`}>framework integrations</a> (LangChain, CrewAI, AutoGen, etc.), <a href={`${base}/docs/mcp`}>MCP protocol</a>, or <a href={`${base}/docs/api`}>direct HTTP API</a>. Optional LLM integration for natural language extraction supports OpenAI, Anthropic, Google, and Ollama.
+    </p>
+    <p><a href={`${base}/docs/llm`}>See LLM integration &rarr;</a></p>
+
+    <hr />
+
+    <h3 id="get-started">How do I get started?</h3>
+    <p>
+        One command to install, five minutes to your first query:
+    </p>
+    <pre><code class="language-bash">curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash</code></pre>
+    <p><a href={`${base}/docs`}>Full quickstart guide &rarr;</a></p>
+
+    <NextSteps links={[
+        { title: "Quickstart", description: "Install and run your first query in 5 minutes", href: `${base}/docs` },
+        { title: "Integrations", description: "Connect to LangChain, CrewAI, AutoGen, and more", href: `${base}/docs/integrations` },
+        { title: "Core Concepts", description: "Understand facts, rules, inference, and salience", href: `${base}/docs/concepts` },
+    ]} />
+</DocsLayout>

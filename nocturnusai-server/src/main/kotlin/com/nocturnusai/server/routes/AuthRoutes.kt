@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.server.routes
 
 import com.nocturnusai.server.ErrorResponse
@@ -13,6 +27,9 @@ import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 
 private val log = LoggerFactory.getLogger("com.nocturnusai.server.routes.AuthRoutes")
+
+// Rate limiter for bootstrap endpoint: 5 attempts per minute, 5-minute lockout
+private val bootstrapRateLimiter = RateLimiter(maxAttempts = 5, windowMs = 60_000L, lockoutMs = 300_000L)
 
 fun Route.authRoutes(keyManager: ApiKeyManager?) {
 
@@ -33,10 +50,26 @@ fun Route.authRoutes(keyManager: ApiKeyManager?) {
             return@post
         }
 
+        // Rate-limit by client IP to prevent credential brute-force
+        val clientIp = call.request.local.remoteHost
+        when (val rate = bootstrapRateLimiter.check(clientIp)) {
+            is RateLimiter.Result.LockedOut -> {
+                log.warn("Bootstrap rate limit exceeded from $clientIp — locked out for ${rate.retryAfterSeconds}s")
+                call.response.header("Retry-After", rate.retryAfterSeconds.toString())
+                call.respond(
+                    HttpStatusCode.TooManyRequests,
+                    ErrorResponse("RATE_LIMITED", "Too many failed attempts. Try again in ${rate.retryAfterSeconds}s")
+                )
+                return@post
+            }
+            RateLimiter.Result.Allowed -> { /* proceed */ }
+        }
+
         val req = call.receive<BootstrapRequest>()
 
         // Verify admin credentials from environment
         if (req.username != ServerConfig.adminUser || req.password != ServerConfig.adminPass) {
+            log.warn("Bootstrap auth failed (bad credentials) from $clientIp")
             call.respond(
                 HttpStatusCode.Unauthorized,
                 ErrorResponse("UNAUTHORIZED", "Invalid admin credentials. Check NOCTURNUSAI_ADMIN_USER and NOCTURNUSAI_ADMIN_PASS in .env")
@@ -44,13 +77,17 @@ fun Route.authRoutes(keyManager: ApiKeyManager?) {
             return@post
         }
 
+        // Success — clear the failure counter
+        bootstrapRateLimiter.reset(clientIp)
+
         val (rawKey, record) = keyManager.createKey(
             name = req.keyName ?: "admin",
             role = Role.ADMIN,
+            expiresInDays = ServerConfig.defaultKeyExpiryDays,
             description = "Bootstrap admin key"
         )
 
-        log.info("Bootstrap completed: first admin key created (id=${record.id})")
+        log.info("Bootstrap completed: first admin key created (id=${record.id}, expiresAt=${record.expiresAt})")
 
         call.respond(HttpStatusCode.Created, CreateKeyResponse(
             id = record.id,
@@ -124,7 +161,7 @@ fun Route.authRoutes(keyManager: ApiKeyManager?) {
             role = role,
             databases = req.databases,
             tenants = req.tenants,
-            expiresInDays = req.expiresInDays,
+            expiresInDays = req.expiresInDays ?: ServerConfig.defaultKeyExpiryDays,
             createdBy = principal?.keyId ?: "system",
             description = req.description
         )

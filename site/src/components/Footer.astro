@@ -1,5 +1,6 @@
 ---
 const year = new Date().getFullYear();
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <footer class="border-t border-white/5 bg-[#020617] pt-16 pb-12 relative z-10">
@@ -24,9 +25,9 @@ const year = new Date().getFullYear();
 
       <!-- Links -->
       <div class="flex flex-wrap justify-center gap-8 text-sm text-slate-400">
-        <a href="/docs" class="hover:text-cyan-400 transition-colors">Documentation</a>
-        <a href="/docs/api" class="hover:text-cyan-400 transition-colors">API Reference</a>
-        <a href="/features" class="hover:text-cyan-400 transition-colors">Features</a>
+        <a href={`${base}/docs`} class="hover:text-cyan-400 transition-colors">Documentation</a>
+        <a href={`${base}/docs/api`} class="hover:text-cyan-400 transition-colors">API Reference</a>
+        <a href={`${base}/features`} class="hover:text-cyan-400 transition-colors">Features</a>
         <a href="https://github.com/Auctalis/nocturnusai" class="hover:text-cyan-400 transition-colors">GitHub</a>
         <a href="https://github.com/Auctalis/nocturnusai/issues" class="hover:text-cyan-400 transition-colors">Support</a>
       </div>

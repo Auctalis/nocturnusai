@@ -1,5 +1,7 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="Multi-Tenancy">
@@ -31,14 +33,18 @@ import DocsLayout from '../../layouts/DocsLayout.astro';
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-cyan-400">X-Tenant-ID</td>
                     <td class="py-2">Selects the tenant within a database — data-level isolation sharing the same rules engine</td>
-                    <td class="py-2 font-mono">"default"</td>
+                    <td class="py-2 font-mono">required*</td>
                 </tr>
             </tbody>
         </table>
     </div>
 
     <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-purple-500 text-slate-300">
-        <strong>When to use which?</strong> Use <strong>databases</strong> to separate completely independent knowledge domains (e.g., "production" vs "staging"). Use <strong>tenants</strong> to isolate customer data within the same domain (e.g., "acme_corp" vs "globex_inc" within "production").
+        <strong>*X-Tenant-ID is required</strong> on most REST endpoints (the server throws a <code>ValidationException</code> if missing). MCP routes are the exception — they default to <code>"default"</code> if not specified.
+    </div>
+
+    <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-purple-500 text-slate-300">
+        <strong>When to use which?</strong> Use <strong>databases</strong> to separate completely independent knowledge domains (e.g., "production" vs "staging"). Use <strong>tenants</strong> to isolate customer data within the same domain (e.g., "acme_corp" vs "globex_inc" within "production"). Use <strong>scopes</strong> for logical partitions within a tenant (hypothetical reasoning, versioning, A/B testing) — scopes are NOT isolation boundaries.
     </div>
 
     <hr />
@@ -117,8 +123,61 @@ X-Tenant-ID: agent_sales_assistant</code></pre>
 
     <hr />
 
+    <h2 id="tenant-management">Tenant Management API</h2>
+    <p>Manage tenants programmatically via the admin API:</p>
+    <pre><code class="language-bash"># List tenants in a database
+curl http://localhost:9300/admin/databases/production/tenants \
+  -H "Authorization: Bearer $ADMIN_KEY"
+
+# Create a tenant
+curl -X POST http://localhost:9300/admin/databases/production/tenants \
+  -H "Authorization: Bearer $ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '&#123;"name": "acme_corp"&#125;'
+
+# Delete a tenant and all its data
+curl -X DELETE http://localhost:9300/admin/databases/production/tenants/acme_corp \
+  -H "Authorization: Bearer $ADMIN_KEY"</code></pre>
+
+    <hr />
+
+    <h2 id="scope-management">Scope Management</h2>
+    <p>Scopes are logical partitions <strong>within a tenant</strong> — they are NOT isolation boundaries (use tenants for that). Scopes enable Git-like knowledge branching for hypothetical reasoning, versioning, and A/B testing.</p>
+
+    <pre><code class="language-bash"># Fork a scope
+curl -X POST http://localhost:9300/scope/fork \
+  -H "Content-Type: application/json" \
+  -H "X-Database: production" \
+  -H "X-Tenant-ID: acme_corp" \
+  -d '&#123;"source": "main", "target": "hypothesis-1"&#125;'
+
+# Diff two scopes
+curl -X POST http://localhost:9300/scope/diff \
+  -H "Content-Type: application/json" \
+  -H "X-Database: production" \
+  -H "X-Tenant-ID: acme_corp" \
+  -d '&#123;"source": "hypothesis-1", "target": "main"&#125;'
+
+# Merge scopes (strategies: SOURCE_WINS, TARGET_WINS, KEEP_BOTH, REJECT)
+curl -X POST http://localhost:9300/scope/merge \
+  -H "Content-Type: application/json" \
+  -H "X-Database: production" \
+  -H "X-Tenant-ID: acme_corp" \
+  -d '&#123;"source": "hypothesis-1", "target": "main", "strategy": "SOURCE_WINS"&#125;'
+
+# List all scopes
+curl http://localhost:9300/scopes \
+  -H "X-Database: production" \
+  -H "X-Tenant-ID: acme_corp"</code></pre>
+
+    <div class="callout callout-info">
+        <strong>Scope query behavior.</strong> Querying with <code>scope=null</code> matches facts from ALL scopes. Set an explicit scope to restrict results to that partition only.
+    </div>
+
+    <hr />
+
     <h2 id="scoped-keys">Scoped API Keys</h2>
-    <p>Combine multi-tenancy with <a href="/docs/security">Security & Auth</a> to create API keys restricted to specific databases and tenants:</p>
+    <p>Combine multi-tenancy with <a href={`${base}/docs/security`}>Security & Auth</a> to create API keys restricted to specific databases and tenants:</p>
     <pre><code class="language-bash"># Create a key that can only access Acme Corp's data
 curl -X POST http://localhost:9300/auth/keys \
   -H "Authorization: Bearer $ADMIN_KEY" \
@@ -130,4 +189,9 @@ curl -X POST http://localhost:9300/auth/keys \
     "description": "Acme Corp writer key"
   &#125;'</code></pre>
 
+    <NextSteps links={[
+        { title: "Security & Auth", description: "API keys, roles, and encryption", href: `${base}/docs/security` },
+        { title: "Operations", description: "Monitoring, persistence, and deployment", href: `${base}/docs/operations` },
+        { title: "API Reference", description: "Headers and endpoint documentation", href: `${base}/docs/api` },
+    ]} />
 </DocsLayout>

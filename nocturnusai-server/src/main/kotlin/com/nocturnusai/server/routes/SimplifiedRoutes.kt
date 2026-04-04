@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.server.routes
 
 import com.nocturnusai.server.*
@@ -40,7 +54,11 @@ data class TellRequest(
     val metadata: Map<String, JsonElement> = emptyMap(),
     val validFrom: Long? = null,
     val validUntil: Long? = null,
-    val ttl: Long? = null
+    val ttl: Long? = null,
+    // Optional confidence score (0.0–1.0). null means unknown confidence.
+    val confidence: Double? = null,
+    // Conflict resolution strategy. null means use database default.
+    val conflictStrategy: com.nocturnusai.core.ConflictStrategy? = null
 )
 
 @Serializable
@@ -48,14 +66,17 @@ data class AskRequest(
     val predicate: String,
     val args: List<String>,
     val scope: String? = null,
-    val withProof: Boolean = false
+    val withProof: Boolean = false,
+    // Optional minimum confidence filter (0.0–1.0). Facts with lower confidence are excluded.
+    val minConfidence: Double? = null
 )
 
 @Serializable
 data class TeachRequest(
     val head: AtomDto,
     val body: List<AtomDto>,
-    val scope: String? = null
+    val scope: String? = null,
+    val confidence: Double? = null
 )
 
 @Serializable
@@ -88,10 +109,12 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
 
             val atom = com.nocturnusai.core.Atom(
                 req.predicate, terms, effectiveTruth, scope = req.scope, metadata = req.metadata,
-                validFrom = req.validFrom, validUntil = req.validUntil, ttl = req.ttl
+                validFrom = req.validFrom, validUntil = req.validUntil, ttl = req.ttl,
+                confidence = req.confidence
             )
 
             val txId = call.request.header("X-Transaction-ID")?.toLongOrNull()
+            val strategy = req.conflictStrategy ?: db.defaultConflictStrategy
 
             val dbName = call.request.header("X-Database") ?: "default"
             if (txId != null) {
@@ -103,7 +126,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
                 }
                 call.respondText("Stored in Tx $txId: $atom")
             } else {
-                db.assertFact(atom, tenantId)
+                db.assertFact(atom, tenantId, conflictStrategy = strategy)
                 call.respondText("Stored: $atom")
             }
             Metrics.factAsserted(dbName, tenantId)
@@ -138,7 +161,7 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
                 Metrics.inferenceCompleted(sample, dbName, response.size)
                 call.respond(response)
             } else {
-                val results = db.infer(queryAtom, tenantId)
+                val results = db.infer(queryAtom, tenantId, minConfidence = req.minConfidence)
                 val response = results.map { AtomResponse.from(it) }.toList()
                 Metrics.inferenceCompleted(sample, dbName, response.size)
                 call.respond(response)
@@ -182,16 +205,16 @@ fun Route.simplifiedRoutes(dbManager: DatabaseManager) {
             call.application.environment.log.info("Endpoint /teach hit. Tenant: $tenantId")
 
             val headTerms = req.head.args.map { parseTerm(it) }
-            val headAtom = com.nocturnusai.core.Atom(req.head.predicate, headTerms, truthVal = !req.head.negated, scope = req.head.scope, metadata = req.head.metadata)
+            val headAtom = com.nocturnusai.core.Atom(req.head.predicate, headTerms, truthVal = !req.head.negated, scope = req.head.scope, metadata = req.head.metadata, confidence = req.head.confidence)
 
             val bodyAtoms = req.body.map { atomReq ->
                 val terms = atomReq.args.map { parseTerm(it) }
-                com.nocturnusai.core.Atom(atomReq.predicate, terms, truthVal = !atomReq.negated, scope = atomReq.scope, metadata = atomReq.metadata)
+                com.nocturnusai.core.Atom(atomReq.predicate, terms, truthVal = !atomReq.negated, scope = atomReq.scope, metadata = atomReq.metadata, naf = atomReq.naf, confidence = atomReq.confidence)
             }
 
             val allTerms = headTerms + bodyAtoms.flatMap { it.args }
             val variables = allTerms.filterIsInstance<com.nocturnusai.core.Term.Variable>().distinct()
-            val rule = com.nocturnusai.core.Rule(variables, headAtom, bodyAtoms, scope = req.scope)
+            val rule = com.nocturnusai.core.Rule(variables, headAtom, bodyAtoms, scope = req.scope, confidence = req.confidence)
 
             val txId = call.request.header("X-Transaction-ID")?.toLongOrNull()
 

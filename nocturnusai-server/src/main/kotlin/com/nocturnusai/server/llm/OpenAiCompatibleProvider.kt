@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.server.llm
 
 import io.ktor.client.*
@@ -29,14 +43,19 @@ class OpenAiCompatibleProvider(
         else -> "openai-compatible"
     }
 
+    // Ollama needs longer timeouts — first call loads the model into memory
+    private val isLocal = baseUrl.contains("localhost") || baseUrl.contains("127.0.0.1")
+            || baseUrl.contains("host.docker.internal") || baseUrl.contains("ollama")
+    private val timeoutMs = if (isLocal) 300_000L else 120_000L   // 5 min local, 2 min cloud
+
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 120_000
-            connectTimeoutMillis = 10_000
-            socketTimeoutMillis = 120_000
+            requestTimeoutMillis = timeoutMs
+            connectTimeoutMillis = if (isLocal) 30_000 else 10_000
+            socketTimeoutMillis = timeoutMs
         }
     }
 
@@ -69,11 +88,57 @@ class OpenAiCompatibleProvider(
             throw RuntimeException("LLM API error (${response.status}): $body")
         }
 
-        val json = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        val completionBody = response.bodyAsText()
+        val json = Json.parseToJsonElement(completionBody).jsonObject
         val choices = json["choices"]?.jsonArray
             ?: throw RuntimeException("No 'choices' in LLM response")
         val content = choices[0].jsonObject["message"]?.jsonObject?.get("content")?.jsonPrimitive?.content
             ?: throw RuntimeException("No content in LLM response")
         return content
+    }
+
+    override suspend fun embed(text: String): FloatArray {
+        if (text.isBlank()) return FloatArray(0)
+        
+        // Use text-embedding-3-small as default for OpenAI, otherwise fallback to configured model
+        val embedModel = if (baseUrl.contains("openai.com")) "text-embedding-3-small" else model
+
+        val requestBody = buildJsonObject {
+            put("model", embedModel)
+            put("input", text)
+        }
+
+        val response = client.post("${baseUrl.trimEnd('/')}/embeddings") {
+            contentType(ContentType.Application.Json)
+            if (!apiKey.isNullOrBlank()) {
+                header("Authorization", "Bearer $apiKey")
+            }
+            setBody(requestBody.toString())
+        }
+
+        val responseBody = response.bodyAsText()
+
+        if (response.status.value !in 200..299) {
+            throw RuntimeException("LLM Embedding API error (${response.status}): $responseBody")
+        }
+
+        val json = Json.parseToJsonElement(responseBody).jsonObject
+        // Ollama usually returns `embedding` or `embeddings` directly, while OpenAI uses `data[0].embedding`
+        val embeddingArray = if (json.containsKey("data")) {
+            val data = json["data"]?.jsonArray
+                ?: throw RuntimeException("No 'data' in Embedding response")
+            data[0].jsonObject["embedding"]?.jsonArray
+        } else if (json.containsKey("embedding")) {
+            json["embedding"]?.jsonArray
+        } else if (json.containsKey("embeddings")) {
+            // some ollama versions return `embeddings`
+            json["embeddings"]?.jsonArray?.get(0)?.jsonArray
+        } else {
+            null
+        } ?: throw RuntimeException("No embedding found in response: $responseBody")
+            
+        return FloatArray(embeddingArray!!.size) { i ->
+            embeddingArray[i].jsonPrimitive.float
+        }
     }
 }

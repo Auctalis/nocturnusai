@@ -4,9 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nocturnusai"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python SDK for NocturnusAI — a logic-based inference engine and knowledge database"
-license = "MIT"
+readme = "README.md"
+license = {text = "Business Source License 1.1"}
 requires-python = ">=3.10"
 authors = [
     { name = "NocturnusAI Team" },
@@ -18,11 +19,16 @@ keywords = [
     "knowledge-base",
     "reasoning",
     "symbolic-ai",
+    "agent-memory",
+    "crewai",
+    "autogen",
+    "langgraph",
+    "openai-agents",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -41,6 +47,18 @@ dependencies = [
 langchain = [
     "langchain-core>=0.2.0,<1.0.0",
 ]
+crewai = [
+    "crewai>=0.80",
+]
+autogen = [
+    "autogen-agentchat>=0.4",
+]
+langgraph = [
+    "langgraph-checkpoint>=2.0",
+]
+openai-agents = [
+    "openai-agents>=0.1",
+]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
@@ -50,6 +68,10 @@ dev = [
 ]
 all = [
     "nocturnusai[langchain]",
+    "nocturnusai[crewai]",
+    "nocturnusai[autogen]",
+    "nocturnusai[langgraph]",
+    "nocturnusai[openai-agents]",
 ]
 
 [project.urls]
@@ -67,13 +89,33 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "ANN", "B", "SIM"]
-ignore = ["ANN101", "ANN102", "ANN401"]
+ignore = ["ANN401"]
 
 [tool.mypy]
 python_version = "3.10"
 strict = true
-warn_return_any = true
 warn_unused_configs = true
+# JSON HTTP clients return Any from deserialization; disable at module level
+warn_return_any = false
+
+# Optional framework dependencies — not installed in CI base environment
+[[tool.mypy.overrides]]
+module = [
+    "agents",
+    "agents.*",
+    "crewai",
+    "crewai.*",
+    "autogen_agentchat",
+    "autogen_agentchat.*",
+    "langgraph",
+    "langgraph.*",
+]
+ignore_missing_imports = true
+
+# crewai.tools.BaseTool resolves to Any without stubs — subclassing Any is fine here
+[[tool.mypy.overrides]]
+module = "nocturnusai.crewai"
+disable_error_code = ["misc"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

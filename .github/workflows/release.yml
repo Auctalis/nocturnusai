@@ -27,16 +27,145 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
       - run: ./gradlew build test --no-daemon
 
-  # ── Docker: multi-platform image → ghcr.io ─────────────────────────────────
-  docker:
-    name: Docker
+  # ── Native CLI binaries — 4 platforms ──────────────────────────────────────
+  cli-native:
+    name: CLI (${{ matrix.artifact }})
     needs: test
+    runs-on: ${{ matrix.runner }}
+    # Allow macos-13 (Intel) to fail without blocking the release — the runner
+    # is only available on public repos; private repos get a configuration error.
+    continue-on-error: ${{ matrix.continue-on-error == true }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            artifact: nocturnusai-linux-x86_64
+          - runner: ubuntu-24.04-arm
+            artifact: nocturnusai-linux-arm64
+          - runner: macos-13          # Intel — only available on public repos
+            artifact: nocturnusai-macos-x86_64
+            continue-on-error: true   # don't block release if runner is unavailable
+          - runner: macos-latest      # Apple Silicon (M1/M2/M3)
+            artifact: nocturnusai-macos-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up GraalVM with native-image
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: "21"
+          distribution: "graalvm"
+          native-image-job-reports: "true"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Inject version from git tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i.bak "s/^    version = \".*\"/    version = \"${VERSION}\"/" build.gradle.kts
+          rm -f build.gradle.kts.bak
+          echo "Set Gradle version to ${VERSION}"
+
+      - name: Build native binary
+        run: ./gradlew :nocturnusai-cli:nativeCompile -PnativeRelease --no-daemon
+        env:
+          # GraalVM CE build optimisation flag
+          GRAALVM_HOME: ${{ env.GRAALVM_HOME }}
+
+      - name: Rename binary
+        run: |
+          mv nocturnusai-cli/build/native/nativeCompile/nocturnusai ${{ matrix.artifact }}
+          chmod +x ${{ matrix.artifact }}
+
+      - name: Smoke test
+        run: ./${{ matrix.artifact }} --help
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+          retention-days: 1
+
+  # ── Docker: native multi-platform build (no QEMU emulation) ─────────────────
+  # Each platform builds on its own native runner in parallel, then the digests
+  # are merged into a single multi-arch manifest. This is ~3× faster than QEMU.
+  docker-build:
+    name: Docker (${{ matrix.platform }})
+    needs: test
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            slug: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            slug: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inject version from git tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i.bak "s/^    version = \".*\"/    version = \"${VERSION}\"/" build.gradle.kts
+          rm -f build.gradle.kts.bak
+          echo "Set Gradle version to ${VERSION}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          push: true
+          outputs: type=image,name=ghcr.io/auctalis/nocturnusai,push-by-digest=true,name-canonical=true
+          cache-from: type=gha,scope=${{ matrix.slug }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.slug }}
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-digest-${{ matrix.slug }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  docker:
+    name: Docker (merge manifests)
+    needs: docker-build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up QEMU (multi-platform builds)
-        uses: docker/setup-qemu-action@v3
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: docker-digest-*
+          merge-multiple: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -58,29 +187,26 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
 
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Create and push manifest list
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf 'ghcr.io/auctalis/nocturnusai@sha256:%s ' *)
 
-  # ── Python SDK → PyPI (Trusted Publisher — no API key needed) ──────────────
+  # ── Python SDK → PyPI ───────────────────────────────────────────────────────
   python-sdk:
     name: Python SDK → PyPI
     needs: test
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/nocturnusai
-    permissions:
-      id-token: write   # required for OIDC trusted publishing
     steps:
       - uses: actions/checkout@v4
+
+      - name: Inject version from git tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" sdks/python/pyproject.toml
+          echo "Set Python SDK version to ${VERSION}"
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -88,7 +214,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Hatch
-        run: pip install hatch
+        run: pip install hatch virtualenv==20.29.3
 
       - name: Build distribution
         working-directory: sdks/python
@@ -98,6 +224,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: sdks/python/dist/
+          password: ${{ secrets.PYPI_API_KEY }}
 
   # ── TypeScript SDK → npm ────────────────────────────────────────────────────
   typescript-sdk:
@@ -106,6 +233,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Inject version from git tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd sdks/typescript
+          npm version "${VERSION}" --no-git-tag-version --allow-same-version
+          echo "Set TypeScript SDK version to ${VERSION}"
 
       - name: Set up Node 20
         uses: actions/setup-node@v4
@@ -119,66 +253,75 @@ jobs:
 
       - name: Publish
         working-directory: sdks/typescript
-        run: npm publish --access public
+        run: |
+          output=$(npm publish --access public 2>&1) && echo "$output" || {
+            echo "$output"
+            echo "$output" | grep -q "previously published versions" && echo "Already published — skipping." && exit 0
+            exit 1
+          }
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  # ── Docs site → GitHub Pages ────────────────────────────────────────────────
-  docs:
-    name: Docs → GitHub Pages
-    needs: test
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
+  # Note: Docs → GitHub Pages is handled by docs.yml on every push to main.
+  # GitHub Pages environment protection rules prevent tag-triggered deployments,
+  # so docs are NOT deployed here in the release workflow.
 
-      - name: Set up Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: site/package-lock.json
-
-      - name: Install and build
-        working-directory: site
-        run: npm ci && npm run build
-        env:
-          GITHUB_PAGES: "true"
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site/dist
-
-      - name: Deploy
-        id: deploy
-        uses: actions/deploy-pages@v4
-
-  # ── GitHub Release with auto-generated notes ────────────────────────────────
+  # ── GitHub Release with CLI binaries + auto-generated notes ─────────────────
   github-release:
     name: GitHub Release
-    needs: [docker, python-sdk, typescript-sdk, docs]
+    needs: [cli-native, docker, python-sdk, typescript-sdk]
+    # Proceed as long as Docker and SDK publishes succeeded.
+    # CLI binaries are downloaded best-effort — missing platforms are OK.
+    if: |
+      always() &&
+      needs.docker.result == 'success' &&
+      needs.python-sdk.result == 'success' &&
+      needs.typescript-sdk.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # full history for release notes
 
+      - name: Download all CLI binaries
+        uses: actions/download-artifact@v4
+        continue-on-error: true   # OK if some platforms failed to build
+        with:
+          pattern: nocturnusai-*
+          path: dist/
+
+      - name: Make binaries executable
+        run: find dist -name 'nocturnusai-*' -type f -exec chmod +x {} \; || true
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          fail_on_unmatched_files: false   # OK if some platforms failed to build
+          files: dist/nocturnusai-*/nocturnusai-*
           body: |
             ## Install
 
-            **Docker**
+            **One-line install (server + CLI)**
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
+            ```
+
+            **Docker (server only)**
             ```bash
             docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:${{ github.ref_name }}
+            ```
+
+            **CLI only**
+            ```bash
+            # macOS (Apple Silicon)
+            curl -fsSL https://github.com/Auctalis/nocturnusai/releases/download/${{ github.ref_name }}/nocturnusai-macos-arm64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
+
+            # macOS (Intel)
+            curl -fsSL https://github.com/Auctalis/nocturnusai/releases/download/${{ github.ref_name }}/nocturnusai-macos-x86_64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
+
+            # Linux (x86_64)
+            curl -fsSL https://github.com/Auctalis/nocturnusai/releases/download/${{ github.ref_name }}/nocturnusai-linux-x86_64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
             ```
 
             **Python SDK**
@@ -188,7 +331,7 @@ jobs:
 
             **TypeScript / Node**
             ```bash
-            npm install @nocturnusai/sdk@${{ github.ref_name }}
+            npm install nocturnusai-sdk@${{ github.ref_name }}
             ```
 
             ---

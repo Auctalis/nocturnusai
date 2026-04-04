@@ -1,21 +1,67 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.cli
 
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import java.io.File
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 // ANSI colors
-private const val RESET  = "\u001B[0m"
-private const val BOLD   = "\u001B[1m"
-private const val DIM    = "\u001B[2m"
-private const val GREEN  = "\u001B[32m"
-private const val CYAN   = "\u001B[36m"
-private const val YELLOW = "\u001B[33m"
-private const val RED    = "\u001B[31m"
+private const val RESET   = "\u001B[0m"
+private const val BOLD    = "\u001B[1m"
+private const val DIM     = "\u001B[2m"
+private const val GREEN   = "\u001B[32m"
+private const val CYAN    = "\u001B[36m"
+private const val YELLOW  = "\u001B[33m"
+private const val RED     = "\u001B[31m"
+private const val MAGENTA = "\u001B[35m"
+
+/** Short HH:mm:ss timestamp for result headers. */
+private fun timestamp(): String {
+    val fmt = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault())
+    return fmt.format(Instant.now())
+}
+
+/** Horizontal rule sized to content. */
+private fun separator(width: Int = 60) = "${DIM}${"─".repeat(width)}${RESET}"
 
 class Repl(private val client: Client) {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+
+    // Lazy-init so the database-fetcher closure captures the live client.database
+    private val lineReader: LineReader by lazy {
+        LineReader(
+            completionProvider = NaiCompletionProvider {
+                try {
+                    val resp = runBlocking { client.listDatabases() }
+                    tryParseArray(resp).mapNotNull { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull }
+                } catch (_: Exception) { emptyList() }
+            }
+        )
+    }
+
+    /** Render the colored db/tenant prompt. */
+    private fun prompt(): String {
+        val db = client.database
+        val tenant = client.tenantId
+        return "${CYAN}${BOLD}$db${RESET}${DIM}/${RESET}${MAGENTA}$tenant${RESET}${DIM}>${RESET} "
+    }
 
     /** Execute a single command and exit (for -e flag / scripting) */
     fun execSingle(command: String) {
@@ -54,46 +100,74 @@ class Repl(private val client: Client) {
         printBanner()
 
         while (true) {
-            print("$BOLD${client.database}$RESET$DIM>$RESET ")
-            val line = readlnOrNull()?.trim() ?: break
+            val line = lineReader.readLine(prompt())?.trim() ?: break
             if (line.isBlank()) continue
 
             val (cmd, rest) = splitFirst(line)
             try {
                 when (cmd.lowercase()) {
-                    "ask", "?"        -> doAsk(rest)
-                    "tell", "+"       -> doTell(rest)
-                    "teach", "++"     -> doTeach(rest)
-                    "forget", "-"     -> doForget(rest)
-                    "ingest"          -> doIngest(rest)
-                    "inspect", "ls"   -> doInspect(rest)
-                    "context", "ctx"  -> doContext(rest)
-                    "compress"        -> doCompress()
-                    "cleanup"         -> doCleanup(rest)
-                    "dsl", "exec"     -> doDsl(rest)
-                    "import", "load"  -> doImport(rest)
-                    "export", "dump"  -> doExport(rest)
-                    "use"             -> doUse(rest)
-                    "dbs"             -> doDbs()
-                    "health"          -> doHealth()
-                    "status"          -> doStatus()
-                    "setup"           -> doSetup()
-                    "login"           -> doLogin()
-                    "whoami"          -> doWhoAmI()
-                    "keys"            -> doKeys(rest)
-                    "help", "h"       -> printHelp()
+                    "ask", "?"          -> doAsk(rest)
+                    "tell", "+"         -> doTell(rest)
+                    "teach", "++"       -> doTeach(rest)
+                    "forget", "-"       -> doForget(rest)
+                    "ingest"            -> doIngest(rest)
+                    "inspect", "ls"     -> doInspect(rest)
+                    "context", "ctx"    -> doContext(rest)
+                    "compress"          -> doCompress()
+                    "cleanup"           -> doCleanup(rest)
+                    "dsl", "exec"       -> doDsl(rest)
+                    "import", "load"    -> doImport(rest)
+                    "export", "dump"    -> doExport(rest)
+                    "use"               -> doUse(rest)
+                    "tenant"            -> doTenant(rest)
+                    "dbs"               -> doDbs()
+                    "health"            -> doHealth()
+                    "status"            -> doStatus()
+                    "setup"             -> doSetup()
+                    "login"             -> doLogin()
+                    "whoami"            -> doWhoAmI()
+                    "keys"              -> doKeys(rest)
+                    "help", "h"         -> printHelp()
+                    "clear"             -> print("\u001B[2J\u001B[H")
+                    "history"           -> printHistory()
                     "exit", "quit", "q" -> { client.close(); return }
-                    else              -> {
-                        println("${RED}Unknown command: $cmd${RESET}")
+                    else                -> {
+                        println("${RED}Unknown command:${RESET} $cmd")
                         println("${DIM}Type 'help' for available commands.${RESET}")
                     }
                 }
             } catch (e: Exception) {
-                println("${RED}Error: ${e.message}${RESET}")
+                println()
+                val msg = e.message ?: "Unknown error"
+                when {
+                    "timeout" in msg.lowercase() || "timed out" in msg.lowercase() -> {
+                        println("${RED}${BOLD}Timeout${RESET}  The request took too long.")
+                        println("${DIM}  If using Ollama, the model may still be loading.${RESET}")
+                        println("${DIM}  Wait a moment and try again — subsequent calls are fast.${RESET}")
+                    }
+                    "refused" in msg.lowercase() || "unreachable" in msg.lowercase() -> {
+                        println("${RED}${BOLD}Connection failed${RESET}  Cannot reach the server.")
+                        println("${DIM}  Is the server running?  nocturnusai setup${RESET}")
+                    }
+                    else -> {
+                        println("${RED}${BOLD}Error${RESET}  $msg")
+                    }
+                }
+                println(separator())
             }
         }
 
         client.close()
+    }
+
+    /** Show recent history entries. */
+    private fun printHistory() {
+        val hist = LineReader.defaultHistoryFile()
+        if (!hist.exists()) { println("${DIM}No history yet.${RESET}"); return }
+        val lines = hist.readLines().filter { it.isNotBlank() }.takeLast(50)
+        lines.forEachIndexed { i, l ->
+            println("  ${DIM}${(lines.size - lines.size + i + 1).toString().padStart(3)}${RESET}  $l")
+        }
     }
 
     // ── commands ──
@@ -116,7 +190,7 @@ class Repl(private val client: Client) {
 
     /** NL question → /synthesize → LLM-powered answer from the knowledge base */
     private fun doSynthesize(question: String) = runBlocking {
-        println("${DIM}Querying knowledge base...${RESET}")
+        println("${DIM}Querying knowledge base... (may take a moment on first call)${RESET}")
         val resp = client.synthesize(question)
         try {
             val obj = json.parseToJsonElement(resp).jsonObject
@@ -124,8 +198,7 @@ class Repl(private val client: Client) {
             // Check for error
             val errCode = obj["code"]?.jsonPrimitive?.contentOrNull
             if (errCode != null) {
-                val errMsg = obj["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
-                println("${RED}$errCode: $errMsg${RESET}")
+                printError(errCode, obj["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error")
                 return@runBlocking
             }
 
@@ -133,38 +206,43 @@ class Repl(private val client: Client) {
             val confidence = obj["confidence"]?.jsonPrimitive?.floatOrNull ?: 0f
             val derivation = obj["derivation"]?.jsonArray ?: JsonArray(emptyList())
             val missing = obj["missingContext"]?.jsonPrimitive?.contentOrNull ?: ""
-            val queries = obj["queriesExecuted"]?.jsonArray
             val provider = obj["provider"]?.jsonPrimitive?.contentOrNull
             val model = obj["model"]?.jsonPrimitive?.contentOrNull
 
             println()
-            println("  $answer")
+            println("  ${BOLD}$answer${RESET}")
             println()
 
             if (derivation.isNotEmpty()) {
-                println("${DIM}Derivation:${RESET}")
-                for (step in derivation) {
+                println("${DIM}Reasoning chain:${RESET}")
+                for ((idx, step) in derivation.withIndex()) {
                     val fact = step.jsonObject["fact"]?.jsonPrimitive?.contentOrNull ?: ""
                     val type = step.jsonObject["type"]?.jsonPrimitive?.contentOrNull ?: ""
                     val rule = step.jsonObject["rule"]?.jsonPrimitive?.contentOrNull
                     val typeTag = when (type) {
-                        "fact_match" -> "${GREEN}fact${RESET}"
+                        "fact_match"       -> "${GREEN}fact${RESET}"
                         "rule_application" -> "${CYAN}rule${RESET}"
-                        else -> "${DIM}$type${RESET}"
+                        else               -> "${DIM}$type${RESET}"
                     }
-                    print("  $typeTag  $fact")
+                    val idx1 = (idx + 1).toString().padStart(2)
+                    print("  ${DIM}$idx1${RESET}  $typeTag  $fact")
                     if (rule != null) print("  ${DIM}via $rule${RESET}")
                     println()
                 }
             }
 
             if (missing.isNotBlank()) {
-                println("${DIM}Gaps: $missing${RESET}")
+                println("  ${YELLOW}Missing context:${RESET} $missing")
             }
 
             val confStr = String.format("%.0f%%", confidence * 100)
-            val providerStr = if (model != null) "$provider/$model" else ""
-            println("${DIM}Confidence: $confStr  $providerStr${RESET}")
+            val confColor = when {
+                confidence >= 0.8f -> GREEN
+                confidence >= 0.5f -> YELLOW
+                else               -> RED
+            }
+            val providerStr = if (model != null) "  ${DIM}$provider/$model${RESET}" else ""
+            println("  ${DIM}Confidence:${RESET} ${confColor}$confStr${RESET}$providerStr  ${DIM}${timestamp()}${RESET}")
 
         } catch (_: Exception) {
             println(resp)
@@ -212,7 +290,7 @@ class Repl(private val client: Client) {
             text
         }
 
-        println("${DIM}Extracting knowledge...${RESET}")
+        println("${DIM}Extracting knowledge... (may take a moment on first call)${RESET}")
         val resp = client.extract(inputText, assert = true, rules = true)
         try {
             val obj = json.parseToJsonElement(resp).jsonObject
@@ -220,8 +298,7 @@ class Repl(private val client: Client) {
             // Check for error
             val errCode = obj["code"]?.jsonPrimitive?.contentOrNull
             if (errCode != null) {
-                val errMsg = obj["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
-                println("${RED}$errCode: $errMsg${RESET}")
+                printError(errCode, obj["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error")
                 return@runBlocking
             }
 
@@ -272,23 +349,33 @@ class Repl(private val client: Client) {
         val rules = tryParseArray(rulesRaw)
 
         val filterLower = filter.lowercase()
+        val filterLabel = if (filterLower.isBlank()) "" else "  ${DIM}filter: $filterLower${RESET}"
 
-        var count = 0
+        var factCount = 0
+        var ruleCount = 0
+
         for (f in facts) {
             val line = formatAtom(f)
             if (filterLower.isBlank() || line.lowercase().contains(filterLower)) {
-                println("  ${DIM}fact${RESET}  $line")
-                count++
+                println("  ${GREEN}fact${RESET}  $line")
+                factCount++
             }
         }
         for (r in rules) {
             val line = formatRule(r)
             if (filterLower.isBlank() || line.lowercase().contains(filterLower)) {
-                println("  ${DIM}rule${RESET}  $line")
-                count++
+                println("  ${CYAN}rule${RESET}  $line")
+                ruleCount++
             }
         }
-        println("${DIM}$count item(s)${RESET}")
+
+        println()
+        val total = factCount + ruleCount
+        if (total == 0) {
+            println("${DIM}No knowledge stored yet.${RESET}")
+        } else {
+            println("${DIM}$factCount fact(s), $ruleCount rule(s)$filterLabel — ${timestamp()}${RESET}")
+        }
     }
 
     private fun doContext(text: String) = runBlocking {
@@ -301,15 +388,30 @@ class Repl(private val client: Client) {
         }
         val total = obj["totalAvailable"]?.jsonPrimitive?.intOrNull ?: scored.size
 
-        println("${BOLD}Context Window$RESET — ${scored.size} of $total facts (by salience)")
+        println("${BOLD}Context Window${RESET}  ${DIM}${scored.size} of $total (by salience) — ${timestamp()}${RESET}")
+        println(separator())
         for (s in scored) {
             val salience = s.jsonObject["salience"]?.jsonPrimitive?.doubleOrNull ?: 0.0
             val atom = s.jsonObject["atom"]?.jsonObject
             if (atom != null) {
                 val line = formatAtom(atom)
-                println("  ${DIM}[${String.format("%.3f", salience)}]${RESET}  $line")
+                val salienceColor = when {
+                    salience >= 0.7 -> GREEN
+                    salience >= 0.4 -> YELLOW
+                    else            -> DIM
+                }
+                val bar = buildSalienceBar(salience)
+                println("  $salienceColor${String.format("%.3f", salience)}${RESET}  $bar  $line")
             }
         }
+        println(separator())
+    }
+
+    /** Renders a compact 5-char salience bar like [████░] */
+    private fun buildSalienceBar(salience: Double): String {
+        val filled = (salience * 5).toInt().coerceIn(0, 5)
+        val bar = "█".repeat(filled) + "░".repeat(5 - filled)
+        return "${DIM}[$bar]${RESET}"
     }
 
     private fun doCompress() = runBlocking {
@@ -406,9 +508,26 @@ class Repl(private val client: Client) {
     }
 
     private fun doUse(name: String) {
-        require(name.isNotBlank()) { "Usage: use <database>" }
-        client.database = name
-        println("${GREEN}Switched to $BOLD$name$RESET")
+        require(name.isNotBlank()) { "Usage: use <database> or use <database>/<tenant>" }
+        if ('/' in name) {
+            val (db, tenant) = name.split("/", limit = 2)
+            client.database = db
+            client.tenantId = tenant.ifBlank { "default" }
+            println("${GREEN}Switched to ${BOLD}${client.database}${RESET}${DIM}/${RESET}${MAGENTA}${client.tenantId}${RESET}")
+        } else {
+            client.database = name
+            println("${GREEN}Switched to ${BOLD}$name${RESET}${DIM}/${RESET}${MAGENTA}${client.tenantId}${RESET}")
+        }
+    }
+
+    private fun doTenant(name: String) {
+        if (name.isBlank()) {
+            println("${DIM}Current tenant:${RESET} ${MAGENTA}${BOLD}${client.tenantId}${RESET}")
+            println("${DIM}Usage: tenant <name>  (e.g., tenant alice)${RESET}")
+            return
+        }
+        client.tenantId = name
+        println("${GREEN}Tenant set to ${MAGENTA}${BOLD}$name${RESET}")
     }
 
     private fun doDbs() = runBlocking {
@@ -608,31 +727,132 @@ class Repl(private val client: Client) {
             } else parts[1]
             println("  ${CYAN}${parts[0]}${RESET} = $value")
         }
-        println()
-        println("${DIM}Add these to your server's .env file, then restart the server.${RESET}")
-        println("${DIM}If using Docker: edit .env then run 'docker compose restart'${RESET}")
 
-        // Try to write to .env if it exists in current directory or parent
-        val envFile = listOf(File(".env"), File("../.env"), File(System.getProperty("user.dir", ".") + "/.env"))
-            .firstOrNull { it.exists() }
+        // Find .env file — check common install locations
+        val envFile = listOf(
+            File(".env"),
+            File("../.env"),
+            File(System.getProperty("user.dir", "."), ".env"),
+            File(System.getProperty("user.home", "."), "nocturnusai/.env"),
+            File("./nocturnusai/.env"),
+        ).firstOrNull { it.exists() }
 
-        if (envFile != null) {
+        if (envFile == null) {
             println()
-            print("Write to ${envFile.absolutePath}? [y/N]: ")
-            val confirm = readlnOrNull()?.trim()?.lowercase()
-            if (confirm == "y" || confirm == "yes") {
-                val existing = envFile.readText()
-                val newContent = StringBuilder(existing)
-                if (!existing.endsWith("\n")) newContent.append("\n")
-                newContent.append("\n# Added by 'setup' command\n")
-                for (line in envLines) {
-                    newContent.appendLine(line)
+            println("${YELLOW}Could not find .env file.${RESET}")
+            println("${DIM}Manually add the above to your server's .env, then restart.${RESET}")
+            println()
+            return
+        }
+
+        // Write to .env — update existing keys, append new ones
+        println()
+        println("${DIM}Updating ${envFile.absolutePath}...${RESET}")
+        writeEnvLines(envFile, envLines)
+        println("${GREEN}Saved.${RESET}")
+
+        // Auto-restart Docker/Podman if compose file exists alongside .env
+        val composeDir = envFile.parentFile ?: File(".")
+        val hasCompose = File(composeDir, "docker-compose.yml").exists() ||
+                File(composeDir, "compose.yml").exists()
+
+        if (hasCompose) {
+            val composeCmd = detectComposeCommand()
+            if (composeCmd != null) {
+                println()
+                println("${DIM}Restarting server to apply changes...${RESET}")
+                val result = runCommand(composeCmd, "restart", workDir = composeDir)
+                if (result == 0) {
+                    // Wait for health
+                    print("${DIM}Waiting for server")
+                    System.out.flush()
+                    var healthy = false
+                    for (i in 1..20) {
+                        Thread.sleep(1500)
+                        print(".")
+                        System.out.flush()
+                        try {
+                            val resp = runBlocking { client.health() }
+                            if ("healthy" in resp || "degraded" in resp) {
+                                healthy = true
+                                break
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    println()
+                    if (healthy) {
+                        println("${GREEN}${BOLD}Server restarted with new configuration.${RESET}")
+                    } else {
+                        println("${YELLOW}Server restarting — check 'health' in a moment.${RESET}")
+                    }
+                } else {
+                    println("${YELLOW}Restart failed.${RESET} Run manually: cd ${composeDir.absolutePath} && $composeCmd restart")
                 }
-                envFile.writeText(newContent.toString())
-                println("${GREEN}Written!${RESET} Restart the server for changes to take effect.")
+            } else {
+                println()
+                println("${DIM}Restart your server to apply changes.${RESET}")
             }
+        } else {
+            println()
+            println("${DIM}Restart your server to apply changes.${RESET}")
         }
         println()
+    }
+
+    /** Update or append env lines in a .env file without duplicating keys. */
+    private fun writeEnvLines(envFile: File, lines: List<String>) {
+        val updates = lines.associate {
+            val (k, v) = it.split("=", limit = 2)
+            k to v
+        }
+        val existing = if (envFile.exists()) envFile.readLines().toMutableList() else mutableListOf()
+        val written = mutableSetOf<String>()
+
+        // Update existing lines
+        for (i in existing.indices) {
+            val line = existing[i].trimStart()
+            if (line.startsWith("#") || "=" !in line) continue
+            val key = line.substringBefore("=").trim()
+            if (key in updates) {
+                existing[i] = "$key=${updates[key]}"
+                written.add(key)
+            }
+        }
+
+        // Append new keys
+        for ((key, value) in updates) {
+            if (key !in written) {
+                existing.add("$key=$value")
+            }
+        }
+
+        envFile.writeText(existing.joinToString("\n") + "\n")
+    }
+
+    /** Detect docker compose or podman-compose. */
+    private fun detectComposeCommand(): String? {
+        for (cmd in listOf("docker compose", "docker-compose", "podman-compose")) {
+            try {
+                val parts = cmd.split(" ")
+                val testCmd = parts + listOf("version")
+                val p = ProcessBuilder(testCmd)
+                    .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                    .redirectError(ProcessBuilder.Redirect.PIPE)
+                    .start()
+                if (p.waitFor() == 0) return cmd
+            } catch (_: Exception) {}
+        }
+        return null
+    }
+
+    /** Run a compose command and return exit code. */
+    private fun runCommand(composeCmd: String, subCmd: String, workDir: File): Int {
+        return try {
+            val pb = ProcessBuilder("bash", "-c", "$composeCmd $subCmd")
+            pb.directory(workDir)
+            pb.inheritIO()
+            pb.start().waitFor()
+        } catch (_: Exception) { -1 }
     }
 
     // ── auth commands ──
@@ -891,6 +1111,15 @@ class Repl(private val client: Client) {
         try {
             val el = json.parseToJsonElement(raw)
             when (el) {
+                is JsonObject -> {
+                    // Check for error response (e.g. UNAUTHORIZED)
+                    val errCode = el["code"]?.jsonPrimitive?.contentOrNull
+                    if (errCode != null) {
+                        printError(errCode, el["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error")
+                    } else {
+                        println(raw)
+                    }
+                }
                 is JsonArray -> {
                     if (el.isEmpty()) {
                         println("${YELLOW}No results.${RESET}")
@@ -912,7 +1141,8 @@ class Repl(private val client: Client) {
                             else -> println("  $item")
                         }
                     }
-                    println("${DIM}${el.size} result(s)${RESET}")
+                    println()
+                    println("${DIM}${el.size} result(s) — ${timestamp()}${RESET}")
                 }
                 is JsonPrimitive -> println(el.content)
                 else -> println(raw)
@@ -923,10 +1153,15 @@ class Repl(private val client: Client) {
     }
 
     private fun printOk(raw: String, defaultMsg: String) {
-        // Check if the response indicates success
         try {
             val el = json.parseToJsonElement(raw)
             if (el is JsonObject) {
+                // Check for error response (e.g. UNAUTHORIZED)
+                val errCode = el["code"]?.jsonPrimitive?.contentOrNull
+                if (errCode != null) {
+                    printError(errCode, el["message"]?.jsonPrimitive?.contentOrNull ?: "Unknown error")
+                    return
+                }
                 val msg = el["message"]?.jsonPrimitive?.contentOrNull
                     ?: el["status"]?.jsonPrimitive?.contentOrNull
                 println("${GREEN}OK$RESET ${msg ?: defaultMsg}")
@@ -936,84 +1171,140 @@ class Repl(private val client: Client) {
         println("${GREEN}OK$RESET $defaultMsg")
     }
 
+    /** Print error with actionable guidance for UNAUTHORIZED. */
+    private fun printError(code: String, message: String) {
+        println("${RED}${BOLD}$code${RESET}  $message")
+        when (code) {
+            "UNAUTHORIZED" -> {
+                if (!client.hasApiKey) {
+                    println("${DIM}  No API key configured. Fix with one of:${RESET}")
+                    println("${DIM}    nocturnusai setup            # re-run setup wizard${RESET}")
+                    println("${DIM}    nocturnusai --api-key <key>  # pass key on command line${RESET}")
+                } else {
+                    println("${DIM}  API key was sent but rejected. Check your key is correct.${RESET}")
+                }
+            }
+            "LLM_TIMEOUT" -> {
+                println("${DIM}  Ollama may still be loading the model into memory.${RESET}")
+                println("${DIM}  Wait a moment and try again — subsequent calls will be fast.${RESET}")
+            }
+            "LLM_UNREACHABLE" -> {
+                println("${DIM}  Is Ollama running?  ollama serve${RESET}")
+                println("${DIM}  Check status:       ollama list${RESET}")
+            }
+            "LLM_NOT_CONFIGURED" -> {
+                println("${DIM}  Run 'setup' to configure an LLM provider, or set env vars in .env${RESET}")
+            }
+        }
+    }
+
     // ── help ──
 
     private fun printBanner() {
         println()
-        println("${BOLD}NocturnusAI CLI$RESET — logic server for agentic AI")
-        println("${DIM}Server:   ${client.server}${RESET}")
-        println("${DIM}Database: ${client.database}${RESET}")
+        println("${BOLD}${CYAN}NocturnusAI${RESET} ${DIM}v${BuildInfo.version}${RESET}  ${DIM}logic server for agentic AI${RESET}")
+        println(separator())
+        println("  ${DIM}Server  ${RESET}  ${client.server}")
+        println("  ${DIM}Database${RESET}  ${CYAN}${BOLD}${client.database}${RESET}  ${DIM}(use <name> to switch)${RESET}")
+        println("  ${DIM}Tenant  ${RESET}  ${MAGENTA}${BOLD}${client.tenantId}${RESET}  ${DIM}(tenant <name> to switch)${RESET}")
+        if (client.hasApiKey) {
+            println("  ${DIM}Auth    ${RESET}  ${GREEN}API key configured${RESET}")
+        }
+        print("  ${DIM}Status  ${RESET}  ")
 
         // Quick connectivity check
         try {
             val resp = runBlocking { client.health() }
             val obj = json.parseToJsonElement(resp).jsonObject
             val status = obj["status"]?.jsonPrimitive?.contentOrNull ?: "unknown"
+            val serverVersion = obj["version"]?.jsonPrimitive?.contentOrNull
+            val versionStr = if (serverVersion != null) "  ${DIM}server v$serverVersion${RESET}" else ""
             when (status) {
-                "healthy" -> println("${GREEN}Connected.${RESET}")
-                "degraded" -> println("${YELLOW}Connected (degraded).${RESET}")
-                else -> println("${RED}Connected ($status).${RESET}")
+                "healthy"  -> println("${GREEN}connected${RESET}$versionStr")
+                "degraded" -> println("${YELLOW}connected (degraded)${RESET}$versionStr")
+                else       -> println("${RED}$status${RESET}")
+            }
+
+            // Check if server requires auth but we have no key
+            if (!client.hasApiKey) {
+                try {
+                    val authResp = runBlocking { client.authStatus() }
+                    val authObj = json.parseToJsonElement(authResp).jsonObject
+                    val authEnabled = authObj["authEnabled"]?.jsonPrimitive?.booleanOrNull ?: false
+                    val legacyKey = authObj["legacyApiKeySet"]?.jsonPrimitive?.booleanOrNull ?: false
+                    if (authEnabled || legacyKey) {
+                        println()
+                        println("  ${YELLOW}Warning:${RESET} server requires auth but no API key is set.")
+                        println("  ${DIM}Run 'setup' or use --api-key flag.${RESET}")
+                    }
+                } catch (_: Exception) {}
             }
         } catch (e: Exception) {
-            println("${RED}Cannot reach server: ${e.message}${RESET}")
-            println("${DIM}Is the server running? Start with: make up${RESET}")
+            println("${RED}unreachable${RESET}  ${DIM}(${e.message})${RESET}")
+            println()
+            println("  ${DIM}Is the server running?  nocturnusai setup${RESET}")
         }
 
-        println("${DIM}Type 'help' for commands, 'status' for details, 'setup' to configure LLM.${RESET}")
+        println(separator())
+        println("  ${DIM}Tab for completion  •  Arrow keys for history  •  type 'help'${RESET}")
         println()
     }
 
     private fun printHelp() {
         println("""
-${BOLD}Agent commands:$RESET
-  ask   <question or pred(?var)>    Query (NL or predicate syntax)
-  tell  <text or pred(arg, arg)>    Store a fact (NL or structured)
-  teach <head(?x) :- body(?x)>      Define a rule
-  forget <pred(arg, arg)>           Remove a fact
-  ingest <text or -f file>          Extract facts from plain text via LLM
+${BOLD}Quick start:${RESET}
+  tell human(socrates)              Store a fact
+  teach mortal(?x) :- human(?x)    Define a rule
+  ask mortal(?who)                  Query  →  ?who = socrates
+  inspect                           Browse all stored knowledge
 
-${BOLD}Explore:$RESET
-  inspect [filter]                  Browse all knowledge
-  context [max]                     Salience-ranked context window
+${BOLD}Core commands:${RESET}
+  tell  <pred(args)>                Store a fact              ${DIM}shortcut: +${RESET}
+  teach <head :- body>              Define a rule             ${DIM}shortcut: ++${RESET}
+  ask   <pred(?var)>                Query with unification    ${DIM}shortcut: ?${RESET}
+  forget <pred(args)>               Retract a fact            ${DIM}shortcut: -${RESET}
 
-${BOLD}Operations:$RESET
-  compress                          Consolidate episodic patterns
-  cleanup [threshold]               Evict expired/low-salience facts
-  dsl <command>                     Raw Logiql DSL
+${BOLD}Explore knowledge:${RESET}
+  inspect [filter]                  List facts & rules        ${DIM}shortcut: ls${RESET}
+  context [max]                     Salience-ranked context   ${DIM}shortcut: ctx${RESET}
 
-${BOLD}Import / Export:$RESET
+${BOLD}Natural language  ${DIM}(requires LLM — run 'status' to check)${RESET}${BOLD}:${RESET}
+  ingest <text>                     Extract facts from text via LLM
+  ingest -f <file>                  Extract from file
+  ask <plain English question>      LLM-powered Q&A from the knowledge base
+  tell <plain English statement>    LLM-powered extraction + assert
+
+${BOLD}Memory management:${RESET}
+  compress                          Consolidate episodic facts → semantic
+  cleanup [threshold]               Evict expired / low-salience facts
+
+${BOLD}Import / Export:${RESET}
   import <file.ab>                  Load facts & rules from file
   export [file.ab]                  Dump knowledge (to file or stdout)
+  dsl <statement>                   Execute raw Logiql DSL
 
-${BOLD}Admin:$RESET
-  use <database>                    Switch database
-  dbs                               List databases
-  health                            Server health check
-  status                            Full server status (health, LLM, KB)
-  setup                             Interactive LLM provider configuration
+${BOLD}Admin:${RESET}
+  use <db>                            Switch database
+  use <db>/<tenant>                   Switch database and tenant at once
+  tenant <name>                       Switch tenant
+  dbs                                 List databases
+  health    status    setup           Server info & setup wizard
+  clear       Clear screen
+  history     Show recent command history
 
-${BOLD}Auth:$RESET
-  login                             Bootstrap auth or check auth status
-  whoami                            Show current key identity & permissions
-  keys list                         List all API keys
-  keys create <name> [role]         Create a new key (admin/writer/reader)
-  keys revoke <id>                  Revoke a key
+${BOLD}Auth:${RESET}
+  login    whoami    keys list    keys create <name> [role]    keys revoke <id>
 
-${BOLD}Shortcuts:$RESET
-  ?  = ask    +  = tell    ++ = teach    -  = forget    ls = inspect
-  ctx = context    exec = dsl    load = import    dump = export    q = exit
+${BOLD}Navigation:${RESET}
+  Tab           Complete command or show hints
+  Up / Down     Browse history
+  Ctrl+A/E      Move to start/end of line
+  Ctrl+U        Clear line
+  Ctrl+W        Delete word
+  Ctrl+R        (coming soon) reverse search
+  q / exit      Quit
 
-${BOLD}Examples — structured:$RESET
-  tell human(socrates)
-  teach mortal(?x) :- human(?x)
-  ask mortal(?who)
-
-${BOLD}Examples — natural language (requires LLM configured on server):$RESET
-  ingest Alice is Bob's mother. Bob works at Acme Corp.
-  ingest -f article.txt
-  ask who is Bob's mother?
-  ask what company does Bob work at?
-  tell the president met with the prime minister yesterday
+  ${DIM}exec / dsl = raw DSL    h / help = this message${RESET}
         """.trimIndent())
     }
 

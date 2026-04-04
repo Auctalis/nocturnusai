@@ -1,5 +1,7 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import NextSteps from '../../components/NextSteps.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <DocsLayout title="Core Concepts">
@@ -64,7 +66,7 @@ NOT allergic(alice, cats)   # alice is not allergic to cats</code></pre>
     <hr />
 
     <h2 id="scopes">Scopes</h2>
-    <p>Facts and rules can be isolated into <strong>scopes</strong> using a string label. A query in a scope sees both scoped facts and unscoped (global) facts. This is different from <a href="/docs/multi-tenancy">multi-tenancy</a> — scopes operate <em>within</em> a tenant for logical isolation.</p>
+    <p>Facts and rules can be isolated into <strong>scopes</strong> using a string label. A query in a scope sees both scoped facts and unscoped (global) facts. This is different from <a href={`${base}/docs/multi-tenancy`}>multi-tenancy</a> — scopes operate <em>within</em> a tenant for logical isolation.</p>
     
     <p>Common use cases:</p>
     <ul>
@@ -183,4 +185,9 @@ curl -X POST http://localhost:9300/memory/decay \
   -H "Content-Type: application/json" \
   -d '&#123;"threshold": 0.05&#125;'</code></pre>
 
+    <NextSteps links={[
+        { title: "API Reference", description: "Every endpoint with full request/response shapes", href: `${base}/docs/api` },
+        { title: "CLI Reference", description: "Interactive REPL for exploring facts and rules", href: `${base}/docs/cli` },
+        { title: "Integrations", description: "Connect NocturnusAI to your agent framework", href: `${base}/docs/integrations` },
+    ]} />
 </DocsLayout>

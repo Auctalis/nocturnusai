@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.server
 
 import com.nocturnusai.NocturnusAI
@@ -13,13 +27,15 @@ import kotlinx.serialization.decodeFromString
 
 @Serializable
 data class DatabaseConfig(
-    val isMultiTenant: Boolean = false
+    val isMultiTenant: Boolean = false,
+    val defaultConflictStrategy: com.nocturnusai.core.ConflictStrategy = com.nocturnusai.core.ConflictStrategy.REJECT
 )
 
 class DatabaseManager(
     private val rootStorageDir: File,
     private val factExtractor: FactExtractor? = null,
-    private val ruleExtractor: RuleExtractor? = null
+    private val ruleExtractor: RuleExtractor? = null,
+    private val semanticContext: com.nocturnusai.core.SemanticContext = com.nocturnusai.core.DummySemanticContext
 ) {
     private val databases = ConcurrentHashMap<String, NocturnusAI>()
     private val encryption: EncryptionService? = ServerConfig.encryptionKey?.let { EncryptionService(it) }
@@ -72,7 +88,11 @@ class DatabaseManager(
         return databases.keys
     }
     
-    fun createDatabase(name: String, @Suppress("UNUSED_PARAMETER") multiTenant: Boolean = true): NocturnusAI {
+    fun createDatabase(
+        name: String,
+        @Suppress("UNUSED_PARAMETER") multiTenant: Boolean = true,
+        defaultConflictStrategy: com.nocturnusai.core.ConflictStrategy = com.nocturnusai.core.ConflictStrategy.REJECT
+    ): NocturnusAI {
         if (databases.containsKey(name)) {
              return databases[name]!! // Already exists
         }
@@ -82,10 +102,15 @@ class DatabaseManager(
 
         // Save config
         val configFile = File(dbDir, "db.config")
-        val config = DatabaseConfig(true)
+        val config = DatabaseConfig(true, defaultConflictStrategy)
         configFile.writeText(Json.encodeToString(config))
-        
-        val db = NocturnusAI(dbDir, true, dbName = name, encryption = encryption, factExtractor = factExtractor, ruleExtractor = ruleExtractor)
+
+        val db = NocturnusAI(
+            dbDir, true, dbName = name, encryption = encryption,
+            factExtractor = factExtractor, ruleExtractor = ruleExtractor,
+            defaultConflictStrategy = defaultConflictStrategy,
+            semanticContext = semanticContext
+        )
         if (!db.getRegisteredTenants().contains("default")) {
             db.createTenant("default")
         }
@@ -118,26 +143,29 @@ class DatabaseManager(
     private fun loadDatabase(name: String) {
         val dbDir = File(rootStorageDir, name)
         val configFile = File(dbDir, "db.config")
-        // var isMultiTenant = false 
-        // Always force true
+        // Always force multi-tenant
         val isMultiTenant = true
-        
-        // We still read config just to migrate or ensure it's valid JSON if needed?
-        // But we ignore the value.
-         if (configFile.exists()) {
+
+        var defaultConflictStrategy = com.nocturnusai.core.ConflictStrategy.REJECT
+        if (configFile.exists()) {
             try {
-                // Just read to validate? Or update?
-                // val config = Json.decodeFromString<DatabaseConfig>(configFile.readText())
+                val config = Json.decodeFromString<DatabaseConfig>(configFile.readText())
+                defaultConflictStrategy = config.defaultConflictStrategy
             } catch (e: Exception) {
                 println("Error loading config for $name: ${e.message}")
             }
         }
-        
-        val db = NocturnusAI(dbDir, isMultiTenant, dbName = name, encryption = encryption, factExtractor = factExtractor, ruleExtractor = ruleExtractor)
+
+        val db = NocturnusAI(
+            dbDir, isMultiTenant, dbName = name, encryption = encryption,
+            factExtractor = factExtractor, ruleExtractor = ruleExtractor,
+            defaultConflictStrategy = defaultConflictStrategy,
+            semanticContext = semanticContext
+        )
         if (isMultiTenant && !db.getRegisteredTenants().contains("default")) {
             db.createTenant("default")
         }
         databases[name] = db
-        println("Loaded database: $name (MT=$isMultiTenant)")
+        println("Loaded database: $name (MT=$isMultiTenant, conflictStrategy=$defaultConflictStrategy)")
     }
 }

@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.server.routes
 
 import com.nocturnusai.server.*
@@ -12,7 +26,8 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
         try {
             val (db, tenantId) = call.getContext(dbManager)
             val request = call.receive<ExecuteRequest>()
-            call.application.environment.log.info("Endpoint /execute hit. Tenant: $tenantId, Request: $request")
+            // Log command length only — avoid logging potentially sensitive DSL content
+            call.application.environment.log.info("Endpoint /execute hit. Tenant: $tenantId, commandLength=${request.command.length}")
             val result = db.execute(request.command, tenantId)
             call.respond(ExecuteResponse(result))
         } catch (e: ValidationException) {
@@ -20,7 +35,8 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
         } catch (e: DatabaseNotFoundException) {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
         } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, ErrorResponse("BAD_REQUEST", e.message ?: "Error"))
+            call.application.environment.log.error("Execute error", e)
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("BAD_REQUEST", "Invalid command"))
         }
     }
 
@@ -36,10 +52,12 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
 
             val atom = com.nocturnusai.core.Atom(
                 req.predicate, terms, effectiveTruth, scope = req.scope, metadata = req.metadata,
-                validFrom = req.validFrom, validUntil = req.validUntil, ttl = req.ttl
+                validFrom = req.validFrom, validUntil = req.validUntil, ttl = req.ttl,
+                confidence = req.confidence
             )
 
             val txId = call.request.header("X-Transaction-ID")?.toLongOrNull()
+            val strategy = req.conflictStrategy ?: db.defaultConflictStrategy
 
             if (txId != null) {
                 if (effectiveTruth) {
@@ -50,7 +68,7 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
                 }
                 call.respondText("Fact Buffered in Tx $txId: $atom")
             } else {
-                db.assertFact(atom, tenantId)
+                db.assertFact(atom, tenantId, conflictStrategy = strategy)
                 call.respondText("Fact Asserted: $atom")
             }
         } catch (e: ValidationException) {
@@ -60,9 +78,10 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
         } catch (e: IllegalArgumentException) {
             call.respond(HttpStatusCode.Conflict, ErrorResponse("CONFLICT", e.message ?: "Contradiction"))
         } catch (e: IllegalStateException) {
-            call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("TOO_MANY_REQUESTS", e.message ?: "Too many requests"))
+            call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("TOO_MANY_REQUESTS", "Too many requests"))
         } catch (e: Exception) {
-            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", e.message ?: "Error"))
+            call.application.environment.log.error("Assert fact error", e)
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", "Internal server error"))
         }
     }
 
@@ -104,19 +123,26 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
 
             // Parse Head
             val headTerms = req.head.args.map { parseTerm(it) }
-            val headAtom = com.nocturnusai.core.Atom(req.head.predicate, headTerms, truthVal = !req.head.negated, scope = req.head.scope, metadata = req.head.metadata)
+            val headAtom = com.nocturnusai.core.Atom(req.head.predicate, headTerms, truthVal = !req.head.negated, scope = req.head.scope, metadata = req.head.metadata, confidence = req.head.confidence)
 
             // Parse Body
             val bodyAtoms = req.body.map { atomReq ->
                 val terms = atomReq.args.map { parseTerm(it) }
-                com.nocturnusai.core.Atom(atomReq.predicate, terms, truthVal = !atomReq.negated, scope = atomReq.scope, metadata = atomReq.metadata)
+                com.nocturnusai.core.Atom(
+                    atomReq.predicate, terms,
+                    truthVal = !atomReq.negated,
+                    scope = atomReq.scope,
+                    metadata = atomReq.metadata,
+                    naf = atomReq.naf,
+                    confidence = atomReq.confidence
+                )
             }
 
             // Collect Variables (from Head and ALL Body atoms)
             val allTerms = headTerms + bodyAtoms.flatMap { it.args }
             val variables = allTerms.filterIsInstance<com.nocturnusai.core.Term.Variable>().distinct()
 
-            val rule = com.nocturnusai.core.Rule(variables, headAtom, bodyAtoms, scope = req.scope)
+            val rule = com.nocturnusai.core.Rule(variables, headAtom, bodyAtoms, scope = req.scope, confidence = req.confidence)
 
             val txId = call.request.header("X-Transaction-ID")?.toLongOrNull()
 
@@ -222,13 +248,15 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
             val queryAtom = com.nocturnusai.core.Atom(req.predicate, terms, effectiveTruth, scope = req.scope)
 
             val withProof = call.request.queryParameters["proof"]?.toBooleanStrictOrNull() ?: false
+            val minConfidence = call.request.queryParameters["minConfidence"]?.toDoubleOrNull()
+                ?: req.confidence // also support in body
 
             if (withProof) {
                 val proofTrees = db.inferWithProof(queryAtom, tenantId)
                 val response = proofTrees.map { ProofTreeResponse.from(it) }.toList()
                 call.respond(response)
             } else {
-                val results = db.infer(queryAtom, tenantId)
+                val results = db.infer(queryAtom, tenantId, minConfidence = minConfidence)
                 val response = results.map { AtomResponse.from(it) }.toList()
                 call.respond(response)
             }

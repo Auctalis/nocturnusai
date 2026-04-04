@@ -793,7 +793,7 @@ async with NocturnusAIClient("http://localhost:9300") as client:
 ### Install
 
 ```bash
-npm install @nocturnusai/sdk
+npm install nocturnusai-sdk
 ```
 
 Zero runtime dependencies — uses built-in `fetch`.
@@ -801,7 +801,7 @@ Zero runtime dependencies — uses built-in `fetch`.
 ### Usage
 
 ```typescript
-import { NocturnusAIClient } from '@nocturnusai/sdk';
+import { NocturnusAIClient } from 'nocturnusai-sdk';
 
 const client = new NocturnusAIClient({
   baseUrl: 'http://localhost:9300',

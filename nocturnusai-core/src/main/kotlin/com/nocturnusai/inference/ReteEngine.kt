@@ -1,3 +1,17 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+//
+// Licensed under the Business Source License 1.1 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://github.com/auctalis/nocturnusai/blob/main/LICENSE
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// For commercial licensing, please contact: licensing@nocturnus.ai
+
 package com.nocturnusai.inference
 
 import com.nocturnusai.core.*
@@ -40,12 +54,16 @@ class ReteEngine(
 
     fun addRule(rule: Rule) {
         rules.add(rule)
-        // Index the conditions
+        // Index the conditions.
+        // NAF conditions do NOT trigger the rule directly (they have no positive
+        // activating fact) — they are checked during solve() instead.
         rule.body.forEachIndexed { index, atom ->
-            alphaNodes.computeIfAbsent(atom.predicate) { mutableListOf() }
-                .add(AlphaNode(rule, index, atom))
+            if (!atom.naf) {
+                alphaNodes.computeIfAbsent(atom.predicate) { mutableListOf() }
+                    .add(AlphaNode(rule, index, atom))
+            }
         }
-        
+
         // Retrospective: If we add a rule AFTER facts exist, we should potentially run against existing facts.
         // For this prototype, we assume rules function on NEW facts or we trigger a full run.
         // In "Project Initialization", we won't implement retrospective triggering yet unless needed.
@@ -106,9 +124,9 @@ class ReteEngine(
     }
 
     private fun solve(
-        conditions: List<Atom>, 
-        index: Int, 
-        subst: Substitution, 
+        conditions: List<Atom>,
+        index: Int,
+        subst: Substitution,
         premises: List<Atom>,
         onMatch: (Substitution, List<Atom>) -> Unit
     ) {
@@ -119,14 +137,44 @@ class ReteEngine(
 
         val currentCond = conditions[index]
         val constrainedCond = Unifier.substitute(currentCond, subst)
-        
+
+        // --- NAF handling for forward chaining ---
+        // For a NAF condition we check that the negated pattern does NOT exist in
+        // the store.  Forward chaining works on ground facts so by the time we
+        // evaluate a NAF condition all body variables before it should already be
+        // bound; if unbound variables remain in the NAF atom we fail safely.
+        if (constrainedCond.naf) {
+            val innerCond = constrainedCond.copy(naf = false)
+
+            // If any unbound variable remains in the NAF condition, we cannot
+            // safely evaluate the closed-world check — skip this branch.
+            val unboundVars = innerCond.args.filterIsInstance<com.nocturnusai.core.Term.Variable>()
+            if (unboundVars.isNotEmpty()) {
+                // Cannot evaluate NAF with unbound variables in forward chaining; skip.
+                return
+            }
+
+            // Check whether the negated fact is present in the store.
+            val existsInStore = store.match(innerCond).any {
+                it.predicate == innerCond.predicate && it.args == innerCond.args
+            }
+
+            if (existsInStore) {
+                // NAF condition fails — the negated pattern IS provable
+                return
+            }
+            // NAF condition succeeds — the negated pattern is NOT in the store
+            solve(conditions, index + 1, subst, premises, onMatch)
+            return
+        }
+
         val matches = store.match(constrainedCond)
-        
+
         for (fact in matches) {
             val newBindings = Unifier.unifyAtoms(constrainedCond, fact)
             if (newBindings != null) {
-                 val nextSubst = subst + newBindings
-                 solve(conditions, index + 1, nextSubst, premises + fact, onMatch)
+                val nextSubst = subst + newBindings
+                solve(conditions, index + 1, nextSubst, premises + fact, onMatch)
             }
         }
     }
