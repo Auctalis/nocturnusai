@@ -39,16 +39,26 @@ fi
 # Kill any conflicting processes
 kill_port $API_PORT
 
-# Load .env (create from example if missing)
-if [ ! -f .env ] && [ -f .env.example ]; then
-    cp .env.example .env
-    echo -e "${YELLOW}Created .env from .env.example — edit it to configure LLM provider.${NC}"
-fi
+# Load local overrides when present, otherwise fall back to example defaults.
+ENV_SOURCE=""
 if [ -f .env ]; then
+    ENV_SOURCE=".env"
+elif [ -f .env.example ]; then
+    ENV_SOURCE=".env.example"
+fi
+if [ -n "$ENV_SOURCE" ]; then
     set -a
-    source .env
+    source "$ENV_SOURCE"
     set +a
-    echo -e "${GREEN}Loaded .env config${NC}"
+    echo -e "${GREEN}Loaded ${ENV_SOURCE} config${NC}"
+fi
+
+# Docker-friendly Ollama URLs do not resolve when the server runs directly on the host.
+if [ "${LLM_PROVIDER}" = "ollama" ]; then
+    if [ -z "${LLM_BASE_URL}" ] || [[ "${LLM_BASE_URL}" == "http://host.docker.internal:11434/v1" ]] || [[ "${LLM_BASE_URL}" == "http://ollama:11434/v1" ]]; then
+        export LLM_BASE_URL="http://localhost:11434/v1"
+        echo -e "${GREEN}Using local Ollama at ${LLM_BASE_URL}${NC}"
+    fi
 fi
 
 # Start Server

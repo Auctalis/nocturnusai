@@ -45,6 +45,12 @@ docker_fallback() {
         esac
     done
 
+    if [ "$use_ollama" = true ] && curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
+        echo -e "${DIM}Found host Ollama on localhost:11434 — reusing it instead of starting a second container.${NC}"
+        use_ollama=false
+        use_host_ollama=true
+    fi
+
     # Detect container runtime
     local compose_cmd="" container_cmd=""
     if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
@@ -98,7 +104,7 @@ services:
       - STORAGE_DIR=/data
       - API_KEY=${API_KEY:-}
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
-      - LLM_MODEL=${LLM_MODEL:-llama3.2}
+      - LLM_MODEL=${LLM_MODEL:-granite3.3:8b}
       - LLM_BASE_URL=${LLM_BASE_URL:-http://ollama:11434/v1}
       - EXTRACTION_ENABLED=${EXTRACTION_ENABLED:-true}
     healthcheck:
@@ -140,7 +146,7 @@ services:
       - STORAGE_DIR=/data
       - API_KEY=${API_KEY:-}
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
-      - LLM_MODEL=${LLM_MODEL:-llama3.2}
+      - LLM_MODEL=${LLM_MODEL:-granite3.3:8b}
       - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
       - EXTRACTION_ENABLED=${EXTRACTION_ENABLED:-true}
     extra_hosts:
@@ -184,9 +190,12 @@ services:
 COMPOSE
     fi
 
-    # Create .env with port and API key if provided
-    if [ ! -f "$install_dir/.env" ]; then
-        echo "PORT=$port" > "$install_dir/.env"
+    # Create .env only when persisting non-default overrides
+    if [ "$port" != "9300" ] || [ -n "$api_key" ]; then
+        : > "$install_dir/.env"
+    fi
+    if [ "$port" != "9300" ]; then
+        echo "PORT=$port" >> "$install_dir/.env"
     fi
     if [ -n "$api_key" ]; then
         # Auto-detect provider from key prefix and write to .env
@@ -227,8 +236,8 @@ COMPOSE
         for i in $(seq 1 15); do
             if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
                 echo " ready"
-                echo -e "${DIM}Pulling model (llama3.2)... runs in background.${NC}"
-                curl -sf http://localhost:11434/api/pull -d '{"name":"llama3.2"}' >/dev/null 2>&1 &
+                echo -e "${DIM}Pulling model (granite3.3:8b)... runs in background.${NC}"
+                curl -sf http://localhost:11434/api/pull -d '{"name":"granite3.3:8b"}' >/dev/null 2>&1 &
                 break
             fi
             printf "."
@@ -262,7 +271,11 @@ COMPOSE
     echo -e "  $compose_cmd down                   ${DIM}# stop${NC}"
     echo -e "  $compose_cmd up -d                  ${DIM}# restart${NC}"
     echo ""
-    echo -e "  ${DIM}Config: $(cd "$install_dir" && pwd)/.env${NC}"
+    if [ -f "$install_dir/.env" ]; then
+        echo -e "  ${DIM}Config overrides: $(cd "$install_dir" && pwd)/.env${NC}"
+    else
+        echo -e "  ${DIM}Config overrides: create $(cd "$install_dir" && pwd)/.env only if you want to change the defaults.${NC}"
+    fi
     echo -e "  ${DIM}Note: Install the CLI binary for the full setup wizard with LLM config.${NC}"
     echo ""
 }

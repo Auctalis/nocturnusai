@@ -675,8 +675,8 @@ class Repl(private val client: Client) {
                 println("${GREEN}Ollama selected.${RESET}")
                 println("${DIM}Make sure Ollama is running: ollama serve${RESET}")
                 println("${DIM}Or start with Docker: make up-ollama${RESET}")
-                print("Model [llama3.2]: ")
-                val model = readlnOrNull()?.trim()?.ifBlank { "llama3.2" } ?: "llama3.2"
+                print("Model [granite3.3:8b]: ")
+                val model = readlnOrNull()?.trim()?.ifBlank { "granite3.3:8b" } ?: "granite3.3:8b"
                 print("Ollama URL [http://localhost:11434/v1]: ")
                 val url = readlnOrNull()?.trim()?.ifBlank { "http://localhost:11434/v1" } ?: "http://localhost:11434/v1"
                 envLines.add("LLM_PROVIDER=ollama")

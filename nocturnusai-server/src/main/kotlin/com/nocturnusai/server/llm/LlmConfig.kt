@@ -75,7 +75,7 @@ object LlmConfig {
                 GoogleProvider(m, key)
             }
             "ollama" -> {
-                val m = model ?: "llama3.2"
+                val m = model ?: "granite3.3:8b"
                 // Default varies: Docker uses service name "ollama", local uses localhost
                 val url = baseUrl ?: detectOllamaUrl()
                 logger.info("Using Ollama provider with model: $m, baseUrl: $url")

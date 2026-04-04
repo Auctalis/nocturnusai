@@ -25,22 +25,24 @@ import java.security.SecureRandom
  * Handles: container runtime detection, LLM/auth configuration,
  * compose generation, server start, health check, and success banner.
  *
- * Called via:  nocturnusai setup [--dir DIR] [--port PORT] [--host-ollama] [--key KEY]
+ * Called via:  nocturnusai setup [--dir DIR] [--port PORT] [--ollama] [--host-ollama] [--key KEY]
  */
 class Setup(
     private val dir: String = "./nocturnusai",
     private val port: Int = 9300,
+    private val bundledOllamaFlag: Boolean = false,
     private val hostOllamaFlag: Boolean = false,
     private val llmKeys: List<String> = emptyList(),
     private val nonInteractive: Boolean = false,
 ) {
     private val interactive = !nonInteractive && System.console() != null
+    private var useBundledOllama = bundledOllamaFlag
     private var useHostOllama = hostOllamaFlag  // true = connect to existing host Ollama (no Docker container)
     private var composeCmd = ""
     private var containerCmd = ""
     private var llmConfigured = false
     private var llmProviderLabel = "none"
-    private var ollamaModel = "llama3.2"
+    private var ollamaModel = "granite3.3:8b"
     private var authConfigured = false
     private var serverApiKey: String? = null  // saved for config file + banner
     private var needBuild = false
@@ -70,7 +72,9 @@ class Setup(
 
         // 4. Set up .env
         val envFile = setupEnvFile()
-        setEnvKey(envFile, "PORT", port.toString())
+        if (port != 9300) {
+            setEnvKey(envFile, "PORT", port.toString())
+        }
 
         // 5. Configure LLM
         configureLlm(envFile)
@@ -103,8 +107,7 @@ class Setup(
         println()
         if (!resolveExistingContainers()) return 0
 
-        println("${BOLD}Starting NocturnusAI...$RESET")
-        shVisible("$composeCmd up -d", installDir)
+        if (!startStack()) return 1
 
         // 13. Wait for health
         println()
@@ -232,15 +235,7 @@ class Setup(
 
     // ── .env management ────────────────────────────────────────────────────────
 
-    private fun setupEnvFile(): File {
-        val envFile = File(installDir, ".env")
-        if (!envFile.exists()) {
-            // Create a fresh .env — don't copy .env.example which has
-            // active Ollama defaults that would conflict with cloud providers.
-            envFile.createNewFile()
-        }
-        return envFile
-    }
+    private fun setupEnvFile(): File = File(installDir, ".env")
 
     private fun setEnvKey(file: File, key: String, value: String) {
         val lines = if (file.exists() && file.length() > 0) {
@@ -313,6 +308,40 @@ class Setup(
 
     // ── LLM configuration ──────────────────────────────────────────────────────
 
+    private fun hostOllamaAvailable(): Boolean =
+        sh("curl -sf http://localhost:11434/api/tags >/dev/null 2>&1").success
+
+    private fun configureHostOllama(envFile: File, modelUrl: String? = "http://localhost:11434", announce: String? = null) {
+        useHostOllama = true
+        useBundledOllama = false
+        ollamaModel = selectOllamaModel(modelUrl)
+        val hostAddr = detectHostAddress()
+        setEnvKey(envFile, "LLM_PROVIDER", "ollama")
+        setEnvKey(envFile, "LLM_MODEL", ollamaModel)
+        setEnvKey(envFile, "LLM_BASE_URL", "http://$hostAddr:11434/v1")
+        setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
+        if (announce != null) {
+            println(announce)
+        } else {
+            println("${GREEN}Using:$RESET existing Ollama on host with model ${BOLD}$ollamaModel$RESET")
+        }
+    }
+
+    private fun configureBundledOllama(envFile: File, announce: String? = null) {
+        useBundledOllama = true
+        useHostOllama = false
+        ollamaModel = selectOllamaModel(null)
+        setEnvKey(envFile, "LLM_PROVIDER", "ollama")
+        setEnvKey(envFile, "LLM_MODEL", ollamaModel)
+        setEnvKey(envFile, "LLM_BASE_URL", "http://ollama:11434/v1")
+        setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
+        if (announce != null) {
+            println(announce)
+        } else {
+            println("${GREEN}Using:$RESET bundled Ollama with model ${BOLD}$ollamaModel$RESET")
+        }
+    }
+
     private fun configureLlm(envFile: File) {
         // Flag: --key (can be passed multiple times via repeated --key args)
         if (llmKeys.isNotEmpty()) {
@@ -342,15 +371,22 @@ class Setup(
             return
         }
 
+        // Flag: --ollama (reuse host Ollama when available, else start bundled Ollama)
+        if (useBundledOllama) {
+            if (hostOllamaAvailable()) {
+                configureHostOllama(
+                    envFile,
+                    announce = "${GREEN}Found:$RESET host Ollama on localhost:11434 — reusing it instead of starting a second container."
+                )
+            } else {
+                configureBundledOllama(envFile)
+            }
+            return
+        }
+
         // Flag: --host-ollama (existing host Ollama)
         if (useHostOllama) {
-            ollamaModel = selectOllamaModel("http://localhost:11434")
-            val hostAddr = detectHostAddress()
-            setEnvKey(envFile, "LLM_PROVIDER", "ollama")
-            setEnvKey(envFile, "LLM_MODEL", ollamaModel)
-            setEnvKey(envFile, "LLM_BASE_URL", "http://$hostAddr:11434/v1")
-            setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-            println("${GREEN}Using:$RESET existing Ollama on host with model ${BOLD}$ollamaModel$RESET")
+            configureHostOllama(envFile)
             return
         }
 
@@ -366,7 +402,8 @@ class Setup(
         println("${DIM}Optional — the core logic API works without an LLM.$RESET")
         val llmChoice = menu(
             "LLM Provider",
-            "Ollama — already running on this machine  ${DIM}(free, private, recommended)$RESET",
+            "Ollama — automatic local mode  ${DIM}(reuse host or start bundled, recommended)$RESET",
+            "Ollama — already running on this machine${RESET}",
             "Anthropic Claude  ${DIM}(claude-sonnet-4-5)$RESET",
             "OpenAI GPT  ${DIM}(gpt-4.1-mini)$RESET",
             "Google Gemini  ${DIM}(gemini-2.5-flash)$RESET",
@@ -375,18 +412,23 @@ class Setup(
 
         when (llmChoice) {
             0 -> {
-                // Host Ollama — query for installed models
-                useHostOllama = true
-                ollamaModel = selectOllamaModel("http://localhost:11434")
-                val hostAddr = detectHostAddress()
-                setEnvKey(envFile, "LLM_PROVIDER", "ollama")
-                setEnvKey(envFile, "LLM_MODEL", ollamaModel)
-                setEnvKey(envFile, "LLM_BASE_URL", "http://$hostAddr:11434/v1")
-                setEnvKey(envFile, "EXTRACTION_ENABLED", "true")
-                println("${GREEN}Using Ollama$RESET at $hostAddr:11434  model: ${BOLD}$ollamaModel$RESET")
-                println("${DIM}Make sure Ollama is running: ollama serve$RESET")
+                if (hostOllamaAvailable()) {
+                    configureHostOllama(
+                        envFile,
+                        announce = "${GREEN}Using Ollama$RESET from localhost:11434  ${DIM}(reused existing host service)$RESET"
+                    )
+                } else {
+                    configureBundledOllama(
+                        envFile,
+                        announce = "${GREEN}Using Ollama$RESET in Docker  ${DIM}(No host Ollama found, bundled service will be started)$RESET"
+                    )
+                }
             }
             1 -> {
+                configureHostOllama(envFile)
+                println("${DIM}Make sure Ollama is running: ollama serve$RESET")
+            }
+            2 -> {
                 val key = prompt("Anthropic API key ${DIM}(sk-ant-...)$RESET")
                 if (!key.isNullOrBlank()) {
                     setEnvKey(envFile, "ANTHROPIC_API_KEY", key)
@@ -399,7 +441,7 @@ class Setup(
                     println("${YELLOW}No key entered.$RESET LLM features won't be available.")
                 }
             }
-            2 -> {
+            3 -> {
                 val key = prompt("OpenAI API key ${DIM}(sk-...)$RESET")
                 if (!key.isNullOrBlank()) {
                     setEnvKey(envFile, "OPENAI_API_KEY", key)
@@ -412,7 +454,7 @@ class Setup(
                     println("${YELLOW}No key entered.$RESET LLM features won't be available.")
                 }
             }
-            3 -> {
+            4 -> {
                 val key = prompt("Google API key ${DIM}(AIza...)$RESET")
                 if (!key.isNullOrBlank()) {
                     setEnvKey(envFile, "GOOGLE_API_KEY", key)
@@ -426,7 +468,7 @@ class Setup(
                 }
             }
             else -> {
-                println("${DIM}Skipped. Edit .env in ${installDir.path}/ and restart to add LLM later.$RESET")
+                println("${DIM}Skipped. Defaults are in docker-compose.yml; create .env in ${installDir.path}/ only if you want overrides later.$RESET")
             }
         }
     }
@@ -439,11 +481,12 @@ class Setup(
      * models not already installed. Otherwise offer only the popular list.
      */
     private fun selectOllamaModel(ollamaUrl: String?): String {
-        if (!interactive) return "llama3.2"
+        if (!interactive) return "granite3.3:8b"
 
         val installed = if (ollamaUrl != null) queryOllamaModels(ollamaUrl) else emptyList()
 
         val popular = listOf(
+            "granite3.3:8b"  to "IBM — strongest local extraction default",
             "llama3.2"       to "Meta — fast, general purpose",
             "llama3.1:8b"    to "Meta — larger, more capable",
             "mistral"        to "Mistral AI — good reasoning",
@@ -477,7 +520,7 @@ class Setup(
 
         val choice = menu(header, *options.toTypedArray())
         return if (values[choice] == "__other__") {
-            prompt("Model name", "llama3.2") ?: "llama3.2"
+            prompt("Model name", "granite3.3:8b") ?: "granite3.3:8b"
         } else {
             values[choice]
         }
@@ -559,6 +602,7 @@ class Setup(
         if (envHasKey(envFile, "OPENAI_API_KEY"))    providers.add("OpenAI GPT")
         if (envHasKey(envFile, "GOOGLE_API_KEY"))    providers.add("Google Gemini")
         if (envHasKey(envFile, "LLM_API_KEY"))       providers.add("Custom LLM")
+        if (useBundledOllama) providers.add("Ollama (bundled)")
         if (useHostOllama) providers.add("Ollama (host)")
         if (providers.isNotEmpty()) {
             llmConfigured = true
@@ -581,7 +625,7 @@ class Setup(
      * Returns true to proceed with start, false to skip (user chose to keep existing).
      */
     private fun resolveExistingContainers(): Boolean {
-        val names = mutableListOf("nocturnusai")
+        val names = mutableListOf("nocturnusai", "nocturnusai-ollama")
 
         val conflicts = names.filter { name ->
             sh("$containerCmd inspect $name >/dev/null 2>&1").success
@@ -755,7 +799,7 @@ class Setup(
     private fun removeContainers(names: List<String>) {
         // compose down handles pods, networks, and name variants (works for both Docker and Podman)
         if (::installDir.isInitialized) {
-            sh("$composeCmd down --remove-orphans 2>/dev/null", installDir)
+            sh("${composePrefix(includeOllamaProfile = true)} down --remove-orphans 2>/dev/null", installDir)
         } else {
             // Fallback when installDir not yet set
             for (name in names) {
@@ -765,7 +809,67 @@ class Setup(
         }
     }
 
+    private fun composePrefix(includeOllamaProfile: Boolean = false): String =
+        if (includeOllamaProfile) "$composeCmd --profile ollama" else composeCmd
+
+    private fun startStack(): Boolean {
+        if (!useBundledOllama) {
+            println("${BOLD}Starting NocturnusAI...$RESET")
+            return shVisible("${composePrefix()} up -d", installDir) == 0
+        }
+
+        val compose = composePrefix(includeOllamaProfile = true)
+        println("${BOLD}Starting Ollama...$RESET")
+        if (shVisible("$compose up -d ollama", installDir) != 0) {
+            println("${RED}Failed to start bundled Ollama.$RESET")
+            return false
+        }
+
+        println()
+        if (!waitForOllama()) return false
+
+        println("${DIM}Pulling Ollama model: $ollamaModel$RESET")
+        if (shVisible("$compose exec -T ollama ollama pull \"$ollamaModel\"", installDir) != 0) {
+            println("${RED}Failed to pull Ollama model: $ollamaModel$RESET")
+            return false
+        }
+
+        println()
+        println("${BOLD}Starting NocturnusAI...$RESET")
+        return shVisible("$compose up -d nocturnusai", installDir) == 0
+    }
+
     // ── Health check ───────────────────────────────────────────────────────────
+
+    private fun waitForOllama(): Boolean {
+        print("Waiting for Ollama")
+        System.out.flush()
+        for (i in 1..30) {
+            if (checkOllama()) {
+                println()
+                println("${GREEN}Ollama is ready.$RESET")
+                return true
+            }
+            print(".")
+            System.out.flush()
+            Thread.sleep(2000)
+        }
+        println()
+        println("${YELLOW}Ollama is taking longer than expected to start.$RESET")
+        println("${DIM}Check logs:  ${composePrefix(includeOllamaProfile = true)} logs -f ollama$RESET")
+        return false
+    }
+
+    private fun checkOllama(): Boolean = try {
+        val conn = URI("http://localhost:11434/api/tags").toURL().openConnection() as HttpURLConnection
+        conn.connectTimeout = 2000
+        conn.readTimeout = 2000
+        val ok = conn.responseCode == 200
+        conn.disconnect()
+        ok
+    } catch (_: Exception) {
+        false
+    }
 
     private fun waitForHealth(): Boolean {
         print("Waiting for server")
@@ -782,7 +886,7 @@ class Setup(
         }
         println()
         println("${YELLOW}Server is taking longer than expected to start.$RESET")
-        println("${DIM}Check logs:  $composeCmd logs -f nocturnusai$RESET")
+        println("${DIM}Check logs:  ${composePrefix(useBundledOllama)} logs -f nocturnusai$RESET")
         println("${DIM}Health:      curl http://localhost:$port/health$RESET")
         return false
     }
@@ -811,6 +915,8 @@ class Setup(
         println("  ${BOLD}Server$RESET       http://localhost:$port")
         if (llmConfigured)
             println("  ${BOLD}LLM$RESET          ${GREEN}$llmProviderLabel$RESET")
+        if (useBundledOllama)
+            println("  ${BOLD}Ollama$RESET       ${GREEN}bundled Docker service$RESET ${DIM}(localhost:11434)$RESET")
         if (useHostOllama)
             println("  ${BOLD}Ollama$RESET       ${GREEN}using host Ollama$RESET ${DIM}(${detectHostAddress()}:11434)$RESET")
         if (authConfigured)
@@ -877,11 +983,16 @@ class Setup(
         // ── Manage ──
         println("  ${BOLD}Manage$RESET")
         println("    cd ${installDir.path}")
-        println("    $composeCmd logs -f nocturnusai   ${DIM}# tail logs$RESET")
-        println("    $composeCmd down                   ${DIM}# stop$RESET")
-        println("    $composeCmd up -d                  ${DIM}# restart$RESET")
+        println("    ${composePrefix(useBundledOllama)} logs -f nocturnusai   ${DIM}# tail logs$RESET")
+        println("    ${composePrefix(useBundledOllama)} down                   ${DIM}# stop$RESET")
+        println("    ${composePrefix(useBundledOllama)} up -d                  ${DIM}# restart$RESET")
         println()
-        println("  ${DIM}Config: ${installDir.path}/.env$RESET")
+        val envFile = File(installDir, ".env")
+        if (envFile.exists()) {
+            println("  ${DIM}Config overrides: ${envFile.path}$RESET")
+        } else {
+            println("  ${DIM}Config overrides: create ${envFile.path} only if you want to change the defaults.$RESET")
+        }
         println("  ${DIM}Docs:   https://auctalis.github.io/nocturnusai/$RESET")
         println()
     }
@@ -918,6 +1029,7 @@ services:
       - HOST=0.0.0.0
       - STORAGE_DIR=/data
       - API_KEY=@{API_KEY:-}
+      - LLM_API_KEY=@{LLM_API_KEY:-}
       - LLM_PROVIDER=@{LLM_PROVIDER:-}
       - LLM_MODEL=@{LLM_MODEL:-}
       - LLM_BASE_URL=@{LLM_BASE_URL:-}
@@ -925,6 +1037,7 @@ services:
       - OPENAI_API_KEY=@{OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=@{GOOGLE_API_KEY:-}
       - EXTRACTION_ENABLED=@{EXTRACTION_ENABLED:-false}
+      - ENCRYPTION_KEY
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -933,6 +1046,23 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nocturnusai-ollama
+    profiles:
+      - ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 """.trimIndent() + "\n"
     }
 }

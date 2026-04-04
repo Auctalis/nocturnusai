@@ -1179,7 +1179,7 @@ NocturnusAI can use an LLM for natural language fact extraction and question ans
 | 1 | Anthropic | `ANTHROPIC_API_KEY` | claude-sonnet-4-20250514 |
 | 2 | OpenAI | `OPENAI_API_KEY` | gpt-4o-mini |
 | 3 | Google Gemini | `GOOGLE_API_KEY` | gemini-2.0-flash |
-| 4 | Ollama (local) | `LLM_PROVIDER=ollama` | llama3.2 |
+| 4 | Ollama (local) | `LLM_PROVIDER=ollama` | granite3.3:8b |
 | 5 | Custom OpenAI-compatible | `LLM_API_KEY` + `LLM_BASE_URL` | (set `LLM_MODEL`) |
 
 ### Fact extraction

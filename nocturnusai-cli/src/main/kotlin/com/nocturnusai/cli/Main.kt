@@ -29,6 +29,7 @@ fun main(args: Array<String>) {
         val code = Setup(
             dir = setupArgs.dir,
             port = setupArgs.port,
+            bundledOllamaFlag = setupArgs.ollama,
             hostOllamaFlag = setupArgs.hostOllama,
             llmKeys = setupArgs.keys,
             nonInteractive = setupArgs.nonInteractive,
@@ -106,6 +107,7 @@ private fun parseArgs(args: Array<String>): CliArgs {
 internal data class SetupArgs(
     val dir: String = "./nocturnusai",
     val port: Int = 9300,
+    val ollama: Boolean = false,
     val hostOllama: Boolean = false,
     val keys: List<String> = emptyList(),
     val nonInteractive: Boolean = false,
@@ -114,6 +116,7 @@ internal data class SetupArgs(
 internal fun parseSetupArgs(args: Array<String>): SetupArgs {
     var dir = "./nocturnusai"
     var port = 9300
+    var ollama = false
     var hostOllama = false
     val keys = mutableListOf<String>()
     var nonInteractive = false
@@ -123,6 +126,7 @@ internal fun parseSetupArgs(args: Array<String>): SetupArgs {
         when (args[i]) {
             "--dir"             -> { dir = args.getOrElse(i + 1) { dir }; i += 2 }
             "--port"            -> { port = args.getOrElse(i + 1) { "9300" }.toIntOrNull() ?: 9300; i += 2 }
+            "--ollama"          -> { ollama = true; i++ }
             "--host-ollama"     -> { hostOllama = true; i++ }
             "--key"             -> { args.getOrElse(i + 1) { null }?.let { keys.add(it) }; i += 2 }
             "--non-interactive" -> { nonInteractive = true; i++ }
@@ -131,7 +135,7 @@ internal fun parseSetupArgs(args: Array<String>): SetupArgs {
         }
     }
 
-    return SetupArgs(dir, port, hostOllama, keys, nonInteractive)
+    return SetupArgs(dir, port, ollama, hostOllama, keys, nonInteractive)
 }
 
 // ── Uninstall ─────────────────────────────────────────────────────────────
@@ -327,7 +331,7 @@ Sets up a NocturnusAI server using Docker or Podman:
   - Detects Docker/Podman and pulls the container image
   - Configures LLM provider (Anthropic, OpenAI, Google, or Ollama)
   - Optionally generates an API key for authentication
-  - Creates docker-compose.yml and .env
+  - Creates docker-compose.yml and optional .env overrides
   - Starts the server and waits for it to be ready
 
 Usage: nocturnusai setup [options]
@@ -335,6 +339,7 @@ Usage: nocturnusai setup [options]
 Options:
   --dir DIR              Install directory (default: ./nocturnusai)
   --port PORT            Server port (default: 9300)
+  --ollama               Reuse host Ollama when available, else start bundled Ollama
   --host-ollama          Use existing Ollama on your machine
   --key KEY              LLM API key (repeatable, auto-detects provider)
   --non-interactive      Skip interactive prompts, use defaults
@@ -342,6 +347,7 @@ Options:
 
 Examples:
   nocturnusai setup                           # interactive wizard
+  nocturnusai setup --ollama                  # automatic local Ollama path
   nocturnusai setup --host-ollama             # use existing local Ollama
   nocturnusai setup --key sk-ant-abc123...    # Anthropic Claude
   nocturnusai setup --key sk-ant-... --key sk-...  # multiple providers

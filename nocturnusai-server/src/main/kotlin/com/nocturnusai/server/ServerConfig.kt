@@ -48,7 +48,7 @@ object ServerConfig {
     val defaultKeyExpiryDays: Int? = System.getenv("API_KEY_DEFAULT_EXPIRY_DAYS")?.toIntOrNull()
 
     // Encryption at Rest
-    val encryptionKey: String? = System.getenv("ENCRYPTION_KEY") // 64 hex chars = 32 bytes AES-256
+    val encryptionKey: String? = System.getenv("ENCRYPTION_KEY")?.ifBlank { null } // 64 hex chars = 32 bytes AES-256
 
     // TLS Configuration
     val tlsEnabled: Boolean = System.getenv("TLS_ENABLED")?.toBoolean() ?: false

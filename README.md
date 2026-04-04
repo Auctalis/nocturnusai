@@ -186,8 +186,19 @@ That is the backend. The front-of-product story is still turn reduction.
 ### Path 1: Try it locally now
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama
 ```
+
+This is the lowest-friction persistent local install: Docker keeps the server running and the bundled Ollama service removes the host-LLM dependency.
+
+### Path 1b: From this repo
+
+```bash
+make up-ollama
+make smoke
+```
+
+`make up-ollama` is the intended zero-guess developer path. It reuses a host Ollama if one is already running, otherwise it starts a bundled Ollama container. Create `.env` only if you want to override the defaults in `.env.example`.
 
 ### Path 2: Python app
 
@@ -243,9 +254,10 @@ Full docs: **[auctalis.github.io/nocturnusai](https://auctalis.github.io/nocturn
 ```bash
 git clone https://github.com/Auctalis/nocturnusai.git && cd nocturnusai
 
-docker compose up -d                           # Server only
-docker compose --profile monitoring up -d      # + Prometheus + Grafana
-docker compose --profile ollama up -d          # + local Ollama LLM
+make up                                        # Server using .env.example defaults or .env overrides
+make up-ollama                                 # Recommended: reuse host Ollama or start bundled Ollama
+make up-monitoring                             # + Prometheus + Grafana
+make smoke                                     # Verify health + text extraction
 ```
 
 ---
