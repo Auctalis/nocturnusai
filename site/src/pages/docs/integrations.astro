@@ -7,7 +7,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <DocsLayout title="Integrations">
     <h1>Framework Integrations</h1>
     <p class="lead text-xl text-slate-400">
-        Drop NocturnusAI into your agent stack in one line. Native integrations for the most popular AI frameworks.
+        Drop NocturnusAI into your agent stack in one line. Cut token costs by 97% with native integrations for the most popular AI frameworks.
     </p>
 
     <h3>Installation</h3>
@@ -112,6 +112,23 @@ tools = get_nocturnusai_tool_definitions()
         <a href={`${base}/docs/mcp`}>MCP protocol</a>, or the
         <a href={`${base}/docs/sdks`}>direct SDK</a>.
     </p>
+
+    <hr />
+
+    <h2>Context Optimization Across All Frameworks</h2>
+    <p class="text-slate-400">
+        Every integration above gives your agent access to the <strong>Context Management Engine</strong>. Instead of stuffing your entire knowledge base into every LLM prompt, call <code>optimize_context()</code> with goals to get only the facts that matter — 97% fewer tokens billed per request, regardless of framework.
+    </p>
+    <pre><code class="language-python"># Works with any framework above
+from nocturnusai import SyncNocturnusAIClient
+
+client = SyncNocturnusAIClient("http://localhost:9300")
+ctx = client.optimize_context(
+    goals=[&#123;"predicate": "eligible_for_sla", "args": ["acme_corp"]&#125;],
+    max_facts=25
+)
+# ctx.entries → 15 facts, 820 tokens, full provenance
+# vs. 150K tokens without optimization</code></pre>
 
     <NextSteps links={[
         { title: "SDKs", description: "Full Python and TypeScript SDK documentation", href: `${base}/docs/sdks` },

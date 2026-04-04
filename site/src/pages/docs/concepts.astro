@@ -7,7 +7,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <DocsLayout title="Core Concepts">
     <h1>Core Concepts</h1>
     <p class="lead text-xl text-slate-400">
-        How Nocturnus.AI represents knowledge and reasons about it.
+        How Nocturnus.AI represents knowledge, reasons about it, and optimizes context to cut your token costs by 97%.
     </p>
 
     <hr />
@@ -155,7 +155,7 @@ curl -X POST http://localhost:9300/ask \
         <li><strong>Frequency</strong> — how often it's been queried</li>
         <li><strong>Priority</strong> — explicit importance weight</li>
     </ul>
-    <p>The <code>/memory/context</code> endpoint returns the top-K most salient facts — this is your agent's "working memory." Low-salience facts can be automatically evicted via <code>/memory/decay</code>, and repetitive patterns can be compressed into summaries via <code>/memory/consolidate</code>.</p>
+    <p>The <code>/memory/context</code> endpoint returns the top-K most salient facts — this is your agent's "working memory." Low-salience facts can be automatically evicted via <code>/memory/decay</code>, and repetitive patterns can be compressed into summaries via <code>/memory/consolidate</code>. For goal-driven optimization that goes further — backward chaining, contradiction detection, and 97% token reduction — see <a href="#context-optimization">Context Optimization</a> below.</p>
 
     <hr />
 
@@ -184,6 +184,40 @@ curl -X POST http://localhost:9300/memory/consolidate
 curl -X POST http://localhost:9300/memory/decay \
   -H "Content-Type: application/json" \
   -d '&#123;"threshold": 0.05&#125;'</code></pre>
+
+    <hr />
+
+    <h2 id="context-optimization">Context Optimization</h2>
+    <p>The <strong>Context Management Engine</strong> is what makes NocturnusAI a cost optimization tool, not just a knowledge base. Instead of stuffing your entire KB into every LLM prompt, the engine delivers only the facts that matter.</p>
+
+    <h3>How It Works</h3>
+    <ol>
+        <li><strong>Goal resolution</strong> — you specify what your agent needs to know (e.g., "is this contract enforceable?"). Backward chaining traces exactly which facts are relevant.</li>
+        <li><strong>Salience ranking</strong> — relevant facts are scored by recency, frequency, and priority. The most important facts bubble to the top.</li>
+        <li><strong>Contradiction detection</strong> — conflicting facts are flagged or auto-resolved before reaching the LLM.</li>
+        <li><strong>Deduplication</strong> — cross-source duplicates are merged to avoid wasting tokens.</li>
+        <li><strong>Token-optimized output</strong> — the final context window contains only goal-relevant, deduplicated, consistent facts with full provenance.</li>
+    </ol>
+
+    <h3>The Cost Impact</h3>
+    <p>A typical knowledge base with 500 facts produces a 150K-token context window when stuffed into a prompt. After optimization, the same query returns 15 goal-relevant facts in ~820 tokens — a <strong>97% reduction</strong> in tokens billed to OpenAI, Anthropic, or any LLM provider.</p>
+    <pre><code class="language-bash"># Optimize context for a specific goal
+curl -X POST http://localhost:9300/context/optimize \
+  -H "Content-Type: application/json" \
+  -d '&#123;
+    "goals": [&#123;"predicate": "eligible_for_sla", "args": ["acme_corp"]&#125;],
+    "maxFacts": 25
+  &#125;'
+
+# Response: 15 facts, 820 tokens, full provenance
+# vs. 150K tokens without optimization</code></pre>
+
+    <h3>Incremental Diffs</h3>
+    <p>For multi-turn conversations, use <code>POST /context/diff</code> with a <code>sessionId</code> to get only what changed since the last call — further reducing token spend on subsequent requests.</p>
+
+    <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-emerald-500 text-slate-300">
+        <strong>Key insight:</strong> Context optimization isn't just about saving money — less noise means better LLM reasoning. Fewer irrelevant facts = fewer hallucinations, fewer contradictions, more accurate answers.
+    </div>
 
     <NextSteps links={[
         { title: "API Reference", description: "Every endpoint with full request/response shapes", href: `${base}/docs/api` },

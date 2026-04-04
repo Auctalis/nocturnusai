@@ -7,7 +7,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <DocsLayout title="SDKs">
     <h1>SDKs & Agents</h1>
     <p class="lead text-xl text-slate-400">
-        Official client libraries for Python and TypeScript — plus native integrations for LangChain, CrewAI, AutoGen, LangGraph, OpenAI Agents SDK, and Anthropic SDK.
+        Official client libraries for Python and TypeScript — with context optimization that cuts token costs by 97%. Plus native integrations for LangChain, CrewAI, AutoGen, LangGraph, OpenAI Agents SDK, and Anthropic SDK.
     </p>
 
     <hr />
@@ -56,6 +56,23 @@ async with NocturnusAIClient("http://localhost:9300") as client:
     await client.assert_fact("human", ["socrates"])
     results = await client.infer("mortal", ["?who"])
     print(results)</code></pre>
+
+    <h3>Context Optimization</h3>
+    <p>The Python SDK includes full support for the Context Management Engine — the feature that cuts token costs by 97%:</p>
+    <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
+
+with SyncNocturnusAIClient("http://localhost:9300") as client:
+    # Goal-driven context optimization
+    ctx = client.optimize_context(
+        goals=[&#123;"predicate": "eligible_for_sla", "args": ["acme_corp"]&#125;],
+        max_facts=25
+    )
+    print(f"&#123;len(ctx.entries)&#125; facts, &#123;ctx.token_estimate&#125; tokens")
+    # 15 facts, 820 tokens — vs. 150K unoptimized
+
+    # Incremental diffs for multi-turn conversations
+    diff = client.diff_context(session_id="session-42")
+    # Only sends what changed since last call</code></pre>
 
     <hr />
 

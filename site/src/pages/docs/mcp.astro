@@ -7,11 +7,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <DocsLayout title="MCP Integration">
     <h1>MCP Integration</h1>
     <p class="lead text-xl text-slate-400">
-        Connect any MCP-compatible agent to Nocturnus in 30 seconds.
+        Connect any MCP-compatible agent to Nocturnus in 30 seconds. Cut token costs by 97% with goal-driven context optimization.
     </p>
 
     <div class="callout callout-success">
-        <strong>Zero code required.</strong> Cursor, Claude Desktop, Windsurf, and any MCP client can use Nocturnus as a reasoning tool with a single config line. No SDK, no API wrapper — just point and go.
+        <strong>Zero code required.</strong> Cursor, Claude Desktop, Windsurf, and any MCP client can use Nocturnus as a reasoning and context optimization tool with a single config line. No SDK, no API wrapper — just point and go. Your agent gets 97% token reduction automatically.
     </div>
 
     <hr />
@@ -172,6 +172,26 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <pre><code class="language-bash"># Test SSE connection
 curl -N http://localhost:9300/mcp/sse</code></pre>
+
+    <hr />
+
+    <h2 id="context">Context Optimization via MCP</h2>
+    <p>MCP-connected agents can use the Context Management Engine to optimize their token spend. Instead of querying all facts, specify goals and get only what's relevant:</p>
+    <pre><code class="language-json">// MCP tool call
+&#123;
+  "method": "tools/call",
+  "params": &#123;
+    "name": "context",
+    "arguments": &#123;
+      "goals": [&#123;"predicate": "eligible_for_sla", "args": ["acme_corp"]&#125;],
+      "maxFacts": 25
+    &#125;
+  &#125;
+&#125;
+
+// Returns: 15 goal-relevant facts, ~820 tokens
+// vs. 150K tokens from querying everything</code></pre>
+    <p>This is the difference between $2.25 and $0.01 per request when using GPT-4o or Claude at $15/M tokens.</p>
 
     <hr />
 

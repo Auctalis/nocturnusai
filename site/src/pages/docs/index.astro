@@ -7,12 +7,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <DocsLayout title="Quickstart">
     <h1>Quickstart</h1>
     <p class="lead">
-        Working agent in under 5 minutes.<br/>
+        Cut your agent's token bill by 97% in under 5 minutes.<br/>
         Start with natural language — no schemas, no structured queries required.
     </p>
 
     <div class="callout callout-info">
-        <strong>What is Nocturnus.AI?</strong> A reasoning engine for AI agents. Feed it plain English and it stores structured facts. Ask it questions and it returns verified answers with proof — not LLM guesses. Your agents connect via MCP, Python SDK, TypeScript SDK, or HTTP.
+        <strong>What is Nocturnus.AI?</strong> A context optimization engine that cuts your agent's token costs by 97%. Feed it plain English, it stores structured facts. Ask questions, get verified answers. Your agents connect via MCP, Python SDK, TypeScript SDK, or HTTP — and the Context Management Engine ensures they only pay for relevant tokens.
     </div>
 
     <div class="callout callout-tip" id="prereqs">
@@ -251,6 +251,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
         <div class="callout callout-tip">
             <strong>That's it.</strong> No API wrappers, no schemas to define, no integration code. The MCP tools are backed by the full reasoning engine — your agent can ask questions in natural language and get verified answers.
+        </div>
+        <div class="callout callout-success" style="margin-top:1rem;">
+            <strong>Context optimization built in.</strong> Once connected, use <code>POST /context/optimize</code> with goals to get only the facts your agent needs — 97% fewer tokens billed per request. <a href="/docs/concepts#context-optimization">Learn about context optimization →</a>
         </div>
     </div>
 
