@@ -128,36 +128,36 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
     <div class="max-w-5xl mx-auto mb-16">
       <div class="text-center mb-8">
         <h3 class="text-xl font-bold text-white mb-2">The Optimization Pipeline</h3>
-        <p class="text-slate-500 text-sm">Every call to <code class="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded text-xs font-mono">POST /context/optimize</code> runs this pipeline in under 50ms</p>
+        <p class="text-slate-500 text-sm">Every call to <code class="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded text-xs font-mono">POST /context</code> runs this pipeline in under 50ms</p>
       </div>
 
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
         {[
-          { icon: "Brain", label: "Goal Resolution", sub: "Backward chaining", color: "cyan" },
-          { icon: "Filter", label: "Salience Rank", sub: "Recency · freq · priority", color: "purple" },
-          { icon: "Layers", label: "Bucket Allocation", sub: "Per-domain budgets", color: "cyan" },
-          { icon: "Shield", label: "Contradiction Check", sub: "Detect conflicts", color: "yellow" },
-          { icon: "GitMerge", label: "Deduplication", sub: "Cross-source merge", color: "purple" },
-          { icon: "Zap", label: "Context Window", sub: "Token-optimized", color: "emerald" },
+          { label: "Send Turns", sub: "Array of strings", color: "cyan" },
+          { label: "Facts Ranked", sub: "Extract · dedupe · score", color: "purple" },
+          { label: "Feed to LLM", sub: "GPT-4o · Claude · any", color: "emerald" },
         ].map((step, i) => (
-          <div class="relative">
-            <div class="p-4 rounded-xl bg-white/3 border border-white/8 text-center hover:bg-white/5 hover:border-emerald-500/20 transition-all group h-full">
-              <div class={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center mb-2 ${
+          <div class="relative flex items-stretch">
+            <div class="p-5 rounded-xl bg-white/3 border border-white/8 text-center hover:bg-white/5 hover:border-emerald-500/20 transition-all group w-full">
+              <div class={`w-9 h-9 mx-auto rounded-lg flex items-center justify-center mb-3 ${
                 step.color === 'cyan' ? 'bg-cyan-500/15' :
                 step.color === 'purple' ? 'bg-purple-500/15' :
-                step.color === 'yellow' ? 'bg-yellow-500/15' :
                 'bg-emerald-500/15'
               }`}>
-                <span class={`text-xs font-bold ${
+                <span class={`text-sm font-bold ${
                   step.color === 'cyan' ? 'text-cyan-400' :
                   step.color === 'purple' ? 'text-purple-400' :
-                  step.color === 'yellow' ? 'text-yellow-400' :
                   'text-emerald-400'
                 }`}>{String(i + 1).padStart(2, '0')}</span>
               </div>
-              <div class="text-xs font-bold text-slate-200 mb-0.5">{step.label}</div>
-              <div class="text-[10px] text-slate-600">{step.sub}</div>
+              <div class="text-sm font-bold text-slate-200 mb-1">{step.label}</div>
+              <div class="text-xs text-slate-500">{step.sub}</div>
             </div>
+            {i < 2 && (
+              <div class="hidden md:flex items-center absolute -right-2.5 top-1/2 -translate-y-1/2 z-10">
+                <ArrowRight class="w-5 h-5 text-slate-600" />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -168,28 +168,16 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
       <!-- Request -->
       <div class="rounded-xl overflow-hidden bg-[#020617] border border-emerald-500/20 shadow-2xl">
         <div class="flex items-center justify-between px-4 py-3 bg-emerald-500/5 border-b border-emerald-500/10">
-          <span class="text-xs font-mono text-emerald-400">POST /context/optimize</span>
+          <span class="text-xs font-mono text-emerald-400">POST /context</span>
           <span class="text-xs font-mono text-slate-600">request</span>
         </div>
         <div class="p-5 font-mono text-sm overflow-x-auto">
 <pre class="!m-0 !p-0 !bg-transparent !border-0"><code>&#123;
-  <span class="text-purple-400">"maxFacts"</span>: <span class="text-blue-400">25</span>,
-  <span class="text-purple-400">"goals"</span>: [
-    &#123; <span class="text-purple-400">"predicate"</span>: <span class="text-green-400">"enforceable"</span>,
-      <span class="text-purple-400">"args"</span>: [<span class="text-green-400">"contract_001"</span>] &#125;,
-    &#123; <span class="text-purple-400">"predicate"</span>: <span class="text-green-400">"exception_applies"</span>,
-      <span class="text-purple-400">"args"</span>: [<span class="text-green-400">"contract_001"</span>, <span class="text-green-400">"?e"</span>] &#125;
-  ],
-  <span class="text-purple-400">"relevanceBuckets"</span>: [
-    &#123; <span class="text-purple-400">"name"</span>: <span class="text-green-400">"contract"</span>,
-      <span class="text-purple-400">"predicates"</span>: [<span class="text-green-400">"contract_type"</span>, <span class="text-green-400">"contract_value"</span>],
-      <span class="text-purple-400">"maxFacts"</span>: <span class="text-blue-400">8</span> &#125;,
-    &#123; <span class="text-purple-400">"name"</span>: <span class="text-green-400">"legal"</span>,
-      <span class="text-purple-400">"predicates"</span>: [<span class="text-green-400">"enforceable"</span>, <span class="text-green-400">"statute_of_frauds"</span>],
-      <span class="text-purple-400">"maxFacts"</span>: <span class="text-blue-400">10</span> &#125;
-  ],
-  <span class="text-purple-400">"sessionId"</span>: <span class="text-green-400">"session-42"</span>,
-  <span class="text-purple-400">"autoResolveContradictions"</span>: <span class="text-blue-400">false</span>
+  <span class="text-purple-400">"turns"</span>: [
+    <span class="text-green-400">"Acme Corp is on the enterprise plan."</span>,
+    <span class="text-green-400">"They have a $2M contract."</span>,
+    <span class="text-green-400">"24/7 SLA support included."</span>
+  ]
 &#125;</code></pre>
         </div>
       </div>
@@ -197,27 +185,25 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
       <!-- Response -->
       <div class="rounded-xl overflow-hidden bg-[#020617] border border-cyan-500/20 shadow-2xl">
         <div class="flex items-center justify-between px-4 py-3 bg-cyan-500/5 border-b border-cyan-500/10">
-          <span class="text-xs font-mono text-cyan-400">Optimized Context Window</span>
+          <span class="text-xs font-mono text-cyan-400">Ranked Facts</span>
           <span class="text-xs font-mono text-slate-600">response</span>
         </div>
         <div class="p-5 font-mono text-sm overflow-x-auto">
 <pre class="!m-0 !p-0 !bg-transparent !border-0"><code>&#123;
-  <span class="text-purple-400">"windowId"</span>: <span class="text-green-400">"ctx-a7f3b2e1"</span>,
-  <span class="text-purple-400">"entries"</span>: [
-    &#123; <span class="text-purple-400">"atom"</span>: <span class="text-green-400">"enforceable(contract_001)"</span>,
-      <span class="text-purple-400">"salience"</span>: <span class="text-blue-400">0.98</span>,
-      <span class="text-purple-400">"category"</span>: <span class="text-green-400">"goal_relevant"</span>,
-      <span class="text-purple-400">"provenance"</span>: &#123;
-        <span class="text-purple-400">"rule"</span>: <span class="text-green-400">"enforceable(?c) :- ..."</span>,
-        <span class="text-purple-400">"premises"</span>: [<span class="text-green-400">"statute_of_frauds..."</span>]
-      &#125; &#125;,
-    <span class="text-slate-600">... 14 more goal-relevant entries</span>
+  <span class="text-purple-400">"facts"</span>: [
+    &#123; <span class="text-purple-400">"predicate"</span>: <span class="text-green-400">"customer_tier"</span>,
+      <span class="text-purple-400">"args"</span>: [<span class="text-green-400">"acme_corp"</span>, <span class="text-green-400">"enterprise"</span>],
+      <span class="text-purple-400">"salience"</span>: <span class="text-blue-400">0.95</span> &#125;,
+    &#123; <span class="text-purple-400">"predicate"</span>: <span class="text-green-400">"contract_value"</span>,
+      <span class="text-purple-400">"args"</span>: [<span class="text-green-400">"acme_corp"</span>, <span class="text-green-400">"2000000"</span>],
+      <span class="text-purple-400">"salience"</span>: <span class="text-blue-400">0.92</span> &#125;,
+    &#123; <span class="text-purple-400">"predicate"</span>: <span class="text-green-400">"sla_tier"</span>,
+      <span class="text-purple-400">"args"</span>: [<span class="text-green-400">"acme_corp"</span>, <span class="text-green-400">"24_7"</span>],
+      <span class="text-purple-400">"salience"</span>: <span class="text-blue-400">0.90</span> &#125;
   ],
-  <span class="text-purple-400">"totalFactsConsidered"</span>: <span class="text-blue-400">512</span>,
-  <span class="text-purple-400">"tokenEstimate"</span>: <span class="text-blue-400">820</span>,
-  <span class="text-purple-400">"compressionRatio"</span>: <span class="text-emerald-400">0.029</span>,
-  <span class="text-purple-400">"contradictions"</span>: [ <span class="text-yellow-400">1 flagged</span> ],
-  <span class="text-purple-400">"relevantRules"</span>: [ <span class="text-slate-400">4 rules</span> ]
+  <span class="text-purple-400">"factsReturned"</span>: <span class="text-blue-400">3</span>,
+  <span class="text-purple-400">"totalFactsInKB"</span>: <span class="text-blue-400">127</span>,
+  <span class="text-purple-400">"contradictions"</span>: <span class="text-blue-400">0</span>
 &#125;</code></pre>
         </div>
       </div>
@@ -245,15 +231,23 @@ import { Minimize2, Zap, ArrowRight, Brain, Filter, GitMerge, TrendingDown, Shie
     <div class="max-w-3xl mx-auto mt-12 text-center">
       <div class="p-6 rounded-2xl bg-gradient-to-r from-emerald-500/5 to-cyan-500/5 border border-emerald-500/15">
         <p class="text-slate-300 text-sm mb-4">
-          <span class="font-bold text-white">Two lines to cut your token bill.</span> Works with LangChain, CrewAI, or any framework.
+          <span class="font-bold text-white">Turns in, facts out, GPT-4o in.</span> Drop into any OpenAI workflow in minutes.
         </p>
         <div class="inline-block text-left rounded-lg bg-[#020617] border border-white/10 px-5 py-3 font-mono text-sm">
-          <div><span class="text-slate-500"># pip install nocturnusai</span></div>
-          <div><span class="text-blue-400">from</span> <span class="text-slate-300">nocturnusai</span> <span class="text-blue-400">import</span> <span class="text-slate-300">SyncNocturnusAIClient</span></div>
-          <div><span class="text-slate-300">ctx</span> = <span class="text-yellow-400">SyncNocturnusAIClient</span>().<span class="text-yellow-400">optimize_context</span>(</div>
-          <div class="pl-4"><span class="text-slate-300">goals</span>=[&#123;<span class="text-green-400">"predicate"</span>: <span class="text-green-400">"enforceable"</span>, <span class="text-green-400">"args"</span>: [<span class="text-green-400">"contract_001"</span>]&#125;]</div>
+          <div><span class="text-slate-500"># pip install nocturnusai openai</span></div>
+          <div><span class="text-blue-400">import</span> <span class="text-slate-300">requests, openai</span></div>
+          <div class="mt-2"><span class="text-slate-500"># Turns in, facts out</span></div>
+          <div><span class="text-slate-300">resp</span> = <span class="text-yellow-400">requests</span>.<span class="text-yellow-400">post</span>(<span class="text-green-400">"http://localhost:9300/context"</span>, json=&#123;</div>
+          <div class="pl-4"><span class="text-green-400">"turns"</span>: [<span class="text-green-400">"Acme is enterprise tier"</span>, <span class="text-green-400">"They have 24/7 SLA"</span>]</div>
+          <div>&#125;)</div>
+          <div><span class="text-slate-300">facts</span> = <span class="text-green-400">"\n"</span>.<span class="text-yellow-400">join</span>(<span class="text-yellow-400">f</span><span class="text-green-400">"- &#123;f['predicate']&#125;(&#123;', '.join(f['args'])&#125;)"</span> <span class="text-blue-400">for</span> <span class="text-slate-300">f</span> <span class="text-blue-400">in</span> <span class="text-slate-300">resp</span>.<span class="text-yellow-400">json</span>()[<span class="text-green-400">"facts"</span>])</div>
+          <div class="mt-2"><span class="text-slate-500"># Feed to GPT-4o — 200 tokens instead of 150K</span></div>
+          <div><span class="text-slate-300">answer</span> = <span class="text-yellow-400">openai</span>.<span class="text-yellow-400">OpenAI</span>().<span class="text-slate-300">chat</span>.<span class="text-slate-300">completions</span>.<span class="text-yellow-400">create</span>(</div>
+          <div class="pl-4"><span class="text-slate-300">model</span>=<span class="text-green-400">"gpt-4o"</span>,</div>
+          <div class="pl-4"><span class="text-slate-300">messages</span>=[&#123;<span class="text-green-400">"role"</span>: <span class="text-green-400">"system"</span>, <span class="text-green-400">"content"</span>: <span class="text-yellow-400">f</span><span class="text-green-400">"Facts:\n&#123;facts&#125;"</span>&#125;,</div>
+          <div class="pl-14">&#123;<span class="text-green-400">"role"</span>: <span class="text-green-400">"user"</span>, <span class="text-green-400">"content"</span>: <span class="text-green-400">"Is Acme eligible for SLA?"</span>&#125;]</div>
           <div>)</div>
-          <div class="text-emerald-400 mt-1"># 15 facts, 820 tokens, $0.01 — down from $2.25 ✓</div>
+          <div class="text-emerald-400 mt-1"># Correct. Sourced. $0.003 instead of $2.25 ✓</div>
         </div>
       </div>
     </div>

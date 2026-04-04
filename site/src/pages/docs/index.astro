@@ -218,6 +218,21 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <div class="callout callout-success">
             <strong>Not a guess.</strong> The <code>derivation</code> field shows the exact facts that produced this answer. This is verification — if the fact isn't in the KB, the answer says so rather than making something up.
         </div>
+
+        <div class="callout callout-success" style="margin-top:1.5rem;">
+            <strong>Even simpler: POST /context</strong>
+            <p style="margin:0.5rem 0 0;">Skip extraction and synthesis — just send your conversation turns and get ranked facts back:</p>
+            <pre style="margin:0.5rem 0 0; font-size:0.8rem;"><code>POST /context
+&#123; "turns": ["Acme is on enterprise plan", "They have 24/7 SLA"] &#125;
+
+→ &#123; "facts": [
+    &#123;"predicate":"customer_tier", "args":["acme","enterprise"], "salience":0.95&#125;,
+    &#123;"predicate":"sla_tier", "args":["acme","24_7"], "salience":0.90&#125;
+  ],
+  "factsReturned": 2, "contradictions": 0
+&#125;</code></pre>
+            <p style="margin:0.5rem 0 0; font-size:0.85rem;">Feed these facts to GPT-4o or Claude — 200 tokens instead of 150K. <a href="/docs/context">Full guide →</a></p>
+        </div>
     </div>
 
     <!-- ============ STEP 3 ============ -->
@@ -317,8 +332,8 @@ result = executor.<span class="syn-fn">invoke</span>(&#123;
 &#125;)
 <span class="syn-fn">print</span>(result[<span class="syn-string">"output"</span>])</code></pre>
 
-        <pre data-lang="output"><code><span class="syn-comment"># → Agent calls tell tool: customer_tier(acme_corp, enterprise)</span>
-<span class="syn-comment"># → Agent calls ask tool: customer_tier(acme_corp, ?tier)</span>
+        <pre data-lang="output"><code><span class="syn-comment"># Agent gets optimized facts from /context — 200 tokens, not 150K.</span>
+<span class="syn-comment"># Correct. Sourced. 750x cheaper than context stuffing.</span>
 <span class="syn-ok">Acme Corp is on the enterprise plan. (verified from knowledge base)</span></code></pre>
 
         <div class="callout callout-success">

@@ -4,8 +4,8 @@
 <section class="py-24 bg-[#0f172a]/30 border-y border-white/5 relative z-10">
   <div class="max-w-7xl mx-auto px-6">
     <div class="text-center mb-16">
-      <h2 class="text-3xl md:text-4xl font-bold mb-4">The Token Bill, Side by Side</h2>
-      <p class="text-slate-400">Same question. Same correct answer. Radically different cost.</p>
+      <h2 class="text-3xl md:text-4xl font-bold mb-4">Your Agent + OpenAI, Before and After</h2>
+      <p class="text-slate-400">Same question to GPT-4o. One costs $2.25. The other costs $0.003.</p>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
@@ -13,22 +13,24 @@
       <div class="rounded-xl overflow-hidden bg-[#020617] border border-red-500/20 shadow-2xl flex flex-col">
           <div class="flex items-center justify-between px-4 py-3 bg-red-500/5 border-b border-red-500/10">
             <span class="text-xs font-mono text-red-400">Without NocturnusAI</span>
-            <span class="text-xs font-mono text-red-400/60">150K tokens billed</span>
+            <span class="text-xs font-mono text-red-400/60">150K tokens → $2.25</span>
           </div>
           <div class="p-6 font-mono text-sm overflow-x-auto flex-1">
-<pre><code><span class="text-slate-500">// Agent dumps entire KB into system prompt</span>
-<span class="text-slate-500">// 500 facts, 47 rules, 12 scopes = 150K tokens</span>
+<pre><code><span class="text-slate-500"># Stuff everything into the system prompt</span>
+<span class="text-slate-300">response</span> = <span class="text-yellow-400">openai.chat.completions.create</span>(
+    <span class="text-slate-300">model</span>=<span class="text-green-400">"gpt-4o"</span>,
+    <span class="text-slate-300">messages</span>=[&#123;
+        <span class="text-green-400">"role"</span>: <span class="text-green-400">"system"</span>,
+        <span class="text-green-400">"content"</span>: <span class="text-red-400">entire_knowledge_base</span>
+        <span class="text-slate-500"># 500 facts, 47 rules = 150K tokens</span>
+    &#125;, &#123;
+        <span class="text-green-400">"role"</span>: <span class="text-green-400">"user"</span>,
+        <span class="text-green-400">"content"</span>: <span class="text-green-400">"What plan is Acme on?"</span>
+    &#125;]
+)
 
-<span class="text-slate-400">"Based on the conversation, I <span class="text-red-400">believe</span></span>
-<span class="text-slate-400"> the customer is on the <span class="text-red-400">premium</span> plan.</span>
-<span class="text-slate-400"> <span class="text-red-400">I'm not entirely sure</span>, but they</span>
-<span class="text-slate-400"> mentioned something about enterprise</span>
-<span class="text-slate-400"> features in a previous message..."</span>
-
-<span class="text-red-400">// Wrong. The customer is on "starter".</span>
-<span class="text-red-400">// Cost: $2.25 for a wrong answer.</span>
-<span class="text-red-400">// Your agent just offered a discount</span>
-<span class="text-red-400">// to the wrong tier. 💸</span></code></pre>
+<span class="text-red-400"># "I believe they're on the premium plan..."</span>
+<span class="text-red-400"># Wrong. $2.25 wasted. 95% of context irrelevant.</span></code></pre>
           </div>
       </div>
 
@@ -37,22 +39,29 @@
           <div class="absolute inset-0 bg-gradient-to-tr from-cyan-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
           <div class="flex items-center justify-between px-4 py-3 bg-emerald-500/5 border-b border-emerald-500/10">
             <span class="text-xs font-mono text-emerald-400">With NocturnusAI</span>
-            <span class="text-xs font-mono text-emerald-400/60">820 tokens billed</span>
+            <span class="text-xs font-mono text-emerald-400/60">200 tokens → $0.003</span>
           </div>
           <div class="p-6 font-mono text-sm overflow-x-auto flex-1">
-<pre><code><span class="text-slate-500">// Context engine selects 15 relevant facts</span>
-<span class="text-slate-500">// Goal-driven: only what answers the question</span>
+<pre><code><span class="text-slate-500"># Turns in, facts out</span>
+<span class="text-slate-300">facts</span> = <span class="text-yellow-400">requests.post</span>(<span class="text-green-400">"/context"</span>, <span class="text-slate-300">json</span>=&#123;
+    <span class="text-green-400">"turns"</span>: [<span class="text-green-400">"Acme is on enterprise"</span>,
+              <span class="text-green-400">"They have 24/7 SLA"</span>]
+&#125;).<span class="text-yellow-400">json</span>()[<span class="text-green-400">"facts"</span>]
 
-<span class="text-blue-400">POST</span> <span class="text-slate-300">/context/optimize</span>
-&#123; <span class="text-purple-400">"goals"</span>: [&#123;<span class="text-green-400">"predicate"</span>: <span class="text-green-400">"subscription_tier"</span>,
-              <span class="text-green-400">"args"</span>: [<span class="text-green-400">"acme_corp"</span>, <span class="text-green-400">"?tier"</span>]&#125;] &#125;
+<span class="text-slate-300">response</span> = <span class="text-yellow-400">openai.chat.completions.create</span>(
+    <span class="text-slate-300">model</span>=<span class="text-green-400">"gpt-4o"</span>,
+    <span class="text-slate-300">messages</span>=[&#123;
+        <span class="text-green-400">"role"</span>: <span class="text-green-400">"system"</span>,
+        <span class="text-green-400">"content"</span>: <span class="text-emerald-400">format_facts</span>(<span class="text-slate-300">facts</span>)
+        <span class="text-slate-500"># 3 facts, 200 tokens</span>
+    &#125;, &#123;
+        <span class="text-green-400">"role"</span>: <span class="text-green-400">"user"</span>,
+        <span class="text-green-400">"content"</span>: <span class="text-green-400">"What plan is Acme on?"</span>
+    &#125;]
+)
 
-<span class="text-emerald-400">// ✓ 820 tokens · $0.01 · correct answer</span>
-&#123; <span class="text-purple-400">"answer"</span>: <span class="text-green-400">"Acme Corp is on the starter plan."</span>,
-  <span class="text-purple-400">"derivation"</span>: [<span class="text-green-400">"subscription_tier(acme_corp, starter)"</span>],
-  <span class="text-purple-400">"confidence"</span>: <span class="text-blue-400">0.95</span> &#125;
-
-<span class="text-emerald-400">// Correct. Sourced. Provable. 225x cheaper. ✓</span></code></pre>
+<span class="text-emerald-400"># "Acme Corp is on the enterprise plan."</span>
+<span class="text-emerald-400"># Correct. Sourced. $0.003. ✓</span></code></pre>
           </div>
       </div>
     </div>
@@ -62,14 +71,14 @@
       <div class="grid grid-cols-3 gap-4 text-center">
         <div class="p-4 rounded-xl bg-red-500/5 border border-red-500/10">
           <div class="text-lg font-black text-red-400">$2.25</div>
-          <div class="text-[10px] text-slate-500 mt-1">per request, unoptimized</div>
+          <div class="text-[10px] text-slate-500 mt-1">per GPT-4o call, unoptimized</div>
         </div>
         <div class="p-4 rounded-xl bg-white/3 border border-white/8 flex items-center justify-center">
           <span class="text-2xl text-slate-600">→</span>
         </div>
         <div class="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-          <div class="text-lg font-black text-emerald-400">$0.01</div>
-          <div class="text-[10px] text-slate-500 mt-1">per request, with NocturnusAI</div>
+          <div class="text-lg font-black text-emerald-400">$0.003</div>
+          <div class="text-[10px] text-slate-500 mt-1">per GPT-4o call, with NocturnusAI</div>
         </div>
       </div>
     </div>

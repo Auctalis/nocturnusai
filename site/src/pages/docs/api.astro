@@ -7,7 +7,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <DocsLayout title="API Reference">
     <h1>API Reference</h1>
     <p class="lead text-xl text-slate-400">
-        Every endpoint on the Nocturnus.AI HTTP server. Base URL: <code>http://localhost:9300</code>
+        Every endpoint on the Nocturnus.AI HTTP server. Start with POST /context — the simplest way to cut your LLM token costs by 97%. Base URL: <code>http://localhost:9300</code>
     </p>
 
     <hr />
@@ -21,43 +21,6 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     </ul>
 
     <hr />
-
-    <h2 id="simplified">Simplified API</h2>
-    <p>Developer-friendly aliases for the most common operations. These are the endpoints shown in the quickstart.</p>
-
-    <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-            <thead>
-                <tr class="border-b border-white/10 text-white">
-                    <th class="py-2">Endpoint</th>
-                    <th class="py-2">Full Form</th>
-                    <th class="py-2">Description</th>
-                </tr>
-            </thead>
-            <tbody class="text-slate-400">
-                <tr class="border-b border-white/5">
-                    <td class="py-2 font-mono text-cyan-400">POST /tell</td>
-                    <td class="py-2 font-mono">POST /assert/fact</td>
-                    <td class="py-2">Store a fact</td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2 font-mono text-cyan-400">POST /ask</td>
-                    <td class="py-2 font-mono">POST /infer</td>
-                    <td class="py-2">Query with inference (backward chaining)</td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2 font-mono text-cyan-400">POST /teach</td>
-                    <td class="py-2 font-mono">POST /assert/rule</td>
-                    <td class="py-2">Define a logical rule</td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2 font-mono text-cyan-400">POST /forget</td>
-                    <td class="py-2 font-mono">POST /retract</td>
-                    <td class="py-2">Remove a fact (cascading)</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
 
     <h3>Context Management (cost optimization)</h3>
     <div class="overflow-x-auto">
@@ -96,6 +59,48 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
             </tbody>
         </table>
     </div>
+
+    <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-emerald-500 text-slate-300">
+        <strong>New to NocturnusAI?</strong> Start with <code>POST /context</code> — send your conversation turns as an array of strings, get back ranked facts. <a href="/docs/context">See the full integration guide →</a>
+    </div>
+
+    <h2 id="simplified">Simplified API</h2>
+    <p>Developer-friendly aliases for the most common operations. These are the endpoints shown in the quickstart.</p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Endpoint</th>
+                    <th class="py-2">Full Form</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /tell</td>
+                    <td class="py-2 font-mono">POST /assert/fact</td>
+                    <td class="py-2">Store a fact</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /ask</td>
+                    <td class="py-2 font-mono">POST /infer</td>
+                    <td class="py-2">Query with inference (backward chaining)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /teach</td>
+                    <td class="py-2 font-mono">POST /assert/rule</td>
+                    <td class="py-2">Define a logical rule</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">POST /forget</td>
+                    <td class="py-2 font-mono">POST /retract</td>
+                    <td class="py-2">Remove a fact (cascading)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
 
     <hr />
 

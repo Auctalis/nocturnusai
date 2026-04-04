@@ -92,48 +92,47 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       ))}
     </div>
 
-    <!-- Terminal Window — Cost Comparison -->
+    <!-- Terminal Window — Simple API Demo -->
     <div class="w-full max-w-3xl mx-auto rounded-xl overflow-hidden bg-[#0f172a]/90 backdrop-blur-xl border border-white/10 shadow-2xl animate-fade-in-up delay-400 group hover:border-emerald-500/30 transition-colors">
       <!-- Terminal Header -->
       <div class="flex items-center gap-2 px-4 py-3 bg-white/5 border-b border-white/5">
         <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
         <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
         <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
-        <div class="ml-4 text-xs font-mono text-slate-500">nocturnus — context optimization</div>
+        <div class="ml-4 text-xs font-mono text-slate-500">turns in, facts out — that's the whole API</div>
       </div>
 
       <!-- Terminal Body -->
       <div class="p-6 text-left font-mono text-sm space-y-3">
         <div class="text-slate-500">
-          # Before NocturnusAI: stuff everything into the prompt
-        </div>
-        <div class="flex items-start gap-2 text-slate-400">
-          <span class="text-red-400 shrink-0">✗</span>
-          <span>150,000 tokens × $15/M = <span class="text-red-400 font-bold">$2.25 per request</span></span>
-        </div>
-        <div class="text-red-400/60 text-xs pl-4">
-          95% irrelevant context · contradictions hidden · no proof trail
-        </div>
-
-        <div class="text-slate-500 mt-4">
-          # After NocturnusAI: goal-driven context optimization
+          # 1. Send your conversation turns
         </div>
         <div class="flex items-start gap-2 text-slate-300">
           <span class="text-emerald-500 shrink-0">$</span>
-          <span>POST /context/optimize &nbsp;&#123; "goals": [&#123; "predicate": "eligible_for_sla", "args": ["acme"] &#125;] &#125;</span>
+          <span>POST /context &nbsp;&#123; "turns": ["Acme is on enterprise plan", "They have 24/7 SLA"] &#125;</span>
         </div>
-        <div class="flex items-start gap-2 text-emerald-400 text-sm">
-          <span class="shrink-0">✓</span>
-          <span>820 tokens × $15/M = <span class="font-bold">$0.01 per request</span> — same correct answer</span>
+        <div class="text-emerald-400 text-sm">
+          ✓ 5 facts extracted &amp; ranked — 200 tokens
+        </div>
+
+        <div class="text-slate-500 mt-2">
+          # 2. Feed those facts to GPT-4o or Claude
+        </div>
+        <div class="flex items-start gap-2 text-slate-300">
+          <span class="text-emerald-500 shrink-0">$</span>
+          <span>openai.chat(system=facts, user="Is Acme eligible for premium SLA?")</span>
+        </div>
+        <div class="text-emerald-400 text-sm">
+          ✓ "Yes — enterprise tier qualifies for 24/7 SLA support."
         </div>
         <div class="text-emerald-400/60 text-xs pl-4">
-          512 facts considered → 15 delivered · 4 rules · 1 contradiction flagged · full provenance
+          sourced from: customer_tier(acme, enterprise) · sla_tier(acme, 24_7)
         </div>
 
         <div class="mt-4 pt-3 border-t border-white/5">
           <div class="flex items-center justify-between text-xs">
-            <span class="text-slate-500">At 1,000 requests/hr:</span>
-            <span><span class="text-red-400">$2,250/hr</span> <span class="text-slate-600">→</span> <span class="text-emerald-400 font-bold">$10/hr</span></span>
+            <span class="text-slate-500">Token cost for that answer:</span>
+            <span><span class="text-red-400 line-through">$2.25 (150K tokens)</span> <span class="text-slate-600">→</span> <span class="text-emerald-400 font-bold">$0.003 (200 tokens)</span></span>
           </div>
         </div>
       </div>
