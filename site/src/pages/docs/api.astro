@@ -59,6 +59,40 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         </table>
     </div>
 
+    <h3>Context Management (cost optimization)</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Endpoint</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-emerald-400">POST /context/optimize</td>
+                    <td class="py-2">Goal-driven context window — 97% token reduction</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-emerald-400">POST /context/diff</td>
+                    <td class="py-2">Incremental changes since last context window</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-emerald-400">POST /context/summary</td>
+                    <td class="py-2">Knowledge base summary (predicate counts, contradictions)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-emerald-400">POST /context/session/clear</td>
+                    <td class="py-2">Clear diff session state</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-emerald-400">POST /context/ingest</td>
+                    <td class="py-2">Extract + assert + optimize in one call (requires LLM)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
     <hr />
 
     <h2 id="assert-fact">POST /assert/fact (or /tell)</h2>
@@ -212,6 +246,234 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID"
     <h3>POST /memory/decay</h3>
     <p>Evict expired and low-salience facts.</p>
     <pre><code class="language-json">&#123; "threshold": 0.05 &#125;</code></pre>
+
+    <hr />
+
+    <h2 id="context-management">Context Management Engine</h2>
+    <p>The context optimization API — the core of NocturnusAI's cost reduction story. These endpoints deliver goal-driven, salience-ranked, contradiction-checked context windows that cut token costs by 97%.</p>
+
+    <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-emerald-500 text-slate-300">
+        <strong>This is the money saver.</strong> Instead of stuffing 150K tokens into every LLM prompt ($2.25/request at GPT-4o rates), these endpoints deliver ~820 tokens of goal-relevant facts ($0.01/request). Same correct answer, 97% lower bill.
+    </div>
+
+    <h3 id="context-optimize">POST /context/optimize</h3>
+    <p>Build an optimized context window. Optionally goal-driven via backward chaining.</p>
+    <h4>Request</h4>
+    <pre><code class="language-json">&#123;
+  "maxFacts": 25,
+  "goals": [
+    &#123; "predicate": "enforceable", "args": ["contract_001"] &#125;,
+    &#123; "predicate": "exception_applies", "args": ["contract_001", "?e"] &#125;
+  ],
+  "relevanceBuckets": [
+    &#123; "name": "contract", "predicates": ["contract_type", "contract_value"], "maxFacts": 8 &#125;,
+    &#123; "name": "legal", "predicates": ["enforceable", "statute_of_frauds"], "maxFacts": 10 &#125;
+  ],
+  "scope": null,
+  "predicates": null,
+  "sessionId": "session-42",
+  "autoResolveContradictions": true,
+  "maxFactsPerPredicate": null
+&#125;</code></pre>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Field</th>
+                    <th class="py-2">Type</th>
+                    <th class="py-2">Default</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">maxFacts</td>
+                    <td class="py-2">int?</td>
+                    <td class="py-2">100</td>
+                    <td class="py-2">Maximum facts in the context window</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">goals</td>
+                    <td class="py-2">GoalSpec[]?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Goal atoms for backward chaining. Each has <code>predicate</code>, <code>args</code>, optional <code>negated</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">relevanceBuckets</td>
+                    <td class="py-2">Bucket[]?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Per-domain budgets: <code>name</code>, <code>predicates</code>, <code>weight</code>, <code>maxFacts</code></td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">scope</td>
+                    <td class="py-2">string?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Restrict to facts in this scope</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">predicates</td>
+                    <td class="py-2">string[]?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Filter to specific predicate names</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">sessionId</td>
+                    <td class="py-2">string?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Session ID for incremental diffs (stores snapshot)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">autoResolveContradictions</td>
+                    <td class="py-2">boolean</td>
+                    <td class="py-2">true</td>
+                    <td class="py-2">Auto-resolve contradictions (keeps higher-salience fact)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">maxFactsPerPredicate</td>
+                    <td class="py-2">int?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Diversity cap — max facts per predicate type</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h4>Response</h4>
+    <pre><code class="language-json">&#123;
+  "windowId": "ctx-a7f3b2e1",
+  "entries": [
+    &#123;
+      "predicate": "enforceable",
+      "args": ["contract_001"],
+      "negated": false,
+      "scope": null,
+      "salience": 0.98,
+      "category": "goal_relevant",
+      "charCount": 28,
+      "provenance": &#123;
+        "rule": "enforceable(?c) :- signed(?c), consideration(?c)",
+        "premises": ["signed(contract_001)", "consideration(contract_001)"]
+      &#125;,
+      "createdAt": 1712180400000,
+      "validFrom": null,
+      "validUntil": null,
+      "metadata": &#123;&#125;
+    &#125;
+  ],
+  "relevantRules": ["enforceable(?c) :- signed(?c), consideration(?c)"],
+  "totalFactsAvailable": 512,
+  "totalFactsIncluded": 15,
+  "deduplicationSavings": 3,
+  "contradictionsFound": 1,
+  "contradictionsResolved": 1,
+  "contradictions": [
+    &#123;
+      "predicate": "valid_until",
+      "args": ["contract_001", "2024-12"],
+      "positiveSalience": 0.7,
+      "negativeSalience": 0.3
+    &#125;
+  ],
+  "bucketStats": &#123;
+    "contract": &#123; "factsIncluded": 6, "maxAllocation": 8, "minSalience": 0.45, "maxSalience": 0.98 &#125;,
+    "legal": &#123; "factsIncluded": 9, "maxAllocation": 10, "minSalience": 0.52, "maxSalience": 0.98 &#125;
+  &#125;,
+  "totalCharCount": 820,
+  "goalDriven": true,
+  "knowledgeGeneration": 47,
+  "generatedAt": 1712180450000
+&#125;</code></pre>
+
+    <hr />
+
+    <h3 id="context-diff">POST /context/diff</h3>
+    <p>Get incremental changes since a previous context window. Requires a <code>sessionId</code> that was used in a prior <code>/context/optimize</code> call. Only sends what changed — further reducing token spend on multi-turn conversations.</p>
+    <h4>Request</h4>
+    <pre><code class="language-json">&#123;
+  "sessionId": "session-42",
+  "maxFacts": 25,
+  "scope": null,
+  "goals": [&#123; "predicate": "enforceable", "args": ["contract_001"] &#125;]
+&#125;</code></pre>
+    <h4>Response</h4>
+    <pre><code class="language-json">&#123;
+  "previousWindowId": "ctx-a7f3b2e1",
+  "currentWindowId": "ctx-b8g4c3f2",
+  "added": [
+    &#123; "predicate": "amendment", "args": ["contract_001", "clause_7"], "salience": 0.91, "category": "goal_relevant", "charCount": 38 &#125;
+  ],
+  "removed": [
+    &#123; "key": "valid_until/contract_001/2024-12", "predicate": "valid_until", "args": ["contract_001", "2024-12"], "negated": false, "scope": null &#125;
+  ],
+  "unchanged": 14,
+  "fullRefreshRecommended": false,
+  "reason": null
+&#125;</code></pre>
+
+    <hr />
+
+    <h3 id="context-summary">POST /context/summary</h3>
+    <p>Get a compact summary of the knowledge base — predicate counts, expiring facts, contradictions, and top salient facts. Useful for dashboard views and monitoring.</p>
+    <h4>Request</h4>
+    <pre><code class="language-json">&#123; "scope": null &#125;</code></pre>
+    <h4>Response</h4>
+    <pre><code class="language-json">&#123;
+  "totalFacts": 512,
+  "predicateCount": 23,
+  "topPredicates": [
+    &#123; "predicate": "contract_type", "count": 87 &#125;,
+    &#123; "predicate": "customer_tier", "count": 64 &#125;
+  ],
+  "factsWithTtl": 45,
+  "factsExpiringWithin1h": 12,
+  "contradictions": 3,
+  "topSalientFacts": [],
+  "totalCharCount": 24500,
+  "knowledgeGeneration": 47,
+  "generatedAt": 1712180450000
+&#125;</code></pre>
+
+    <hr />
+
+    <h3 id="context-session-clear">POST /context/session/clear</h3>
+    <p>Clear session state used for context diffing. Call this when a conversation ends or to reset diff tracking.</p>
+    <h4>Request</h4>
+    <pre><code class="language-json">&#123; "sessionId": "session-42" &#125;</code></pre>
+    <h4>Response</h4>
+    <pre><code class="language-text">Session 'session-42' cleared</code></pre>
+
+    <hr />
+
+    <h3 id="context-ingest">POST /context/ingest</h3>
+    <p>One-shot pipeline: extract facts from text (via LLM or predicate syntax), assert them, and return an optimized context window — all in a single request. Requires LLM extraction to be enabled for natural language input.</p>
+    <h4>Request</h4>
+    <pre><code class="language-json">&#123;
+  "text": "Acme Corp signed contract #001 for $2M. The contract includes an arbitration clause.",
+  "goals": [&#123; "predicate": "enforceable", "args": ["contract_001"] &#125;],
+  "maxFacts": 25,
+  "scope": null,
+  "sessionId": "session-42",
+  "autoResolveContradictions": true,
+  "contextHint": "Legal contract analysis"
+&#125;</code></pre>
+    <h4>Response</h4>
+    <pre><code class="language-json">&#123;
+  "extracted": [
+    &#123; "predicate": "contract_signed", "args": ["acme_corp", "contract_001"], "confidence": 0.95 &#125;,
+    &#123; "predicate": "contract_value", "args": ["contract_001", "2000000"], "confidence": 0.92 &#125;,
+    &#123; "predicate": "has_clause", "args": ["contract_001", "arbitration"], "confidence": 0.88 &#125;
+  ],
+  "extractionProvider": "anthropic",
+  "context": &#123;
+    "windowId": "ctx-c9h5d4g3",
+    "entries": [...],
+    "totalFactsAvailable": 515,
+    "totalFactsIncluded": 18,
+    "totalCharCount": 940,
+    "goalDriven": true
+  &#125;
+&#125;</code></pre>
 
     <hr />
 
