@@ -5,10 +5,12 @@
 ## One-line install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 ```
 
-NocturnusAI now runs on `http://localhost:9300`.
+This downloads the CLI and launches the interactive `nocturnusai setup` wizard so the developer can choose the environment instead of being forced into Ollama first.
+
+NocturnusAI then runs on `http://localhost:9300`.
 
 If you are starting from this repo instead of the hosted installer:
 
@@ -17,7 +19,7 @@ make up-ollama
 make smoke
 ```
 
-`make up-ollama` is the default developer path. It reuses a host Ollama if you already have one, otherwise it starts a bundled Ollama container. Create `.env` only when you want to override the defaults in `.env.example`.
+`make up-ollama` is the repo-local/manual path. The primary install path is still the one-line installer above.
 
 ### Install options
 

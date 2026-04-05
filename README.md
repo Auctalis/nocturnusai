@@ -186,10 +186,26 @@ That is the backend. The front-of-product story is still turn reduction.
 ### Path 1: Try it locally now
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 ```
 
-This is the lowest-friction persistent local install: Docker keeps the server running and the bundled Ollama service removes the host-LLM dependency.
+This is the primary install path. It downloads the CLI and immediately launches the interactive `nocturnusai setup` wizard so the developer can choose:
+
+- Ollama
+- Anthropic
+- OpenAI
+- Google
+- Or skip LLM setup for now
+
+The install remains persistent because it finishes by creating a Docker Compose install and starting the server.
+
+Optional shortcuts if you already know what you want:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --host-ollama
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --key sk-ant-your-key
+```
 
 ### Path 1b: From this repo
 
@@ -198,7 +214,7 @@ make up-ollama
 make smoke
 ```
 
-`make up-ollama` is the intended zero-guess developer path. It reuses a host Ollama if one is already running, otherwise it starts a bundled Ollama container. Create `.env` only if you want to override the defaults in `.env.example`.
+This is the repo-local/manual path for contributors working from a checkout. It is not the primary first-run install story.
 
 ### Path 2: Python app
 
@@ -255,7 +271,7 @@ Full docs: **[auctalis.github.io/nocturnusai](https://auctalis.github.io/nocturn
 git clone https://github.com/Auctalis/nocturnusai.git && cd nocturnusai
 
 make up                                        # Server using .env.example defaults or .env overrides
-make up-ollama                                 # Recommended: reuse host Ollama or start bundled Ollama
+make up-ollama                                 # Repo-local Ollama shortcut
 make up-monitoring                             # + Prometheus + Grafana
 make smoke                                     # Verify health + text extraction
 ```

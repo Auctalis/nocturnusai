@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # NocturnusAI Installer
-# Downloads the CLI binary and runs the interactive setup wizard.
+# Downloads the CLI binary and runs the interactive setup wizard so the user
+# can choose provider, auth, install directory, and other environment options.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
@@ -9,7 +10,8 @@
 #   curl -fsSL ... | bash -s -- --key sk-ant-...
 #   curl -fsSL ... | bash -s -- --port 8080
 #
-# All flags are forwarded to `nocturnusai setup`. See `nocturnusai setup --help`.
+# No flags = launch the interactive `nocturnusai setup` wizard.
+# Flags are optional shortcuts forwarded to `nocturnusai setup`.
 # ─────────────────────────────────────────────────────────────────────────────
 set -eo pipefail
 

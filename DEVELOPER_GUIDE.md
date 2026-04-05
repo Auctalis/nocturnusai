@@ -53,6 +53,8 @@ This guide still covers facts, rules, inference, transactions, scopes, and auth.
 curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 ```
 
+That command downloads the CLI and immediately runs the interactive `nocturnusai setup` wizard so the developer can choose the environment at install time.
+
 Options:
 
 ```bash
