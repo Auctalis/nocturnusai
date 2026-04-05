@@ -178,14 +178,14 @@ fun Application.moduleWithStorageDir(storageDir: File) {
         environment.log.warn("Failed to initialize LLM provider: ${e.message}")
         null
     }
-    val factExtractor = if (llmProvider != null) {
-        environment.log.info("LLM extraction: provider=${llmProvider.name}, model=${llmProvider.model}, enabled=${ServerConfig.extractionEnabled}, maxFacts=${LlmConfig.extractionMaxFacts}")
+    val factExtractor = if (llmProvider != null && ServerConfig.extractionEnabled) {
+        environment.log.info("LLM extraction: provider=${llmProvider.name}, model=${llmProvider.model}, enabled=true, maxFacts=${LlmConfig.extractionMaxFacts}")
         LlmFactExtractor(llmProvider, LlmConfig.extractionMaxFacts)
     } else {
-        environment.log.info("LLM extraction: disabled (no provider configured)")
+        environment.log.info("LLM extraction: disabled (${if (llmProvider == null) "no provider configured" else "EXTRACTION_ENABLED=false"})")
         null
     }
-    val ruleExtractor = if (llmProvider != null) {
+    val ruleExtractor = if (llmProvider != null && ServerConfig.extractionEnabled) {
         LlmRuleExtractor(llmProvider)
     } else {
         null
