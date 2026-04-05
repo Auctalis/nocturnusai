@@ -5,6 +5,14 @@ Demonstrates:
   - execute() — run raw Logiql DSL commands
   - predicates() — schema/fact-count discovery
   - Asserting facts and rules directly through DSL syntax
+
+DSL syntax reference:
+  - Keywords are UPPERCASE: ASSERT, INFER, RESTRICT, EXPLAIN
+  - Statements end with semicolons: ASSERT fact(args);
+  - Variables use ? prefix: ?x, ?who
+  - Rules use FORALL: ASSERT FORALL ?x { head(?x) <- body(?x) };
+  - Queries use INFER: INFER predicate(?var);
+  - The DSL has no retract command — use the SDK's retract() method
 """
 
 from nocturnusai import SyncNocturnusAIClient
@@ -18,12 +26,12 @@ def main():
 
         print("=== 1. Assert facts via DSL ===")
         commands = [
-            "assert human(socrates)",
-            "assert human(aristotle)",
-            "assert human(plato)",
-            "assert likes(socrates, philosophy)",
-            "assert likes(plato, mathematics)",
-            "assert likes(aristotle, biology)",
+            "ASSERT human(socrates);",
+            "ASSERT human(aristotle);",
+            "ASSERT human(plato);",
+            "ASSERT likes(socrates, philosophy);",
+            "ASSERT likes(plato, mathematics);",
+            "ASSERT likes(aristotle, biology);",
         ]
         for cmd in commands:
             result = client.execute(cmd)
@@ -32,25 +40,25 @@ def main():
                 print(f"    {result.strip()}")
 
         print("\n=== 2. Assert a rule via DSL ===")
-        rule_cmd = "assert mortal(?x) :- human(?x)"
+        rule_cmd = "ASSERT FORALL ?x { mortal(?x) <- human(?x) };"
         result = client.execute(rule_cmd)
         print(f"  > {rule_cmd}")
         if result:
             print(f"    {result.strip()}")
 
-        print("\n=== 3. Query via DSL ===")
-        query_cmd = "query mortal(?who)"
-        result = client.execute(query_cmd)
-        print(f"  > {query_cmd}")
+        print("\n=== 3. Infer via DSL ===")
+        infer_cmd = "INFER mortal(?who);"
+        result = client.execute(infer_cmd)
+        print(f"  > {infer_cmd}")
         print(f"    {result.strip()}")
 
-        print("\n=== 4. Retract via DSL ===")
-        retract_cmd = "retract human(aristotle)"
-        result = client.execute(retract_cmd)
-        print(f"  > {retract_cmd}")
+        print("\n=== 4. Retract via SDK (DSL has no retract) ===")
+        client.retract("human", ["aristotle"])
+        print("  Retracted human(aristotle) via SDK")
 
-        check = client.execute("query human(?x)")
-        print(f"  Humans after retract: {check.strip()}")
+        check = client.execute("INFER human(?x);")
+        print(f"  > INFER human(?x);")
+        print(f"    {check.strip()}")
 
         print("\n=== 5. Schema discovery ===")
         schema = client.predicates()
