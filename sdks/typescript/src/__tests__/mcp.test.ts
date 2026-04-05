@@ -105,7 +105,7 @@ async function makeInitializedClient(
   const serverInfo = {
     protocolVersion: '2025-11-25',
     capabilities: { tools: {} },
-    serverInfo: { name: 'nocturnusai', version: '0.2.1' },
+    serverInfo: { name: 'nocturnusai', version: '0.2.2' },
   };
   mockFetch.mockResolvedValueOnce(rpcSuccess(serverInfo, 1));
   const client = makeClient(overrides);
@@ -203,7 +203,7 @@ describe('initialize', () => {
     const serverInfo = {
       protocolVersion: '2025-11-25',
       capabilities: { tools: {} },
-      serverInfo: { name: 'nocturnusai', version: '0.2.1' },
+      serverInfo: { name: 'nocturnusai', version: '0.2.2' },
     };
     mockFetch.mockResolvedValueOnce(rpcSuccess(serverInfo, 1));
     const client = makeClient();

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nocturnusai"
-version = "0.2.1"
+version = "0.2.2"
 description = "Python SDK for NocturnusAI — a logic-based inference engine and knowledge database"
 readme = "README.md"
 license = {text = "Business Source License 1.1"}
@@ -79,6 +79,20 @@ Homepage = "https://github.com/Auctalis/nocturnusai"
 Documentation = "https://github.com/Auctalis/nocturnusai/tree/main/sdks/python"
 Repository = "https://github.com/Auctalis/nocturnusai"
 Issues = "https://github.com/Auctalis/nocturnusai/issues"
+
+[tool.hatch.build]
+# This package lives inside a larger monorepo; rely on explicit package selection
+# instead of repo-root VCS ignore rules when building release artifacts.
+ignore-vcs = true
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/README.md",
+    "/pyproject.toml",
+    "/examples",
+    "/nocturnusai",
+    "/tests",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["nocturnusai"]

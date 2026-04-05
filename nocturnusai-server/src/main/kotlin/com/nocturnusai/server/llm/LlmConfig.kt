@@ -14,10 +14,14 @@
 
 package com.nocturnusai.server.llm
 
+import java.net.HttpURLConnection
+import java.net.URI
 import org.slf4j.LoggerFactory
 
 object LlmConfig {
     private val logger = LoggerFactory.getLogger(LlmConfig::class.java)
+    const val MISSING_PROVIDER_MESSAGE =
+        "No LLM provider configured. Set LLM_PROVIDER, OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, or run Ollama on localhost:11434."
 
     // Explicit provider selection (ifBlank guards against Docker Compose empty-string defaults)
     val provider: String? = System.getenv("LLM_PROVIDER")?.ifBlank { null }
@@ -44,14 +48,23 @@ object LlmConfig {
     val embedProvider: String? = System.getenv("EMBED_PROVIDER")?.ifBlank { null }
     val embedModel: String? = System.getenv("EMBED_MODEL")?.ifBlank { null }
 
+    internal data class ResolvedProviderConfig(
+        val provider: String,
+        val baseUrl: String? = null
+    )
+
     fun createProvider(): LlmProvider? {
-        val resolvedProvider = provider ?: detectProvider()
-        if (resolvedProvider == null) {
-            logger.info("No LLM provider configured. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, or LLM_BASE_URL.")
+        val resolved = resolveProviderConfig()
+        if (resolved == null) {
+            logger.info(MISSING_PROVIDER_MESSAGE)
             return null
         }
 
-        val llmProvider = when (resolvedProvider.lowercase()) {
+        if (provider == null && resolved.provider == "ollama") {
+            logger.info("No explicit LLM provider configured. Auto-detected Ollama at ${resolved.baseUrl}.")
+        }
+
+        val llmProvider = when (resolved.provider.lowercase()) {
             "anthropic" -> {
                 val key = anthropicApiKey ?: apiKey
                     ?: throw IllegalStateException("ANTHROPIC_API_KEY or LLM_API_KEY required for Anthropic provider")
@@ -76,13 +89,12 @@ object LlmConfig {
             }
             "ollama" -> {
                 val m = model ?: "granite3.3:8b"
-                // Default varies: Docker uses service name "ollama", local uses localhost
-                val url = baseUrl ?: detectOllamaUrl()
+                val url = resolved.baseUrl ?: detectOllamaUrl()
                 logger.info("Using Ollama provider with model: $m, baseUrl: $url")
                 OpenAiCompatibleProvider(m, null, url)
             }
             "custom" -> {
-                val url = baseUrl
+                val url = resolved.baseUrl
                     ?: throw IllegalStateException("LLM_BASE_URL required for custom provider")
                 val m = model ?: throw IllegalStateException("LLM_MODEL required for custom provider")
                 val key = apiKey
@@ -90,7 +102,7 @@ object LlmConfig {
                 OpenAiCompatibleProvider(m, key, url)
             }
             else -> {
-                logger.warn("Unknown LLM provider: $resolvedProvider")
+                logger.warn("Unknown LLM provider: ${resolved.provider}")
                 null
             }
         }
@@ -142,15 +154,42 @@ object LlmConfig {
 
     /**
      * Auto-detect provider from available API keys.
-     * Priority: Anthropic > OpenAI > Google > Custom endpoint
+     * Priority: explicit provider > API keys > custom endpoint > reachable Ollama
      */
-    private fun detectProvider(): String? {
-        return when {
-            !anthropicApiKey.isNullOrBlank() -> "anthropic"
-            !openaiApiKey.isNullOrBlank() -> "openai"
-            !googleApiKey.isNullOrBlank() -> "google"
-            !baseUrl.isNullOrBlank() -> "custom"
-            else -> null
+    internal fun resolveProviderConfig(
+        explicitProvider: String? = provider,
+        configuredBaseUrl: String? = baseUrl,
+        anthropicKey: String? = anthropicApiKey,
+        openaiKey: String? = openaiApiKey,
+        googleKey: String? = googleApiKey,
+        ollamaCandidates: List<String> = detectOllamaUrls(),
+        ollamaReachable: (String) -> Boolean = ::isOllamaReachable
+    ): ResolvedProviderConfig? {
+        val normalizedProvider = explicitProvider?.lowercase()
+        if (normalizedProvider == "none") return null
+        if (!normalizedProvider.isNullOrBlank()) {
+            return ResolvedProviderConfig(
+                provider = normalizedProvider,
+                baseUrl = when (normalizedProvider) {
+                    "ollama" -> configuredBaseUrl ?: ollamaCandidates.firstOrNull()
+                    "custom" -> configuredBaseUrl
+                    else -> configuredBaseUrl
+                }
+            )
+        }
+
+        when {
+            !anthropicKey.isNullOrBlank() -> return ResolvedProviderConfig("anthropic")
+            !openaiKey.isNullOrBlank() -> return ResolvedProviderConfig("openai", configuredBaseUrl)
+            !googleKey.isNullOrBlank() -> return ResolvedProviderConfig("google")
+            !configuredBaseUrl.isNullOrBlank() -> return ResolvedProviderConfig("custom", configuredBaseUrl)
+        }
+
+        val reachableOllamaUrl = ollamaCandidates.firstOrNull(ollamaReachable)
+        return if (reachableOllamaUrl != null) {
+            ResolvedProviderConfig("ollama", reachableOllamaUrl)
+        } else {
+            null
         }
     }
 
@@ -159,6 +198,15 @@ object LlmConfig {
      * In Docker (when /proc/1/cgroup contains "docker" or /.dockerenv exists),
      * use the compose service name "ollama". Otherwise use localhost.
      */
+    internal fun detectOllamaUrls(): List<String> {
+        val candidates = mutableListOf<String>()
+        candidates += detectOllamaUrl()
+        candidates += "http://localhost:11434/v1"
+        candidates += "http://127.0.0.1:11434/v1"
+        candidates += "http://host.docker.internal:11434/v1"
+        return candidates.distinct()
+    }
+
     private fun detectOllamaUrl(): String {
         val inDocker = try {
             java.io.File("/.dockerenv").exists() ||
@@ -169,6 +217,22 @@ object LlmConfig {
             "http://ollama:11434/v1"
         } else {
             "http://localhost:11434/v1"
+        }
+    }
+
+    internal fun isOllamaReachable(v1Url: String): Boolean {
+        val base = v1Url.removeSuffix("/")
+            .removeSuffix("/v1")
+        return try {
+            val conn = URI("$base/api/tags").toURL().openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 300
+            conn.readTimeout = 300
+            conn.instanceFollowRedirects = true
+            conn.connect()
+            conn.responseCode in 200..299
+        } catch (_: Exception) {
+            false
         }
     }
 }

@@ -36,7 +36,7 @@ fun Route.extractionRoutes(dbManager: DatabaseManager, extractor: FactExtractor?
                 HttpStatusCode.ServiceUnavailable,
                 ErrorResponse(
                     "LLM_NOT_CONFIGURED",
-                    "No LLM provider configured. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_API_KEY environment variable."
+                    com.nocturnusai.server.llm.LlmConfig.MISSING_PROVIDER_MESSAGE
                 )
             )
             return@post
@@ -156,7 +156,7 @@ fun Route.extractionRoutes(dbManager: DatabaseManager, extractor: FactExtractor?
                 HttpStatusCode.ServiceUnavailable,
                 ErrorResponse(
                     "LLM_NOT_CONFIGURED",
-                    "No LLM provider configured. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_API_KEY environment variable."
+                    com.nocturnusai.server.llm.LlmConfig.MISSING_PROVIDER_MESSAGE
                 )
             )
             return@post

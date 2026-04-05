@@ -67,7 +67,7 @@ object HealthChecker {
         checks["llm"] = if (llmConfigured) {
             CheckResult("pass", "LLM provider configured (extraction=${if (ServerConfig.extractionEnabled) "on" else "off"})")
         } else {
-            CheckResult("pass", "No LLM provider (natural language features unavailable)")
+            CheckResult("pass", "No LLM provider (natural language features unavailable; run Ollama on localhost:11434 or configure an API key)")
         }
 
         // 7. Auth status (informational — dev mode without auth is a valid configuration)

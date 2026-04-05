@@ -121,7 +121,7 @@ export class NocturnusAIMCPClient {
       capabilities: {},
       clientInfo: {
         name: 'nocturnusai-sdk',
-        version: '0.2.1',
+        version: '0.2.2',
       },
     });
     this.initialized = true;

@@ -747,7 +747,9 @@ class NocturnusAIClient:
 
         This is the one-call developer workflow: send raw text (conversation
         transcript, document chunk, tool output) and get back a minimal,
-        structured, goal-driven context window.
+        structured, goal-driven context window. This maps to the server's
+        ``POST /context/ingest`` endpoint so predicate-style input still works
+        when no LLM extractor is configured.
 
         Args:
             text: Raw text to extract facts from.
@@ -771,17 +773,28 @@ class NocturnusAIClient:
             )
             print(f"Ingested and optimized: {ctx.total_facts_included} facts from {ctx.total_facts_available}")
         """
-        # Step 1: Extract and assert
-        await self.extract_facts(text=text, context=context_hint, assert_facts=True, scope=scope)
+        body: dict[str, Any] = {
+            "text": text,
+            "maxFacts": max_facts,
+        }
+        if goals is not None:
+            body["goals"] = goals
+        if session_id is not None:
+            body["sessionId"] = session_id
+        if relevance_buckets is not None:
+            body["relevanceBuckets"] = relevance_buckets
+        if scope is not None:
+            body["scope"] = scope
+        if context_hint is not None:
+            body["contextHint"] = context_hint
 
-        # Step 2: Optimize
-        return await self.optimize_context(
-            goals=goals,
-            max_facts=max_facts,
-            session_id=session_id,
-            relevance_buckets=relevance_buckets,
-            scope=scope,
-        )
+        result = await self._request("POST", "/context/ingest", json_body=body)
+        if not isinstance(result, dict) or "context" not in result:
+            raise NocturnusAIAPIError(
+                message="Unexpected response from /context/ingest",
+                status_code=0,
+            )
+        return OptimizedContext.model_validate(result["context"])
 
     async def temporal_query(
         self,

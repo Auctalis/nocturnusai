@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: NocturnusAI API
-  version: 0.2.1
+  version: 0.2.2
   description: |
     NocturnusAI is the logic server for Agentic AI. It provides deterministic multi-step
     reasoning, truth maintenance, and agent memory lifecycle management via HTTP API.
@@ -496,7 +496,7 @@ components:
         version:
           type: string
           description: Server version string.
-          example: 0.2.1
+          example: 0.2.2
         checks:
           type: object
           additionalProperties:
@@ -3265,7 +3265,7 @@ paths:
                 $ref: '#/components/schemas/HealthStatus'
               example:
                 status: healthy
-                version: 0.2.1
+                version: 0.2.2
                 checks:
                   wal_writable: { status: pass, message: "Storage directory is writable" }
                   disk_space: { status: pass, message: "Disk usage: 42%" }

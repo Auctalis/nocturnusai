@@ -56,7 +56,7 @@ Thumbs.db
 
 # Local dev scripts and reports (not for distribution)
 site-reality-check-report.md
-client.py
+/client.py
 reproduce_logic.py
 verify_*.py
 generate_llm_txt.py

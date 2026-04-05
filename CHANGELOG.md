@@ -7,6 +7,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.2.2] — 2026-04-04
+
+### Changed
+- Backend now auto-selects a reachable local Ollama endpoint as the default LLM provider when no explicit provider or API key is configured
+
+### Fixed
+- Python SDK release artifacts now include `nocturnusai.client` even when built from the monorepo
+- Python SDK `ingest_and_optimize()` now uses the server’s `/context/ingest` endpoint instead of failing on `/extract` when no LLM extractor is configured
+
+---
+
 ## [0.2.1] — 2026-04-04
 
 ### Added
