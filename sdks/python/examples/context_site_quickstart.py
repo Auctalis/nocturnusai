@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import contextlib
 import time
 import uuid
 
 from nocturnusai import SyncNocturnusAIClient
-
 
 BASE_URL = "http://localhost:9300"
 
@@ -65,10 +65,8 @@ def main() -> None:
         finally:
             client.clear_context_session(session_id)
             for predicate, args in cleanup_facts:
-                try:
+                with contextlib.suppress(Exception):
                     client.retract(predicate, args, scope=scope)
-                except Exception:
-                    pass
 
 
 if __name__ == "__main__":

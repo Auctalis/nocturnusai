@@ -1,12 +1,12 @@
 ---
 interface Link {
-    title: string;
-    description: string;
-    href: string;
+  title: string;
+  description: string;
+  href: string;
 }
 
 interface Props {
-    links: Link[];
+  links: Link[];
 }
 
 const { links } = Astro.props;
@@ -14,11 +14,11 @@ const { links } = Astro.props;
 
 <hr />
 <h2>What's Next?</h2>
-<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1.5rem;">
-    {links.map(link => (
-        <a href={link.href} class="next-card">
-            <h4>{link.title} &rarr;</h4>
-            <p>{link.description}</p>
-        </a>
-    ))}
+<div class="docs-card-grid">
+  {links.map((link) => (
+    <a href={link.href} class="next-card">
+      <h4>{link.title} &rarr;</h4>
+      <p>{link.description}</p>
+    </a>
+  ))}
 </div>

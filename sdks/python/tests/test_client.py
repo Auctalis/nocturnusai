@@ -7,7 +7,9 @@ from nocturnusai.client import NocturnusAIClient
 
 
 @pytest.mark.asyncio
-async def test_ingest_and_optimize_uses_context_ingest_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_ingest_and_optimize_uses_context_ingest_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     client = NocturnusAIClient("http://localhost:9300")
     captured: dict[str, object] = {}
 

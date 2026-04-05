@@ -7,15 +7,22 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <DocsLayout title="OpenClaw Context Integration">
     <h1>OpenClaw Context Integration</h1>
     <p class="lead text-xl text-slate-400">
-        Use NocturnusAI as OpenClaw's context backend: fast MCP tool integration now, or a full Context Engine plugin for deterministic context assembly.
+        OpenClaw bills against whatever reaches the context window. System prompt, history, tool output, attachments, and compaction artifacts all count. Nocturnus cuts that payload before the next run, first through MCP and completely through a Context Engine.
     </p>
+
+    <div class="callout callout-info">
+        <strong>Cost framing</strong>
+        <p style="margin:0.5rem 0 0;">
+            This cost claim is an inference from OpenClaw's official docs: OpenClaw says those inputs count toward the context window, exposes token and cost reporting, and compacts when the window is full. If the payload is bloated, the next run is more expensive and more likely to need compaction.
+        </p>
+    </div>
 
     <div class="callout callout-info">
         <strong>When to use this page</strong>
         <ul style="margin:0.5rem 0 0; padding-left:1.25rem;">
-            <li>You already run OpenClaw and want lower context cost with better recall precision.</li>
+            <li>You already run OpenClaw and want to cut the token-heavy part of the bill without changing models.</li>
             <li>You want OpenClaw's context lifecycle (<code>ingest</code>, <code>assemble</code>, <code>compact</code>) to route through NocturnusAI.</li>
-            <li>You need a practical migration path: registry-first, plugin-next.</li>
+            <li>You need a practical path: fast MCP registration now, full Context Engine control next.</li>
         </ul>
     </div>
 
@@ -182,6 +189,8 @@ cat ~/.openclaw/openclaw.json | jq '.plugins.slots.contextEngine'
 
     <h2 id="refs">Research References</h2>
     <ul>
+        <li><a href="https://docs.openclaw.ai/concepts/context" target="_blank" rel="noopener noreferrer">OpenClaw Context (official)</a></li>
+        <li><a href="https://docs.openclaw.ai/reference/token-use" target="_blank" rel="noopener noreferrer">OpenClaw Token Use and Costs (official)</a></li>
         <li><a href="https://docs.openclaw.ai/concepts/context-engine" target="_blank" rel="noopener noreferrer">OpenClaw Context Engine (official)</a></li>
         <li><a href="https://docs.openclaw.ai/cli/mcp" target="_blank" rel="noopener noreferrer">OpenClaw MCP CLI + registry behavior (official)</a></li>
         <li><a href="https://docs.openclaw.ai/plugins/architecture" target="_blank" rel="noopener noreferrer">OpenClaw Plugin Architecture (context engine registration)</a></li>

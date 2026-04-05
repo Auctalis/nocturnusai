@@ -1,26 +1,346 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Navbar from '../components/Navbar.astro';
-import Hero from '../components/Hero.astro';
-import Features from '../components/Features.astro';
-import HowItWorks from '../components/HowItWorks.astro';
-import CodeExample from '../components/CodeExample.astro';
-import AgentExample from '../components/AgentExample.astro';
-import ContextOptimizer from '../components/ContextOptimizer.astro';
-import Stats from '../components/Stats.astro';
 import Footer from '../components/Footer.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const heroPairs = [
+  {
+    old: 'You are paying for old context.',
+    next: 'Nocturnus cuts it.',
+  },
+  {
+    old: 'OpenClaw can burn tokens on history and tool junk.',
+    next: 'Nocturnus strips it out.',
+  },
+  {
+    old: 'Long prompts cost more and think worse.',
+    next: 'Nocturnus keeps the prompt tight.',
+  },
+  {
+    old: 'Your model should not read the whole thread.',
+    next: 'Nocturnus sends the live state.',
+  },
+];
 ---
 
-<Layout title="Nocturnus.AI - Cut Agent Context Costs by 97%">
-	<Navbar />
-	<main>
-		<Hero />
-		<ContextOptimizer />
-		<CodeExample />
-		<Features />
-		<AgentExample />
-		<HowItWorks />
-		<Stats />
-	</main>
-	<Footer />
+<Layout
+  title="Nocturnus.AI - Cut Prompt Spend Without Replacing Your Stack"
+  description="Nocturnus.AI cuts bloated turn arrays into smaller prompts so agent teams spend less and get cleaner model input."
+>
+  <Navbar />
+
+  <main>
+    <section class="hero-cut" id="top">
+      <div class="hero-cut-top">
+        <div class="hero-question-wrap">
+          <h1 class="hero-question" id="hero-question">{heroPairs[0].old}</h1>
+        </div>
+      </div>
+
+      <div class="line-divider" aria-hidden="true"></div>
+
+      <div class="hero-cut-bottom">
+        <div class="hero-answer-wrap">
+          <p class="hero-answer" id="hero-answer">{heroPairs[0].next}</p>
+        </div>
+
+        <div class="hero-footer">
+          <p class="hero-support">
+            Nocturnus shrinks bloated turn arrays before the model call. Lower spend. Cleaner prompts. Better answers.
+          </p>
+          <div class="hero-cta-row">
+            <a href={`${base}/docs/context`} class="button-primary">Cut prompt cost</a>
+            <a href={`${base}/docs/openclaw`} class="button-secondary">Use with OpenClaw</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="site-section" id="economics">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Economics</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.3rem);">Most of the bill is replay.</h2>
+          <p class="site-subtitle">
+            If your agent keeps replaying old context, that is the bill.
+          </p>
+        </div>
+
+        <div class="economics-layout reveal reveal-delay-1">
+          <div class="equation-box">
+            <span class="box-label">Current equation</span>
+            <pre>Prompt bill =
+  Active work
+  + replayed turns
+  + tool chatter
+  + stale summaries</pre>
+          </div>
+
+          <div class="equation-box is-new">
+            <span class="box-label">After reduction</span>
+            <pre>Prompt bill =
+  Active work
+  + reduced window
+  + later-turn diffs</pre>
+          </div>
+        </div>
+
+        <div class="economics-control reveal reveal-delay-2">
+          <label for="replay-share">How much of a monthly prompt bill is replayed context?</label>
+          <div class="range-wrap">
+            <input type="range" id="replay-share" min="40" max="90" value="80" step="5" />
+            <div class="range-markers">
+              <span>40%</span>
+              <span>55%</span>
+              <span>70%</span>
+              <span>90%</span>
+            </div>
+          </div>
+
+          <div class="economics-results">
+            <div class="result">
+              <span class="result-label">Monthly prompt bill</span>
+              <span class="result-value" id="bill-current">$10,000</span>
+            </div>
+            <div class="result">
+              <span class="result-label">Replay share</span>
+              <span class="result-value" id="bill-replay">80%</span>
+            </div>
+            <div class="result">
+              <span class="result-label">Illustrative savings</span>
+              <span class="result-value" id="bill-saved">$7,360</span>
+            </div>
+          </div>
+
+          <div class="bar-stack" aria-hidden="true">
+            <div class="bar-row">
+              <div class="bar-label">Current replay</div>
+              <div class="bar-track"><div id="bar-old" class="bar-fill old" style="width: 80%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-label">After Nocturnus</div>
+              <div class="bar-track"><div id="bar-new" class="bar-fill new" style="width: 26.4%;"></div></div>
+            </div>
+          </div>
+
+          <p class="bar-caption" id="bill-caption">
+            At an $10k monthly prompt bill, 80% replay share, and a 92% reduction of that replayed slice,
+            the expensive part of the bill drops sharply while the active work stays intact.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="site-section-tight" id="how-it-fits">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">How It Fits</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">Keep the stack. Cut the prompt bill.</h2>
+          <p class="site-subtitle">
+            Put Nocturnus in front of the model. Leave the rest alone.
+          </p>
+        </div>
+
+        <div class="fits-diagram reveal reveal-delay-1">
+          <div class="fits-stage">
+            <h3>Your current app</h3>
+            <ul>
+              <li>Conversation turns</li>
+              <li>Tool traces</li>
+              <li>CRM and system notes</li>
+              <li>Previous summaries and retries</li>
+            </ul>
+          </div>
+          <div class="fits-stage is-accent">
+            <h3>NocturnusAI</h3>
+            <ul>
+              <li><code>POST /context</code> for the first cut</li>
+              <li><code>POST /context/optimize</code> for the next decision</li>
+              <li><code>POST /context/diff</code> for later turns</li>
+            </ul>
+          </div>
+          <div class="fits-stage">
+            <h3>Same model call</h3>
+            <ul>
+              <li>Smaller system payload</li>
+              <li>Less prompt noise</li>
+              <li>Better accuracy on the next step</li>
+              <li>Lower repeated input spend</li>
+              <li>No framework rewrite</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="plain-card fits-note reveal reveal-delay-2">
+          <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-muted-soft); margin-bottom: 0.8rem;">OpenClaw</div>
+          <h3>Easy add. Full takeover later.</h3>
+          <p>
+            OpenClaw counts history, tool output, compaction, and system prompt overhead in the context window. Bigger payload, bigger bill. Nocturnus plugs in fast with <code>openclaw mcp set</code> or takes over fully as the Context Engine.
+          </p>
+        </div>
+
+        <div class="fits-comparison reveal reveal-delay-3">
+          <div class="panel-dark" style="padding: var(--space-4);">
+            <div class="panel-label">Before</div>
+            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;">messages = [
+  system(full_thread_state),
+  user(next_question),
+]</pre>
+          </div>
+          <div class="panel-dark" style="padding: var(--space-4);">
+            <div class="panel-label">After</div>
+            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;">window = POST /context(turns)
+messages = [
+  system(reduced_window),
+  user(next_question),
+]</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="site-section-tight" id="who-this-is-for">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Who This Is For</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Who feels the bill first.</h2>
+          <p class="site-subtitle">
+            Different teams. Same problem: too much prompt waste.
+          </p>
+        </div>
+
+        <div class="audience-grid reveal reveal-delay-1">
+          <div class="audience-card">
+            <div class="audience-tag">Agent platform teams</div>
+            <h3>Keep the framework.</h3>
+            <p>Cut cost without another stack rewrite.</p>
+          </div>
+          <div class="audience-card">
+            <div class="audience-tag">Product teams</div>
+            <h3>Stop thread bloat.</h3>
+            <p>Keep long-running agents from dragging old junk into every call.</p>
+          </div>
+          <div class="audience-card">
+            <div class="audience-tag">Infra and cost owners</div>
+            <h3>Find the waste.</h3>
+            <p>Measure replay. Cut it. Watch the bill drop.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="site-section cta-band" id="get-started">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Get Started</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem); color: var(--site-dark-text);">Run a cost check locally.</h2>
+          <p class="site-subtitle">
+            Run one real thread through <code>POST /context</code>. Compare before and after.
+          </p>
+        </div>
+
+        <div class="statement-grid reveal reveal-delay-1">
+          <div class="plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none;">
+            <h3 style="color: var(--site-dark-text);">Check one real thread</h3>
+            <p style="color: rgba(255,255,255,0.72);">Post one real turn array. Measure the cut.</p>
+            <div style="margin-top: 1rem;">
+              <span class="command-chip" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.18); color: var(--site-dark-text); box-shadow: none;">
+                <span class="prompt">$</span>
+                <span>curl localhost:9300/health</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none;">
+            <h3 style="color: var(--site-dark-text);">Route the cheaper path</h3>
+            <p style="color: rgba(255,255,255,0.72);">Use REST, SDKs, MCP, or CLI in the stack you already run.</p>
+            <div class="button-row" style="margin-top: 1rem;">
+              <a href={`${base}/docs`} class="button-primary">Open the docs</a>
+              <a href={`${base}/features`} class="button-secondary">Why it works</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+
+  <script is:inline define:vars={{ heroPairs }}>
+    (() => {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const questionEl = document.getElementById('hero-question');
+      const answerEl = document.getElementById('hero-answer');
+      if (!questionEl || !answerEl || heroPairs.length < 2) return;
+
+      let index = 0;
+      const hold = 3200;
+      const fade = 500;
+
+      const show = (el, text) => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(10px)';
+        el.textContent = text;
+        requestAnimationFrame(() => {
+          el.style.transition = `opacity ${fade}ms ease, transform ${fade}ms ease`;
+          el.style.opacity = '1';
+          el.style.transform = 'translateY(0)';
+        });
+      };
+
+      const hide = (el) => {
+        el.style.transition = `opacity ${Math.round(fade / 2)}ms ease`;
+        el.style.opacity = '0';
+      };
+
+      const cycle = () => {
+        const pair = heroPairs[index];
+        show(questionEl, pair.old);
+        setTimeout(() => show(answerEl, pair.next), 120);
+        setTimeout(() => {
+          hide(questionEl);
+          hide(answerEl);
+          setTimeout(() => {
+            index = (index + 1) % heroPairs.length;
+            cycle();
+          }, Math.round(fade / 2) + 120);
+        }, hold);
+      };
+
+      cycle();
+    })();
+  </script>
+
+  <script is:inline>
+    (() => {
+      const slider = document.getElementById('replay-share');
+      const replayEl = document.getElementById('bill-replay');
+      const savedEl = document.getElementById('bill-saved');
+      const captionEl = document.getElementById('bill-caption');
+      const currentEl = document.getElementById('bill-current');
+      const oldBar = document.getElementById('bar-old');
+      const newBar = document.getElementById('bar-new');
+      if (!(slider instanceof HTMLInputElement) || !replayEl || !savedEl || !captionEl || !currentEl || !oldBar || !newBar) return;
+
+      const monthlySpend = 10000;
+      const replayReduction = 0.92;
+      const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+      const render = () => {
+        const replayShare = Number(slider.value) / 100;
+        const saved = monthlySpend * replayShare * replayReduction;
+        const newBill = monthlySpend - saved;
+        replayEl.textContent = `${Math.round(replayShare * 100)}%`;
+        savedEl.textContent = usd.format(saved);
+        currentEl.textContent = usd.format(monthlySpend);
+        oldBar.style.width = `${replayShare * 100}%`;
+        newBar.style.width = `${(newBill / monthlySpend) * 100}%`;
+        captionEl.textContent = `At a ${usd.format(monthlySpend)} monthly prompt bill, ${Math.round(replayShare * 100)}% replay share, and a ${Math.round(replayReduction * 100)}% reduction of that replayed slice, the expensive part of the bill drops while the active work stays intact.`;
+      };
+
+      slider.addEventListener('input', render);
+      render();
+    })();
+  </script>
 </Layout>

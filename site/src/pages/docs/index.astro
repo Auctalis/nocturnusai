@@ -4,74 +4,26 @@ import NextSteps from '../../components/NextSteps.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<DocsLayout title="Cut Down Turns">
-    <h1>Cut Down a Large Turn Array</h1>
-    <p class="lead">
-        This product is for one problem: you already have too much conversation state, and you need a smaller context window before the next model call.
-    </p>
+<DocsLayout title="Overview">
+  <h1>Start with the reduction loop.</h1>
+  <p class="lead">
+    The entry point is simple: you already have a large array of turns, and you do not want to keep sending that whole thing into the next model call.
+    Nocturnus reduces the working set first, then helps you keep later turns lean.
+  </p>
 
-    <div class="callout callout-info">
-        <strong>The primary use case.</strong> You have chat turns, tool output, CRM notes, internal comments, previous summaries, and partial retries all mixed together. You do not want to send that full pile back to GPT-4o or Claude on every turn. You want a smaller, usable context window that keeps the important state and drops the rest.
-    </div>
+  <div class="callout callout-info">
+    <strong>Default mental model.</strong> Your app owns the thread. Nocturnus owns the cut. That is the product story the docs are optimized around.
+  </div>
 
-    <div class="step-card">
-        <h3>What NocturnusAI actually does</h3>
-        <p><code>POST /context</code> takes an array of turns and returns a compact set of structured context entries. When you know the exact question, use <code>POST /context/optimize</code>. When the thread keeps going, use <code>POST /context/diff</code> so you stop re-sending old context every time.</p>
-    </div>
+  <h2>Start in four moves</h2>
+  <ol>
+    <li>Send raw turns to <code>POST /context</code>.</li>
+    <li>Narrow the next decision with <code>POST /context/optimize</code>.</li>
+    <li>Reuse the same <code>sessionId</code> with <code>POST /context/diff</code>.</li>
+    <li>Clear the session when the thread ends.</li>
+  </ol>
 
-    <hr />
-
-    <h2 id="real-example">A Real Example</h2>
-    <p>
-        This is the shape of a real production input. It is shortened for readability, but it reflects the actual problem: user chat mixed with tool traces, account metadata, previous promises, and internal notes.
-    </p>
-
-    <pre data-lang="json"><code>&#123;
-  "turns": [
-    "User: We still cannot log in after yesterday's Okta cutover.",
-    "Agent: Pulling CRM account data and recent incident history.",
-    "Tool crm_lookup: account=acme_corp tier=enterprise renewal=2026-07-01 owner=sarah.ng",
-    "Tool auth_audit: 14 failed SAML assertions since 09:12 UTC; issuer mismatch after IdP migration.",
-    "Internal note: Billing is current. Do not route this to collections.",
-    "Slack escalation: Incident INC-4821 affects enterprise tenants still using legacy issuer URLs.",
-    "Previous ticket: Support promised a service credit if outage duration exceeds 4 hours.",
-    "User: We changed IdP metadata yesterday and lost admin access for three teams.",
-    "Tool statuspage: identity degraded in us-east-1; workaround is manual issuer override.",
-    "Agent: Need a compact handoff context for the next model call."
-  ]
-&#125;</code></pre>
-
-    <p>
-        The useful output is not "the same thread, but shorter." The useful output is the few stateful facts the next model call actually needs:
-    </p>
-
-    <pre data-lang="json"><code>&#123;
-  "facts": [
-    &#123; "predicate": "customer_tier", "args": ["acme_corp", "enterprise"], "salience": 0.98 &#125;,
-    &#123; "predicate": "billing_status", "args": ["acme_corp", "current"], "salience": 0.82 &#125;,
-    &#123; "predicate": "current_issue", "args": ["acme_corp", "saml_issuer_mismatch"], "salience": 0.97 &#125;,
-    &#123; "predicate": "incident", "args": ["acme_corp", "INC-4821"], "salience": 0.93 &#125;,
-    &#123; "predicate": "workaround", "args": ["INC-4821", "manual_issuer_override"], "salience": 0.88 &#125;,
-    &#123; "predicate": "impact", "args": ["acme_corp", "admin_access_lost_for_three_teams"], "salience": 0.90 &#125;,
-    &#123; "predicate": "service_credit_promised", "args": ["acme_corp", "after_4_hours"], "salience": 0.74 &#125;
-  ],
-  "factsReturned": 7,
-  "contradictions": 0,
-  "newFactsExtracted": 7
-&#125;</code></pre>
-
-    <div class="callout callout-success">
-        <strong>The point is reduction.</strong> Ten noisy turns become seven high-signal entries. In real threads, the reduction is usually much larger because the repeated greetings, tool chatter, retries, and stale summaries disappear.
-    </div>
-
-    <hr />
-
-    <h2 id="start-fast">Start Fast</h2>
-    <p>Start with the simplest path first.</p>
-
-    <pre data-lang="bash"><code>curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
-
-curl -X POST http://localhost:9300/context \
+  <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context \
   -H "Content-Type: application/json" \
   -H "X-Tenant-ID: default" \
   -d '&#123;
@@ -82,97 +34,34 @@ curl -X POST http://localhost:9300/context \
     ]
   &#125;'</code></pre>
 
-    <p>If this is your first week with the product, stay here. Do not start by designing predicate schemas or rules unless you actually need backend control.</p>
-
-    <hr />
-
-    <h2 id="production-loop">The Production Loop</h2>
-    <p>Most teams end up with this pattern:</p>
-
-    <ol>
-        <li><strong>First pass:</strong> call <code>POST /context</code> with raw turns.</li>
-        <li><strong>Question-specific pass:</strong> call <code>POST /context/optimize</code> when the next model call has a clear goal such as "what should the support agent say next?" or "is this customer eligible for a credit?"</li>
-        <li><strong>Ongoing thread:</strong> keep a stable <code>sessionId</code> and call <code>POST /context/diff</code> so only the changed context is sent on later turns.</li>
-        <li><strong>Thread end:</strong> call <code>POST /context/session/clear</code>.</li>
-    </ol>
-
-    <pre data-lang="bash"><code># Goal-specific window
-curl -X POST http://localhost:9300/context/optimize \
-  -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: default" \
-  -d '&#123;
-    "sessionId": "support-thread-4821",
-    "maxFacts": 12,
-    "goals": [
-      &#123;"predicate":"next_best_action","args":["acme_corp"]&#125;
-    ]
-  &#125;'
-
-# Later turn: only fetch the delta
-curl -X POST http://localhost:9300/context/diff \
-  -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: default" \
-  -d '&#123;
-    "sessionId": "support-thread-4821",
-    "maxFacts": 12
-  &#125;'</code></pre>
-
-    <hr />
-
-    <h2 id="where-to-plug-in">Where To Plug It In</h2>
-    <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-            <thead>
-                <tr class="border-b border-white/10 text-white">
-                    <th class="py-2">Surface</th>
-                    <th class="py-2">Best For</th>
-                    <th class="py-2">Start Here</th>
-                </tr>
-            </thead>
-            <tbody class="text-slate-400">
-                <tr class="border-b border-white/5">
-                    <td class="py-2">HTTP API</td>
-                    <td class="py-2">Direct control over turn reduction and session diffs</td>
-                    <td class="py-2"><a href={`${base}/docs/api#context-management`}>Context endpoints</a></td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2">Python SDK</td>
-                    <td class="py-2">Application code, orchestrators, agent runtimes</td>
-                    <td class="py-2"><a href={`${base}/docs/sdks`}>SDK docs</a></td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2">TypeScript SDK</td>
-                    <td class="py-2">Node/browser apps that need direct SDK methods for windows, optimization, diffs, and session cleanup</td>
-                    <td class="py-2"><a href={`${base}/docs/sdks#typescript`}>TypeScript SDK</a></td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2">MCP</td>
-                    <td class="py-2">Cursor, Claude Desktop, Windsurf, tool-calling agents</td>
-                    <td class="py-2"><a href={`${base}/docs/mcp`}>MCP workflow</a></td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2">Framework integrations</td>
-                    <td class="py-2">LangChain, CrewAI, AutoGen, OpenAI Agents, Anthropic</td>
-                    <td class="py-2"><a href={`${base}/docs/integrations`}>Integrations</a></td>
-                </tr>
-            </tbody>
-        </table>
+  <h2>Where to go next</h2>
+  <div class="docs-card-grid">
+    <div class="docs-card">
+      <div class="docs-tag">Workflow</div>
+      <h3>See the real loop</h3>
+      <p>The context workflow page walks through first-pass reduction, goal-specific narrowing, and later-turn diffs.</p>
     </div>
+    <div class="docs-card">
+      <div class="docs-tag">Integration</div>
+      <h3>Pick your surface</h3>
+      <p>Use the API, SDKs, CLI, or MCP depending on where your app or agent runtime already lives.</p>
+    </div>
+    <div class="docs-card">
+      <div class="docs-tag">Backend mechanics</div>
+      <h3>Read this second</h3>
+      <p>Predicates, rules, salience, and truth maintenance still matter, but they belong behind the reduction story, not in front of it.</p>
+    </div>
+    <div class="docs-card">
+      <div class="docs-tag">Operations</div>
+      <h3>Run it safely</h3>
+      <p>Security, multi-tenancy, and operations remain documented, but they stay in the operating lane rather than the front-page lane.</p>
+    </div>
+  </div>
 
-    <hr />
-
-    <h2 id="backend-note">About Predicates, Rules, and Backend Mechanics</h2>
-    <p>
-        Those pieces are real, and they matter, but they are not the first thing most teams need. If your immediate problem is "my model keeps seeing too many turns," you can treat them as backend implementation details at first.
-    </p>
-    <p>
-        When you need to understand the machinery underneath the reduction pipeline, start with <a href={`${base}/docs/concepts`}>How It Works on the Backend</a>. That is where the lower-level concepts live.
-    </p>
-
-    <NextSteps links={[
-        { title: "Real Workflow", description: "See the full turn-reduction flow with optimize and diff", href: `${base}/docs/context` },
-        { title: "API Reference", description: "Every context endpoint and request shape", href: `${base}/docs/api#context-management` },
-        { title: "SDKs", description: "Call the same workflow from Python or TypeScript", href: `${base}/docs/sdks` },
-        { title: "How It Works", description: "Backend mechanics, predicates, rules, and memory internals", href: `${base}/docs/concepts` },
-    ]} />
+  <NextSteps links={[
+    { title: 'Context Workflow', description: 'Walk through /context, /context/optimize, and /context/diff', href: `${base}/docs/context` },
+    { title: 'API Reference', description: 'See every HTTP endpoint and request shape', href: `${base}/docs/api` },
+    { title: 'SDKs and MCP', description: 'Pick the integration surface that matches your stack', href: `${base}/docs/sdks` },
+    { title: 'How It Works', description: 'Read the backend mechanics after the workflow is clear', href: `${base}/docs/concepts` },
+  ]} />
 </DocsLayout>

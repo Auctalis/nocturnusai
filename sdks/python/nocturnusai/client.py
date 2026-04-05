@@ -16,9 +16,9 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import random
-import sys
 from typing import Any
 
 import httpx
@@ -35,13 +35,11 @@ from nocturnusai.models import (
     Atom,
     ConsolidationResult,
     ContextDiff,
-    ContextEntry,
     ContextSummary,
     ContextWindow,
     DecayResult,
     OptimizedContext,
     ProofTree,
-    ScoredAtom,
 )
 
 logger = logging.getLogger("nocturnusai")
@@ -548,7 +546,7 @@ class NocturnusAIClient:
         relevance_buckets: list[dict[str, Any]] | None = None,
         predicates: list[str] | None = None,
         scope: str | None = None,
-    ) -> "OptimizedContext":
+    ) -> OptimizedContext:
         """Get a goal-driven optimized context window.
 
         Unlike context_window() which does flat salience ranking, this uses
@@ -560,9 +558,11 @@ class NocturnusAIClient:
                    Each can include "negated": True for negative goals.
             max_facts: Maximum facts to return.
             max_facts_per_predicate: Optional diversity cap per predicate.
-            auto_resolve_contradictions: If True, auto-resolve by salience. If False, keep both sides.
+            auto_resolve_contradictions: If True, auto-resolve by salience.
+                If False, keep both sides.
             session_id: Session ID for incremental diffing.
-            relevance_buckets: List of buckets, e.g. [{"name": "prefs", "predicates": ["likes"], "weight": 3.0}].
+            relevance_buckets: List of buckets, e.g.
+                [{"name": "prefs", "predicates": ["likes"], "weight": 3.0}].
             predicates: Filter by these predicates (non-goal mode).
             scope: Scope filter.
 
@@ -610,7 +610,7 @@ class NocturnusAIClient:
         relevance_buckets: list[dict[str, Any]] | None = None,
         predicates: list[str] | None = None,
         scope: str | None = None,
-    ) -> "ContextDiff":
+    ) -> ContextDiff:
         """Get incremental diff since the last optimized context window.
 
         Returns only what changed: added facts, removed facts, and count of unchanged.
@@ -630,7 +630,10 @@ class NocturnusAIClient:
         Example::
 
             diff = await client.diff_context(session_id="session_42")
-            print(f"Added: {len(diff.added)}, Removed: {len(diff.removed)}, Unchanged: {diff.unchanged}")
+            print(
+                f"Added: {len(diff.added)}, Removed: {len(diff.removed)}, "
+                f"Unchanged: {diff.unchanged}"
+            )
             if diff.full_refresh_recommended:
                 print(f"Full refresh recommended: {diff.reason}")
         """
@@ -649,7 +652,7 @@ class NocturnusAIClient:
         result = await self._request("POST", "/context/diff", json_body=body)
         return ContextDiff.model_validate(result)
 
-    async def summarize_context(self, scope: str | None = None) -> "ContextSummary":
+    async def summarize_context(self, scope: str | None = None) -> ContextSummary:
         """Get a compact summary of the knowledge base.
 
         Returns predicate counts, contradiction count, top salient facts,
@@ -742,7 +745,7 @@ class NocturnusAIClient:
         relevance_buckets: list[dict[str, Any]] | None = None,
         scope: str | None = None,
         context_hint: str | None = None,
-    ) -> "OptimizedContext":
+    ) -> OptimizedContext:
         """Extract facts from text, assert them, then return an optimized context.
 
         This is the one-call developer workflow: send raw text (conversation
@@ -766,12 +769,18 @@ class NocturnusAIClient:
         Example::
 
             ctx = await client.ingest_and_optimize(
-                text="The user likes electronics and has a budget of $1000. Product X costs $899 and has 4.5 stars.",
+                text=(
+                    "The user likes electronics and has a budget of $1000."
+                    " Product X costs $899 and has 4.5 stars."
+                ),
                 goals=[{"predicate": "recommend", "args": ["?product"]}],
                 max_facts=20,
                 session_id="session_42",
             )
-            print(f"Ingested and optimized: {ctx.total_facts_included} facts from {ctx.total_facts_available}")
+            print(
+                f"Ingested and optimized: {ctx.total_facts_included}"
+                f" facts from {ctx.total_facts_available}"
+            )
         """
         body: dict[str, Any] = {
             "text": text,
@@ -1365,7 +1374,7 @@ class SyncNocturnusAIClient:
         relevance_buckets: list[dict[str, Any]] | None = None,
         predicates: list[str] | None = None,
         scope: str | None = None,
-    ) -> "OptimizedContext":
+    ) -> OptimizedContext:
         """Get goal-driven optimized context. See :meth:`NocturnusAIClient.optimize_context`."""
         return self._run(
             self._async_client.optimize_context(
@@ -1385,7 +1394,7 @@ class SyncNocturnusAIClient:
         relevance_buckets: list[dict[str, Any]] | None = None,
         predicates: list[str] | None = None,
         scope: str | None = None,
-    ) -> "ContextDiff":
+    ) -> ContextDiff:
         """Get incremental context diff. See :meth:`NocturnusAIClient.diff_context`."""
         return self._run(
             self._async_client.diff_context(
@@ -1394,7 +1403,7 @@ class SyncNocturnusAIClient:
             )
         )
 
-    def summarize_context(self, scope: str | None = None) -> "ContextSummary":
+    def summarize_context(self, scope: str | None = None) -> ContextSummary:
         """Get KB summary. See :meth:`NocturnusAIClient.summarize_context`."""
         return self._run(self._async_client.summarize_context(scope=scope))
 
@@ -1427,8 +1436,11 @@ class SyncNocturnusAIClient:
         relevance_buckets: list[dict[str, Any]] | None = None,
         scope: str | None = None,
         context_hint: str | None = None,
-    ) -> "OptimizedContext":
-        """Extract facts from text then optimize. See :meth:`NocturnusAIClient.ingest_and_optimize`."""
+    ) -> OptimizedContext:
+        """Extract facts from text then optimize.
+
+        See :meth:`NocturnusAIClient.ingest_and_optimize`.
+        """
         return self._run(
             self._async_client.ingest_and_optimize(
                 text=text, goals=goals, max_facts=max_facts,
@@ -1453,7 +1465,9 @@ class SyncNocturnusAIClient:
         """Check auth status. See :meth:`NocturnusAIClient.auth_status`."""
         return self._run(self._async_client.auth_status())
 
-    def bootstrap(self, name: str = "admin", description: str = "Initial admin key") -> dict[str, Any]:
+    def bootstrap(
+        self, name: str = "admin", description: str = "Initial admin key"
+    ) -> dict[str, Any]:
         """Bootstrap first admin key. See :meth:`NocturnusAIClient.bootstrap`."""
         return self._run(self._async_client.bootstrap(name=name, description=description))
 
@@ -1504,10 +1518,8 @@ class SyncNocturnusAIClient:
 
     def __del__(self) -> None:
         """Best-effort cleanup on garbage collection."""
-        try:
+        with contextlib.suppress(Exception):
             self.close()
-        except Exception:
-            pass
 
 
 # ------------------------------------------------------------------

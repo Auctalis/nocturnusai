@@ -41,7 +41,9 @@ data/
 __pycache__/
 *.pyc
 .venv/
+.venv-*/
 env/
+uv.lock
 
 # Node
 node_modules/
@@ -66,3 +68,4 @@ hexastore_debug.log
 database_analysis.md
 legal_logic.logiql
 .worktrees/
+.agents/

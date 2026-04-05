@@ -205,7 +205,7 @@ private fun handleInitialize(request: JsonRpcRequest): JsonRpcResponse {
         )),
         "serverInfo" to JsonObject(mapOf(
             "name" to JsonPrimitive("nocturnusai"),
-            "version" to JsonPrimitive("0.2.2")
+            "version" to JsonPrimitive("0.2.3")
         ))
     ))
     return JsonRpcResponse(id = request.id, result = result)

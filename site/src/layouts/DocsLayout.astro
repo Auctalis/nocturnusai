@@ -4,122 +4,157 @@ import Navbar from '../components/Navbar.astro';
 import Footer from '../components/Footer.astro';
 
 interface Props {
-	title: string;
+  title: string;
 }
 
 const { title } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const navItems = [
-    { title: "Start Here", links: [
-        { text: "Cut Down Turns", href: `${base}/docs` },
-        { text: "Real Workflow", href: `${base}/docs/context` },
-        { text: "Integrations", href: `${base}/docs/integrations` },
-        { text: "FAQ", href: `${base}/docs/faq` },
-    ]},
-    { title: "Use It From", links: [
-        { text: "API Reference", href: `${base}/docs/api` },
-        { text: "Python SDK", href: `${base}/docs/sdks` },
-        { text: "TypeScript SDK", href: `${base}/docs/sdks#typescript` },
-        { text: "MCP Integration", href: `${base}/docs/mcp` },
-        { text: "OpenClaw Context", href: `${base}/docs/openclaw` },
-        { text: "CLI Reference", href: `${base}/docs/cli` },
-    ]},
-    { title: "Backend", links: [
-        { text: "How It Works", href: `${base}/docs/concepts` },
-        { text: "LLM Integration", href: `${base}/docs/llm` },
-        { text: "Multi-Tenancy", href: `${base}/docs/multi-tenancy` },
-        { text: "Security & Auth", href: `${base}/docs/security` },
-        { text: "Operations", href: `${base}/docs/operations` },
-    ]},
+  {
+    title: 'Start Here',
+    links: [
+      { text: 'Overview', href: `${base}/docs` },
+      { text: 'Context Workflow', href: `${base}/docs/context` },
+      { text: 'FAQ', href: `${base}/docs/faq` },
+    ],
+  },
+  {
+    title: 'Integrate It',
+    links: [
+      { text: 'API', href: `${base}/docs/api` },
+      { text: 'SDKs', href: `${base}/docs/sdks` },
+      { text: 'MCP', href: `${base}/docs/mcp` },
+      { text: 'CLI', href: `${base}/docs/cli` },
+      { text: 'Integrations', href: `${base}/docs/integrations` },
+      { text: 'OpenClaw', href: `${base}/docs/openclaw` },
+    ],
+  },
+  {
+    title: 'Backend Mechanics',
+    links: [
+      { text: 'How It Works', href: `${base}/docs/concepts` },
+      { text: 'LLM Integration', href: `${base}/docs/llm` },
+      { text: 'Multi-Tenancy', href: `${base}/docs/multi-tenancy` },
+    ],
+  },
+  {
+    title: 'Operate It',
+    links: [
+      { text: 'Security', href: `${base}/docs/security` },
+      { text: 'Operations', href: `${base}/docs/operations` },
+    ],
+  },
 ];
 ---
 
 <!doctype html>
-<html lang="en" class="scroll-smooth">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="description" content="Nocturnus.AI Developer Documentation" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
-		<link rel="alternate icon" href={`${base}/favicon.ico`} />
-		<link rel="preconnect" href="https://fonts.googleapis.com">
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-		<meta name="generator" content={Astro.generator} />
-		<title>{title} | Nocturnus.AI Docs</title>
-	</head>
-	<body class="bg-[#020617] text-slate-300 font-sans antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
-        <Navbar />
-        
-        <div class="max-w-[90rem] mx-auto px-6 lg:px-10 pt-28 pb-16 min-h-screen flex gap-16">
-            <!-- Sidebar -->
-            <aside class="w-56 hidden lg:block shrink-0 sticky top-28 h-[calc(100vh-8rem)] overflow-y-auto pr-4">
-                <nav class="space-y-7">
-                    {navItems.map(section => (
-                        <div>
-                            <h3 class="text-[0.7rem] font-bold text-slate-500 uppercase tracking-[0.12em] mb-3">{section.title}</h3>
-                            <ul class="space-y-1 border-l border-white/5">
-                                {section.links.map(link => (
-                                    <li>
-                                        <a href={link.href} class="block pl-4 py-1 text-[0.82rem] text-slate-400 hover:text-cyan-400 hover:border-l-2 hover:border-cyan-400 -ml-[1px] transition-all">
-                                            {link.text}
-                                        </a>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    ))}
-                </nav>
-                <div class="mt-8 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-                    <h4 class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-emerald-300">Turn Reduction Loop</h4>
-                    <ol class="mt-2 space-y-1 text-[0.76rem] leading-5 text-slate-300">
-                        <li>1. Send raw turns to <a href={`${base}/docs/context`} class="text-cyan-400 hover:text-cyan-300"><code>POST /context</code></a>.</li>
-                        <li>2. Narrow by the next question with <a href={`${base}/docs/api#context-optimize`} class="text-cyan-400 hover:text-cyan-300"><code>POST /context/optimize</code></a>.</li>
-                        <li>3. Reuse <code>sessionId</code> + <a href={`${base}/docs/api#context-diff`} class="text-cyan-400 hover:text-cyan-300"><code>POST /context/diff</code></a>.</li>
-                        <li>4. Keep old state from piling up with <a href={`${base}/docs/api#memory`} class="text-cyan-400 hover:text-cyan-300"><code>/memory/consolidate</code> + <code>/memory/decay</code></a>.</li>
-                        <li>5. Clear thread state with <a href={`${base}/docs/api#context-session-clear`} class="text-cyan-400 hover:text-cyan-300"><code>POST /context/session/clear</code></a>.</li>
-                    </ol>
-                </div>
-            </aside>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content="Nocturnus.AI documentation for reducing large turn arrays into smaller model-ready context windows." />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+    <link rel="alternate icon" href={`${base}/favicon.ico`} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title} | Nocturnus.AI Docs</title>
+  </head>
+  <body class="site-body docs-page">
+    <Navbar solid />
 
-            <!-- Main Content -->
-            <main class="docs-content flex-1 min-w-0 max-w-3xl">
-                <slot />
-            </main>
+    <div class="site-container docs-shell">
+      <aside class="docs-sidebar">
+        {navItems.map((group) => (
+          <div class="docs-nav-group">
+            <div class="docs-nav-title">{group.title}</div>
+            <ul class="docs-nav-list">
+              {group.links.map((link) => (
+                <li><a href={link.href} class="docs-nav-link">{link.text}</a></li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </aside>
 
-            <!-- Right spacer for symmetry -->
-            <div class="w-56 hidden xl:block shrink-0"></div>
-        </div>
+      <main class="docs-main">
+        <details class="docs-mobile-nav">
+          <summary>Docs Navigation</summary>
+          <div class="docs-mobile-nav-panel">
+            {navItems.map((group) => (
+              <div class="docs-nav-group">
+                <div class="docs-nav-title">{group.title}</div>
+                <ul class="docs-nav-list">
+                  {group.links.map((link) => (
+                    <li><a href={link.href} class="docs-nav-link">{link.text}</a></li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </details>
 
-        <Footer />
+        <article class="docs-content">
+          <slot />
+        </article>
+      </main>
+    </div>
 
-        <script>
-          document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('.docs-content pre').forEach(pre => {
-              const btn = document.createElement('button');
-              btn.className = 'copy-btn';
-              btn.textContent = 'copy';
-              btn.addEventListener('click', async () => {
-                const code = pre.querySelector('code');
-                const text = (code ?? pre).innerText;
-                try {
-                  await navigator.clipboard.writeText(text);
-                } catch {
-                  const ta = document.createElement('textarea');
-                  ta.value = text;
-                  document.body.appendChild(ta);
-                  ta.select();
-                  document.execCommand('copy');
-                  ta.remove();
-                }
-                btn.textContent = 'copied!';
-                btn.classList.add('copied');
-                setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 2000);
-              });
-              pre.appendChild(btn);
-            });
+    <Footer />
+
+    <script is:inline>
+      (() => {
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          document.documentElement.classList.add('motion-ok');
+          const nodes = document.querySelectorAll('.reveal');
+          if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver(
+              (entries) => {
+                entries.forEach((entry) => {
+                  if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                    observer.unobserve(entry.target);
+                  }
+                });
+              },
+              { threshold: 0.16 },
+            );
+            nodes.forEach((node) => observer.observe(node));
+          } else {
+            nodes.forEach((node) => node.classList.add('is-visible'));
+          }
+        }
+
+        document.querySelectorAll('.docs-content pre').forEach((pre) => {
+          if (pre.querySelector('.copy-btn')) return;
+          const button = document.createElement('button');
+          button.className = 'copy-btn';
+          button.textContent = 'copy';
+          button.addEventListener('click', async () => {
+            const code = pre.querySelector('code');
+            const text = (code ?? pre).innerText;
+            try {
+              await navigator.clipboard.writeText(text);
+            } catch {
+              const ta = document.createElement('textarea');
+              ta.value = text;
+              document.body.appendChild(ta);
+              ta.select();
+              document.execCommand('copy');
+              ta.remove();
+            }
+            button.textContent = 'copied';
+            button.classList.add('copied');
+            setTimeout(() => {
+              button.textContent = 'copy';
+              button.classList.remove('copied');
+            }, 1600);
           });
-        </script>
-	</body>
+          pre.appendChild(button);
+        });
+      })();
+    </script>
+  </body>
 </html>
