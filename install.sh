@@ -161,6 +161,10 @@ services:
       start_period: 30s
 COMPOSE
     else
+        # No explicit --ollama or --host-ollama flag, but assume host Ollama
+        # is available as the default LLM provider. This ensures natural
+        # language extraction works out of the box for developers who have
+        # Ollama installed (the most common local setup).
         cat > "$install_dir/docker-compose.yml" <<'COMPOSE'
 services:
   nocturnusai:
@@ -176,13 +180,15 @@ services:
       - HOST=0.0.0.0
       - STORAGE_DIR=/data
       - API_KEY=${API_KEY:-}
-      - LLM_PROVIDER=${LLM_PROVIDER:-}
-      - LLM_MODEL=${LLM_MODEL:-}
-      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_MODEL=${LLM_MODEL:-granite3.3:8b}
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - EXTRACTION_ENABLED=${EXTRACTION_ENABLED:-false}
+      - EXTRACTION_ENABLED=${EXTRACTION_ENABLED:-true}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-9300}/health"]
       interval: 10s
@@ -272,6 +278,7 @@ COMPOSE
     echo -e "  $compose_cmd logs -f nocturnusai   ${DIM}# tail logs${NC}"
     echo -e "  $compose_cmd down                   ${DIM}# stop${NC}"
     echo -e "  $compose_cmd up -d                  ${DIM}# restart${NC}"
+    echo -e "  $container_cmd pull ghcr.io/auctalis/nocturnusai:latest  ${DIM}# upgrade${NC}"
     echo ""
     if [ -f "$install_dir/.env" ]; then
         echo -e "  ${DIM}Config overrides: $(cd "$install_dir" && pwd)/.env${NC}"

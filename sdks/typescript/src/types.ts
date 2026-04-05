@@ -558,7 +558,7 @@ export interface FactOptions {
   ttl?: number;
 
   /** Transaction ID for transactional operations. */
-  transactionId?: number;
+  transactionId?: number | string;
 }
 
 /**
@@ -569,7 +569,7 @@ export interface RuleOptions {
   scope?: string;
 
   /** Transaction ID for transactional operations. */
-  transactionId?: number;
+  transactionId?: number | string;
 }
 
 /**

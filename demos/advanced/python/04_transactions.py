@@ -15,6 +15,7 @@ SERVER = "http://localhost:9300"
 
 def main():
     with SyncNocturnusAIClient(SERVER, database="demo-txn") as client:
+        client.ensure_database()
 
         print("=== 1. Successful transaction (commit) ===")
         tx_id = client.begin_transaction()

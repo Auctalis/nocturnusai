@@ -15,6 +15,7 @@ SERVER = "http://localhost:9300"
 
 def main():
     with SyncNocturnusAIClient(SERVER, database="demo-rules") as client:
+        client.ensure_database()
 
         print("=== 1. Classic Syllogism ===")
         # All humans are mortal

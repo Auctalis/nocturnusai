@@ -61,12 +61,24 @@ class ScoredAtom(BaseModel):
     Salience is a composite score (0.0 to 1.0) reflecting recency, access
     frequency, and explicit priority. Used in context window and
     salience-ranked query responses.
+
+    Attribute access is delegated to the inner :class:`Atom`, so
+    ``scored.predicate`` works the same as ``scored.atom.predicate``.
     """
 
     atom: Atom = Field(description="The underlying atom.")
     salience: float = Field(description="Composite salience score between 0.0 and 1.0.")
 
     model_config = {"populate_by_name": True}
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate unknown attribute access to the inner Atom."""
+        try:
+            return getattr(self.atom, name)
+        except AttributeError:
+            raise AttributeError(
+                f"'{type(self).__name__}' object has no attribute '{name}'"
+            ) from None
 
 
 class ContextWindow(BaseModel):

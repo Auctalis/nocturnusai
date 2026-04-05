@@ -96,6 +96,7 @@ def main():
 
         print("\n=== 8. Use writer key to assert a fact ===")
         with SyncNocturnusAIClient(SERVER, api_key=writer_key, database="production") as writer_client:
+            writer_client.ensure_database()
             writer_client.assert_fact("demo", ["auth-works"])
             facts = writer_client.query("demo", ["?x"])
             print(f"  Writer successfully asserted and queried: {len(facts)} fact(s)")

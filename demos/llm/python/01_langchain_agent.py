@@ -140,6 +140,7 @@ Thought: {agent_scratchpad}""")
 
 def main():
     with SyncNocturnusAIClient(SERVER, database=DB) as client:
+        client.ensure_database()
         print("=== Seeding knowledge base ===")
         seed_knowledge(client)
 

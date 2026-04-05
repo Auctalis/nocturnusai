@@ -33,6 +33,7 @@ def demo_tools_directly():
 
     async def run():
         async with NocturnusAIClient(SERVER, database="demo-langchain") as nai:
+            await nai.ensure_database()
             assert_tool = NocturnusAIAssertTool(client=nai)
             query_tool = NocturnusAIQueryTool(client=nai)
             infer_tool = NocturnusAIInferTool(client=nai)
@@ -82,6 +83,7 @@ def demo_with_agent():
         from langchain_openai import ChatOpenAI
 
         async with NocturnusAIClient(SERVER, database="demo-langchain-agent") as nai:
+            await nai.ensure_database()
             tools = [
                 NocturnusAIAssertTool(client=nai),
                 NocturnusAIQueryTool(client=nai),

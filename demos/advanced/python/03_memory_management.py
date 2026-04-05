@@ -19,6 +19,7 @@ SERVER = "http://localhost:9300"
 
 def main():
     with SyncNocturnusAIClient(SERVER, database="demo-memory") as client:
+        client.ensure_database()
 
         print("=== 1. Seeding agent knowledge base ===")
         client.assert_fact("task", ["write-report"], metadata={"status": "pending"})

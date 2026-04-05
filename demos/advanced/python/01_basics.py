@@ -16,6 +16,8 @@ SERVER = "http://localhost:9300"
 
 def main():
     with SyncNocturnusAIClient(SERVER, database="demo-basics") as client:
+        client.ensure_database()
+
         print("=== 1. Assert Facts ===")
         client.assert_fact("human", ["socrates"])
         client.assert_fact("human", ["plato"])

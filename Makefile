@@ -97,6 +97,17 @@ down: ## Stop everything
 
 restart: down up ## Restart server
 
+upgrade: ## Pull latest image and restart
+	@echo "\033[36mPulling latest NocturnusAI image...\033[0m"
+	docker pull ghcr.io/auctalis/nocturnusai:latest
+	@CURRENT=$$(curl -sf http://localhost:$${PORT:-9300}/health 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','unknown'))" 2>/dev/null || echo "not running"); \
+	echo "  Current version: $$CURRENT"
+	$(COMPOSE) --profile monitoring --profile ollama down
+	$(COMPOSE) up -d
+	@$(MAKE) wait-for-health
+	@NEW=$$(curl -sf http://localhost:$${PORT:-9300}/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','unknown'))" 2>/dev/null); \
+	echo "\033[32mUpgraded to $$NEW\033[0m"
+
 logs: ## Tail server logs
 	$(COMPOSE) --profile ollama logs -f nocturnusai
 
@@ -112,20 +123,29 @@ metrics: ## Show raw Prometheus metrics
 status: ## Show running containers
 	$(COMPOSE) --profile monitoring --profile ollama ps
 
-smoke: ## Verify /health and a sample /context extraction round-trip
+smoke: ## Verify /health, assert a fact, and confirm /context returns it
 	@curl -sf http://localhost:$${PORT:-9300}/health >/dev/null || { \
 		echo "\033[31mServer not responding on http://localhost:$${PORT:-9300}\033[0m"; exit 1; \
 	}
-	@RESP=$$(curl -sS -X POST http://localhost:$${PORT:-9300}/context \
+	@echo "\033[36mHealth OK.\033[0m"
+	@curl -sS -X POST http://localhost:$${PORT:-9300}/assert/fact \
 		-H 'Content-Type: application/json' \
 		-H 'X-Tenant-ID: default' \
-		-d '{"turns":["user: Acme Corp is enterprise.","tool: Renewal is due next month."],"maxFacts":5}'); \
+		-d '{"predicate":"smoke_test","args":["passed"]}' >/dev/null; \
+	RESP=$$(curl -sS -X POST http://localhost:$${PORT:-9300}/context \
+		-H 'Content-Type: application/json' \
+		-H 'X-Tenant-ID: default' \
+		-d '{"turns":["smoke_test(passed)"],"maxFacts":5}'); \
 	COMPACT=$$(printf "%s" "$$RESP" | tr -d '[:space:]'); \
 	printf "%s" "$$COMPACT" | grep -Eq '"factsReturned":[1-9]' || { \
-		echo "\033[31mSmoke test failed.\033[0m"; \
+		echo "\033[31mSmoke test failed — /context returned no facts.\033[0m"; \
 		echo "$$RESP"; \
 		exit 1; \
 	}; \
+	curl -sS -X POST http://localhost:$${PORT:-9300}/retract \
+		-H 'Content-Type: application/json' \
+		-H 'X-Tenant-ID: default' \
+		-d '{"predicate":"smoke_test","args":["passed"]}' >/dev/null 2>&1 || true; \
 	echo "\033[32mSmoke test passed.\033[0m"; \
 	echo "$$RESP"
 

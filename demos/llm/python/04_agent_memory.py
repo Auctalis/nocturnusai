@@ -178,6 +178,7 @@ async def main():
     print("The KB persists across sessions — this is the point.")
 
     async with NocturnusAIClient(SERVER, database=DB) as client:
+        await client.ensure_database()
         await session_one(client)
         await session_two(client)
         await session_three(client)

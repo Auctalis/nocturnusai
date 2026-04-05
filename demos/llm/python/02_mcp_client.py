@@ -17,6 +17,7 @@ No OPENAI_API_KEY needed — the direct tool calls work against any running serv
 
 import asyncio
 import json
+from nocturnusai import NocturnusAIClient
 from nocturnusai.mcp import NocturnusAIMCPClient
 
 SERVER = "http://localhost:9300"
@@ -143,6 +144,10 @@ async def simulate_llm_tool_loop(mcp: NocturnusAIMCPClient):
 
 
 async def main():
+    # Ensure the database exists before using it via MCP
+    async with NocturnusAIClient(SERVER, database=DB) as setup:
+        await setup.ensure_database()
+
     async with NocturnusAIMCPClient(SERVER, database=DB) as mcp:
         await show_server_capabilities(mcp)
         await list_available_tools(mcp)

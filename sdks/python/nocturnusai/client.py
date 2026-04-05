@@ -143,6 +143,7 @@ class NocturnusAIClient:
         json_body: Any | None = None,
         params: dict[str, Any] | None = None,
         expect_json: bool = True,
+        extra_headers: dict[str, str] | None = None,
     ) -> Any:
         """Send an HTTP request with retry logic and error handling.
 
@@ -155,6 +156,7 @@ class NocturnusAIClient:
             json_body: Optional JSON request body.
             params: Optional query parameters.
             expect_json: Whether to parse the response as JSON.
+            extra_headers: Optional additional headers for this request only.
 
         Returns:
             Parsed JSON response or raw text, depending on ``expect_json``.
@@ -174,6 +176,7 @@ class NocturnusAIClient:
                     path,
                     json=json_body,
                     params=params,
+                    headers=extra_headers,
                 )
 
                 # Successful response.
@@ -266,6 +269,7 @@ class NocturnusAIClient:
         valid_from: int | None = None,
         valid_until: int | None = None,
         metadata: dict[str, Any] | None = None,
+        transaction_id: int | str | None = None,
     ) -> dict[str, Any]:
         """Assert a fact into the knowledge base.
 
@@ -282,6 +286,7 @@ class NocturnusAIClient:
             valid_from: Epoch ms from which this fact is valid.
             valid_until: Epoch ms until which this fact is valid.
             metadata: Optional key-value metadata to attach.
+            transaction_id: Optional transaction ID to buffer this operation.
 
         Returns:
             A dict with the server's response text under the ``"result"`` key.
@@ -316,7 +321,8 @@ class NocturnusAIClient:
         if metadata is not None:
             body["metadata"] = metadata
 
-        result = await self._request("POST", "/assert/fact", json_body=body)
+        extra = {"X-Transaction-ID": str(transaction_id)} if transaction_id else None
+        result = await self._request("POST", "/assert/fact", json_body=body, extra_headers=extra)
         if isinstance(result, str):
             return {"result": result}
         return result
@@ -461,6 +467,7 @@ class NocturnusAIClient:
         predicate: str,
         args: list[str],
         scope: str | None = None,
+        transaction_id: int | str | None = None,
     ) -> dict[str, Any]:
         """Retract (remove) a fact from the knowledge base.
 
@@ -472,6 +479,7 @@ class NocturnusAIClient:
             predicate: The predicate of the fact to retract.
             args: Arguments of the fact to retract.
             scope: Optional scope.
+            transaction_id: Optional transaction ID to buffer this operation.
 
         Returns:
             A dict with the server's response text under the ``"result"`` key.
@@ -487,7 +495,8 @@ class NocturnusAIClient:
         if scope is not None:
             body["scope"] = scope
 
-        result = await self._request("POST", "/retract", json_body=body)
+        extra = {"X-Transaction-ID": str(transaction_id)} if transaction_id else None
+        result = await self._request("POST", "/retract", json_body=body, extra_headers=extra)
         if isinstance(result, str):
             return {"result": result}
         return result
@@ -985,6 +994,83 @@ class NocturnusAIClient:
         return {"predicates": []}
 
     # ------------------------------------------------------------------
+    # Transactions
+    # ------------------------------------------------------------------
+
+    async def begin_transaction(self) -> str:
+        """Begin an ACID transaction.
+
+        Returns:
+            The transaction ID (a string or numeric ID).
+
+        Example::
+
+            tx_id = await client.begin_transaction()
+            await client.assert_fact("x", ["y"], transaction_id=tx_id)
+            await client.commit_transaction(tx_id)
+        """
+        result = await self._request("POST", "/tx/begin")
+        return str(result) if not isinstance(result, str) else result
+
+    async def commit_transaction(self, transaction_id: int | str) -> str:
+        """Commit a transaction, making all buffered operations permanent.
+
+        Args:
+            transaction_id: The transaction ID from :meth:`begin_transaction`.
+        """
+        result = await self._request(
+            "POST", f"/tx/commit/{transaction_id}", expect_json=False,
+        )
+        return str(result)
+
+    async def rollback_transaction(self, transaction_id: int | str) -> str:
+        """Rollback a transaction, discarding all buffered operations.
+
+        Args:
+            transaction_id: The transaction ID from :meth:`begin_transaction`.
+        """
+        result = await self._request(
+            "POST", f"/tx/rollback/{transaction_id}", expect_json=False,
+        )
+        return str(result)
+
+    # ------------------------------------------------------------------
+    # Database Management
+    # ------------------------------------------------------------------
+
+    async def create_database(self, name: str | None = None) -> str:
+        """Create a database on the server.
+
+        Args:
+            name: Database name. Defaults to this client's ``database`` property.
+
+        Returns:
+            The server's response text.
+
+        Raises:
+            NocturnusAIConflictError: If the database already exists.
+        """
+        db_name = name or self._database
+        result = await self._request(
+            "POST", "/admin/databases", json_body={"name": db_name}
+        )
+        if isinstance(result, dict) and "result" in result:
+            return result["result"]
+        return str(result)
+
+    async def ensure_database(self, name: str | None = None) -> None:
+        """Create the database if it does not already exist.
+
+        This is safe to call unconditionally — it silently succeeds
+        when the database is already present.
+
+        Args:
+            name: Database name. Defaults to this client's ``database`` property.
+        """
+        with contextlib.suppress(NocturnusAIConflictError, NocturnusAIAPIError):
+            await self.create_database(name)
+
+    # ------------------------------------------------------------------
     # Auth / Key Management
     # ------------------------------------------------------------------
 
@@ -1244,6 +1330,7 @@ class SyncNocturnusAIClient:
         valid_from: int | None = None,
         valid_until: int | None = None,
         metadata: dict[str, Any] | None = None,
+        transaction_id: int | str | None = None,
     ) -> dict[str, Any]:
         """Assert a fact into the knowledge base. See :meth:`NocturnusAIClient.assert_fact`."""
         return self._run(
@@ -1256,6 +1343,7 @@ class SyncNocturnusAIClient:
                 valid_from=valid_from,
                 valid_until=valid_until,
                 metadata=metadata,
+                transaction_id=transaction_id,
             )
         )
 
@@ -1299,10 +1387,14 @@ class SyncNocturnusAIClient:
         predicate: str,
         args: list[str],
         scope: str | None = None,
+        transaction_id: int | str | None = None,
     ) -> dict[str, Any]:
         """Retract a fact. See :meth:`NocturnusAIClient.retract`."""
         return self._run(
-            self._async_client.retract(predicate=predicate, args=args, scope=scope)
+            self._async_client.retract(
+                predicate=predicate, args=args, scope=scope,
+                transaction_id=transaction_id,
+            )
         )
 
     def context_window(
@@ -1460,6 +1552,26 @@ class SyncNocturnusAIClient:
     def predicates(self, scope: str | None = None) -> dict[str, Any]:
         """Discover the KB schema. See :meth:`NocturnusAIClient.predicates`."""
         return self._run(self._async_client.predicates(scope=scope))
+
+    def begin_transaction(self) -> str:
+        """Begin a transaction. See :meth:`NocturnusAIClient.begin_transaction`."""
+        return self._run(self._async_client.begin_transaction())
+
+    def commit_transaction(self, transaction_id: int | str) -> str:
+        """Commit a transaction. See :meth:`NocturnusAIClient.commit_transaction`."""
+        return self._run(self._async_client.commit_transaction(transaction_id))
+
+    def rollback_transaction(self, transaction_id: int | str) -> str:
+        """Rollback a transaction. See :meth:`NocturnusAIClient.rollback_transaction`."""
+        return self._run(self._async_client.rollback_transaction(transaction_id))
+
+    def create_database(self, name: str | None = None) -> str:
+        """Create a database. See :meth:`NocturnusAIClient.create_database`."""
+        return self._run(self._async_client.create_database(name=name))
+
+    def ensure_database(self, name: str | None = None) -> None:
+        """Create DB if missing. See :meth:`NocturnusAIClient.ensure_database`."""
+        self._run(self._async_client.ensure_database(name=name))
 
     def auth_status(self) -> dict[str, Any]:
         """Check auth status. See :meth:`NocturnusAIClient.auth_status`."""

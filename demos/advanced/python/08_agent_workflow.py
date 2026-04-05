@@ -23,6 +23,7 @@ DB = "demo-agent"
 
 async def main():
     async with NocturnusAIClient(SERVER, database=DB) as client:
+        await client.ensure_database()
 
         # ── 1. World knowledge ────────────────────────────────────────────────
         print("=== 1. Bootstrap world knowledge ===")

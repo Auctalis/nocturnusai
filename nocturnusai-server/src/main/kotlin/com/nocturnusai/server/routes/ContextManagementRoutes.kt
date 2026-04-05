@@ -84,7 +84,8 @@ data class SimpleContextResponse(
     val totalFactsInKB: Int,
     val factsReturned: Int,
     val contradictions: Int,
-    val newFactsExtracted: Int
+    val newFactsExtracted: Int,
+    val warning: String? = null
 )
 
 @Serializable
@@ -273,6 +274,7 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager, extractor: FactExt
             // Step 1: Extract facts from each turn
             val allText = req.turns.joinToString("\n")
             var newFactsExtracted = 0
+            var warning: String? = null
 
             if (extractor != null) {
                 try {
@@ -284,6 +286,8 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager, extractor: FactExt
                     }
                 } catch (e: Exception) {
                     call.application.environment.log.warn("Extraction failed in /context: ${e.message}")
+                    warning = "LLM extraction failed: ${e.message}. " +
+                        "Check that your LLM provider is running and reachable, or use predicate syntax: predicate(arg1, arg2)"
                 }
             } else {
                 // No LLM — try predicate syntax lines
@@ -297,6 +301,17 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager, extractor: FactExt
                     val atom = com.nocturnusai.core.Atom(predicate, terms, scope = req.scope)
                     try { db.assertFact(atom, tenantId); newFactsExtracted++ } catch (_: Exception) { }
                 }
+                if (newFactsExtracted == 0) {
+                    warning = "No LLM provider configured. Natural language turns were not extracted. " +
+                        "Set EXTRACTION_ENABLED=true and configure an LLM provider, or use predicate syntax: predicate(arg1, arg2)"
+                }
+            }
+
+            // Also warn when extraction was configured but produced nothing
+            if (extractor != null && newFactsExtracted == 0 && warning == null) {
+                warning = "LLM extraction returned 0 facts from the provided turns. " +
+                    "The LLM may not have found structured facts, or the turns may be too short. " +
+                    "You can also use predicate syntax directly: predicate(arg1, arg2)"
             }
 
             // Step 2: Optimize — return the most relevant facts
@@ -321,7 +336,8 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager, extractor: FactExt
                 totalFactsInKB = result.totalFactsAvailable,
                 factsReturned = result.totalFactsIncluded,
                 contradictions = result.contradictionsFound,
-                newFactsExtracted = newFactsExtracted
+                newFactsExtracted = newFactsExtracted,
+                warning = warning
             ))
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))

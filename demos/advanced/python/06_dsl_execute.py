@@ -14,6 +14,7 @@ SERVER = "http://localhost:9300"
 
 def main():
     with SyncNocturnusAIClient(SERVER, database="demo-dsl") as client:
+        client.ensure_database()
 
         print("=== 1. Assert facts via DSL ===")
         commands = [

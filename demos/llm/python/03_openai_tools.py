@@ -234,6 +234,7 @@ def demo_tool_execution_without_llm(client: SyncNocturnusAIClient):
 
 def main():
     with SyncNocturnusAIClient(SERVER, database=DB) as client:
+        client.ensure_database()
         demo_tool_execution_without_llm(client)
 
         # Live agent questions (requires OPENAI_API_KEY)

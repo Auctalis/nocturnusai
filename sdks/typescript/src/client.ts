@@ -589,6 +589,106 @@ export class NocturnusAIClient {
   }
 
   // -----------------------------------------------------------------------
+  // Transaction operations
+  // -----------------------------------------------------------------------
+
+  /**
+   * Begin an ACID transaction.
+   *
+   * Returns a transaction ID that can be passed to {@link assertFact},
+   * {@link assertRule}, and {@link retract} via the `transactionId` option
+   * to buffer operations within the transaction.
+   *
+   * @returns The transaction ID string.
+   *
+   * @example
+   * ```ts
+   * const txId = await client.beginTransaction();
+   * await client.assertFact('parent', ['alice', 'bob'], { transactionId: Number(txId) });
+   * await client.commitTransaction(txId);
+   * ```
+   */
+  async beginTransaction(): Promise<string> {
+    return this.requestText('POST', '/tx/begin');
+  }
+
+  /**
+   * Commit a transaction, making all buffered operations permanent.
+   *
+   * @param transactionId - The transaction ID from {@link beginTransaction}.
+   * @returns Server confirmation message.
+   *
+   * @example
+   * ```ts
+   * await client.commitTransaction(txId);
+   * ```
+   */
+  async commitTransaction(transactionId: string): Promise<string> {
+    return this.requestText('POST', `/tx/commit/${transactionId}`);
+  }
+
+  /**
+   * Rollback a transaction, discarding all buffered operations.
+   *
+   * @param transactionId - The transaction ID from {@link beginTransaction}.
+   * @returns Server confirmation message.
+   *
+   * @example
+   * ```ts
+   * await client.rollbackTransaction(txId);
+   * ```
+   */
+  async rollbackTransaction(transactionId: string): Promise<string> {
+    return this.requestText('POST', `/tx/rollback/${transactionId}`);
+  }
+
+  // -----------------------------------------------------------------------
+  // Database management
+  // -----------------------------------------------------------------------
+
+  /**
+   * Create a database on the server.
+   *
+   * @param name - Database name. Defaults to the client's configured database.
+   * @returns Server confirmation message.
+   * @throws {NocturnusAIRequestError} If the database already exists (HTTP 409).
+   *
+   * @example
+   * ```ts
+   * await client.createDatabase('my-new-db');
+   * ```
+   */
+  async createDatabase(name?: string): Promise<string> {
+    const dbName = name ?? this.database;
+    return this.requestText('POST', '/admin/databases', { name: dbName });
+  }
+
+  /**
+   * Create the database if it does not already exist.
+   *
+   * This is safe to call unconditionally — it silently succeeds when the
+   * database is already present.
+   *
+   * @param name - Database name. Defaults to the client's configured database.
+   *
+   * @example
+   * ```ts
+   * await client.ensureDatabase(); // uses the client's configured database
+   * ```
+   */
+  async ensureDatabase(name?: string): Promise<void> {
+    try {
+      await this.createDatabase(name);
+    } catch (err) {
+      // Suppress "already exists" errors (HTTP 409 Conflict)
+      if (err instanceof NocturnusAIRequestError && err.statusCode === 409) {
+        return;
+      }
+      throw err;
+    }
+  }
+
+  // -----------------------------------------------------------------------
   // DSL execution
   // -----------------------------------------------------------------------
 
