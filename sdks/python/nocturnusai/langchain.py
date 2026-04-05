@@ -145,7 +145,7 @@ if _LANGCHAIN_AVAILABLE:
             description="Optional scope filter.",
         )
 
-    class OptimizeInput(BaseModel):  # type: ignore[misc]
+    class OptimizeInput(BaseModel):
         """Input schema for the NocturnusAI optimize_context tool."""
 
         goals: str | None = Field(
@@ -177,7 +177,7 @@ if _LANGCHAIN_AVAILABLE:
             description="Optional scope filter.",
         )
 
-    class ExtractInput(BaseModel):  # type: ignore[misc]
+    class ExtractInput(BaseModel):
         """Input schema for the NocturnusAI extract_facts tool."""
 
         text: str = Field(
@@ -474,7 +474,7 @@ if _LANGCHAIN_AVAILABLE:
                 scope=scope,
             )
 
-    class NocturnusAIOptimizeTool(BaseTool):  # type: ignore[misc]
+    class NocturnusAIOptimizeTool(BaseTool):
         """LangChain tool for goal-driven optimized context from NocturnusAI.
 
         Uses backward chaining to find facts reachable from goals,
@@ -484,7 +484,10 @@ if _LANGCHAIN_AVAILABLE:
         Example invocation by an LLM agent::
 
             Action: nocturnusai_optimize
-            Action Input: {"goals": "[{\"predicate\": \"recommend\", \"args\": [\"?product\"]}]", "max_facts": 30}
+            Action Input: {
+                "goals": "[{\"predicate\": \"recommend\", \"args\": [\"?product\"]}]",
+                "max_facts": 30
+            }
         """
 
         name: str = "nocturnusai_optimize"
@@ -495,7 +498,7 @@ if _LANGCHAIN_AVAILABLE:
             "and applies relevance buckets. Returns the minimal set of facts needed "
             "for reasoning. Use this instead of nocturnusai_context for better results."
         )
-        args_schema: Type[BaseModel] = OptimizeInput  # type: ignore[assignment]
+        args_schema: type[BaseModel] = OptimizeInput
         client: Any = None
 
         model_config = {"arbitrary_types_allowed": True}
@@ -583,7 +586,7 @@ if _LANGCHAIN_AVAILABLE:
                 scope=scope,
             )
 
-    class NocturnusAIExtractTool(BaseTool):  # type: ignore[misc]
+    class NocturnusAIExtractTool(BaseTool):
         """LangChain tool for extracting structured facts from raw text.
 
         Sends free-form text to NocturnusAI for LLM-powered extraction
@@ -593,7 +596,10 @@ if _LANGCHAIN_AVAILABLE:
         Example invocation by an LLM agent::
 
             Action: nocturnusai_extract
-            Action Input: {"text": "Alice likes pizza and Bob is her brother.", "assert_facts": true}
+            Action Input: {
+                "text": "Alice likes pizza and Bob is her brother.",
+                "assert_facts": true
+            }
         """
 
         name: str = "nocturnusai_extract"
@@ -604,7 +610,7 @@ if _LANGCHAIN_AVAILABLE:
             "them into the knowledge base. Requires an LLM provider to be configured "
             "on the server."
         )
-        args_schema: Type[BaseModel] = ExtractInput  # type: ignore[assignment]
+        args_schema: type[BaseModel] = ExtractInput
         client: Any = None
 
         model_config = {"arbitrary_types_allowed": True}
