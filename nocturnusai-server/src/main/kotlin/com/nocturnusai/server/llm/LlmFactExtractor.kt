@@ -27,49 +27,26 @@ class LlmFactExtractor(
     private val logger = LoggerFactory.getLogger(LlmFactExtractor::class.java)
 
     private val systemPrompt = """
-You are a comprehensive fact extraction engine. Extract ALL structured facts from the given text.
-Your goal is COMPLETENESS — capture every entity, relationship, event, attribute, and numeric detail.
+You are a concise fact extraction engine. Extract the MINIMUM set of distinct, non-redundant facts from the given text.
+Your goal is REDUCTION — compress the text into the fewest facts that preserve all key information. Never extract two facts that say the same thing.
 
-Extraction categories (extract ALL that apply):
-1. ENTITIES: People, organizations, places, roles, titles
-   - IsA(entity, type): IsA(renee_good, mother), IsA(chuck_schumer, senate_minority_leader)
-   - HasRole(person, role): HasRole(jacky_rosen, senator)
-   - AffiliatedWith(person, org): AffiliatedWith(jacky_rosen, nevada)
+Use ONLY these predicate categories:
 
-2. EVENTS & ACTIONS: What happened, who did what to whom
-   - VotedOn(actor, subject): VotedOn(senate, dhs_funding_bill)
-   - Blocked(actor, target): Blocked(senate_democrats, dhs_funding_bill)
-   - ShotBy(victim, agent): ShotBy(renee_good, ice_agent)
-
-3. RELATIONSHIPS: Connections between entities
-   - CausedBy(effect, cause): CausedBy(shutdown, blocked_bill)
-   - Demands(actor, demand): Demands(democrats, ice_reforms)
-   - Opposes(actor, target): Opposes(democrats, status_quo)
-
-4. ATTRIBUTES & QUANTITIES: Numbers, dates, ages, measurements
-   - HasVoteCount(vote, count): HasVoteCount(dhs_vote, 52)
-   - RequiresCount(threshold, count): RequiresCount(filibuster_override, 60)
-   - HasAge(person, age): HasAge(renee_good, 37)
-   - OccurredOn(event, date): OccurredOn(renee_good_shooting, january_7)
-
-5. LOCATIONS & TEMPORAL: Where and when things happened
-   - LocatedIn(entity, place): LocatedIn(shooting, minneapolis)
-   - ScheduledFor(event, time): ScheduledFor(funding_expiry, midnight_friday)
-
-6. STATEMENTS & POSITIONS: Quotes, demands, accusations
-   - Stated(person, position): Stated(schumer, oppose_continuing_resolution)
-   - Accused(accuser, accused): Accused(democrats, trump_administration)
+ENTITIES: IsA, HasRole, AffiliatedWith
+ACTIONS:  Did, Said, Threatened, Proposed, Rejected, Demanded, Blocked, Approved
+RELATIONS: CausedBy, Opposes, Supports, Mediates, Involves
+ATTRIBUTES: HasValue, HasCount, HasStatus, HasName
+TEMPORAL: OccurredOn, Deadline, ScheduledFor, Duration
+LOCATION: LocatedIn, LocatedAt
 
 Rules:
-- Use CamelCase predicates (e.g., ShotBy, HasAge, OccurredOn, LocatedIn)
-- Use snake_case for arguments (e.g., renee_good, ice_agent, minneapolis)
-- Extract EVERY fact — prefer over-extraction to missing information
-- Decompose compound sentences into multiple atomic facts
-- Capture numeric values (vote counts, ages, dates, thresholds)
-- Capture temporal information (dates, deadlines, durations)
-- Each fact should have exactly 2-3 arguments
-- Set confidence 1.0 for explicit statements, 0.8-0.9 for strong implications
-- Return valid JSON array only, no other text
+- Use ONLY the predicates listed above. Do NOT invent new predicate names.
+- Use snake_case for arguments (e.g., president_trump, strait_of_hormuz)
+- Extract the FEWEST facts that capture all distinct information. Merge overlapping details into one fact.
+- If the same relationship appears multiple times in the text, extract it ONCE with the most complete version.
+- Each fact should have exactly 2-3 arguments.
+- Set confidence 1.0 for explicit statements, 0.8-0.9 for implications.
+- Return valid JSON array only, no other text.
 
 Return format:
 [{"predicate": "...", "args": ["...", "..."], "confidence": 0.0-1.0}]
@@ -95,7 +72,53 @@ Return format:
             throw RuntimeException("LLM extraction failed: ${e.message}", e)
         }
 
-        return parseResponse(response)
+        return deduplicateExtracted(parseResponse(response))
+    }
+
+    /**
+     * Post-extraction deduplication: remove facts that share the same predicate
+     * and first argument (keeping the one with the most arguments/detail), and
+     * collapse facts whose arguments are subsets of each other.
+     */
+    private fun deduplicateExtracted(facts: List<ExtractedFact>): List<ExtractedFact> {
+        if (facts.size <= 1) return facts
+
+        val result = mutableListOf<ExtractedFact>()
+        val used = BooleanArray(facts.size)
+
+        // Sort by number of args descending so the most detailed version is kept first
+        val indexed = facts.withIndex().sortedByDescending { it.value.args.size }
+
+        for ((i, fact) in indexed) {
+            if (used[i]) continue
+            result.add(fact)
+            used[i] = true
+
+            // Mark any less-detailed duplicate as used
+            for ((j, other) in indexed) {
+                if (used[j] || i == j) continue
+                if (isDuplicate(fact, other)) {
+                    used[j] = true
+                    logger.debug("Dedup: dropping {} (subsumed by {})", other, fact)
+                }
+            }
+        }
+
+        return result
+    }
+
+    /** Two facts are duplicates if they share the same predicate and first arg,
+     *  or if the shorter fact's args are a subset of the longer one's args. */
+    private fun isDuplicate(kept: ExtractedFact, candidate: ExtractedFact): Boolean {
+        if (kept.predicate != candidate.predicate) return false
+        // Same predicate + same first arg = duplicate
+        val kFirst = kept.args.firstOrNull()?.lowercase()
+        val cFirst = candidate.args.firstOrNull()?.lowercase()
+        if (kFirst != null && kFirst == cFirst) return true
+        // Args of candidate are a subset of kept
+        val kSet = kept.args.map { it.lowercase() }.toSet()
+        val cSet = candidate.args.map { it.lowercase() }.toSet()
+        return cSet.all { it in kSet }
     }
 
     private fun parseResponse(response: String): List<ExtractedFact> {
