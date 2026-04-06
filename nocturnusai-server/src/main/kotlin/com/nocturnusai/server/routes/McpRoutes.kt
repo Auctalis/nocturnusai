@@ -14,6 +14,13 @@
 
 package com.nocturnusai.server.routes
 
+import com.nocturnusai.context.GoalSpec
+import com.nocturnusai.context.OptimizeContextRequest
+import com.nocturnusai.context.RelevanceBucket
+import com.nocturnusai.memory.ContextFormat
+import com.nocturnusai.memory.ContextFormatter
+import com.nocturnusai.memory.ContextWindow
+import com.nocturnusai.memory.ScoredAtom
 import com.nocturnusai.server.*
 import com.nocturnusai.server.observability.Metrics
 import io.ktor.http.*
@@ -276,13 +283,19 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "context",
-            description = "Get the most relevant knowledge for your current reasoning step. Returns facts ranked by relevance (composite of recency, access frequency, and priority). Use this to efficiently populate your context window with the most important knowledge.",
+            description = "Get the most relevant knowledge for your current reasoning step. Returns facts ranked by relevance (composite of recency, access frequency, and priority). Use this to efficiently populate your context window with the most important knowledge. Optionally pass goals for goal-driven selection, sessionId for incremental diffing, or maxFactsPerPredicate for diversity control.",
             properties = mapOf(
                 "maxFacts" to propNumber("Maximum facts to return (default: 100)"),
                 "minSalience" to propNumber("Minimum salience score 0.0-1.0 (default: 0.0)"),
                 "minRelevance" to propNumber("Legacy alias for minSalience"),
                 "predicates" to propArray("Optional: only include these relationship types"),
-                "scope" to propString("Optional scope filter")
+                "scope" to propString("Optional scope filter"),
+                "format" to propString("Output format: 'predicate' (default, machine-readable), 'natural' (LLM-optimized natural language), or 'structured' (grouped with metadata)"),
+                "includeRules" to propBool("Include reasoning rules in the context (default: true)"),
+                "goals" to propGoalArray("Goal atoms for goal-driven selection, e.g. [{\"predicate\":\"recommend\",\"args\":[\"?x\"]}]"),
+                "sessionId" to propString("Session ID for incremental diffing across turns"),
+                "autoResolveContradictions" to propBool("Auto-resolve contradictions by salience (default: true)"),
+                "maxFactsPerPredicate" to propNumber("Optional diversity cap per predicate")
             ),
             required = emptyList()
         ))
@@ -590,17 +603,72 @@ private fun callContextWindow(db: com.nocturnusai.NocturnusAI, tenantId: String,
         ?: 0.0
     val predicates = args["predicates"]?.jsonArray?.map { it.jsonPrimitive.content }
     val scope = args["scope"]?.jsonPrimitive?.contentOrNull
+    val formatStr = args["format"]?.jsonPrimitive?.contentOrNull ?: "predicate"
+    val includeRules = args["includeRules"]?.jsonPrimitive?.booleanOrNull ?: true
 
-    val window = db.buildContextWindow(tenantId, scope, maxFacts, minSalience, predicates)
+    // Advanced mode params
+    val goalsJson = args["goals"]?.jsonArray
+    val sessionId = args["sessionId"]?.jsonPrimitive?.contentOrNull
+    val autoResolve = args["autoResolveContradictions"]?.jsonPrimitive?.booleanOrNull ?: true
+    val maxPerPredicate = args["maxFactsPerPredicate"]?.jsonPrimitive?.intOrNull
 
-    if (window.facts.isEmpty()) return "Context window is empty. No facts match the criteria."
+    val isAdvanced = goalsJson != null || sessionId != null || maxPerPredicate != null
 
-    val sb = StringBuilder("Context Window (${window.windowSize}/${window.totalAvailable} facts):\n")
-    sb.append("Predicates: ${window.predicateDistribution}\n\n")
-    for (scored in window.facts) {
-        sb.append("  [salience=${String.format("%.3f", scored.salience)}] ${scored.atom}\n")
+    val contextFormat = when (formatStr.lowercase()) {
+        "natural" -> ContextFormat.NATURAL
+        "structured" -> ContextFormat.STRUCTURED
+        else -> ContextFormat.PREDICATE
     }
-    return sb.toString()
+
+    if (isAdvanced) {
+        val goals = goalsJson?.map { goalObj ->
+            val g = goalObj.jsonObject
+            GoalSpec(
+                predicate = g["predicate"]!!.jsonPrimitive.content,
+                args = g["args"]!!.jsonArray.map { it.jsonPrimitive.content },
+                negated = g["negated"]?.jsonPrimitive?.booleanOrNull ?: false
+            )
+        }
+
+        val result = db.optimizeContext(
+            request = OptimizeContextRequest(
+                maxFacts = maxFacts,
+                scope = scope,
+                predicates = predicates,
+                goals = goals,
+                sessionId = sessionId,
+                autoResolveContradictions = autoResolve,
+                maxFactsPerPredicate = maxPerPredicate
+            ),
+            tenantId = tenantId
+        )
+
+        if (result.entries.isEmpty() && contextFormat == ContextFormat.PREDICATE) {
+            return "Context window is empty. No facts match the criteria."
+        }
+
+        // Convert to ContextWindow for formatting
+        val scoredAtoms = result.entries.map { entry -> ScoredAtom(entry.atom, entry.salience) }
+        val window = ContextWindow(
+            facts = scoredAtoms,
+            totalAvailable = result.totalFactsAvailable,
+            windowSize = result.totalFactsIncluded,
+            predicateDistribution = scoredAtoms.groupBy { it.atom.predicate }.mapValues { it.value.size },
+            generatedAt = result.generatedAt
+        )
+        val rules = if (includeRules) db.getRules(tenantId, scope) else emptyList()
+        return ContextFormatter.format(window, rules, contextFormat)
+    } else {
+        val window = db.buildContextWindow(tenantId, scope, maxFacts, minSalience, predicates)
+
+        // Backward compat: for PREDICATE format, keep the original empty-window message
+        if (window.facts.isEmpty() && contextFormat == ContextFormat.PREDICATE) {
+            return "Context window is empty. No facts match the criteria."
+        }
+
+        val rules = if (includeRules) db.getRules(tenantId, scope) else emptyList()
+        return ContextFormatter.format(window, rules, contextFormat)
+    }
 }
 
 private fun callTemporalQuery(db: com.nocturnusai.NocturnusAI, tenantId: String, args: JsonObject): String {
@@ -883,4 +951,17 @@ private fun propObject(description: String, props: Map<String, JsonObject>): Jso
     "type" to JsonPrimitive("object"),
     "description" to JsonPrimitive(description),
     "properties" to JsonObject(props)
+))
+
+private fun propGoalArray(description: String): JsonObject = JsonObject(mapOf(
+    "type" to JsonPrimitive("array"),
+    "description" to JsonPrimitive(description),
+    "items" to JsonObject(mapOf(
+        "type" to JsonPrimitive("object"),
+        "properties" to JsonObject(mapOf(
+            "predicate" to JsonObject(mapOf("type" to JsonPrimitive("string"))),
+            "args" to JsonObject(mapOf("type" to JsonPrimitive("array"), "items" to JsonObject(mapOf("type" to JsonPrimitive("string"))))),
+            "negated" to JsonObject(mapOf("type" to JsonPrimitive("boolean")))
+        ))
+    ))
 ))

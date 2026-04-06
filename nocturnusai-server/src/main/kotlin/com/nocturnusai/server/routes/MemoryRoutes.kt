@@ -14,6 +14,13 @@
 
 package com.nocturnusai.server.routes
 
+import com.nocturnusai.context.GoalSpec
+import com.nocturnusai.context.OptimizeContextRequest
+import com.nocturnusai.context.RelevanceBucket
+import com.nocturnusai.memory.ContextFormat
+import com.nocturnusai.memory.ContextFormatter
+import com.nocturnusai.memory.ContextWindow
+import com.nocturnusai.memory.ScoredAtom
 import com.nocturnusai.server.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -44,10 +51,19 @@ data class SalienceQueryRequest(
 
 @Serializable
 data class ContextWindowRequest(
+    // Simple mode
     val maxFacts: Int = 100,
     val minSalience: Double = 0.0,
     val predicates: List<String>? = null,
-    val scope: String? = null
+    val scope: String? = null,
+    val format: String? = null,        // "predicate", "natural", "structured"
+    val includeRules: Boolean = true,
+    // Advanced mode (presence triggers optimizeContext engine)
+    val goals: List<GoalSpecDto>? = null,
+    val sessionId: String? = null,
+    val autoResolveContradictions: Boolean = true,
+    val maxFactsPerPredicate: Int? = null,
+    val relevanceBuckets: List<RelevanceBucketDto>? = null
 )
 
 @Serializable
@@ -85,7 +101,18 @@ data class ContextWindowResponse(
     val totalAvailable: Int,
     val windowSize: Int,
     val predicateDistribution: Map<String, Int>,
-    val generatedAt: Long
+    val generatedAt: Long,
+    val formattedText: String? = null,   // present when format is specified (non-default)
+    // Advanced fields (present when optimization engine used)
+    val windowId: String? = null,
+    val rules: List<String>? = null,
+    val contradictionsFound: Int? = null,
+    val contradictionsResolved: Int? = null,
+    val contradictions: List<ContradictionResponse>? = null,
+    val deduplicationSavings: Int? = null,
+    val bucketStats: Map<String, BucketStatsResponse>? = null,
+    val goalDriven: Boolean = false,
+    val knowledgeGeneration: Long? = null
 )
 
 @Serializable
@@ -160,32 +187,120 @@ fun Route.memoryRoutes(dbManager: DatabaseManager) {
     }
 
     // Context window: "Give me the optimal set of facts for my next reasoning step"
+    // Unified endpoint: simple salience-ranked path OR advanced goal-driven optimization.
+    // Advanced mode is triggered when goals, sessionId, relevanceBuckets, or maxFactsPerPredicate are present.
     post("/memory/context") {
         try {
             val (db, tenantId) = call.getContext(dbManager)
             val req = call.receive<ContextWindowRequest>()
 
-            val window = db.buildContextWindow(tenantId, req.scope, req.maxFacts, req.minSalience, req.predicates)
-            val response = ContextWindowResponse(
-                facts = window.facts.map { scored ->
-                    ScoredAtomResponse(
-                        predicate = scored.atom.predicate,
-                        args = scored.atom.args.map { it.toString() },
-                        negated = !scored.atom.truthVal,
-                        scope = scored.atom.scope,
-                        salience = scored.salience,
-                        createdAt = scored.atom.createdAt,
-                        validFrom = scored.atom.validFrom,
-                        validUntil = scored.atom.validUntil,
-                        metadata = scored.atom.metadata
+            val isAdvanced = req.goals != null || req.sessionId != null ||
+                    req.relevanceBuckets != null || req.maxFactsPerPredicate != null
+
+            if (isAdvanced) {
+                // Delegate to optimization engine
+                val result = db.optimizeContext(
+                    request = OptimizeContextRequest(
+                        maxFacts = req.maxFacts,
+                        scope = req.scope,
+                        predicates = req.predicates,
+                        goals = req.goals?.map { GoalSpec(it.predicate, it.args, it.negated) },
+                        relevanceBuckets = req.relevanceBuckets?.map { RelevanceBucket(it.name, it.predicates, it.weight) },
+                        sessionId = req.sessionId,
+                        autoResolveContradictions = req.autoResolveContradictions,
+                        maxFactsPerPredicate = req.maxFactsPerPredicate
+                    ),
+                    tenantId = tenantId
+                )
+
+                // Build formatted text if requested
+                val contextFormat = when (req.format?.lowercase()) {
+                    "natural" -> ContextFormat.NATURAL
+                    "structured" -> ContextFormat.STRUCTURED
+                    else -> null
+                }
+                val formattedText = if (contextFormat != null) {
+                    val scoredAtoms = result.entries.map { entry ->
+                        ScoredAtom(entry.atom, entry.salience)
+                    }
+                    val window = ContextWindow(
+                        facts = scoredAtoms,
+                        totalAvailable = result.totalFactsAvailable,
+                        windowSize = result.totalFactsIncluded,
+                        predicateDistribution = scoredAtoms.groupBy { it.atom.predicate }.mapValues { it.value.size },
+                        generatedAt = result.generatedAt
                     )
-                },
-                totalAvailable = window.totalAvailable,
-                windowSize = window.windowSize,
-                predicateDistribution = window.predicateDistribution,
-                generatedAt = window.generatedAt
-            )
-            call.respond(response)
+                    val rules = if (req.includeRules) db.getRules(tenantId, req.scope) else emptyList()
+                    ContextFormatter.format(window, rules, contextFormat)
+                } else null
+
+                val response = ContextWindowResponse(
+                    facts = result.entries.map { entry ->
+                        ScoredAtomResponse(
+                            predicate = entry.atom.predicate,
+                            args = entry.atom.args.map { it.toString() },
+                            negated = !entry.atom.truthVal,
+                            scope = entry.atom.scope,
+                            salience = entry.salience,
+                            createdAt = entry.atom.createdAt,
+                            validFrom = entry.atom.validFrom,
+                            validUntil = entry.atom.validUntil,
+                            metadata = entry.atom.metadata
+                        )
+                    },
+                    totalAvailable = result.totalFactsAvailable,
+                    windowSize = result.totalFactsIncluded,
+                    predicateDistribution = result.entries.groupBy { it.atom.predicate }.mapValues { (_, v) -> v.size },
+                    generatedAt = result.generatedAt,
+                    formattedText = formattedText,
+                    windowId = result.windowId,
+                    rules = result.relevantRules.map { it.toString() },
+                    contradictionsFound = result.contradictionsFound,
+                    contradictionsResolved = result.contradictionsResolved,
+                    contradictions = result.contradictions.map { ContradictionResponse(it.predicate, it.args, it.positiveSalience, it.negativeSalience) },
+                    deduplicationSavings = result.deduplicationSavings,
+                    bucketStats = result.bucketStats.mapValues { (_, v) -> BucketStatsResponse(v.factsIncluded, v.maxAllocation, v.minSalience, v.maxSalience) },
+                    goalDriven = result.goalDriven,
+                    knowledgeGeneration = result.knowledgeGeneration
+                )
+                call.respond(response)
+            } else {
+                // Simple salience-ranked path (existing behavior)
+                val window = db.buildContextWindow(tenantId, req.scope, req.maxFacts, req.minSalience, req.predicates)
+
+                // Generate formatted text if a non-default format is requested
+                val formattedText = if (req.format != null && req.format.lowercase() != "predicate") {
+                    val contextFormat = when (req.format.lowercase()) {
+                        "natural" -> ContextFormat.NATURAL
+                        "structured" -> ContextFormat.STRUCTURED
+                        else -> ContextFormat.PREDICATE
+                    }
+                    val rules = if (req.includeRules) db.getRules(tenantId, req.scope) else emptyList()
+                    ContextFormatter.format(window, rules, contextFormat)
+                } else null
+
+                val response = ContextWindowResponse(
+                    facts = window.facts.map { scored ->
+                        ScoredAtomResponse(
+                            predicate = scored.atom.predicate,
+                            args = scored.atom.args.map { it.toString() },
+                            negated = !scored.atom.truthVal,
+                            scope = scored.atom.scope,
+                            salience = scored.salience,
+                            createdAt = scored.atom.createdAt,
+                            validFrom = scored.atom.validFrom,
+                            validUntil = scored.atom.validUntil,
+                            metadata = scored.atom.metadata
+                        )
+                    },
+                    totalAvailable = window.totalAvailable,
+                    windowSize = window.windowSize,
+                    predicateDistribution = window.predicateDistribution,
+                    generatedAt = window.generatedAt,
+                    formattedText = formattedText
+                )
+                call.respond(response)
+            }
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: DatabaseNotFoundException) {

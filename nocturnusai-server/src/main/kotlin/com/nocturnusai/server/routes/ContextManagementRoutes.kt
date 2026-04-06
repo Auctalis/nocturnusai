@@ -348,7 +348,7 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager, extractor: FactExt
         }
     }
 
-    // Goal-driven context optimization
+    // Goal-driven context optimization (DEPRECATED — use POST /memory/context with goals/sessionId instead)
     post("/context/optimize") {
         try {
             val (db, tenantId) = call.getContext(dbManager)
@@ -367,6 +367,11 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager, extractor: FactExt
                 ),
                 tenantId = tenantId
             )
+
+            // Deprecation headers — clients should migrate to POST /memory/context
+            call.response.header("Deprecation", "true")
+            call.response.header("Sunset", "2026-07-01")
+            call.response.header("Link", "</memory/context>; rel=\"successor-version\"")
 
             call.respond(OptimizedContextResponse(
                 windowId = result.windowId,

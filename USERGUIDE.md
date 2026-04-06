@@ -44,9 +44,11 @@ start with the context workflow, not the logic model.
 Recommended loop:
 
 1. `POST /context` for the first compact pass over raw turns
-2. `POST /context/optimize` when the next question is goal-specific
+2. `POST /memory/context` with `goals` when the next question is goal-specific (the unified context endpoint handles both simple salience ranking and goal-driven optimization)
 3. `POST /context/diff` on later turns with the same `sessionId`
 4. `POST /context/session/clear` when the thread ends
+
+> **Note:** `POST /context/optimize` is deprecated (sunset 2026-07-01). Use `POST /memory/context` with `goals` instead.
 
 Everything else in this guide explains the backend that makes that loop work: facts, rules, inference, truth maintenance, temporal state, and scopes.
 

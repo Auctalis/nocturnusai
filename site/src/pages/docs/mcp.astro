@@ -143,8 +143,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-cyan-400">context</td>
-                    <td class="py-2">Salience-ranked context window for agent reasoning</td>
-                    <td class="py-2 text-sm">"Get the 50 most relevant facts"</td>
+                    <td class="py-2">Unified context window — salience-ranked or goal-driven optimization</td>
+                    <td class="py-2 text-sm">"Get the 50 most relevant facts" or "Get context for SLA eligibility"</td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-cyan-400">compress</td>
@@ -196,9 +196,10 @@ curl -N http://localhost:9300/mcp/sse</code></pre>
     <hr />
 
     <h2 id="context">Context Optimization via MCP</h2>
-    <p>MCP gives you salience-ranked context directly via the <code>context</code> tool. Use it every turn before answering:</p>
-    <pre><code class="language-json">// MCP tool call (supported arguments)
-&#123;
+    <p>The MCP <code>context</code> tool now supports the full unified context API. Use it for simple salience windows or goal-driven optimization directly from your MCP client:</p>
+
+    <h3>Simple usage (salience-ranked)</h3>
+    <pre><code class="language-json">&#123;
   "method": "tools/call",
   "params": &#123;
     "name": "context",
@@ -210,7 +211,22 @@ curl -N http://localhost:9300/mcp/sse</code></pre>
     &#125;
   &#125;
 &#125;</code></pre>
-    <p class="text-slate-400 text-sm">The MCP server accepts <code>minSalience</code>. It also accepts the legacy alias <code>minRelevance</code> because some MCP clients still surface that older schema label.</p>
+
+    <h3>Goal-driven usage (optimization engine)</h3>
+    <pre><code class="language-json">&#123;
+  "method": "tools/call",
+  "params": &#123;
+    "name": "context",
+    "arguments": &#123;
+      "maxFacts": 25,
+      "goals": [&#123;"predicate":"eligible_for_sla","args":["acme_corp"]&#125;],
+      "sessionId": "mcp-session-42",
+      "format": "natural",
+      "includeRules": true
+    &#125;
+  &#125;
+&#125;</code></pre>
+    <p class="text-slate-400 text-sm">Adding <code>goals</code>, <code>sessionId</code>, <code>format</code>, or <code>includeRules</code> triggers the optimization engine. The MCP server also accepts the legacy alias <code>minRelevance</code> for <code>minSalience</code>.</p>
 
     <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
@@ -224,13 +240,13 @@ curl -N http://localhost:9300/mcp/sse</code></pre>
             <tbody class="text-slate-400">
                 <tr class="border-b border-white/5">
                     <td class="py-2">Salience-ranked context</td>
-                    <td class="py-2 font-mono">JSON-RPC <code>tools/call</code> + tool <code>context</code></td>
+                    <td class="py-2 font-mono">MCP <code>context</code> tool (simple args)</td>
                     <td class="py-2">MCP</td>
                 </tr>
                 <tr class="border-b border-white/5">
-                    <td class="py-2">Goal-driven context assembly</td>
-                    <td class="py-2 font-mono">HTTP <code>POST /context/optimize</code></td>
-                    <td class="py-2">Context API</td>
+                    <td class="py-2">Goal-driven context</td>
+                    <td class="py-2 font-mono">MCP <code>context</code> tool (with <code>goals</code>)</td>
+                    <td class="py-2">MCP</td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2">Incremental updates</td>
@@ -247,17 +263,8 @@ curl -N http://localhost:9300/mcp/sse</code></pre>
     </div>
 
     <p>
-        For <strong>goal-driven</strong> context windows (<code>/context/optimize</code> and <code>/context/diff</code>), call the HTTP Context API from your app/orchestrator alongside MCP tools. This gives you the full optimization pipeline: goals, contradiction handling, and session diffs.
+        Goal-driven context assembly now works directly through the MCP <code>context</code> tool. For incremental diffs and session cleanup, use the companion HTTP endpoints alongside MCP.
     </p>
-    <pre><code class="language-bash"># Companion HTTP call for goal-driven windows
-curl -X POST http://localhost:9300/context/optimize \
-  -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: default" \
-  -d '&#123;
-    "goals":[&#123;"predicate":"eligible_for_sla","args":["acme_corp"]&#125;],
-    "maxFacts":25,
-    "sessionId":"mcp-session-42"
-  &#125;'</code></pre>
 
     <hr />
 

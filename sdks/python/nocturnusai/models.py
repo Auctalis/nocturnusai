@@ -84,9 +84,8 @@ class ScoredAtom(BaseModel):
 class ContextWindow(BaseModel):
     """A salience-ranked window of facts for agent reasoning.
 
-    Represents the optimal subset of knowledge for the current reasoning
-    step, ranked by a composite score of recency, access frequency, and
-    priority.
+    When advanced parameters (goals, session_id, relevance_buckets) are used,
+    additional fields like window_id, rules, and contradictions will be populated.
     """
 
     facts: list[ScoredAtom] = Field(
@@ -109,6 +108,56 @@ class ContextWindow(BaseModel):
     generated_at: int = Field(
         alias="generatedAt",
         description="Epoch milliseconds when this window was generated.",
+    )
+    # New: LLM-formatted text (present when format parameter used)
+    formatted_text: str | None = Field(
+        default=None,
+        alias="formattedText",
+        description="LLM-optimized text rendering (present when format is specified).",
+    )
+    # Advanced fields (present when optimization engine used)
+    window_id: str | None = Field(
+        default=None,
+        alias="windowId",
+        description="Unique window identifier (present in advanced mode).",
+    )
+    rules: list[str] | None = Field(
+        default=None,
+        description="Relevant reasoning rules (present in advanced mode).",
+    )
+    contradictions_found: int | None = Field(
+        default=None,
+        alias="contradictionsFound",
+        description="Number of contradictions detected.",
+    )
+    contradictions_resolved: int | None = Field(
+        default=None,
+        alias="contradictionsResolved",
+        description="Number of contradictions auto-resolved.",
+    )
+    contradictions: list[ContradictionInfo] | None = Field(
+        default=None,
+        description="Detected contradictions.",
+    )
+    deduplication_savings: int | None = Field(
+        default=None,
+        alias="deduplicationSavings",
+        description="Number of duplicate facts removed.",
+    )
+    bucket_stats: dict[str, BucketStats] | None = Field(
+        default=None,
+        alias="bucketStats",
+        description="Statistics per relevance bucket.",
+    )
+    goal_driven: bool = Field(
+        default=False,
+        alias="goalDriven",
+        description="Whether the optimization was goal-driven.",
+    )
+    knowledge_generation: int | None = Field(
+        default=None,
+        alias="knowledgeGeneration",
+        description="Knowledge base generation counter.",
     )
 
     model_config = {"populate_by_name": True}

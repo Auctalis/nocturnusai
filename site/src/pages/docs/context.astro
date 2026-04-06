@@ -44,7 +44,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <h2 id="first-pass">Step 1: First Reduction With <code>POST /context</code></h2>
     <p>
-        Use <code>POST /context</code> when you want the first compact pass. Send raw turns. Get back the normalized state that seems most important.
+        Use <code>POST /context</code> when you want the first compact pass. Send raw turns. Get back the normalized state that seems most important. This endpoint extracts facts from your turns and stores them in the knowledge base.
     </p>
 
     <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context \
@@ -78,12 +78,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <hr />
 
-    <h2 id="goal-pass">Step 2: Ask The Next Question With <code>POST /context/optimize</code></h2>
+    <h2 id="goal-pass">Step 2: Ask The Next Question With <code>POST /memory/context</code></h2>
     <p>
-        The first pass is broad. The next pass should be question-specific. Once you know what the next model call is trying to do, use <code>/context/optimize</code> to narrow the window further.
+        The first pass is broad. The next pass should be question-specific. Once you know what the next model call is trying to do, use <code>/memory/context</code> with <code>goals</code> to narrow the window further.
+    </p>
+    <p>
+        <code>POST /memory/context</code> is the unified context endpoint. Simple requests (just <code>maxFacts</code>/<code>minSalience</code>) use a fast salience-ranked path. Adding <code>goals</code>, <code>sessionId</code>, or <code>relevanceBuckets</code> automatically triggers the full optimization engine — goal-driven backward chaining, contradiction handling, and session snapshots.
     </p>
 
-    <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context/optimize \
+    <pre data-lang="bash"><code>curl -X POST http://localhost:9300/memory/context \
   -H "Content-Type: application/json" \
   -H "X-Tenant-ID: default" \
   -d '&#123;
@@ -92,12 +95,20 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     "goals": [
       &#123;"predicate":"next_best_action","args":["acme_corp"]&#125;,
       &#123;"predicate":"service_credit_applicable","args":["acme_corp"]&#125;
-    ]
+    ],
+    "format": "natural"
   &#125;'</code></pre>
 
     <p>
         This is where the context window becomes operational instead of merely descriptive. The model stops seeing the whole incident and starts seeing the subset needed to answer the next action question.
     </p>
+    <p>
+        The <code>format</code> parameter controls output shape: <code>"natural"</code> returns a pre-formatted <code>formattedText</code> field ready to paste into a system prompt, while <code>"structured"</code> (the default) returns the entries array for programmatic use.
+    </p>
+
+    <div class="callout callout-info">
+        <strong>Deprecation notice:</strong> <code>POST /context/optimize</code> still works but is deprecated (sunset 2026-07-01). It returns a <code>Deprecation: true</code> header. Migrate to <code>POST /memory/context</code> with the same parameters.
+    </div>
 
     <hr />
 
@@ -145,6 +156,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <p>
         Most teams take the returned entries and flatten them into a short system or tool message. The model does not need the original transcript if the compact context already captures the operational state.
     </p>
+    <p>
+        The easiest approach: pass <code>"format": "natural"</code> and use the <code>formattedText</code> field directly in your system prompt. No manual formatting needed.
+    </p>
 
     <pre data-lang="python"><code>import requests
 from openai import OpenAI
@@ -152,24 +166,30 @@ from openai import OpenAI
 client = OpenAI()
 
 ctx = requests.post(
-    "http://localhost:9300/context/optimize",
+    "http://localhost:9300/memory/context",
     headers=&#123;"X-Tenant-ID": "default"&#125;,
     json=&#123;
         "sessionId": "support-thread-4821",
         "maxFacts": 10,
         "goals": [&#123;"predicate": "next_best_action", "args": ["acme_corp"]&#125;],
+        "format": "natural",
     &#125;,
 ).json()
 
-context_lines = [
-    f"- &#123;entry['predicate']&#125;(&#123;', '.join(entry['args'])&#125;)"
-    for entry in ctx["entries"]
-]
+# With format="natural", use formattedText directly
+context_text = ctx.get("formattedText", "")
+
+# Or with format="structured" (default), build lines from entries
+# context_lines = [
+#     f"- &#123;entry['predicate']&#125;(&#123;', '.join(entry['args'])&#125;)"
+#     for entry in ctx["entries"]
+# ]
+# context_text = "\n".join(context_lines)
 
 response = client.chat.completions.create(
     model="gpt-4o",
     messages=[
-        &#123;"role": "system", "content": "Use only this reduced context:\n" + "\n".join(context_lines)&#125;,
+        &#123;"role": "system", "content": "Use only this reduced context:\n" + context_text&#125;,
         &#123;"role": "user", "content": "Write the next support reply."&#125;,
     ],
 )</code></pre>
@@ -178,10 +198,10 @@ response = client.chat.completions.create(
 
     <h2 id="where-surfaces-fit">Where The Other Surfaces Fit</h2>
     <ul>
-        <li><strong>API:</strong> best when your app already owns the turn array and prompt assembly.</li>
-        <li><strong>Python SDK:</strong> best when you want <code>optimize_context()</code>, <code>diff_context()</code>, and session cleanup in app code.</li>
-        <li><strong>TypeScript SDK:</strong> best when you want <code>contextWindow()</code>, <code>optimizeContext()</code>, <code>diffContext()</code>, and <code>clearContextSession()</code> directly in app code.</li>
-        <li><strong>MCP:</strong> best when your agent runtime already uses tool calling. Use MCP <code>context</code> for salience retrieval and pair it with the HTTP context endpoints when you need goal-specific windows.</li>
+        <li><strong>API:</strong> best when your app already owns the turn array and prompt assembly. Use <code>POST /memory/context</code> for both simple salience windows and goal-driven optimization.</li>
+        <li><strong>Python SDK:</strong> best when you want <code>client.context()</code>, <code>diff_context()</code>, and session cleanup in app code.</li>
+        <li><strong>TypeScript SDK:</strong> best when you want <code>client.context()</code>, <code>diffContext()</code>, and <code>clearContextSession()</code> directly in app code.</li>
+        <li><strong>MCP:</strong> best when your agent runtime already uses tool calling. The MCP <code>context</code> tool now supports <code>goals</code>, <code>sessionId</code>, <code>format</code>, and <code>includeRules</code> — so you get the full optimization pipeline without leaving MCP.</li>
     </ul>
 
     <hr />

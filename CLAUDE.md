@@ -95,7 +95,7 @@ Built on Ktor 2.3.7 with Netty. Depends on `:nocturnusai-core`.
 
 **Routes** (`routes/`):
 - `LogicRoutes` — `POST /assert/fact`, `/assert/rule`, `/assert/template`, `/infer`, `/retract`, `/execute`
-- `MemoryRoutes` — `POST /memory/query/temporal`, `/memory/query/salient`, `/memory/context`, `/memory/priority`, `/memory/consolidate`, `/memory/decay`, `GET /memory/events` (SSE)
+- `MemoryRoutes` — `POST /memory/query/temporal`, `/memory/query/salient`, `/memory/context` (unified context endpoint: simple salience ranking OR goal-driven optimization via progressive disclosure), `/memory/priority`, `/memory/consolidate`, `/memory/decay`, `GET /memory/events` (SSE)
 - `SimplifiedRoutes` — `POST /tell`, `/ask`, `/query`, `/teach`, `/forget` (developer-friendly aliases); `POST /memory/recall`, `/memory/compress`, `/memory/cleanup`, `/memory/prioritize`; `GET /memory/stream`
 - `ScopeRoutes` — `POST /scope/fork`, `/scope/diff`, `/scope/merge`, `DELETE /scope/{name}`, `GET /scopes`
 - `AggregateRoutes` — `POST /aggregate` (COUNT/SUM/MIN/MAX/AVG), `POST /assert/facts` (bulk), `POST /retract/pattern`
@@ -187,6 +187,7 @@ Args: `--server`, `--db`, `--api-key`, `--tenant`/`-t`, `--exec`/`-e`.
 - **Negation-as-Failure (NAF)**: Closed-world assumption — `NOT p(?x)` in a rule body succeeds when `p(?x)` cannot be proven. Distinct from explicit negation (`truthVal=false`). In JSON: `{"predicate":"p","args":["?x"],"naf":true}`. In CLI/DSL: `NOT p(?x)`. Rete forward chaining evaluates NAF at fire time; backward chainer evaluates at query time.
 - **Confidence and conflict resolution**: Facts can carry `confidence: 0.0–1.0`. Queries accept `minConfidence` to filter low-confidence results. `ConflictStrategy` controls duplicate predicate+args handling: `REJECT` (error), `NEWEST_WINS`, `CONFIDENCE` (highest wins), `KEEP_BOTH`.
 - **Aggregation**: `POST /aggregate` with `AggregateOp` enum: `COUNT`, `SUM`, `MIN`, `MAX`, `AVG`. Operates over matched facts with optional `scope` and `argIndex` parameters. `COUNT` doesn't require `argIndex`; numeric ops do.
+- **Unified context API**: `POST /memory/context` is the single entry point for all context window operations. Simple requests (just `maxFacts`/`minSalience`) use a fast salience-ranked path. Adding `goals`, `sessionId`, or `relevanceBuckets` triggers the full optimization engine (goal-driven backward chaining, contradiction handling, session snapshots). `POST /context/optimize` is deprecated (sunset 2026-07-01) and returns a `Deprecation: true` header. SDKs expose a unified `client.context()` method; old `context_window()`/`optimize_context()` methods are deprecated. The MCP `context` tool accepts `goals`, `sessionId`, `format`, and `includeRules`.
 
 ## Testing
 

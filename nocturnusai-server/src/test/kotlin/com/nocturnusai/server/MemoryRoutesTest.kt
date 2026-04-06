@@ -120,6 +120,72 @@ class MemoryRoutesTest {
         assertEquals(HttpStatusCode.BadRequest, response.status)
     }
 
+    @Test
+    fun `POST memory-context - format natural returns formattedText`() = testApplication {
+        application { module() }
+
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"likes","args":["alice","bob"]}""")
+        }
+
+        val response = client.post("/memory/context") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"format":"natural"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertTrue(body.contains("formattedText"), "Expected 'formattedText' key: $body")
+        assertTrue(body.contains("Current Knowledge"), "Expected natural language header in formattedText: $body")
+    }
+
+    @Test
+    fun `POST memory-context - format structured returns formattedText`() = testApplication {
+        application { module() }
+
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"likes","args":["alice","bob"]}""")
+        }
+
+        val response = client.post("/memory/context") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"format":"structured"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertTrue(body.contains("formattedText"), "Expected 'formattedText' key: $body")
+        assertTrue(body.contains("knowledge"), "Expected structured XML-style tags in formattedText: $body")
+    }
+
+    @Test
+    fun `POST memory-context - default format has no formattedText`() = testApplication {
+        application { module() }
+
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"likes","args":["alice","bob"]}""")
+        }
+
+        val response = client.post("/memory/context") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        // formattedText should be null when no format is specified
+        assertTrue(body.contains("\"formattedText\":null"), "Expected 'formattedText' to be null when default format: $body")
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // POST /memory/consolidate
     // ─────────────────────────────────────────────────────────────────────────
@@ -381,5 +447,96 @@ class MemoryRoutesTest {
         }
 
         assertEquals(HttpStatusCode.OK, response.status)
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /memory/context — unified advanced mode (goal-driven optimization)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `POST memory-context - with goals triggers advanced mode`() = testApplication {
+        application { module() }
+
+        // Populate a fact
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"likes","args":["alice","bob"]}""")
+        }
+
+        val response = client.post("/memory/context") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"goals":[{"predicate":"likes","args":["?x","?y"]}]}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertTrue(body.contains("\"windowId\""), "Expected 'windowId' in advanced response: $body")
+        assertTrue(body.contains("\"goalDriven\":true"), "Expected goalDriven=true in response: $body")
+    }
+
+    @Test
+    fun `POST memory-context - with sessionId triggers advanced mode`() = testApplication {
+        application { module() }
+
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"status","args":["active"]}""")
+        }
+
+        val response = client.post("/memory/context") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"sessionId":"test-session-123"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertTrue(body.contains("\"windowId\""), "Expected 'windowId' in advanced response: $body")
+    }
+
+    @Test
+    fun `POST memory-context - simple mode has no windowId`() = testApplication {
+        application { module() }
+
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"color","args":["sky","blue"]}""")
+        }
+
+        val response = client.post("/memory/context") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"maxFacts":50}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertTrue(body.contains("\"windowId\":null"), "Expected windowId to be null in simple mode: $body")
+    }
+
+    @Test
+    fun `POST memory-context - advanced mode with format natural`() = testApplication {
+        application { module() }
+
+        client.post("/tell") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"predicate":"likes","args":["alice","bob"]}""")
+        }
+
+        val response = client.post("/memory/context") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody("""{"goals":[{"predicate":"likes","args":["?x","?y"]}],"format":"natural"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertTrue(body.contains("\"formattedText\""), "Expected formattedText in response: $body")
+        assertTrue(body.contains("\"windowId\""), "Expected windowId in advanced response: $body")
     }
 }

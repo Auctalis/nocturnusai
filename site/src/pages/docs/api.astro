@@ -70,7 +70,7 @@ curl -sS -X POST "$NOCTURNUS_BASE_URL/ask" \
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-emerald-400">POST /context/optimize</td>
-                    <td class="py-2">Advanced: goal-driven context window with buckets, diversity caps</td>
+                    <td class="py-2"><span class="text-yellow-400">Deprecated (sunset 2026-07-01)</span> — use <code>POST /memory/context</code> with <code>goals</code> instead</td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-emerald-400">POST /context/diff</td>
@@ -327,23 +327,116 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID" \
 
     <h2 id="memory">Memory Endpoints</h2>
 
-    <h3>POST /memory/context</h3>
-    <p>Get the top-K most salient facts for the agent's context window.</p>
+    <h3>POST /memory/context <span class="text-emerald-400 text-sm">(unified context endpoint)</span></h3>
+    <p>The single entry point for all context window operations. Simple requests (just <code>maxFacts</code>/<code>minSalience</code>) use a fast salience-ranked path. Adding <code>goals</code>, <code>sessionId</code>, or <code>relevanceBuckets</code> automatically triggers the full optimization engine.</p>
+
+    <h4>Simple usage (fast path)</h4>
     <pre><code class="language-bash">curl -X POST http://localhost:9300/memory/context \
   -H "Content-Type: application/json" \
   -H "X-Tenant-ID: default" \
   -d '&#123;
     "maxFacts": 100,
-    "minSalience": 0.0,
-    "predicates": null,
-    "scope": null
+    "minSalience": 0.0
   &#125;'</code></pre>
-    <pre><code class="language-json">&#123;
-  "maxFacts": 100,
-  "minSalience": 0.0,
-  "predicates": null,
-  "scope": null
-&#125;</code></pre>
+
+    <h4>Advanced usage (goal-driven optimization)</h4>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/memory/context \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "maxFacts": 25,
+    "goals": [&#123;"predicate":"enforceable","args":["contract_001"]&#125;],
+    "sessionId": "session-42",
+    "format": "natural",
+    "includeRules": true,
+    "autoResolveContradictions": true,
+    "relevanceBuckets": [
+      &#123;"name":"legal","predicates":["enforceable","statute_of_frauds"],"weight":3.0&#125;
+    ]
+  &#125;'</code></pre>
+
+    <h4>Request fields</h4>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-white/10 text-white">
+                    <th class="py-2">Field</th>
+                    <th class="py-2">Type</th>
+                    <th class="py-2">Default</th>
+                    <th class="py-2">Description</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-400">
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">maxFacts</td>
+                    <td class="py-2">int?</td>
+                    <td class="py-2">100</td>
+                    <td class="py-2">Maximum facts in the context window</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">minSalience</td>
+                    <td class="py-2">double?</td>
+                    <td class="py-2">0.0</td>
+                    <td class="py-2">Minimum salience score filter</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">predicates</td>
+                    <td class="py-2">string[]?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Filter to specific predicate names</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">scope</td>
+                    <td class="py-2">string?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Restrict to facts in this scope</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">format</td>
+                    <td class="py-2">string?</td>
+                    <td class="py-2">"structured"</td>
+                    <td class="py-2"><code>"natural"</code> returns pre-formatted <code>formattedText</code> for LLM prompts; <code>"structured"</code> returns entries array</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">includeRules</td>
+                    <td class="py-2">boolean?</td>
+                    <td class="py-2">false</td>
+                    <td class="py-2">Include relevant rules in the response</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">goals</td>
+                    <td class="py-2">GoalSpec[]?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Goal atoms for backward chaining (triggers optimization engine)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">sessionId</td>
+                    <td class="py-2">string?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Session ID for incremental diffs (triggers optimization engine)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">autoResolveContradictions</td>
+                    <td class="py-2">boolean?</td>
+                    <td class="py-2">true</td>
+                    <td class="py-2">Auto-resolve contradictions (keeps higher-salience fact)</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">maxFactsPerPredicate</td>
+                    <td class="py-2">int?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Diversity cap — max facts per predicate type</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">relevanceBuckets</td>
+                    <td class="py-2">Bucket[]?</td>
+                    <td class="py-2">null</td>
+                    <td class="py-2">Per-domain weighting: <code>name</code>, <code>predicates</code>, <code>weight</code> (triggers optimization engine)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="text-slate-400 text-sm">When <code>goals</code>, <code>sessionId</code>, or <code>relevanceBuckets</code> are present, the response includes additional fields: <code>formattedText</code>, <code>windowId</code>, <code>rules</code>, <code>contradictionsFound</code>, <code>contradictionsResolved</code>, <code>contradictions</code>, <code>deduplicationSavings</code>, <code>bucketStats</code>, <code>goalDriven</code>, <code>knowledgeGeneration</code>.</p>
 
     <h3>POST /memory/consolidate</h3>
     <p>Compress repetitive episodic patterns into semantic summaries.</p>
@@ -364,7 +457,7 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID" \
     </div>
 
     <div class="callout callout-tip">
-        <strong>Recommended production loop.</strong> Use <code>/context</code> for fast turn ingestion, <code>/context/optimize</code> with a stable <code>sessionId</code> for assembly, <code>/context/diff</code> for follow-up turns, and <code>/context/session/clear</code> when the conversation ends.
+        <strong>Recommended production loop.</strong> Use <code>/context</code> for fast turn ingestion, <code>/memory/context</code> with <code>goals</code> and a stable <code>sessionId</code> for assembly, <code>/context/diff</code> for follow-up turns, and <code>/context/session/clear</code> when the conversation ends.
     </div>
 
     <div class="overflow-x-auto">
@@ -378,15 +471,15 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID" \
             <tbody class="text-slate-400">
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono">POST /memory/context</td>
-                    <td class="py-2">Fast salience-ranked window</td>
+                    <td class="py-2"><strong>Unified context endpoint</strong> — simple salience window OR goal-driven optimization (progressive disclosure)</td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono">POST /context</td>
                     <td class="py-2">Turns in, facts out (simple ingestion + selection)</td>
                 </tr>
                 <tr class="border-b border-white/5">
-                    <td class="py-2 font-mono">POST /context/optimize</td>
-                    <td class="py-2">Goal-driven window with contradiction handling and session snapshots</td>
+                    <td class="py-2 font-mono text-yellow-400/70">POST /context/optimize</td>
+                    <td class="py-2"><span class="text-yellow-400">Deprecated (sunset 2026-07-01)</span> — use <code>POST /memory/context</code> with <code>goals</code></td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono">POST /context/diff</td>
@@ -450,7 +543,10 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID" \
 
     <hr />
 
-    <h3 id="context-optimize">POST /context/optimize</h3>
+    <h3 id="context-optimize">POST /context/optimize <span class="text-yellow-400 text-sm">(deprecated — sunset 2026-07-01)</span></h3>
+    <div class="callout callout-warning">
+        <strong>Deprecated.</strong> Use <code>POST /memory/context</code> with the same parameters instead. This endpoint returns a <code>Deprecation: true</code> response header. It will be removed after 2026-07-01.
+    </div>
     <p>Build an optimized context window. Optionally goal-driven via backward chaining.</p>
     <h4>cURL</h4>
     <pre><code class="language-bash">curl -X POST http://localhost:9300/context/optimize \
@@ -594,7 +690,7 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID" \
     <hr />
 
     <h3 id="context-diff">POST /context/diff</h3>
-    <p>Get incremental changes since a previous context window. Requires a <code>sessionId</code> that was used in a prior <code>/context/optimize</code> call. Only sends what changed — further reducing token spend on multi-turn conversations.</p>
+    <p>Get incremental changes since a previous context window. Requires a <code>sessionId</code> that was used in a prior <code>/memory/context</code> call (with <code>goals</code> or <code>sessionId</code>). Only sends what changed — further reducing token spend on multi-turn conversations.</p>
     <h4>Request</h4>
     <pre><code class="language-json">&#123;
   "sessionId": "session-42",

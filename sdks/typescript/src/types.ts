@@ -117,6 +117,36 @@ export interface ContextWindow {
 
   /** Epoch milliseconds when this window was generated. */
   generatedAt: number;
+
+  /** LLM-optimized text rendering (present when format is specified). */
+  formattedText?: string;
+
+  /** Unique window identifier (present in advanced mode). */
+  windowId?: string;
+
+  /** Relevant reasoning rules (present in advanced mode). */
+  rules?: string[];
+
+  /** Number of contradictions detected. */
+  contradictionsFound?: number;
+
+  /** Number of contradictions auto-resolved. */
+  contradictionsResolved?: number;
+
+  /** Detected contradictions. */
+  contradictions?: ContradictionInfo[];
+
+  /** Number of duplicate facts removed. */
+  deduplicationSavings?: number;
+
+  /** Statistics per relevance bucket. */
+  bucketStats?: Record<string, BucketStatsInfo>;
+
+  /** Whether the optimization was goal-driven. */
+  goalDriven?: boolean;
+
+  /** Knowledge base generation counter. */
+  knowledgeGeneration?: number;
 }
 
 /**
@@ -214,6 +244,23 @@ export interface ContradictionInfo {
 
   /** Salience of the negative fact. */
   negativeSalience: number;
+}
+
+/**
+ * Statistics for a relevance bucket allocation (used by the unified context endpoint).
+ */
+export interface BucketStatsInfo {
+  /** Number of facts included from this bucket. */
+  factsIncluded: number;
+
+  /** Maximum allocated facts for this bucket. */
+  maxAllocation: number;
+
+  /** Minimum salience within this bucket. */
+  minSalience: number;
+
+  /** Maximum salience within this bucket. */
+  maxSalience: number;
 }
 
 /**
@@ -588,6 +635,9 @@ export interface InferOptions {
 
 /**
  * Options for the context window endpoint.
+ *
+ * @deprecated Use {@link ContextOptions} instead, which supports both simple
+ * and advanced (goal-driven) modes via a single unified endpoint.
  */
 export interface ContextWindowOptions {
   /** Maximum number of facts to return. Defaults to 100. */
@@ -601,6 +651,48 @@ export interface ContextWindowOptions {
 
   /** Isolation scope. */
   scope?: string;
+}
+
+/**
+ * Options for the unified context endpoint.
+ * Simple usage returns salience-ranked facts. Adding goals, sessionId,
+ * or relevanceBuckets triggers the advanced optimization engine.
+ */
+export interface ContextOptions {
+  /** Maximum number of facts to return. Defaults to 100. */
+  maxFacts?: number;
+
+  /** Minimum salience score (0.0 to 1.0). Defaults to 0.0. */
+  minSalience?: number;
+
+  /** Optional list of predicate names to filter by. */
+  predicates?: string[];
+
+  /** Isolation scope. */
+  scope?: string;
+
+  /** Output format for formattedText: 'natural' or 'structured'. */
+  format?: 'natural' | 'structured';
+
+  /** Include reasoning rules in formattedText (default: true). */
+  includeRules?: boolean;
+
+  // --- Advanced params (triggers optimization engine) ---
+
+  /** Goal atoms for goal-driven backward-chaining selection. */
+  goals?: GoalSpec[];
+
+  /** Session ID for incremental diffing across turns. */
+  sessionId?: string;
+
+  /** Auto-resolve contradictions by salience. Defaults to true. */
+  autoResolveContradictions?: boolean;
+
+  /** Optional diversity cap per predicate. */
+  maxFactsPerPredicate?: number;
+
+  /** Optional weighted predicate buckets. */
+  relevanceBuckets?: RelevanceBucket[];
 }
 
 /**

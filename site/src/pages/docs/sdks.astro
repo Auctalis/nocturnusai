@@ -11,7 +11,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     </p>
 
     <div class="callout callout-info">
-        <strong>Context optimization surface area.</strong> Python exposes both salience windows and goal-driven context helpers directly. TypeScript currently exposes salience windows in the SDK; pair it with the Context API endpoints for goal-driven windows and session diffs.
+        <strong>Unified context API.</strong> Both Python and TypeScript SDKs expose a single <code>client.context()</code> method that handles simple salience windows and goal-driven optimization. Pass just <code>maxFacts</code> for a fast window, or add <code>goals</code>/<code>sessionId</code> to trigger the full optimization engine.
     </div>
 
     <hr />
@@ -62,17 +62,21 @@ async with NocturnusAIClient("http://localhost:9300") as client:
     print(results)</code></pre>
 
     <h3>Context Optimization</h3>
-    <p>The Python SDK includes full support for the Context Management Engine — the feature that cuts token costs by 97%:</p>
+    <p>The Python SDK includes full support for the Context Management Engine — the feature that cuts token costs by 97%. Use the unified <code>client.context()</code> method for both simple and goal-driven windows:</p>
     <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
 
 with SyncNocturnusAIClient("http://localhost:9300") as client:
     session_id = "session-42"
 
-    # Goal-driven context optimization
-    ctx = client.optimize_context(
+    # Simple salience-ranked window (fast path)
+    ctx = client.context(max_facts=50)
+
+    # Goal-driven context optimization (add goals to trigger optimization engine)
+    ctx = client.context(
         goals=[&#123;"predicate": "eligible_for_sla", "args": ["acme_corp"]&#125;],
         max_facts=25,
-        session_id=session_id
+        session_id=session_id,
+        format="natural"  # returns formattedText for direct LLM use
     )
     approx_tokens = max(1, ctx.total_char_count // 4)
     print(f"&#123;ctx.total_facts_included&#125; facts, ~&#123;approx_tokens&#125; tokens")
@@ -83,6 +87,9 @@ with SyncNocturnusAIClient("http://localhost:9300") as client:
 
     # Clear diff state when the conversation ends
     client.clear_context_session(session_id)</code></pre>
+    <div class="callout callout-info">
+        <strong>Deprecation note.</strong> The old <code>context_window()</code> and <code>optimize_context()</code> methods still work but are deprecated. Migrate to <code>context()</code> which supports all parameters from both.
+    </div>
 
     <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
@@ -95,12 +102,17 @@ with SyncNocturnusAIClient("http://localhost:9300") as client:
             </thead>
             <tbody class="text-slate-400">
                 <tr class="border-b border-white/5">
-                    <td class="py-2">Salience-ranked window</td>
+                    <td class="py-2">Unified context (simple + goal-driven)</td>
+                    <td class="py-2 font-mono"><code>context()</code></td>
+                    <td class="py-2 font-mono"><code>context()</code></td>
+                </tr>
+                <tr class="border-b border-white/5 text-slate-500">
+                    <td class="py-2">Salience-ranked window <span class="text-yellow-400/70 text-xs">(deprecated)</span></td>
                     <td class="py-2 font-mono"><code>context_window()</code></td>
                     <td class="py-2 font-mono"><code>contextWindow()</code></td>
                 </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-2">Goal-driven window</td>
+                <tr class="border-b border-white/5 text-slate-500">
+                    <td class="py-2">Goal-driven window <span class="text-yellow-400/70 text-xs">(deprecated)</span></td>
                     <td class="py-2 font-mono"><code>optimize_context()</code></td>
                     <td class="py-2 font-mono"><code>optimizeContext()</code></td>
                 </tr>
@@ -414,21 +426,23 @@ console.log(results);</code></pre>
 
     <h3>Context Optimization with TypeScript</h3>
     <p>
-        The TypeScript SDK now covers the full context-management loop directly: salience windows, goal-driven optimization,
+        The TypeScript SDK covers the full context-management loop with the unified <code>context()</code> method,
         incremental diffs, session cleanup, and one-shot text ingestion.
     </p>
-    <pre><code class="language-typescript">// 1) Salience-ranked window
-const window = await client.contextWindow(&#123;
+    <pre><code class="language-typescript">// 1) Simple salience-ranked window (fast path)
+const window = await client.context(&#123;
   maxFacts: 25,
   minSalience: 0.1,
   scope: 'session_acme_42',
 &#125;);
 
-// 2) Goal-driven window
-const optimized = await client.optimizeContext(&#123;
+// 2) Goal-driven window (add goals to trigger optimization engine)
+const optimized = await client.context(&#123;
   goals: [&#123; predicate: 'eligible_for_sla', args: ['acme_corp'] &#125;],
   maxFacts: 25,
   sessionId: 'session-42',
+  format: 'natural',       // returns formattedText for direct LLM use
+  includeRules: true,
 &#125;);
 
 // 3) Incremental diff for later turns
@@ -452,6 +466,7 @@ console.log(
   diff.added?.length ?? 0,
   ingested.context.totalCharCount,
 );</code></pre>
+    <p class="text-slate-400 text-sm">The old <code>contextWindow()</code> and <code>optimizeContext()</code> methods are deprecated. Use the unified <code>context()</code> method instead.</p>
 
     <h3>MCP Client</h3>
     <p>The SDK also includes an MCP client for JSON-RPC 2.0 tool calls:</p>

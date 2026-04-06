@@ -38,6 +38,7 @@ import type {
   RuleOptions,
   InferOptions,
   ContextWindowOptions,
+  ContextOptions,
   OptimizeContextOptions,
   DiffContextOptions,
   IngestAndOptimizeOptions,
@@ -325,6 +326,9 @@ export class NocturnusAIClient {
    * @param opts - Optional parameters: maxFacts, minSalience, predicates, scope.
    * @returns The context window with ranked facts and metadata.
    *
+   * @deprecated Use {@link context} instead, which supports both simple
+   * and advanced (goal-driven) modes via a single unified endpoint.
+   *
    * @example
    * ```ts
    * const ctx = await client.contextWindow({ maxFacts: 50, minSalience: 0.1 });
@@ -342,6 +346,57 @@ export class NocturnusAIClient {
   }
 
   /**
+   * Get the optimal context for the current reasoning step.
+   *
+   * Simple usage returns facts ranked by salience. When goals, sessionId,
+   * or relevanceBuckets are provided, the server uses its advanced
+   * optimization engine with backward chaining, contradiction detection,
+   * and session-based incremental diffing.
+   *
+   * @param opts - Context options (simple and/or advanced).
+   * @returns Context window with ranked facts and optional advanced metadata.
+   *
+   * @example
+   * ```ts
+   * // Simple: just the most relevant facts
+   * const ctx = await client.context({ maxFacts: 50 });
+   *
+   * // With LLM-friendly formatting
+   * const ctx = await client.context({ maxFacts: 50, format: 'natural' });
+   * console.log(ctx.formattedText);
+   *
+   * // Advanced: goal-driven with session tracking
+   * const ctx = await client.context({
+   *   goals: [{ predicate: 'recommend', args: ['?product'] }],
+   *   sessionId: 'turn-3',
+   *   format: 'natural',
+   * });
+   * ```
+   */
+  async context(opts?: ContextOptions): Promise<ContextWindow> {
+    const body: Record<string, unknown> = {};
+    if (opts?.maxFacts !== undefined) body.maxFacts = opts.maxFacts;
+    if (opts?.minSalience !== undefined) body.minSalience = opts.minSalience;
+    if (opts?.predicates !== undefined) body.predicates = opts.predicates;
+    if (opts?.scope !== undefined) body.scope = opts.scope;
+    if (opts?.format !== undefined) body.format = opts.format;
+    if (opts?.includeRules !== undefined) body.includeRules = opts.includeRules;
+    if (opts?.goals !== undefined) body.goals = opts.goals;
+    if (opts?.sessionId !== undefined) body.sessionId = opts.sessionId;
+    if (opts?.autoResolveContradictions !== undefined) {
+      body.autoResolveContradictions = opts.autoResolveContradictions;
+    }
+    if (opts?.maxFactsPerPredicate !== undefined) {
+      body.maxFactsPerPredicate = opts.maxFactsPerPredicate;
+    }
+    if (opts?.relevanceBuckets !== undefined) {
+      body.relevanceBuckets = opts.relevanceBuckets;
+    }
+
+    return this.requestJson<ContextWindow>('POST', '/memory/context', body);
+  }
+
+  /**
    * Build a goal-driven optimized context window.
    *
    * Unlike {@link contextWindow}, this endpoint can use goals, weighted buckets,
@@ -349,6 +404,9 @@ export class NocturnusAIClient {
    *
    * @param opts - Optimization options including goals, predicates, and sessionId.
    * @returns Optimized context window with selected entries and telemetry.
+   *
+   * @deprecated Use {@link context} with goals/sessionId parameters instead.
+   * The unified endpoint at POST /memory/context now supports all optimization features.
    *
    * @example
    * ```ts

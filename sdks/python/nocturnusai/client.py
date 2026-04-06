@@ -514,6 +514,10 @@ class NocturnusAIClient:
     ) -> ContextWindow:
         """Get the most salient facts for the current reasoning context.
 
+        .. deprecated::
+            Use :meth:`context` instead, which supports both simple and
+            advanced (goal-driven) modes via a single unified endpoint.
+
         Returns facts ranked by a composite salience score reflecting
         recency, access frequency, and explicit priority. Ideal for
         populating an LLM's context with the most relevant knowledge.
@@ -545,6 +549,95 @@ class NocturnusAIClient:
         result = await self._request("POST", "/memory/context", json_body=body)
         return _parse_context_window(result)
 
+    async def context(
+        self,
+        *,
+        max_facts: int = 100,
+        min_salience: float = 0.0,
+        predicates: list[str] | None = None,
+        scope: str | None = None,
+        format: str | None = None,
+        include_rules: bool = True,
+        # Advanced params (triggers optimization engine when present)
+        goals: list[dict[str, Any]] | None = None,
+        session_id: str | None = None,
+        auto_resolve_contradictions: bool = True,
+        max_facts_per_predicate: int | None = None,
+        relevance_buckets: list[dict[str, Any]] | None = None,
+    ) -> ContextWindow:
+        """Get the optimal context for your current reasoning step.
+
+        Simple usage returns facts ranked by salience. When goals, session_id,
+        or relevance_buckets are provided, the server uses its advanced
+        optimization engine with backward chaining, contradiction detection,
+        and session-based incremental diffing.
+
+        Args:
+            max_facts: Maximum number of facts to return.
+            min_salience: Minimum salience score (0.0 to 1.0).
+            predicates: Optional list of predicates to filter by.
+            scope: Optional scope filter.
+            format: Output format for formattedText field: 'natural' (LLM-optimized),
+                    'structured' (grouped with metadata), or None (no formattedText).
+            include_rules: Include reasoning rules in formattedText (default True).
+            goals: Goal atoms for goal-driven selection,
+                   e.g. [{"predicate": "recommend", "args": ["?x"]}].
+            session_id: Session ID for incremental diffing across turns.
+            auto_resolve_contradictions: Auto-resolve contradictions by salience.
+            max_facts_per_predicate: Optional diversity cap per predicate.
+            relevance_buckets: Weighted predicate buckets for allocation,
+                              e.g. [{"name": "prefs", "predicates": ["likes"], "weight": 3.0}].
+
+        Returns:
+            A :class:`ContextWindow` with ranked facts and metadata. When advanced
+            params are used, additional fields like window_id, rules, and
+            contradictions will be populated.
+
+        Example::
+
+            # Simple: just get the most relevant facts
+            ctx = await client.context(max_facts=50)
+
+            # With LLM-friendly formatting
+            ctx = await client.context(max_facts=50, format="natural")
+            print(ctx.formatted_text)  # natural language summary
+
+            # Advanced: goal-driven with session tracking
+            ctx = await client.context(
+                goals=[{"predicate": "recommend", "args": ["?product"]}],
+                session_id="turn-3",
+                relevance_buckets=[
+                    {"name": "prefs", "predicates": ["likes"], "weight": 3},
+                ],
+                format="natural",
+            )
+        """
+        body: dict[str, Any] = {
+            "maxFacts": max_facts,
+            "minSalience": min_salience,
+        }
+        if predicates is not None:
+            body["predicates"] = predicates
+        if scope is not None:
+            body["scope"] = scope
+        if format is not None:
+            body["format"] = format
+        if not include_rules:
+            body["includeRules"] = False
+        if goals is not None:
+            body["goals"] = goals
+        if session_id is not None:
+            body["sessionId"] = session_id
+        if not auto_resolve_contradictions:
+            body["autoResolveContradictions"] = False
+        if max_facts_per_predicate is not None:
+            body["maxFactsPerPredicate"] = max_facts_per_predicate
+        if relevance_buckets is not None:
+            body["relevanceBuckets"] = relevance_buckets
+
+        result = await self._request("POST", "/memory/context", json_body=body)
+        return _parse_context_window(result)
+
     async def optimize_context(
         self,
         goals: list[dict[str, Any]] | None = None,
@@ -557,6 +650,11 @@ class NocturnusAIClient:
         scope: str | None = None,
     ) -> OptimizedContext:
         """Get a goal-driven optimized context window.
+
+        .. deprecated::
+            Use :meth:`context` with goals/session_id parameters instead.
+            The unified endpoint at POST /memory/context now supports all
+            optimization features.
 
         Unlike context_window() which does flat salience ranking, this uses
         backward chaining to find facts reachable from your goals, deduplicates,
@@ -1414,6 +1512,38 @@ class SyncNocturnusAIClient:
             )
         )
 
+    def context(
+        self,
+        *,
+        max_facts: int = 100,
+        min_salience: float = 0.0,
+        predicates: list[str] | None = None,
+        scope: str | None = None,
+        format: str | None = None,
+        include_rules: bool = True,
+        goals: list[dict[str, Any]] | None = None,
+        session_id: str | None = None,
+        auto_resolve_contradictions: bool = True,
+        max_facts_per_predicate: int | None = None,
+        relevance_buckets: list[dict[str, Any]] | None = None,
+    ) -> ContextWindow:
+        """Get optimal context. See :meth:`NocturnusAIClient.context`."""
+        return self._run(
+            self._async_client.context(
+                max_facts=max_facts,
+                min_salience=min_salience,
+                predicates=predicates,
+                scope=scope,
+                format=format,
+                include_rules=include_rules,
+                goals=goals,
+                session_id=session_id,
+                auto_resolve_contradictions=auto_resolve_contradictions,
+                max_facts_per_predicate=max_facts_per_predicate,
+                relevance_buckets=relevance_buckets,
+            )
+        )
+
     def temporal_query(
         self,
         predicate: str,
@@ -1727,13 +1857,30 @@ def _parse_context_window(result: Any) -> ContextWindow:
                     "salience": sf.get("salience", 0.0),
                 })
 
-        return ContextWindow.model_validate({
+        data: dict[str, Any] = {
             "facts": parsed_facts,
             "totalAvailable": result.get("totalAvailable", 0),
             "windowSize": result.get("windowSize", 0),
             "predicateDistribution": result.get("predicateDistribution", {}),
             "generatedAt": result.get("generatedAt", 0),
-        })
+        }
+        # Pass through advanced / unified fields when present.
+        for key in (
+            "formattedText",
+            "windowId",
+            "rules",
+            "contradictionsFound",
+            "contradictionsResolved",
+            "contradictions",
+            "deduplicationSavings",
+            "bucketStats",
+            "goalDriven",
+            "knowledgeGeneration",
+        ):
+            if key in result:
+                data[key] = result[key]
+
+        return ContextWindow.model_validate(data)
 
     raise NocturnusAIAPIError(
         message="Unexpected response format for context window",
