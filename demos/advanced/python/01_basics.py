@@ -7,6 +7,7 @@ Demonstrates:
   - query()
   - infer()
   - retract()
+  - negated facts (explicit negation)
 """
 
 from nocturnusai import SyncNocturnusAIClient
@@ -48,12 +49,19 @@ def main():
         for atom in remaining:
             print(f"  {atom.predicate}({', '.join(atom.args)})")
 
-        print("\n=== 6. Negated fact ===")
+        print("\n=== 6. Negated fact (explicit negation) ===")
+        # Explicit negation: assert that something is NOT true.
+        # Negated facts are stored for truth maintenance and rule evaluation,
+        # but query() and infer() only return positive facts — by design.
         client.assert_fact("mortal", ["gods"], negated=True)
+
+        # query() correctly returns nothing for mortal(gods) — it's negated
         neg_results = client.query("mortal", ["gods"])
-        if neg_results:
-            a = neg_results[0]
-            print(f"  mortal(gods) negated={a.negated}")
+        print(f"  query mortal(gods): {len(neg_results)} results (negated facts are excluded from queries)")
+
+        # The negated fact IS stored — visible via the /admin/databases endpoint
+        # This is useful in rules: e.g., "if NOT mortal(?x) then immortal(?x)"
+        print("  Negated facts participate in rule evaluation and truth maintenance")
 
         print("\nDone.")
 

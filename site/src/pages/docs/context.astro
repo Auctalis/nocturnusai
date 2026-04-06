@@ -10,6 +10,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         Think in terms of turn reduction, not knowledge modeling. Your input is a big array of turns. Your output is a smaller context window for the next model call.
     </p>
 
+    <div class="callout callout-warning">
+        <strong>LLM required.</strong> The context workflow uses an LLM to extract structured facts from raw text.
+        You must configure a provider before these endpoints will work. The simplest path is <code>nocturnusai setup</code> (auto-configures Ollama),
+        or set <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, or <code>LLM_BASE_URL</code>/<code>LLM_MODEL</code> manually.
+        Without this, <code>POST /context</code> and <code>POST /context/ingest</code> will time out or return empty results.
+    </div>
+
     <div class="callout callout-success">
         <strong>Do not optimize the wrong thing.</strong> Most teams lose time trying to make the raw transcript "better." The practical problem is simpler: too many turns go into the prompt, so the model pays attention to noise and you pay for the noise too.
     </div>
@@ -43,6 +50,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <hr />
 
     <h2 id="first-pass">Step 1: First Reduction With <code>POST /context</code></h2>
+
+    <div class="callout callout-warning">
+        <strong>Requires LLM extraction.</strong> <code>POST /context</code> uses an LLM to extract structured facts from raw text.
+        You must configure an LLM provider — set <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>,
+        or point <code>LLM_BASE_URL</code>/<code>LLM_MODEL</code> at a local Ollama instance.
+        Without this, the endpoint will time out or return empty results.
+        If you just want to query pre-asserted facts, skip to <a href="#goal-pass">Step 2</a> using <code>POST /memory/context</code>.
+    </div>
+
     <p>
         Use <code>POST /context</code> when you want the first compact pass. Send raw turns. Get back the normalized state that seems most important. This endpoint extracts facts from your turns and stores them in the knowledge base.
     </p>

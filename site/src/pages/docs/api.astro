@@ -7,7 +7,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <DocsLayout title="API Reference">
     <h1>API Reference</h1>
     <p class="lead text-xl text-slate-400">
-        Every endpoint on the Nocturnus.AI HTTP server. Start with POST /context — the simplest way to cut your LLM token costs by 97%. Base URL: <code>http://localhost:9300</code>
+        Every endpoint on the Nocturnus.AI HTTP server. Run the smoke test below to verify your setup, then explore context management and the simplified API. Base URL: <code>http://localhost:9300</code>
     </p>
 
     <hr />
@@ -28,12 +28,20 @@ export NOCTURNUS_TENANT=default
 
 curl -sS "$NOCTURNUS_BASE_URL/health"
 
+## Tell two parent facts (need a chain for grandparent to work)
 curl -sS -X POST "$NOCTURNUS_BASE_URL/tell" \
   -H "Content-Type: application/json" \
   -H "X-Database: $NOCTURNUS_DB" \
   -H "X-Tenant-ID: $NOCTURNUS_TENANT" \
   -d '&#123;"predicate":"parent","args":["alice","bob"]&#125;'
 
+curl -sS -X POST "$NOCTURNUS_BASE_URL/tell" \
+  -H "Content-Type: application/json" \
+  -H "X-Database: $NOCTURNUS_DB" \
+  -H "X-Tenant-ID: $NOCTURNUS_TENANT" \
+  -d '&#123;"predicate":"parent","args":["bob","charlie"]&#125;'
+
+## Teach a rule: grandparent(?x,?z) :- parent(?x,?y), parent(?y,?z)
 curl -sS -X POST "$NOCTURNUS_BASE_URL/teach" \
   -H "Content-Type: application/json" \
   -H "X-Database: $NOCTURNUS_DB" \
@@ -46,11 +54,12 @@ curl -sS -X POST "$NOCTURNUS_BASE_URL/teach" \
   ]
 &#125;'
 
+## Ask: should return grandparent(alice, charlie)
 curl -sS -X POST "$NOCTURNUS_BASE_URL/ask" \
   -H "Content-Type: application/json" \
   -H "X-Database: $NOCTURNUS_DB" \
   -H "X-Tenant-ID: $NOCTURNUS_TENANT" \
-  -d '&#123;"predicate":"grandparent","args":["?who","bob"]&#125;'</code></pre>
+  -d '&#123;"predicate":"grandparent","args":["?who","charlie"]&#125;'</code></pre>
 
     <hr />
 
@@ -66,7 +75,7 @@ curl -sS -X POST "$NOCTURNUS_BASE_URL/ask" \
             <tbody class="text-slate-400">
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-emerald-400">POST /context</td>
-                    <td class="py-2"><strong>Simplest API</strong> — turns in, facts out. Array of strings → optimized facts</td>
+                    <td class="py-2"><strong>Simplest API</strong> — turns in, facts out. Array of strings → optimized facts. <em>Requires LLM provider.</em></td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-emerald-400">POST /context/optimize</td>
@@ -93,7 +102,7 @@ curl -sS -X POST "$NOCTURNUS_BASE_URL/ask" \
     </div>
 
     <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-emerald-500 text-slate-300">
-        <strong>New to NocturnusAI?</strong> Start with <code>POST /context</code> — send your conversation turns as an array of strings, get back ranked facts. <a href="/docs/context">See the full integration guide →</a>
+        <strong>New to NocturnusAI?</strong> Run the smoke test above — it uses <code>/tell</code>, <code>/teach</code>, and <code>/ask</code> which work immediately with no LLM config. For the full turn-reduction workflow with <code>POST /context</code>, you'll need an LLM provider configured. <a href={`${base}/docs/context`}>See the context workflow guide →</a>
     </div>
 
     <h2 id="simplified">Simplified API</h2>

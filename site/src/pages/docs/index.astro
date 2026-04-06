@@ -17,8 +17,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
   <h2>Start in four moves</h2>
   <ol>
-    <li>Send raw turns to <code>POST /context</code>.</li>
-    <li>Narrow the next decision with <code>POST /context/optimize</code>.</li>
+    <li>Send raw turns to <code>POST /context</code> (requires LLM — see note below).</li>
+    <li>Narrow the next decision with <code>POST /memory/context</code> and <code>goals</code>.</li>
     <li>Reuse the same <code>sessionId</code> with <code>POST /context/diff</code>.</li>
     <li>Clear the session when the thread ends.</li>
   </ol>
@@ -33,6 +33,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       "Audit log shows SAML issuer mismatch."
     ]
   &#125;'</code></pre>
+
+  <div class="callout callout-warning">
+    <strong>LLM extraction required for <code>POST /context</code>.</strong>
+    This endpoint extracts structured facts from raw text using an LLM.
+    Set <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, or configure <code>LLM_BASE_URL</code>/<code>LLM_MODEL</code> (e.g. Ollama).
+    Without LLM config, start with <code>POST /tell</code> to assert facts directly, then use <code>POST /memory/context</code> — no LLM needed.
+  </div>
 
   <h2>Where to go next</h2>
   <div class="docs-card-grid">
