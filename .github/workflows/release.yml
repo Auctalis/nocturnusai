@@ -32,9 +32,6 @@ jobs:
     name: CLI (${{ matrix.artifact }})
     needs: test
     runs-on: ${{ matrix.runner }}
-    # Allow macos-13 (Intel) to fail without blocking the release — the runner
-    # is only available on public repos; private repos get a configuration error.
-    continue-on-error: ${{ matrix.continue-on-error == true }}
     strategy:
       fail-fast: false
       matrix:
@@ -43,9 +40,6 @@ jobs:
             artifact: nocturnusai-linux-x86_64
           - runner: ubuntu-24.04-arm
             artifact: nocturnusai-linux-arm64
-          - runner: macos-13          # Intel — only available on public repos
-            artifact: nocturnusai-macos-x86_64
-            continue-on-error: true   # don't block release if runner is unavailable
           - runner: macos-latest      # Apple Silicon (M1/M2/M3)
             artifact: nocturnusai-macos-arm64
 
@@ -231,6 +225,9 @@ jobs:
     name: TypeScript SDK → npm
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # required for npm provenance
     steps:
       - uses: actions/checkout@v4
 
@@ -323,9 +320,6 @@ jobs:
             ```bash
             # macOS (Apple Silicon)
             curl -fsSL https://github.com/Auctalis/nocturnusai/releases/download/${{ github.ref_name }}/nocturnusai-macos-arm64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
-
-            # macOS (Intel)
-            curl -fsSL https://github.com/Auctalis/nocturnusai/releases/download/${{ github.ref_name }}/nocturnusai-macos-x86_64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
 
             # Linux (x86_64)
             curl -fsSL https://github.com/Auctalis/nocturnusai/releases/download/${{ github.ref_name }}/nocturnusai-linux-x86_64 -o /usr/local/bin/nocturnusai && chmod +x /usr/local/bin/nocturnusai
