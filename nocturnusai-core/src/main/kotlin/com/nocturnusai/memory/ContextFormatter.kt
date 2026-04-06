@@ -279,74 +279,102 @@ object ContextFormatter {
             .replaceFirstChar { it.uppercaseChar() }
     }
 
+    /**
+     * Templates for the locked predicate vocabulary.
+     * Each entry maps a predicate to a function: (subject, object) -> sentence.
+     * For 3-arg predicates the third arg is appended naturally.
+     */
+    private val predicateTemplates: Map<String, (String, String) -> String> = mapOf(
+        "IsA" to { s, o -> "$s is $o" },
+        "HasRole" to { s, o -> "$s serves as $o" },
+        "AffiliatedWith" to { s, o -> "$s is affiliated with $o" },
+        "Did" to { s, o -> "$s $o" },
+        "Said" to { s, o -> "$s said: \"$o\"" },
+        "Threatened" to { s, o -> "$s threatened $o" },
+        "Proposed" to { s, o -> "$s proposed $o" },
+        "Rejected" to { s, o -> "$s rejected $o" },
+        "Demanded" to { s, o -> "$s demanded $o" },
+        "Blocked" to { s, o -> "$s blocked $o" },
+        "Approved" to { s, o -> "$s approved $o" },
+        "CausedBy" to { s, o -> "$s was caused by $o" },
+        "Opposes" to { s, o -> "$s opposes $o" },
+        "Supports" to { s, o -> "$s supports $o" },
+        "Mediates" to { s, o -> "$s is mediated by $o" },
+        "Involves" to { s, o -> "$s involves $o" },
+        "HasValue" to { s, o -> "The $s is $o" },
+        "HasCount" to { s, o -> "There are $o $s" },
+        "HasStatus" to { s, o -> "The $s is $o" },
+        "HasName" to { s, o -> "$s is named $o" },
+        "OccurredOn" to { s, o -> "$s occurred on $o" },
+        "Deadline" to { s, o -> "The deadline for $s is $o" },
+        "ScheduledFor" to { s, o -> "$s is scheduled for $o" },
+        "Duration" to { s, o -> "The duration of $s is $o" },
+        "LocatedIn" to { s, o -> "$s is located in $o" },
+        "LocatedAt" to { s, o -> "$s is at $o" },
+    )
+
     private fun naturalizeAtom(atom: Atom): String {
         val args = atom.args
-        val predicate = humanizePredicate(atom.predicate)
+        val predicate = atom.predicate
 
-        val base = when (args.size) {
-            0 -> predicate
-            1 -> {
-                val subject = capitalizeEntity(args[0])
-                "$subject is $predicate"
+        val subject = if (args.isNotEmpty()) capitalizeEntity(args[0]) else ""
+        val obj = if (args.size >= 2) capitalizeEntity(args[1]) else ""
+        val third = if (args.size >= 3) capitalizeEntity(args[2]) else ""
+
+        // Try template lookup first
+        val template = predicateTemplates[predicate]
+        val base = when {
+            template != null && args.size >= 2 -> {
+                val sentence = template(subject, obj)
+                if (third.isNotEmpty()) "$sentence ($third)" else sentence
             }
-            2 -> {
-                val subject = capitalizeEntity(args[0])
-                val obj = capitalizeEntity(args[1])
-                "$subject $predicate $obj"
-            }
+            template != null && args.size == 1 -> template(subject, "")
+            // Fallback: split CamelCase into words
+            args.isEmpty() -> splitCamelCase(predicate)
+            args.size == 1 -> "$subject is ${splitCamelCase(predicate).lowercase()}"
+            args.size == 2 -> "$subject ${splitCamelCase(predicate).lowercase()} $obj"
             else -> {
-                val subject = capitalizeEntity(args[0])
                 val rest = args.drop(1).joinToString(", ") { capitalizeEntity(it) }
-                "$subject $predicate: $rest"
+                "$subject ${splitCamelCase(predicate).lowercase()}: $rest"
             }
         }
 
         return when {
             atom.naf -> "It is not known that ${base.replaceFirstChar { it.lowercaseChar() }}"
-            !atom.truthVal -> {
-                // Insert NOT after the subject for multi-arg, or "is NOT" for single-arg
-                when (args.size) {
-                    0 -> "NOT $predicate"
-                    1 -> {
-                        val subject = capitalizeEntity(args[0])
-                        "$subject is NOT $predicate"
-                    }
-                    2 -> {
-                        val subject = capitalizeEntity(args[0])
-                        val obj = capitalizeEntity(args[1])
-                        "$subject does NOT $predicate $obj"
-                    }
-                    else -> {
-                        val subject = capitalizeEntity(args[0])
-                        val rest = args.drop(1).joinToString(", ") { capitalizeEntity(it) }
-                        "$subject does NOT $predicate: $rest"
-                    }
-                }
-            }
+            !atom.truthVal -> "It is NOT the case that ${base.replaceFirstChar { it.lowercaseChar() }}"
             else -> base
         }
     }
 
+    /** Convert CamelCase or snake_case to space-separated words: "HasStatus" -> "Has status", "user_interested_in" -> "User interested in" */
+    private fun splitCamelCase(s: String): String {
+        // Handle snake_case first
+        if (s.contains('_')) return s.replace('_', ' ').replaceFirstChar { it.uppercaseChar() }
+        // Handle CamelCase
+        return s.replace(Regex("([a-z])([A-Z])"), "$1 $2")
+            .replace(Regex("([A-Z]+)([A-Z][a-z])"), "$1 $2")
+            .replaceFirstChar { it.uppercaseChar() }
+    }
+
     private fun naturalizeRule(rule: Rule): String {
-        val headPredicate = humanizePredicate(rule.head.predicate)
-        val conclusion = when (rule.head.args.size) {
-            0 -> headPredicate
-            1 -> "it is $headPredicate"
-            else -> "it $headPredicate ${rule.head.args.drop(1).joinToString(", ") { termToString(it) }}"
+        // Build the "then" clause from the head
+        val headAtom = rule.head
+        val conclusion = naturalizeAtom(headAtom)
+
+        // Build the "if" conditions from the body
+        val conditions = rule.body.map { bodyAtom ->
+            when {
+                bodyAtom.naf -> "it is NOT known that ${naturalizeAtom(bodyAtom).replaceFirstChar { it.lowercaseChar() }}"
+                !bodyAtom.truthVal -> "it is NOT the case that ${naturalizeAtom(bodyAtom).replaceFirstChar { it.lowercaseChar() }}"
+                else -> naturalizeAtom(bodyAtom).replaceFirstChar { it.lowercaseChar() }
+            }
         }
 
-        return "If something is ${rule.body.firstOrNull()?.let { humanizePredicate(it.predicate) } ?: "true"}" +
-            if (rule.body.size > 1) {
-                " and ${rule.body.drop(1).joinToString(" and ") { bodyAtom ->
-                    when {
-                        bodyAtom.naf -> "it is not known to be ${humanizePredicate(bodyAtom.predicate)}"
-                        !bodyAtom.truthVal -> "it is not ${humanizePredicate(bodyAtom.predicate)}"
-                        else -> "it is ${humanizePredicate(bodyAtom.predicate)}"
-                    }
-                }}"
-            } else {
-                ""
-            } + ", then $conclusion"
+        return if (conditions.isEmpty()) {
+            conclusion
+        } else {
+            "If ${conditions.joinToString(" AND ")}, then ${conclusion.replaceFirstChar { it.lowercaseChar() }}"
+        }
     }
 
     private fun termToString(term: Term): String {

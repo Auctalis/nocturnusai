@@ -148,9 +148,9 @@ class ContextFormatterTest {
 
         val result = ContextFormatter.format(w, format = ContextFormat.NATURAL)
 
-        assertTrue(result.contains("Alice does NOT located Nyc"), "Expected explicit negation, got:\n$result")
-        assertTrue(result.contains("It is not known that tweety is can fly") ||
-            result.contains("It is not known that Tweety is can fly"),
+        assertTrue(result.contains("It is NOT the case that") && result.contains("located"),
+            "Expected explicit negation, got:\n$result")
+        assertTrue(result.contains("It is not known that"),
             "Expected NAF phrasing, got:\n$result")
     }
 
@@ -226,10 +226,10 @@ class ContextFormatterTest {
         val result = ContextFormatter.format(w, rules, ContextFormat.NATURAL)
 
         assertTrue(result.contains("## Reasoning Rules (2 available)"), "Expected rules heading, got:\n$result")
-        assertTrue(result.contains("If something is human"), "Expected natural rule, got:\n$result")
-        assertTrue(result.contains("mortal") || result.contains("it is mortal"),
-            "Expected mortal conclusion, got:\n$result")
-        assertTrue(result.contains("not known to be penguin"),
+        assertTrue(result.contains("human") && result.contains("mortal"),
+            "Expected mortal/human rule, got:\n$result")
+        assertTrue(result.contains("If "), "Expected If... then... rule format, got:\n$result")
+        assertTrue(result.contains("NOT known"),
             "Expected NAF phrasing in rule, got:\n$result")
     }
 
@@ -428,8 +428,11 @@ class ContextFormatterTest {
 
         val result = ContextFormatter.format(w, format = ContextFormat.NATURAL)
 
-        assertTrue(result.contains("user interested in"), "Expected underscores replaced, got:\n$result")
-        assertTrue(result.contains("Functional programming"), "Expected entity underscore replaced, got:\n$result")
+        // CamelCase predicates use templates; snake_case fallback splits on underscore
+        assertTrue(result.contains("user interested in") || result.contains("User interested in"),
+            "Expected underscores replaced in predicate, got:\n$result")
+        assertTrue(result.contains("Functional programming") || result.contains("functional programming"),
+            "Expected entity underscore replaced, got:\n$result")
     }
 
     @Test

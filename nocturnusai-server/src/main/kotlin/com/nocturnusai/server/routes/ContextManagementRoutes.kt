@@ -284,6 +284,28 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager, extractor: FactExt
                         val atom = com.nocturnusai.core.Atom(fact.predicate, terms, scope = req.scope)
                         try { db.assertFact(atom, tenantId); newFactsExtracted++ } catch (_: Exception) { }
                     }
+                    // Also assert any extracted rules
+                    val llmExtractor = extractor as? com.nocturnusai.server.llm.LlmFactExtractor
+                    llmExtractor?.lastExtractionResult?.rules?.forEach { rule ->
+                        try {
+                            val headTerms = rule.head.args.map { a ->
+                                if (a.startsWith("?")) com.nocturnusai.core.Term.Variable(a.drop(1))
+                                else com.nocturnusai.core.Term.Identifier(a)
+                            }
+                            val head = com.nocturnusai.core.Atom(rule.head.predicate, headTerms, scope = req.scope)
+                            val body = rule.body.map { bodyAtom ->
+                                val bodyTerms = bodyAtom.args.map { a ->
+                                    if (a.startsWith("?")) com.nocturnusai.core.Term.Variable(a.drop(1))
+                                    else com.nocturnusai.core.Term.Identifier(a)
+                                }
+                                com.nocturnusai.core.Atom(bodyAtom.predicate, bodyTerms, scope = req.scope)
+                            }
+                            // Collect variables from head and body
+                            val allTerms = headTerms + body.flatMap { it.args }
+                            val ruleVars = allTerms.filterIsInstance<com.nocturnusai.core.Term.Variable>().distinct()
+                            db.assertRule(com.nocturnusai.core.Rule(ruleVars, head, body, scope = req.scope), tenantId)
+                        } catch (_: Exception) { }
+                    }
                 } catch (e: Exception) {
                     call.application.environment.log.warn("Extraction failed in /context: ${e.message}")
                     warning = "LLM extraction failed: ${e.message}. " +

@@ -14,23 +14,35 @@
 
 package com.nocturnusai.server.llm
 
+import com.nocturnusai.extraction.ExtractedAtom
 import com.nocturnusai.extraction.ExtractedFact
+import com.nocturnusai.extraction.ExtractedRule
 import com.nocturnusai.extraction.FactExtractor
 import kotlinx.serialization.json.*
 import org.slf4j.LoggerFactory
+
+data class ExtractionResult(
+    val facts: List<ExtractedFact>,
+    val rules: List<ExtractedRule>
+)
 
 class LlmFactExtractor(
     private val provider: LlmProvider,
     private val maxFacts: Int = 20
 ) : FactExtractor {
 
+    /** Last extraction result including rules. */
+    @Volatile
+    var lastExtractionResult: ExtractionResult? = null
+        private set
+
     private val logger = LoggerFactory.getLogger(LlmFactExtractor::class.java)
 
     private val systemPrompt = """
-You are a concise fact extraction engine. Extract the MINIMUM set of distinct, non-redundant facts from the given text.
+You are a concise fact and rule extraction engine. Extract the MINIMUM set of distinct, non-redundant facts AND logical rules from the given text.
 Your goal is REDUCTION — compress the text into the fewest facts that preserve all key information. Never extract two facts that say the same thing.
 
-Use ONLY these predicate categories:
+Use ONLY these predicate categories for facts:
 
 ENTITIES: IsA, HasRole, AffiliatedWith
 ACTIONS:  Did, Said, Threatened, Proposed, Rejected, Demanded, Blocked, Approved
@@ -39,17 +51,19 @@ ATTRIBUTES: HasValue, HasCount, HasStatus, HasName
 TEMPORAL: OccurredOn, Deadline, ScheduledFor, Duration
 LOCATION: LocatedIn, LocatedAt
 
-Rules:
+Also extract RULES when the text contains conditional logic ("if X then Y", "when X happens Y follows", cause-and-effect, threats with conditions, or requirements for outcomes). Rules have a head (conclusion) and body (conditions).
+
+Rules for extraction:
 - Use ONLY the predicates listed above. Do NOT invent new predicate names.
-- Use snake_case for arguments (e.g., president_trump, strait_of_hormuz)
+- Use snake_case for arguments (e.g., president_trump, strait_of_hormuz).
 - Extract the FEWEST facts that capture all distinct information. Merge overlapping details into one fact.
 - If the same relationship appears multiple times in the text, extract it ONCE with the most complete version.
 - Each fact should have exactly 2-3 arguments.
 - Set confidence 1.0 for explicit statements, 0.8-0.9 for implications.
-- Return valid JSON array only, no other text.
+- Return valid JSON only, no other text.
 
 Return format:
-[{"predicate": "...", "args": ["...", "..."], "confidence": 0.0-1.0}]
+{"facts": [{"predicate": "...", "args": ["...", "..."], "confidence": 0.0-1.0}], "rules": [{"head": {"predicate": "...", "args": ["...", "..."]}, "body": [{"predicate": "...", "args": ["...", "..."]}]}]}
 """.trimIndent()
 
     override suspend fun extract(text: String, context: String?): List<ExtractedFact> {
@@ -72,7 +86,12 @@ Return format:
             throw RuntimeException("LLM extraction failed: ${e.message}", e)
         }
 
-        return deduplicateExtracted(parseResponse(response))
+        val result = parseResponseFull(response)
+        lastExtractionResult = ExtractionResult(
+            facts = deduplicateExtracted(result.facts),
+            rules = result.rules
+        )
+        return lastExtractionResult!!.facts
     }
 
     /**
@@ -121,17 +140,32 @@ Return format:
         return cSet.all { it in kSet }
     }
 
-    private fun parseResponse(response: String): List<ExtractedFact> {
-        // Extract JSON array from response (LLMs sometimes wrap in markdown code blocks)
-        val jsonStr = extractJsonArray(response)
+    private fun parseResponseFull(response: String): ExtractionResult {
+        val jsonStr = extractJson(response)
 
-        val jsonArray = try {
-            Json.parseToJsonElement(jsonStr).jsonArray
+        val element = try {
+            Json.parseToJsonElement(jsonStr)
         } catch (e: Exception) {
-            logger.error("Failed to parse LLM response as JSON array: $response")
+            logger.error("Failed to parse LLM response as JSON: $response")
             throw RuntimeException("LLM returned invalid JSON: ${e.message}")
         }
 
+        // Handle both formats: {"facts": [...], "rules": [...]} or bare [...]
+        return when (element) {
+            is JsonObject -> {
+                val factsArray = element["facts"]?.jsonArray ?: JsonArray(emptyList())
+                val rulesArray = element["rules"]?.jsonArray ?: JsonArray(emptyList())
+                ExtractionResult(
+                    facts = parseFactsArray(factsArray),
+                    rules = parseRulesArray(rulesArray)
+                )
+            }
+            is JsonArray -> ExtractionResult(facts = parseFactsArray(element), rules = emptyList())
+            else -> throw RuntimeException("LLM returned unexpected JSON type")
+        }
+    }
+
+    private fun parseFactsArray(jsonArray: JsonArray): List<ExtractedFact> {
         val facts = mutableListOf<ExtractedFact>()
         for (element in jsonArray) {
             if (facts.size >= maxFacts) break
@@ -140,36 +174,73 @@ Return format:
                 val predicate = obj["predicate"]?.jsonPrimitive?.content ?: continue
                 val args = obj["args"]?.jsonArray?.map { it.jsonPrimitive.content } ?: continue
                 val confidence = obj["confidence"]?.jsonPrimitive?.floatOrNull ?: 1.0f
-
-                // Validate
-                if (predicate.isBlank()) continue
-                if (args.isEmpty() || args.size > 3) continue
+                if (predicate.isBlank() || args.isEmpty() || args.size > 3) continue
                 if (confidence < 0f || confidence > 1f) continue
-
                 facts.add(ExtractedFact(predicate, args, confidence.coerceIn(0f, 1f)))
             } catch (e: Exception) {
-                logger.warn("Skipping malformed fact in LLM response: ${e.message}")
+                logger.warn("Skipping malformed fact: ${e.message}")
             }
         }
-
         return facts
     }
 
-    private fun extractJsonArray(text: String): String {
-        // Try to find JSON array directly
-        val trimmed = text.trim()
-        if (trimmed.startsWith("[")) return trimmed
+    private fun parseRulesArray(jsonArray: JsonArray): List<ExtractedRule> {
+        val rules = mutableListOf<ExtractedRule>()
+        for (element in jsonArray) {
+            try {
+                val obj = element.jsonObject
+                val headObj = obj["head"]?.jsonObject ?: continue
+                val bodyArray = obj["body"]?.jsonArray ?: continue
 
-        // Try to extract from markdown code block
-        val codeBlockPattern = Regex("```(?:json)?\\s*\\n?(\\[.+])\\s*\\n?```", RegexOption.DOT_MATCHES_ALL)
+                val head = parseAtom(headObj) ?: continue
+                val body = bodyArray.mapNotNull { parseAtom(it.jsonObject) }
+                if (body.isEmpty()) continue
+
+                // Collect variables (args starting with ?)
+                val allArgs = (listOf(head) + body).flatMap { it.args }
+                val vars = allArgs.filter { it.startsWith("?") }.distinct()
+
+                rules.add(ExtractedRule(head, body, vars))
+            } catch (e: Exception) {
+                logger.warn("Skipping malformed rule: ${e.message}")
+            }
+        }
+        return rules
+    }
+
+    private fun parseAtom(obj: JsonObject): ExtractedAtom? {
+        val predicate = obj["predicate"]?.jsonPrimitive?.content ?: return null
+        val args = obj["args"]?.jsonArray?.map { it.jsonPrimitive.content } ?: return null
+        if (predicate.isBlank() || args.isEmpty()) return null
+        return ExtractedAtom(predicate, args)
+    }
+
+    private fun extractJson(text: String): String {
+        val trimmed = text.trim()
+        // Direct JSON object or array
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) return trimmed
+
+        // Try to extract from markdown code block (object or array)
+        val codeBlockPattern = Regex("```(?:json)?\\s*\\n?([{\\[].+[}\\]])\\s*\\n?```", RegexOption.DOT_MATCHES_ALL)
         val match = codeBlockPattern.find(trimmed)
         if (match != null) return match.groupValues[1]
 
-        // Last resort: find first [ and last ]
-        val start = trimmed.indexOf('[')
-        val end = trimmed.lastIndexOf(']')
-        if (start >= 0 && end > start) return trimmed.substring(start, end + 1)
+        // Last resort: find first { or [ and matching last } or ]
+        val objStart = trimmed.indexOf('{')
+        val arrStart = trimmed.indexOf('[')
+        val start = when {
+            objStart >= 0 && arrStart >= 0 -> minOf(objStart, arrStart)
+            objStart >= 0 -> objStart
+            arrStart >= 0 -> arrStart
+            else -> -1
+        }
+        if (start >= 0) {
+            val openChar = trimmed[start]
+            val closeChar = if (openChar == '{') '}' else ']'
+            val end = trimmed.lastIndexOf(closeChar)
+            if (end > start) return trimmed.substring(start, end + 1)
+        }
 
-        throw RuntimeException("Could not find JSON array in LLM response")
+        throw RuntimeException("Could not find JSON in LLM response")
     }
 }
