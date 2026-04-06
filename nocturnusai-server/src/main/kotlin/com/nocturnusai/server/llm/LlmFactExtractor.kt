@@ -39,31 +39,33 @@ class LlmFactExtractor(
     private val logger = LoggerFactory.getLogger(LlmFactExtractor::class.java)
 
     private val systemPrompt = """
-You are a concise fact and rule extraction engine. Extract the MINIMUM set of distinct, non-redundant facts AND logical rules from the given text.
-Your goal is REDUCTION — compress the text into the fewest facts that preserve all key information. Never extract two facts that say the same thing.
+You are a thorough fact and rule extraction engine. Extract EVERY distinct piece of information from the text. Each unique claim, event, quote, number, date, person, place, and causal relationship gets its own fact. Do not skip anything — but never state the same information twice.
 
-Use ONLY these predicate categories for facts:
+Predicates (use ONLY these):
 
-ENTITIES: IsA, HasRole, AffiliatedWith
-ACTIONS:  Did, Said, Threatened, Proposed, Rejected, Demanded, Blocked, Approved
-RELATIONS: CausedBy, Opposes, Supports, Mediates, Involves
-ATTRIBUTES: HasValue, HasCount, HasStatus, HasName
-TEMPORAL: OccurredOn, Deadline, ScheduledFor, Duration
-LOCATION: LocatedIn, LocatedAt
+IsA, HasRole, AffiliatedWith, Did, Said, Threatened, Proposed, Rejected, Demanded, Blocked, Approved, CausedBy, Opposes, Supports, Mediates, Involves, HasValue, HasCount, HasStatus, HasName, OccurredOn, Deadline, ScheduledFor, Duration, LocatedIn, LocatedAt
 
-Also extract RULES when the text contains conditional logic ("if X then Y", "when X happens Y follows", cause-and-effect, threats with conditions, or requirements for outcomes). Rules have a head (conclusion) and body (conditions).
+Also extract RULES for conditional logic ("if X then Y", threats with conditions, cause-and-effect).
 
-Rules for extraction:
-- Use ONLY the predicates listed above. Do NOT invent new predicate names.
-- Use snake_case for arguments (e.g., president_trump, strait_of_hormuz).
-- Extract the FEWEST facts that capture all distinct information. Merge overlapping details into one fact.
-- If the same relationship appears multiple times in the text, extract it ONCE with the most complete version.
-- Each fact should have exactly 2-3 arguments.
-- Set confidence 1.0 for explicit statements, 0.8-0.9 for implications.
-- Return valid JSON only, no other text.
+Example input: "Sen. Rosen, age 55, blocked the DHS bill. The vote was 52-48. Democrats demand ICE reforms."
+Example output:
+{"facts": [
+  {"predicate": "HasRole", "args": ["Rosen", "Senator"], "confidence": 1.0},
+  {"predicate": "HasValue", "args": ["Rosen", "Age 55"], "confidence": 1.0},
+  {"predicate": "Blocked", "args": ["Rosen", "DHS bill"], "confidence": 1.0},
+  {"predicate": "HasCount", "args": ["Vote result", "52-48"], "confidence": 1.0},
+  {"predicate": "Demanded", "args": ["Democrats", "ICE reforms"], "confidence": 1.0}
+], "rules": []}
 
-Return format:
-{"facts": [{"predicate": "...", "args": ["...", "..."], "confidence": 0.0-1.0}], "rules": [{"head": {"predicate": "...", "args": ["...", "..."]}, "body": [{"predicate": "...", "args": ["...", "..."]}]}]}
+Rules:
+- Use ONLY the predicates listed. Do NOT invent new ones.
+- Arguments in Title Case with spaces: "President Trump", "Strait of Hormuz". NOT snake_case.
+- Extract ALL details: every name, number, date, quote, weapon, vehicle, mediator, deadline.
+- Each fact = 2-3 arguments. Use the 3rd for context when helpful.
+- Confidence: 1.0 for explicit, 0.8 for analyst opinion or implication.
+- Return ONLY valid JSON, no other text.
+
+{"facts": [...], "rules": [...]}
 """.trimIndent()
 
     override suspend fun extract(text: String, context: String?): List<ExtractedFact> {

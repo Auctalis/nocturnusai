@@ -275,8 +275,10 @@ object ContextFormatter {
 
     private fun capitalizeEntity(term: Term): String {
         val raw = termToString(term)
+        // Handle snake_case (legacy) and Title Case (new) args
         return raw.replace('_', ' ')
-            .replaceFirstChar { it.uppercaseChar() }
+            .split(' ')
+            .joinToString(" ") { word -> word.replaceFirstChar { it.uppercaseChar() } }
     }
 
     /**
@@ -288,7 +290,7 @@ object ContextFormatter {
         "IsA" to { s, o -> "$s is $o" },
         "HasRole" to { s, o -> "$s serves as $o" },
         "AffiliatedWith" to { s, o -> "$s is affiliated with $o" },
-        "Did" to { s, o -> "$s $o" },
+        "Did" to { s, o -> "$s ${o.replaceFirstChar { it.lowercaseChar() }}" },
         "Said" to { s, o -> "$s said: \"$o\"" },
         "Threatened" to { s, o -> "$s threatened $o" },
         "Proposed" to { s, o -> "$s proposed $o" },

@@ -431,7 +431,7 @@ class ContextFormatterTest {
         // CamelCase predicates use templates; snake_case fallback splits on underscore
         assertTrue(result.contains("user interested in") || result.contains("User interested in"),
             "Expected underscores replaced in predicate, got:\n$result")
-        assertTrue(result.contains("Functional programming") || result.contains("functional programming"),
+        assertTrue(result.contains("Functional Programming") || result.contains("Functional programming"),
             "Expected entity underscore replaced, got:\n$result")
     }
 
