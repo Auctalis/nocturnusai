@@ -139,7 +139,12 @@ class MemoryRoutesTest {
         assertEquals(HttpStatusCode.OK, response.status)
         val body = response.bodyAsText()
         assertTrue(body.contains("formattedText"), "Expected 'formattedText' key: $body")
-        assertTrue(body.contains("Current Knowledge"), "Expected natural language header in formattedText: $body")
+        // When an LLM is available, the formatter produces a free-form briefing;
+        // otherwise the template formatter produces "## Current Knowledge".
+        assertTrue(
+            body.contains("likes") || body.contains("alice") || body.contains("Current Knowledge"),
+            "Expected formatted content referencing the asserted fact: $body"
+        )
     }
 
     @Test

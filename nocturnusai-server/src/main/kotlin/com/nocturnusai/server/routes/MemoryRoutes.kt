@@ -132,7 +132,7 @@ data class DecayResponse(
 
 // --- Routes ---
 
-fun Route.memoryRoutes(dbManager: DatabaseManager) {
+fun Route.memoryRoutes(dbManager: DatabaseManager, llmContextFormatter: com.nocturnusai.server.llm.LlmContextFormatter? = null) {
 
     // Temporal query: "What was true at time T?"
     post("/memory/query/temporal") {
@@ -223,15 +223,19 @@ fun Route.memoryRoutes(dbManager: DatabaseManager) {
                     val scoredAtoms = result.entries.map { entry ->
                         ScoredAtom(entry.atom, entry.salience)
                     }
-                    val window = ContextWindow(
-                        facts = scoredAtoms,
-                        totalAvailable = result.totalFactsAvailable,
-                        windowSize = result.totalFactsIncluded,
-                        predicateDistribution = scoredAtoms.groupBy { it.atom.predicate }.mapValues { it.value.size },
-                        generatedAt = result.generatedAt
-                    )
                     val rules = if (req.includeRules) db.getRules(tenantId, req.scope) else emptyList()
-                    ContextFormatter.format(window, rules, contextFormat)
+                    if (contextFormat == ContextFormat.NATURAL && llmContextFormatter != null) {
+                        llmContextFormatter.format(scoredAtoms, rules)
+                    } else {
+                        val window = ContextWindow(
+                            facts = scoredAtoms,
+                            totalAvailable = result.totalFactsAvailable,
+                            windowSize = result.totalFactsIncluded,
+                            predicateDistribution = scoredAtoms.groupBy { it.atom.predicate }.mapValues { it.value.size },
+                            generatedAt = result.generatedAt
+                        )
+                        ContextFormatter.format(window, rules, contextFormat)
+                    }
                 } else null
 
                 val response = ContextWindowResponse(
@@ -276,7 +280,11 @@ fun Route.memoryRoutes(dbManager: DatabaseManager) {
                         else -> ContextFormat.PREDICATE
                     }
                     val rules = if (req.includeRules) db.getRules(tenantId, req.scope) else emptyList()
-                    ContextFormatter.format(window, rules, contextFormat)
+                    if (contextFormat == ContextFormat.NATURAL && llmContextFormatter != null) {
+                        llmContextFormatter.format(window.facts, rules)
+                    } else {
+                        ContextFormatter.format(window, rules, contextFormat)
+                    }
                 } else null
 
                 val response = ContextWindowResponse(

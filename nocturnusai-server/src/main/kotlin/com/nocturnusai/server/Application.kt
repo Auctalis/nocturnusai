@@ -19,6 +19,7 @@ import com.nocturnusai.server.auth.ApiKeyManager
 import com.nocturnusai.server.auth.AuthInterceptor
 import com.nocturnusai.server.auth.AuthMode
 import com.nocturnusai.server.llm.LlmConfig
+import com.nocturnusai.server.llm.LlmContextFormatter
 import com.nocturnusai.server.llm.LlmFactExtractor
 import com.nocturnusai.server.llm.LlmRuleExtractor
 import com.nocturnusai.server.observability.LoggingConfig
@@ -352,7 +353,8 @@ fun Application.moduleWithStorageDir(storageDir: File) {
         aggregateRoutes(dbManager)
         transactionRoutes(dbManager)
         testRoutes(dbManager)
-        memoryRoutes(dbManager)
+        val llmContextFormatter = if (llmProvider != null) LlmContextFormatter(llmProvider) else null
+        memoryRoutes(dbManager, llmContextFormatter)
         contextManagementRoutes(dbManager, factExtractor, llmProvider?.name)
         scopeRoutes(dbManager)
         mcpRoutes(dbManager)
