@@ -61,8 +61,12 @@ ollama pull granite3.3:8b</pre>
           </div>
           <div class="panel-dark" style="padding: var(--space-3) var(--space-4);">
             <div class="panel-label">Start the server</div>
-            <pre style="margin: 0; font-size: 0.92rem; line-height: 1.8; white-space: pre-wrap;">docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest</pre>
-            <p style="margin: 0.6rem 0 0; font-size: 0.82rem; color: var(--site-muted-soft);">No Ollama? Pass <code>-e ANTHROPIC_API_KEY</code> or <code>-e OPENAI_API_KEY</code> instead.</p>
+            <pre style="margin: 0; font-size: 0.92rem; line-height: 1.8; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.45);"># With Ollama (free, local)</span>
+docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+
+<span style="color: rgba(255,255,255,0.45);"># Or with a cloud LLM (faster inference)</span>
+docker run -p 9300:9300 -e ANTHROPIC_API_KEY=sk-ant-... ghcr.io/auctalis/nocturnusai:latest
+docker run -p 9300:9300 -e OPENAI_API_KEY=sk-... ghcr.io/auctalis/nocturnusai:latest</pre>
           </div>
         </div>
 
