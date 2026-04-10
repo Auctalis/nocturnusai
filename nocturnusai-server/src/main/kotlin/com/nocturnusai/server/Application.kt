@@ -18,6 +18,7 @@ import com.nocturnusai.TenantNotFoundException
 import com.nocturnusai.server.auth.ApiKeyManager
 import com.nocturnusai.server.auth.AuthInterceptor
 import com.nocturnusai.server.auth.AuthMode
+import com.nocturnusai.server.conversation.ConversationTurnBuffer
 import com.nocturnusai.server.llm.LlmConfig
 import com.nocturnusai.server.llm.LlmContextFormatter
 import com.nocturnusai.server.llm.LlmFactExtractor
@@ -354,8 +355,9 @@ fun Application.moduleWithStorageDir(storageDir: File) {
         transactionRoutes(dbManager)
         testRoutes(dbManager)
         val llmContextFormatter = if (llmProvider != null) LlmContextFormatter(llmProvider) else null
+        val conversationTurnBuffer = ConversationTurnBuffer()
         memoryRoutes(dbManager, llmContextFormatter)
-        contextManagementRoutes(dbManager, factExtractor, llmProvider?.name)
+        contextManagementRoutes(dbManager, factExtractor, llmProvider?.name, llmContextFormatter, conversationTurnBuffer)
         scopeRoutes(dbManager)
         mcpRoutes(dbManager)
         observabilityRoutes(appMicrometerRegistry, dbManager, storageDir, llmProvider != null)

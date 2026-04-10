@@ -680,6 +680,15 @@ class NocturnusAI(
         ctx.contextManager.clearSession(sessionId)
     }
 
+    /**
+     * Peek at the previous snapshot for [sessionId] without modifying it.
+     * Returns null when no snapshot exists or it has expired.
+     */
+    fun peekContextSession(sessionId: String, tenantId: String? = null): ContextSnapshot? {
+        val ctx = getContext(tenantId)
+        return ctx.contextManager.peekSession(sessionId)
+    }
+
     /** Get the context management service for a tenant. */
     fun getContextManager(tenantId: String? = null): ContextManagementService {
         return getContext(tenantId).contextManager

@@ -94,6 +94,96 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <hr />
 
+    <h2 id="conversation-tracking">Tracking A Conversation Across Many Turns</h2>
+    <p>
+        For multi-turn agent loops you usually want three things at once: facts that belong to <em>this</em> conversation should be partitioned, the LLM extractor should see prior turns so pronouns resolve, and the next model call only needs to see what's <em>new</em>. <code>POST /context</code> handles all three with two fields.
+    </p>
+
+    <h3 id="three-layer-model">The Three-Layer Mental Model</h3>
+    <p>
+        It helps to think about facts in three layers, mapped onto NocturnusAI primitives that already exist:
+    </p>
+    <ul>
+        <li><strong>Tenant layer</strong> — durable knowledge that survives across conversations: customer profiles, product catalogs, policies. Stored under a <code>tenantId</code> with <code>scope = null</code>. Selected via the <code>X-Tenant-ID</code> header.</li>
+        <li><strong>Conversation layer</strong> — facts extracted from one specific dialog. Use the conversation id as the <code>scope</code> on every assertion so the conversation is a logical partition you can list, diff, merge, or delete in one shot.</li>
+        <li><strong>Derived layer</strong> — facts produced by inference rules off the other two. The provenance tracker keeps these consistent automatically; you don't manage them by hand.</li>
+    </ul>
+    <p>
+        The recommended pattern is to use the same string as both the <code>scope</code> and the <code>sessionId</code>. The scope partitions the facts; the sessionId keys the diff snapshot. Two clean roles, one identifier.
+    </p>
+
+    <h3 id="incremental-extraction">Incremental Updates Per Turn</h3>
+    <p>
+        Pass <code>sessionId</code> and <code>scope</code> on every <code>/context</code> call for the same conversation. The server then:
+    </p>
+    <ul>
+        <li>Tags every extracted fact and rule with that <code>scope</code>, so the conversation stays partitioned from tenant-wide knowledge.</li>
+        <li>Keeps a small ring buffer of the last few turns under that key and feeds them to the extractor as <code>contextHint</code>, so references like <em>"the same customer"</em> resolve correctly.</li>
+        <li>Snapshots the optimized window per <code>sessionId</code>, so the next call can compute a delta against it.</li>
+    </ul>
+    <p>
+        You can override the auto-built hint by sending <code>contextHint</code> explicitly. You can omit <code>scope</code> if you want all conversation facts to land under the tenant layer (not recommended for long-running agents — it conflates customers).
+    </p>
+
+    <h3 id="briefing-delta">The <code>briefingDelta</code> Field</h3>
+    <p>
+        From the second turn onward (i.e. once a snapshot exists for the <code>sessionId</code>), the response includes a <code>briefingDelta</code>: a short LLM-formatted natural-language briefing of <em>just the facts that are new this turn</em>. This is what you want to add to the next model prompt — not the entire window again.
+    </p>
+
+    <pre data-lang="bash"><code># Turn 1 — first call for this conversation
+curl -X POST http://localhost:9300/context \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "turns": [
+      "User: We still cannot log in after yesterday'\''s Okta cutover.",
+      "Tool crm_lookup: account=acme_corp tier=enterprise"
+    ],
+    "scope": "support-thread-4821",
+    "sessionId": "support-thread-4821",
+    "maxFacts": 12
+  &#125;'</code></pre>
+
+    <pre data-lang="bash"><code># Turn 2 — same scope + sessionId; the server pulls turn 1 as contextHint
+curl -X POST http://localhost:9300/context \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "turns": [
+      "Tool auth_audit: 14 failed SAML assertions; issuer mismatch detected.",
+      "Slack escalation: workaround is manual issuer override."
+    ],
+    "scope": "support-thread-4821",
+    "sessionId": "support-thread-4821",
+    "maxFacts": 12
+  &#125;'</code></pre>
+
+    <pre data-lang="json"><code>&#123;
+  "facts": [ /* full optimized window */ ],
+  "factsReturned": 7,
+  "newFactsExtracted": 3,
+  "briefingDelta": "## Authentication\nThe auth_audit tool detected an issuer mismatch after 14 failed SAML assertions. The accepted workaround is a manual issuer override.",
+  "sessionId": "support-thread-4821"
+&#125;</code></pre>
+
+    <p>
+        Pass <code>briefingDelta</code> straight into the next model call as a short system message. The full <code>facts</code> array is still available when you need to inspect or audit.
+    </p>
+
+    <h3 id="conversation-cleanup">Cleaning Up A Finished Conversation</h3>
+    <p>
+        When the conversation is done, delete the scope and clear the snapshot in two calls:
+    </p>
+    <pre data-lang="bash"><code>curl -X DELETE http://localhost:9300/scope/support-thread-4821 \
+  -H "X-Tenant-ID: default"
+
+curl -X POST http://localhost:9300/context/session/clear \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"sessionId":"support-thread-4821"&#125;'</code></pre>
+
+    <hr />
+
     <h2 id="goal-pass">Step 2: Ask The Next Question With <code>POST /memory/context</code></h2>
     <p>
         The first pass is broad. The next pass should be question-specific. Once you know what the next model call is trying to do, use <code>/memory/context</code> with <code>goals</code> to narrow the window further.

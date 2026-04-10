@@ -2,7 +2,10 @@ package com.nocturnusai.server.routes
 
 import com.nocturnusai.context.*
 import com.nocturnusai.extraction.FactExtractor
+import com.nocturnusai.memory.ScoredAtom
 import com.nocturnusai.server.*
+import com.nocturnusai.server.conversation.ConversationTurnBuffer
+import com.nocturnusai.server.llm.LlmContextFormatter
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -67,7 +70,26 @@ data class ClearSessionApiRequest(
 data class SimpleContextRequest(
     val turns: List<String>,
     val maxFacts: Int? = null,
-    val scope: String? = null
+    val scope: String? = null,
+    /**
+     * Stable conversation/session identifier. When supplied:
+     * - the server tracks recent turns under this key for incremental extraction,
+     * - newly-added facts since the previous call with the same sessionId are
+     *   returned as `briefingDelta` (LLM-formatted natural language),
+     * - the snapshot used for diffing is keyed by sessionId.
+     *
+     * If `scope` is also set and `sessionId` is not, the server uses `scope` as
+     * the session/conversation key. Most callers should use the same value for
+     * both `scope` and `sessionId` (the conversation id) so that facts and
+     * delta tracking line up cleanly.
+     */
+    val sessionId: String? = null,
+    /**
+     * Optional caller-supplied context hint (passed straight to the extractor).
+     * When omitted, the server builds one automatically from prior turns
+     * recorded under the sessionId/scope.
+     */
+    val contextHint: String? = null
 )
 
 @Serializable
@@ -85,7 +107,15 @@ data class SimpleContextResponse(
     val factsReturned: Int,
     val contradictions: Int,
     val newFactsExtracted: Int,
-    val warning: String? = null
+    val warning: String? = null,
+    /**
+     * Natural-language briefing of facts that are *new this turn* (not present
+     * in the previous snapshot for this sessionId). Empty when nothing was
+     * added or when no sessionId was supplied.
+     */
+    val briefingDelta: String? = null,
+    /** Echo of the sessionId used for snapshotting and turn buffering. */
+    val sessionId: String? = null
 )
 
 @Serializable
@@ -256,7 +286,13 @@ private fun RemovedEntry.toResponse() = RemovedEntryResponse(
 
 // --- Routes ---
 
-fun Route.contextManagementRoutes(dbManager: DatabaseManager, extractor: FactExtractor? = null, extractionProvider: String? = null) {
+fun Route.contextManagementRoutes(
+    dbManager: DatabaseManager,
+    extractor: FactExtractor? = null,
+    extractionProvider: String? = null,
+    llmContextFormatter: LlmContextFormatter? = null,
+    turnBuffer: ConversationTurnBuffer? = null
+) {
 
     // ==========================================
     // Simplified interface: turns in, facts out
@@ -271,14 +307,30 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager, extractor: FactExt
                 return@post
             }
 
-            // Step 1: Extract facts from each turn
+            // ── Resolve conversation key ────────────────────────────────────
+            // Use sessionId when supplied, otherwise fall back to scope. When both
+            // are present we still key on sessionId for diff/snapshot tracking.
+            val conversationKey = req.sessionId ?: req.scope
+            val bufferKey = if (conversationKey != null) "$tenantId:$conversationKey" else null
+
+            // ── Capture previous snapshot before this call mutates it ───────
+            val previousSnapshot = if (req.sessionId != null) {
+                try { db.peekContextSession(req.sessionId, tenantId) } catch (_: Exception) { null }
+            } else null
+            val previousKeys: Set<String> = previousSnapshot?.entries?.keys ?: emptySet()
+
+            // ── Build contextHint: caller-supplied wins, otherwise prior turns ──
+            val effectiveContextHint = req.contextHint
+                ?: bufferKey?.let { turnBuffer?.buildHint(it) }
+
+            // Step 1: Extract facts from the current turns (with hint from prior turns)
             val allText = req.turns.joinToString("\n")
             var newFactsExtracted = 0
             var warning: String? = null
 
             if (extractor != null) {
                 try {
-                    val facts = extractor.extract(allText)
+                    val facts = extractor.extract(allText, effectiveContextHint)
                     for (fact in facts) {
                         val terms = fact.args.map { com.nocturnusai.core.Term.Identifier(it) }
                         val atom = com.nocturnusai.core.Atom(fact.predicate, terms, scope = req.scope)
@@ -336,14 +388,44 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager, extractor: FactExt
                     "You can also use predicate syntax directly: predicate(arg1, arg2)"
             }
 
-            // Step 2: Optimize — return the most relevant facts
+            // ── Append turns to buffer AFTER extraction so this turn is hint
+            //    material for the *next* call, not this one. ─────────────────
+            if (bufferKey != null && turnBuffer != null) {
+                turnBuffer.append(bufferKey, req.turns)
+            }
+
+            // Step 2: Optimize — return the most relevant facts. Pass sessionId
+            // so a fresh snapshot is saved for the next /context call.
             val result = db.optimizeContext(
                 request = OptimizeContextRequest(
                     maxFacts = req.maxFacts ?: 50,
-                    scope = req.scope
+                    scope = req.scope,
+                    sessionId = req.sessionId
                 ),
                 tenantId = tenantId
             )
+
+            // ── Compute the delta of newly added entries vs the previous
+            //    snapshot (if any) and format them via LLM. ─────────────────
+            val addedEntries: List<SelectedContextEntry> = if (previousKeys.isNotEmpty()) {
+                result.entries.filter { entry ->
+                    val key = "${entry.atom.predicate}|${entry.atom.args.joinToString(",")}|${entry.atom.truthVal}|${entry.atom.scope ?: ""}"
+                    key !in previousKeys
+                }
+            } else {
+                // First turn for this session — everything is new
+                if (req.sessionId != null) result.entries else emptyList()
+            }
+
+            val briefingDelta: String? = if (addedEntries.isNotEmpty() && llmContextFormatter != null) {
+                try {
+                    val scored = addedEntries.map { ScoredAtom(it.atom, it.salience) }
+                    llmContextFormatter.format(scored, result.relevantRules)
+                } catch (e: Exception) {
+                    call.application.environment.log.warn("Briefing delta formatting failed: ${e.message}")
+                    null
+                }
+            } else null
 
             // Step 3: Flatten to simple response
             call.respond(SimpleContextResponse(
@@ -359,7 +441,9 @@ fun Route.contextManagementRoutes(dbManager: DatabaseManager, extractor: FactExt
                 factsReturned = result.totalFactsIncluded,
                 contradictions = result.contradictionsFound,
                 newFactsExtracted = newFactsExtracted,
-                warning = warning
+                warning = warning,
+                briefingDelta = briefingDelta,
+                sessionId = req.sessionId
             ))
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))

@@ -74,6 +74,8 @@ export type {
   ContextSummary,
   ExtractedFact,
   IngestAndOptimizeResult,
+  TurnFact,
+  TurnContextResult,
   ConsolidationResult,
   DecayResult,
 
@@ -96,6 +98,7 @@ export type {
   OptimizeContextOptions,
   DiffContextOptions,
   IngestAndOptimizeOptions,
+  ProcessTurnsOptions,
   EventSubscriptionOptions,
 
   // Events

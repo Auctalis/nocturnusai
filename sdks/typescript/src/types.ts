@@ -448,6 +448,70 @@ export interface IngestAndOptimizeResult {
 }
 
 /**
+ * A single fact returned by `POST /context` (the turns-in / facts-out endpoint).
+ */
+export interface TurnFact {
+  predicate: string;
+  args: string[];
+  salience: number;
+  /** "rule ← premise1, premise2" string when the fact was inferred. */
+  provenance?: string | null;
+}
+
+/**
+ * Options for `client.processTurns()`.
+ *
+ * Recommended: pass the conversation id as both `scope` and `sessionId`.
+ * The first scopes the extracted facts so the conversation is a logical
+ * partition; the second drives snapshot diffing and the prior-turn buffer.
+ */
+export interface ProcessTurnsOptions {
+  /** New turns to process this call. The server tracks priors via sessionId. */
+  turns: string[];
+  /** Maximum facts in the returned window. Defaults to 50 server-side. */
+  maxFacts?: number;
+  /** Logical partition for extracted facts. Use the conversation id. */
+  scope?: string;
+  /**
+   * Stable conversation id. From the second call onward, the response
+   * includes `briefingDelta` — the LLM-formatted natural-language summary
+   * of just the facts that are new this turn.
+   */
+  sessionId?: string;
+  /**
+   * Override the auto-built hint with explicit context text. Usually leave
+   * this undefined and let the server build it from prior turns.
+   */
+  contextHint?: string;
+}
+
+/**
+ * Result of `POST /context` — turns in, optimized facts and delta briefing out.
+ */
+export interface TurnContextResult {
+  /** Optimized window of facts (full window, not just the delta). */
+  facts: TurnFact[];
+  /** Total atoms currently in the knowledge base for this tenant. */
+  totalFactsInKB: number;
+  /** How many facts the response includes after optimization. */
+  factsReturned: number;
+  /** Number of contradictions detected during optimization. */
+  contradictions: number;
+  /** Facts newly created by extraction during this call. */
+  newFactsExtracted: number;
+  /** Operator-facing warning when extraction degraded (e.g. no LLM provider). */
+  warning?: string | null;
+  /**
+   * LLM-formatted natural-language briefing of facts NEW this turn vs the
+   * previous snapshot for the same `sessionId`. `null` on the first turn or
+   * when no LLM provider is configured.
+   */
+  briefingDelta?: string | null;
+  /** Echo of the sessionId used for snapshot tracking. */
+  sessionId?: string | null;
+}
+
+/**
  * Result of a memory consolidation operation.
  * Consolidation detects repeated episodic patterns and compresses them into
  * semantic summary facts.

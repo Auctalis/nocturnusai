@@ -40,6 +40,7 @@ from nocturnusai.models import (
     DecayResult,
     OptimizedContext,
     ProofTree,
+    TurnContextResult,
 )
 
 logger = logging.getLogger("nocturnusai")
@@ -912,6 +913,78 @@ class NocturnusAIClient:
             )
         return OptimizedContext.model_validate(result["context"])
 
+    async def process_turns(
+        self,
+        turns: list[str],
+        *,
+        max_facts: int | None = None,
+        scope: str | None = None,
+        session_id: str | None = None,
+        context_hint: str | None = None,
+    ) -> TurnContextResult:
+        """Process a batch of conversation turns into facts and an optimized context.
+
+        Wraps ``POST /context``: extracts facts from each turn (LLM if configured,
+        otherwise predicate syntax fallback), stores them, and returns the
+        most-relevant facts as a single window. When ``session_id`` is supplied
+        the server also tracks recent turns for the next call (so pronouns
+        resolve) and returns a ``briefing_delta`` of just the facts that are
+        new this turn.
+
+        Args:
+            turns: The new turns to process this call (just the new ones —
+                the server keeps track of priors via session_id).
+            max_facts: Maximum facts in the returned window. Defaults to 50.
+            scope: Logical partition for the extracted facts. Recommended
+                pattern: pass the same string for both ``scope`` and
+                ``session_id`` (typically the conversation id).
+            session_id: Stable conversation id used for snapshot diffing and
+                turn-buffer tracking. From the second call onward, the
+                response includes ``briefing_delta``.
+            context_hint: Override the auto-built hint with explicit context
+                text. Usually you can leave this None and let the server
+                build it from prior turns.
+
+        Returns:
+            A :class:`TurnContextResult` containing the optimized window plus
+            ``briefing_delta`` (LLM-formatted natural-language summary of
+            facts new since the previous turn for this session).
+
+        Example::
+
+            # First turn
+            result = await client.process_turns(
+                turns=["User: We can't log in after the Okta cutover."],
+                scope="ticket-4821",
+                session_id="ticket-4821",
+            )
+
+            # Second turn — server pulls turn 1 as contextHint, returns delta
+            result = await client.process_turns(
+                turns=["Tool auth_audit: issuer mismatch detected."],
+                scope="ticket-4821",
+                session_id="ticket-4821",
+            )
+            print(result.briefing_delta)  # only what's new this turn
+        """
+        body: dict[str, Any] = {"turns": turns}
+        if max_facts is not None:
+            body["maxFacts"] = max_facts
+        if scope is not None:
+            body["scope"] = scope
+        if session_id is not None:
+            body["sessionId"] = session_id
+        if context_hint is not None:
+            body["contextHint"] = context_hint
+
+        result = await self._request("POST", "/context", json_body=body)
+        if not isinstance(result, dict):
+            raise NocturnusAIAPIError(
+                message="Unexpected response from /context",
+                status_code=0,
+            )
+        return TurnContextResult.model_validate(result)
+
     async def temporal_query(
         self,
         predicate: str,
@@ -1668,6 +1741,29 @@ class SyncNocturnusAIClient:
                 text=text, goals=goals, max_facts=max_facts,
                 session_id=session_id, relevance_buckets=relevance_buckets,
                 scope=scope, context_hint=context_hint,
+            )
+        )
+
+    def process_turns(
+        self,
+        turns: list[str],
+        *,
+        max_facts: int | None = None,
+        scope: str | None = None,
+        session_id: str | None = None,
+        context_hint: str | None = None,
+    ) -> TurnContextResult:
+        """Process conversation turns into facts + delta briefing.
+
+        See :meth:`NocturnusAIClient.process_turns`.
+        """
+        return self._run(
+            self._async_client.process_turns(
+                turns=turns,
+                max_facts=max_facts,
+                scope=scope,
+                session_id=session_id,
+                context_hint=context_hint,
             )
         )
 

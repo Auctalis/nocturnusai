@@ -155,9 +155,9 @@ const heroPairs = [
           <div class="fits-stage is-accent">
             <h3>NocturnusAI</h3>
             <ul>
-              <li><code>POST /context</code> for the first cut</li>
-              <li><code>POST /context/optimize</code> for the next decision</li>
-              <li><code>POST /context/diff</code> for later turns</li>
+              <li><code>POST /context</code> with <code>sessionId</code></li>
+              <li>Server tracks turns, extracts facts</li>
+              <li>Returns <code>briefingDelta</code> — just what's new</li>
             </ul>
           </div>
           <div class="fits-stage">
@@ -182,21 +182,282 @@ const heroPairs = [
 
         <div class="fits-comparison reveal reveal-delay-3">
           <div class="panel-dark" style="padding: var(--space-4);">
-            <div class="panel-label">Before</div>
+            <div class="panel-label">Before — every model call pays for the full thread</div>
             <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;">messages = [
-  system(full_thread_state),
+  system(full_thread + tools + notes),
   user(next_question),
 ]</pre>
           </div>
           <div class="panel-dark" style="padding: var(--space-4);">
-            <div class="panel-label">After</div>
-            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;">window = POST /context(turns)
+            <div class="panel-label">After — each call only sees what changed</div>
+            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;">r = POST /context(
+  turns, scope, sessionId
+)
 messages = [
-  system(reduced_window),
+  system(r.briefingDelta),
   user(next_question),
 ]</pre>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section class="site-section-tight" id="see-it-work">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">See It Work</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">One support ticket. Four turns. Watch the waste disappear.</h2>
+          <p class="site-subtitle">
+            Same conversation id flows through as <code>scope</code> and <code>sessionId</code>. The server keeps track. Each turn, you only get what changed.
+            <span style="display: block; margin-top: 0.5rem; font-size: 0.85rem; color: var(--site-muted-soft);">Real output from a running server. Exact phrasing varies by LLM model.</span>
+          </p>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="walkthrough-step reveal reveal-delay-1">
+          <div class="step-marker">
+            <span class="step-number">1</span>
+            <span class="step-label">Turn 1 — Opening context</span>
+          </div>
+          <div class="step-columns">
+            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
+              <div class="panel-label">You send</div>
+              <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;">POST /context
+&#123;
+  "turns": [
+    "User: We can't log in after the Okta cutover.",
+    "Tool crm_lookup: account=acme tier=enterprise"
+  ],
+  <span style="color: #e8a86d;">"scope": "ticket-4821"</span>,
+  <span style="color: #e8a86d;">"sessionId": "ticket-4821"</span>
+&#125;</pre>
+            </div>
+            <div class="plain-card" style="flex: 1; border-left: 3px solid var(--site-accent);">
+              <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">You get back</div>
+              <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap; color: var(--site-text);">&#123;
+  "facts": [
+    &#123;"predicate":"HasStatus","args":["Login","Failed"]&#125;,
+    &#123;"predicate":"HasRole","args":["Acme","Enterprise Tier"]&#125;,
+    &#123;"predicate":"HasName","args":["Okta Cutover"]&#125;,
+    ...
+  ],
+  "newFactsExtracted": 4,
+  "sessionId": "ticket-4821",
+  "briefingDelta": "## Login Issue\n
+    Login is currently failing following the
+    Okta cutover. Acme is enterprise tier..."
+&#125;</pre>
+              <p style="margin-top: 0.8rem; font-size: 0.88rem; color: var(--site-muted);">
+                First turn &mdash; the LLM extracts structured facts and stores them under <code>scope=ticket-4821</code>. The <code>briefingDelta</code> covers everything (since it's all new). The snapshot is saved for diffing on the next call.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="walkthrough-step reveal reveal-delay-2">
+          <div class="step-marker">
+            <span class="step-number">2</span>
+            <span class="step-label">Turn 2 — New tool results come in</span>
+          </div>
+          <div class="step-columns">
+            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
+              <div class="panel-label">You send (just the new turns)</div>
+              <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;">POST /context
+&#123;
+  "turns": [
+    "Tool auth_audit: 14 failed SAML assertions.",
+    "Tool auth_audit: issuer mismatch after IdP migration."
+  ],
+  "scope": "ticket-4821",
+  "sessionId": "ticket-4821"
+&#125;</pre>
+              <p style="margin-top: 0.8rem; font-size: 0.82rem; color: rgba(255,255,255,0.55);">
+                You only send the new turns. The server already has turn 1 in its buffer and uses it as context so "the account" resolves correctly.
+              </p>
+            </div>
+            <div class="plain-card" style="flex: 1; border-left: 3px solid var(--site-accent);">
+              <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">briefingDelta &mdash; only what's new</div>
+              <pre style="margin: 0; font-size: 0.88rem; line-height: 1.7; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">## SAML Assertion Failure
+There were 14 failed SAML assertions
+starting at 09:12 UTC. An issuer mismatch
+was detected following the IdP migration.</pre>
+              <p style="margin-top: 0.8rem; font-size: 0.88rem; color: var(--site-muted);">
+                Turn 1 facts (login failure, enterprise tier) are <strong>not repeated</strong>. Only the SAML audit results appear in the delta. This is what goes into the next model call.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="walkthrough-step reveal reveal-delay-3">
+          <div class="step-marker">
+            <span class="step-number">3</span>
+            <span class="step-label">Turn 3 — Agent commits to a promise</span>
+          </div>
+          <div class="step-columns">
+            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
+              <div class="panel-label">You send</div>
+              <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;">POST /context
+&#123;
+  "turns": [
+    "Agent: If outage exceeds 4h, Acme gets credit."
+  ],
+  "scope": "ticket-4821",
+  "sessionId": "ticket-4821"
+&#125;</pre>
+            </div>
+            <div class="plain-card" style="flex: 1; border-left: 3px solid var(--site-accent);">
+              <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">briefingDelta</div>
+              <pre style="margin: 0; font-size: 0.88rem; line-height: 1.7; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">## Service Credit Proposal
+A service credit is being proposed for Acme.
+The outage threshold is 4 hours.</pre>
+              <p style="margin-top: 0.8rem; font-size: 0.88rem; color: var(--site-muted);">
+                The commitment is extracted and stored. The delta shows only the new proposal &mdash; not the 9 facts already in the window from turns 1&ndash;2.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="walkthrough-step reveal reveal-delay-4">
+          <div class="step-marker">
+            <span class="step-number">4</span>
+            <span class="step-label">Turn 4 — Resolution arrives</span>
+          </div>
+          <div class="step-columns">
+            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
+              <div class="panel-label">You send</div>
+              <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;">POST /context
+&#123;
+  "turns": [
+    "Tool statuspage: identity service recovered.",
+    "User: Confirmed — all teams can log in."
+  ],
+  "scope": "ticket-4821",
+  "sessionId": "ticket-4821"
+&#125;</pre>
+            </div>
+            <div class="plain-card" style="flex: 1; border-left: 3px solid var(--site-accent);">
+              <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">briefingDelta</div>
+              <pre style="margin: 0; font-size: 0.88rem; line-height: 1.7; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">## Login Status
+All user teams can log in again.
+The identity service is confirmed recovered.
+
+If identity service is recovered, then
+all associated user teams can log in.</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- The payoff -->
+        <div class="walkthrough-payoff reveal reveal-delay-5">
+          <div class="payoff-columns">
+            <div class="payoff-left">
+              <h3>What the model call sees at turn 4</h3>
+              <div class="panel-dark" style="padding: var(--space-4);">
+                <div class="panel-label">System prompt context</div>
+                <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;">Case delta since last reply:
+
+## Login Status
+All user teams can log in again.
+The identity service is confirmed recovered.</pre>
+              </div>
+              <p style="margin-top: 0.8rem; font-size: 0.92rem; color: var(--site-muted);">
+                <strong>3 sentences.</strong> Not the full transcript. The model gets only what changed &mdash; the 11 prior facts are already in the window from earlier turns.
+              </p>
+            </div>
+            <div class="payoff-right">
+              <h3>What it would have seen without Nocturnus</h3>
+              <div class="equation-box" style="padding: var(--space-4); opacity: 0.7;">
+                <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;">messages = [
+  system(full_thread + crm + audit + notes),
+  user(next_question),
+]
+
+// 10 messages. ~2,400 tokens.
+// Replayed every model call.
+// Most of it no longer relevant.</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cleanup -->
+        <div class="walkthrough-step reveal" style="margin-top: var(--space-6);">
+          <div class="step-marker">
+            <span class="step-number" style="background: var(--site-muted-soft);">5</span>
+            <span class="step-label">Ticket closed &mdash; clean up</span>
+          </div>
+          <div class="step-columns">
+            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
+              <div class="panel-label">Two calls. Everything gone.</div>
+              <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.5);">// Delete the conversation facts</span>
+DELETE /scope/ticket-4821
+
+<span style="color: rgba(255,255,255,0.5);">// Clear the snapshot</span>
+POST /context/session/clear
+&#123; "sessionId": "ticket-4821" &#125;</pre>
+            </div>
+            <div class="plain-card" style="flex: 1;">
+              <h3 style="font-size: 1rem;">Promote what matters first</h3>
+              <p>Before deleting, move durable facts to the tenant layer (no scope) so the <em>next</em> conversation with Acme remembers they are enterprise tier and had a prior outage. Ephemeral turn noise is gone. Customer knowledge stays.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- SDK examples -->
+        <div class="walkthrough-sdk reveal" style="margin-top: var(--space-7);">
+          <h3 style="text-align: center; margin-bottom: var(--space-3);">Same flow in code</h3>
+          <div class="sdk-tabs">
+            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
+              <div class="panel-label">Python</div>
+              <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;">from nocturnusai import SyncNocturnusAIClient
+
+c = SyncNocturnusAIClient("http://localhost:9300")
+
+<span style="color: rgba(255,255,255,0.5);"># Turn 1</span>
+r = c.process_turns(
+    turns=["User: Can't log in after Okta cutover."],
+    scope="ticket-4821",
+    session_id="ticket-4821",
+)
+
+<span style="color: rgba(255,255,255,0.5);"># Turn 2 — server auto-feeds turn 1 as context</span>
+r = c.process_turns(
+    turns=["Tool: 14 failed SAML assertions."],
+    scope="ticket-4821",
+    session_id="ticket-4821",
+)
+print(r.briefing_delta)
+<span style="color: rgba(255,255,255,0.5);"># "The auth_audit tool detected an issuer...</span></pre>
+            </div>
+            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
+              <div class="panel-label">TypeScript</div>
+              <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;">import &#123; NocturnusAIClient &#125; from 'nocturnusai-sdk';
+
+const c = new NocturnusAIClient(&#123;
+  baseUrl: 'http://localhost:9300',
+&#125;);
+
+<span style="color: rgba(255,255,255,0.5);">// Turn 1</span>
+await c.processTurns(&#123;
+  turns: ["User: Can't log in after Okta cutover."],
+  scope: 'ticket-4821',
+  sessionId: 'ticket-4821',
+&#125;);
+
+<span style="color: rgba(255,255,255,0.5);">// Turn 2</span>
+const r = await c.processTurns(&#123;
+  turns: ['Tool: 14 failed SAML assertions.'],
+  scope: 'ticket-4821',
+  sessionId: 'ticket-4821',
+&#125;);
+console.log(r.briefingDelta);</pre>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 

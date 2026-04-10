@@ -47,6 +47,8 @@ from nocturnusai.models import (
     ProofStep,
     ProofTree,
     ScoredAtom,
+    TurnContextResult,
+    TurnFact,
 )
 
 __version__ = "0.2.4"
@@ -64,6 +66,8 @@ __all__ = [
     "ProofStep",
     "ProofTree",
     "ScoredAtom",
+    "TurnContextResult",
+    "TurnFact",
     # Exceptions
     "NocturnusAIAPIError",
     "NocturnusAIConflictError",

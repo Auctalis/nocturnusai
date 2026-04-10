@@ -369,6 +369,16 @@ class ContextManagementService(
         sessionStore.remove(sessionId)
     }
 
+    /**
+     * Peek at the previous snapshot for [sessionId] without modifying it.
+     * Returns null when no snapshot exists or it has expired.
+     *
+     * Useful for computing deltas around an upcoming optimizeContext call:
+     * capture the previous snapshot, run optimize, and compare current entries
+     * against the snapshot to find what's *newly added* this turn.
+     */
+    fun peekSession(sessionId: String): ContextSnapshot? = sessionStore.load(sessionId)
+
     // --- Candidate Gathering ---
 
     private fun gatherGlobalCandidates(

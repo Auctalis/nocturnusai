@@ -29,6 +29,7 @@ import type {
   ContextDiff,
   ContextSummary,
   IngestAndOptimizeResult,
+  TurnContextResult,
   ConsolidationResult,
   DecayResult,
   RuleHead,
@@ -42,6 +43,7 @@ import type {
   OptimizeContextOptions,
   DiffContextOptions,
   IngestAndOptimizeOptions,
+  ProcessTurnsOptions,
   EventSubscriptionOptions,
   KnowledgeEvent,
   HealthStatus,
@@ -534,6 +536,47 @@ export class NocturnusAIClient {
     if (opts.contextHint !== undefined) body.contextHint = opts.contextHint;
 
     return this.requestJson<IngestAndOptimizeResult>('POST', '/context/ingest', body);
+  }
+
+  /**
+   * Process a batch of conversation turns into facts plus a delta briefing.
+   *
+   * Wraps `POST /context`. Extracts facts from each turn (LLM if configured,
+   * otherwise predicate-syntax fallback), stores them under `scope`, and
+   * returns the most-relevant facts as a single window. When `sessionId` is
+   * supplied the server also tracks recent turns for the next call (so
+   * pronouns resolve) and returns a `briefingDelta` of just the facts that
+   * are new this turn.
+   *
+   * @param opts - Turns plus optional scope/sessionId/contextHint.
+   * @returns Optimized window plus briefingDelta when a snapshot exists.
+   *
+   * @example
+   * ```ts
+   * // Turn 1
+   * await client.processTurns({
+   *   turns: ["User: We can't log in after the Okta cutover."],
+   *   scope: 'ticket-4821',
+   *   sessionId: 'ticket-4821',
+   * });
+   *
+   * // Turn 2 — server pulls turn 1 as contextHint, returns delta
+   * const result = await client.processTurns({
+   *   turns: ['Tool auth_audit: issuer mismatch detected.'],
+   *   scope: 'ticket-4821',
+   *   sessionId: 'ticket-4821',
+   * });
+   * console.log(result.briefingDelta);
+   * ```
+   */
+  async processTurns(opts: ProcessTurnsOptions): Promise<TurnContextResult> {
+    const body: Record<string, unknown> = { turns: opts.turns };
+    if (opts.maxFacts !== undefined) body.maxFacts = opts.maxFacts;
+    if (opts.scope !== undefined) body.scope = opts.scope;
+    if (opts.sessionId !== undefined) body.sessionId = opts.sessionId;
+    if (opts.contextHint !== undefined) body.contextHint = opts.contextHint;
+
+    return this.requestJson<TurnContextResult>('POST', '/context', body);
   }
 
   /**

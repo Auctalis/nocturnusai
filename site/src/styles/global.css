@@ -1261,6 +1261,96 @@ samp {
   50% { opacity: 0; }
 }
 
+/* ── Walkthrough steps (homepage "See It Work") ───────────────────────────── */
+
+.walkthrough-step {
+  margin-bottom: var(--space-6);
+}
+
+.step-marker {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: var(--space-3);
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--site-accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.88rem;
+  flex-shrink: 0;
+}
+
+.step-label {
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--site-text);
+}
+
+.step-columns {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.step-columns > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.walkthrough-payoff {
+  margin-top: var(--space-7);
+  padding: var(--space-5);
+  background: var(--site-surface);
+  border: 2px solid var(--site-accent-soft);
+  border-radius: var(--radius-lg);
+}
+
+.payoff-columns {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: var(--space-4);
+}
+
+.payoff-left h3,
+.payoff-right h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 var(--space-2);
+}
+
+.walkthrough-sdk {
+  padding: var(--space-5) 0;
+}
+
+.sdk-tabs {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.sdk-tabs > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.motion-ok .reveal-delay-3 {
+  transition-delay: 0.24s;
+}
+
+.motion-ok .reveal-delay-4 {
+  transition-delay: 0.32s;
+}
+
+.motion-ok .reveal-delay-5 {
+  transition-delay: 0.40s;
+}
+
 @media (max-width: 1024px) {
   .statement-grid,
   .feature-grid,
@@ -1273,8 +1363,12 @@ samp {
   .economics-results,
   .fits-comparison,
   .fits-diagram,
-  .docs-shell {
+  .docs-shell,
+  .step-columns,
+  .payoff-columns,
+  .sdk-tabs {
     grid-template-columns: 1fr;
+    flex-direction: column;
   }
 
   .docs-sidebar {

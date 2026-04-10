@@ -266,6 +266,42 @@ class RemovedEntry(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class TurnFact(BaseModel):
+    """A single fact returned by `POST /context` (the turns-in/facts-out endpoint)."""
+
+    predicate: str
+    args: list[str] = Field(default_factory=list)
+    salience: float
+    provenance: str | None = Field(default=None)
+    model_config = {"populate_by_name": True}
+
+
+class TurnContextResult(BaseModel):
+    """Result of `POST /context` — turns in, optimized facts and delta briefing out."""
+
+    facts: list[TurnFact] = Field(default_factory=list)
+    total_facts_in_kb: int = Field(alias="totalFactsInKB")
+    facts_returned: int = Field(alias="factsReturned")
+    contradictions: int = Field(default=0)
+    new_facts_extracted: int = Field(alias="newFactsExtracted")
+    warning: str | None = Field(default=None)
+    briefing_delta: str | None = Field(
+        default=None,
+        alias="briefingDelta",
+        description=(
+            "LLM-formatted natural-language briefing of facts that are NEW this turn "
+            "compared to the previous snapshot for the same session_id. "
+            "None on the first turn or when no LLM provider is configured."
+        ),
+    )
+    session_id: str | None = Field(
+        default=None,
+        alias="sessionId",
+        description="Echo of the session id used for snapshot tracking.",
+    )
+    model_config = {"populate_by_name": True}
+
+
 class ContextDiff(BaseModel):
     """Incremental diff between two context windows."""
 

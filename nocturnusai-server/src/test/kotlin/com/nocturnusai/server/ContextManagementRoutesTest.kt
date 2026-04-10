@@ -179,4 +179,127 @@ class ContextManagementRoutesTest {
         assertTrue(body.contains("\"extracted\""), "Expected extracted facts in response: $body")
         assertTrue(body.contains("\"context\""), "Expected optimized context in response: $body")
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Conversation tracking: scope partitioning + sessionId snapshotting
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `POST context - scope partitions facts under conversation key`() = withTestApp {
+        // Conversation A — facts under scope "conv-a"
+        client.post("/context") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "turns": ["customer(acme_corp)", "priority(high)"],
+                  "scope": "conv-a",
+                  "sessionId": "conv-a",
+                  "maxFacts": 10
+                }
+                """.trimIndent()
+            )
+        }
+
+        // Conversation B — different scope, different facts
+        client.post("/context") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "turns": ["customer(globex)", "priority(low)"],
+                  "scope": "conv-b",
+                  "sessionId": "conv-b",
+                  "maxFacts": 10
+                }
+                """.trimIndent()
+            )
+        }
+
+        // Both scopes should be listed
+        val scopes = client.get("/scopes") { header("X-Tenant-ID", "default") }
+        assertEquals(HttpStatusCode.OK, scopes.status)
+        val scopesBody = scopes.bodyAsText()
+        assertTrue(scopesBody.contains("conv-a"), "Expected conv-a in scopes: $scopesBody")
+        assertTrue(scopesBody.contains("conv-b"), "Expected conv-b in scopes: $scopesBody")
+    }
+
+    @Test
+    fun `POST context - second turn with same sessionId echoes sessionId in response`() = withTestApp {
+        // Turn 1
+        val first = client.post("/context") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "turns": ["customer(acme_corp)"],
+                  "scope": "support-thread-99",
+                  "sessionId": "support-thread-99",
+                  "maxFacts": 10
+                }
+                """.trimIndent()
+            )
+        }
+        assertEquals(HttpStatusCode.OK, first.status)
+        val firstBody = first.bodyAsText()
+        assertTrue(firstBody.contains("\"sessionId\":\"support-thread-99\""),
+            "Expected sessionId echo in first response: $firstBody")
+
+        // Turn 2 — adds a new fact under same conversation
+        val second = client.post("/context") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "turns": ["priority(critical)"],
+                  "scope": "support-thread-99",
+                  "sessionId": "support-thread-99",
+                  "maxFacts": 10
+                }
+                """.trimIndent()
+            )
+        }
+        assertEquals(HttpStatusCode.OK, second.status)
+        val secondBody = second.bodyAsText()
+        assertTrue(secondBody.contains("\"sessionId\":\"support-thread-99\""),
+            "Expected sessionId echo in second response: $secondBody")
+        // briefingDelta is null when no LLM provider is configured — but the field
+        // must still be present (or absent — kotlinx-serialization may omit nulls).
+        // The important assertion is that the call succeeded and the snapshot
+        // machinery did not blow up on the second turn.
+        assertTrue(secondBody.contains("\"facts\""))
+    }
+
+    @Test
+    fun `DELETE scope - removes conversation facts`() = withTestApp {
+        client.post("/context") {
+            header("X-Tenant-ID", "default")
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "turns": ["customer(acme_corp)"],
+                  "scope": "to-be-deleted",
+                  "sessionId": "to-be-deleted"
+                }
+                """.trimIndent()
+            )
+        }
+
+        val deleted = client.delete("/scope/to-be-deleted") {
+            header("X-Tenant-ID", "default")
+        }
+        assertEquals(HttpStatusCode.OK, deleted.status)
+        val body = deleted.bodyAsText()
+        assertTrue(body.contains("to-be-deleted"))
+        // At least one atom should have been removed
+        assertTrue(
+            Regex("\"deleted\"\\s*:\\s*([1-9][0-9]*)").containsMatchIn(body),
+            "Expected non-zero deleted count: $body"
+        )
+    }
 }

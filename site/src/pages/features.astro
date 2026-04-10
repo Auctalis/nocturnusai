@@ -60,29 +60,27 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
         <div class="feature-story-layout reveal reveal-delay-1">
           <div class="plain-card">
-            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-muted-soft); margin-bottom: 0.8rem;">First cut</div>
-            <h3><code>POST /context</code></h3>
-            <p>Send raw turns. Get a smaller working set back.</p>
+            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-muted-soft); margin-bottom: 0.8rem;">Every turn</div>
+            <h3><code>POST /context</code> with <code>sessionId</code></h3>
+            <p>Send just the new turns. The server tracks priors, extracts facts under the conversation scope, and returns a <code>briefingDelta</code> &mdash; only what's new.</p>
           </div>
           <div class="panel-dark" style="padding: var(--space-4);">
-            <div class="panel-label">Input shape</div>
-            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;">turns = [
-  chat,
-  tool traces,
-  CRM notes,
-  retries,
-  internal comments,
-]</pre>
+            <div class="panel-label">What you send</div>
+            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;">&#123;
+  "turns": [new messages only],
+  "scope": "conversation-id",
+  "sessionId": "conversation-id"
+&#125;</pre>
           </div>
           <div class="plain-card">
             <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-muted-soft); margin-bottom: 0.8rem;">Goal pass</div>
-            <h3><code>POST /context/optimize</code></h3>
-            <p>Once the next step is clear, tighten the window around it.</p>
+            <h3><code>POST /memory/context</code> with goals</h3>
+            <p>Once the next step is clear, narrow the window to just the subset the model needs.</p>
           </div>
           <div class="plain-card">
-            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-muted-soft); margin-bottom: 0.8rem;">Later turns</div>
-            <h3><code>POST /context/diff</code></h3>
-            <p>Reuse a session and fetch only what changed.</p>
+            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-muted-soft); margin-bottom: 0.8rem;">Cleanup</div>
+            <h3><code>DELETE /scope/&#123;id&#125;</code></h3>
+            <p>Conversation done? Delete the scope. Promote durable facts to the tenant layer first.</p>
           </div>
         </div>
       </div>
@@ -116,10 +114,60 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       </div>
     </section>
 
+    <section class="site-section-tight">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">4. Conversation memory</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Three layers. One identifier.</h2>
+          <p class="site-subtitle">
+            Use the conversation id as both <code>scope</code> and <code>sessionId</code>. Nocturnus handles the rest.
+          </p>
+        </div>
+
+        <div class="feature-grid reveal reveal-delay-1">
+          <div class="plain-card" style="border-top: 3px solid var(--site-accent);">
+            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">Tenant layer</div>
+            <h3>Durable customer knowledge</h3>
+            <p>Facts with no scope: customer profiles, policies, product catalogs. Survives across every conversation. Think <em>CRM state</em>.</p>
+          </div>
+          <div class="plain-card" style="border-top: 3px solid var(--site-accent);">
+            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">Conversation layer</div>
+            <h3>Facts scoped to this dialog</h3>
+            <p>Facts tagged with <code>scope=conversationId</code>. Tool results, user statements, agent commitments. Deleted when the ticket closes.</p>
+          </div>
+          <div class="plain-card" style="border-top: 3px solid var(--site-accent);">
+            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">Derived layer</div>
+            <h3>Inferred automatically</h3>
+            <p>Rules fire across both layers. If a customer is enterprise tier and has an outage, the priority escalation rule triggers without you writing glue code.</p>
+          </div>
+        </div>
+
+        <div class="reveal reveal-delay-2" style="margin-top: var(--space-5);">
+          <div class="panel-dark" style="padding: var(--space-4);">
+            <div class="panel-label">The full turn lifecycle</div>
+            <pre style="margin: 0; font-size: 0.85rem; line-height: 1.8; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.5);">// 1. Each turn — extract, store, get delta</span>
+r = POST /context(turns, scope, sessionId)
+next_prompt = r.briefingDelta
+
+<span style="color: rgba(255,255,255,0.5);">// 2. Need a goal-specific subset?</span>
+ctx = POST /memory/context(goals, sessionId, format="natural")
+next_prompt = ctx.formattedText
+
+<span style="color: rgba(255,255,255,0.5);">// 3. Promote durable facts before cleanup</span>
+POST /assert/fact(&#123;"predicate":"IsA","args":["Acme","Enterprise"]&#125;)
+
+<span style="color: rgba(255,255,255,0.5);">// 4. Conversation done — clean up</span>
+DELETE /scope/&#123;conversationId&#125;
+POST /context/session/clear(&#123;"sessionId":"..."&#125;)</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="site-section cta-band">
       <div class="site-container">
         <div class="section-head reveal">
-          <div class="site-kicker">4. How to integrate it</div>
+          <div class="site-kicker">5. How to integrate it</div>
           <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem); color: var(--site-dark-text);">Keep your stack.</h2>
           <p class="site-subtitle">OpenClaw is a clear example: more context means more tokens. Nocturnus cuts the payload before the run.</p>
         </div>
