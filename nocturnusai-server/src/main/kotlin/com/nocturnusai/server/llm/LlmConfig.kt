@@ -182,7 +182,13 @@ object LlmConfig {
             !anthropicKey.isNullOrBlank() -> return ResolvedProviderConfig("anthropic")
             !openaiKey.isNullOrBlank() -> return ResolvedProviderConfig("openai", configuredBaseUrl)
             !googleKey.isNullOrBlank() -> return ResolvedProviderConfig("google")
-            !configuredBaseUrl.isNullOrBlank() -> return ResolvedProviderConfig("custom", configuredBaseUrl)
+            !configuredBaseUrl.isNullOrBlank() -> {
+                // If the base URL looks like Ollama, treat it as Ollama (not custom)
+                if (configuredBaseUrl.contains(":11434")) {
+                    return ResolvedProviderConfig("ollama", configuredBaseUrl)
+                }
+                return ResolvedProviderConfig("custom", configuredBaseUrl)
+            }
         }
 
         val reachableOllamaUrl = ollamaCandidates.firstOrNull(ollamaReachable)

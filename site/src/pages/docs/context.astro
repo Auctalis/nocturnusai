@@ -53,14 +53,17 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <div class="callout callout-warning">
         <strong>Requires LLM extraction.</strong> <code>POST /context</code> uses an LLM to extract structured facts from raw text.
-        You must configure an LLM provider — set <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>,
-        or point <code>LLM_BASE_URL</code>/<code>LLM_MODEL</code> at a local Ollama instance.
-        Without this, the endpoint will time out or return empty results.
-        If you just want to query pre-asserted facts, skip to <a href="#goal-pass">Step 2</a> using <code>POST /memory/context</code>.
+        The Docker image connects to <a href="https://ollama.com">Ollama</a> on your host by default (install Ollama, then <code>ollama pull granite3.3:8b</code>).
+        Or pass <code>-e ANTHROPIC_API_KEY</code> / <code>-e OPENAI_API_KEY</code> for a cloud LLM.
+        First calls take 10&ndash;30s on local Ollama hardware.
+        If you just want to query pre-asserted facts without an LLM, skip to <a href="#goal-pass">Step 2</a> using <code>POST /memory/context</code>.
     </div>
 
     <p>
         Use <code>POST /context</code> when you want the first compact pass. Send raw turns. Get back the normalized state that seems most important. This endpoint extracts facts from your turns and stores them in the knowledge base.
+    </p>
+    <p>
+        Always include <code>scope</code> and <code>sessionId</code> so the server can track the conversation across turns and compute deltas for Steps 2&ndash;4. Use the same value for both (e.g. your ticket or thread ID).
     </p>
 
     <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context \
@@ -68,28 +71,32 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   -H "X-Tenant-ID: default" \
   -d '&#123;
     "turns": [
-      "User: We still cannot log in after yesterday's Okta cutover.",
+      "User: We still cannot log in after yesterday'\''s Okta cutover.",
       "Tool crm_lookup: account=acme_corp tier=enterprise billing=current",
       "Tool auth_audit: issuer mismatch detected after IdP migration.",
       "Slack escalation: workaround is manual issuer override."
     ],
+    "scope": "support-thread-4821",
+    "sessionId": "support-thread-4821",
     "maxFacts": 12
   &#125;'</code></pre>
 
     <pre data-lang="json"><code>&#123;
   "facts": [
-    &#123; "predicate": "customer_tier", "args": ["acme_corp", "enterprise"], "salience": 0.98 &#125;,
-    &#123; "predicate": "billing_status", "args": ["acme_corp", "current"], "salience": 0.80 &#125;,
-    &#123; "predicate": "current_issue", "args": ["acme_corp", "saml_issuer_mismatch"], "salience": 0.97 &#125;,
-    &#123; "predicate": "workaround", "args": ["acme_corp", "manual_issuer_override"], "salience": 0.88 &#125;
+    &#123; "predicate": "HasRole", "args": ["acme_corp", "Enterprise Account"], "salience": 0.64 &#125;,
+    &#123; "predicate": "Identified", "args": ["Auth audit", "Issuer mismatch"], "salience": 0.64 &#125;,
+    &#123; "predicate": "Proposed", "args": ["Workaround", "Manual issuer override"], "salience": 0.64 &#125;,
+    &#123; "predicate": "HasStatus", "args": ["Login", "Failed"], "salience": 0.64 &#125;
   ],
   "factsReturned": 4,
   "contradictions": 0,
-  "newFactsExtracted": 4
+  "newFactsExtracted": 4,
+  "briefingDelta": "## Okta Cutover\nLogin is failing after the Okta cutover...",
+  "sessionId": "support-thread-4821"
 &#125;</code></pre>
 
     <div class="callout callout-info">
-        <strong>Important:</strong> you do not need to invent predicate names up front to use this flow. The product can extract and normalize structure from turns. The predicate-style output is the backend representation of the reduced window.
+        <strong>Important:</strong> you do not need to invent predicate names up front. The LLM extracts and normalizes structure from your turns. Exact predicate names and output phrasing vary by model. First calls may take 10&ndash;30 seconds depending on your LLM provider.
     </div>
 
     <hr />

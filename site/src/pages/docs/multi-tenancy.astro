@@ -51,17 +51,27 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <h2 id="create-database">Creating a Database</h2>
     <p>Create a new logical database:</p>
-    <pre><code class="language-bash">curl -X POST http://localhost:9300/databases \
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/admin/databases \
   -H "Content-Type: application/json" \
   -d '&#123;"name": "production"&#125;'</code></pre>
 
     <p>List all databases:</p>
-    <pre><code class="language-bash">curl http://localhost:9300/databases</code></pre>
+    <pre><code class="language-bash">curl http://localhost:9300/admin/databases</code></pre>
 
     <hr />
 
     <h2 id="using-tenants">Using Tenants</h2>
-    <p>Pass the tenant and database headers with every request:</p>
+    <p>Create tenants before using them. A <code>"default"</code> tenant is auto-created in every database, but custom tenants must be created explicitly:</p>
+    <pre><code class="language-bash"># Create tenants in the production database
+curl -X POST http://localhost:9300/admin/databases/production/tenants \
+  -H "Content-Type: application/json" \
+  -d '&#123;"tenantId": "acme_corp"&#125;'
+
+curl -X POST http://localhost:9300/admin/databases/production/tenants \
+  -H "Content-Type: application/json" \
+  -d '&#123;"tenantId": "globex_inc"&#125;'</code></pre>
+
+    <p>Then pass the tenant and database headers with every request:</p>
     <pre><code class="language-bash"># Assert a fact for Acme Corp in the production database
 curl -X POST http://localhost:9300/tell \
   -H "Content-Type: application/json" \
@@ -76,8 +86,7 @@ curl -X POST http://localhost:9300/ask \
   -H "X-Tenant-ID: globex_inc" \
   -d '&#123;"predicate": "plan", "args": ["?tier"]&#125;'
 
-# Returns empty — Globex has no facts yet
-&#123; "results": [] &#125;</code></pre>
+# Returns [] — Globex has no facts yet</code></pre>
 
     <hr />
 

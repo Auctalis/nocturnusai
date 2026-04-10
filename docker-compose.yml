@@ -84,6 +84,22 @@ services:
       retries: 10
       start_period: 20s
 
+  # Auto-pull the default model when using --profile ollama
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: nocturnusai-ollama-pull
+    profiles:
+      - ollama
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["ollama", "pull", "granite3.3:8b"]
+    environment:
+      - OLLAMA_HOST=ollama
+    networks:
+      - nocturnusai-net
+
   # ── Monitoring Stack (opt-in via profile) ──────────────────────────────
   # Activated with:  docker compose --profile monitoring up -d
   # Or:  make up-monitoring

@@ -93,13 +93,20 @@ class ContextManagementService(
     ): OptimizedContextWindow {
         val now = System.currentTimeMillis()
         val maxFacts = request.maxFacts ?: 100
+
+        // Inherit scope from previous session snapshot when not explicitly provided,
+        // so goal-driven and diff queries stay within the conversation scope.
+        val effectiveRequest = if (request.scope == null && request.sessionId != null) {
+            val previousScope = sessionStore.load(request.sessionId)?.scope
+            if (previousScope != null) request.copy(scope = previousScope) else request
+        } else request
         val currentGen = cacheGeneration.get()
 
         // 1. Gather candidate facts — goal-driven (cached) or global
-        val candidates: List<Atom> = if (request.goals.isNullOrEmpty()) {
-            gatherGlobalCandidates(store, request, now)
+        val candidates: List<Atom> = if (effectiveRequest.goals.isNullOrEmpty()) {
+            gatherGlobalCandidates(store, effectiveRequest, now)
         } else {
-            gatherGoalCandidates(store, request.goals, request.scope, now, currentGen)
+            gatherGoalCandidates(store, effectiveRequest.goals, effectiveRequest.scope, now, currentGen)
         }
 
         // 2. Batch salience scoring — compute once, reuse everywhere
@@ -122,7 +129,7 @@ class ContextManagementService(
         // 5b. Resolve contradictions only if opt-in (default true for backward compat)
         val postContradiction: List<ScoredEntry>
         val contradictionsResolved: Int
-        if (request.autoResolveContradictions && contradictions.isNotEmpty()) {
+        if (effectiveRequest.autoResolveContradictions && contradictions.isNotEmpty()) {
             postContradiction = resolveContradictions(deduped, contradictions)
             contradictionsResolved = contradictions.size
         } else {
@@ -131,8 +138,8 @@ class ContextManagementService(
         }
 
         // 6. Apply diversity cap if requested
-        val diversified = if (request.maxFactsPerPredicate != null) {
-            applyDiversityCap(postContradiction, request.maxFactsPerPredicate)
+        val diversified = if (effectiveRequest.maxFactsPerPredicate != null) {
+            applyDiversityCap(postContradiction, effectiveRequest.maxFactsPerPredicate)
         } else {
             postContradiction
         }
@@ -141,8 +148,8 @@ class ContextManagementService(
         val selected: List<SelectedContextEntry>
         val bucketStats: Map<String, BucketStats>
 
-        if (request.relevanceBuckets != null && request.relevanceBuckets.isNotEmpty()) {
-            val result = applyBuckets(diversified, request.relevanceBuckets, maxFacts, now)
+        if (effectiveRequest.relevanceBuckets != null && effectiveRequest.relevanceBuckets.isNotEmpty()) {
+            val result = applyBuckets(diversified, effectiveRequest.relevanceBuckets, maxFacts, now)
             selected = result.first
             bucketStats = result.second
         } else {
@@ -159,11 +166,11 @@ class ContextManagementService(
         }
 
         // 9. Collect relevant rules (#1)
-        val relevantRules = collectRelevantRules(request.goals, request.scope)
+        val relevantRules = collectRelevantRules(effectiveRequest.goals, effectiveRequest.scope)
 
         // 10. Session snapshot (store structured entry info for diff #6)
         val windowId = "ctx_${windowIdCounter.incrementAndGet()}"
-        if (request.sessionId != null) {
+        if (effectiveRequest.sessionId != null) {
             val entryInfoMap = selected.associate { entry ->
                 entryKey(entry.atom) to SnapshotEntryInfo(
                     predicate = entry.atom.predicate,
@@ -172,10 +179,11 @@ class ContextManagementService(
                     scope = entry.atom.scope
                 )
             }
-            sessionStore.save(request.sessionId, ContextSnapshot(
+            sessionStore.save(effectiveRequest.sessionId!!, ContextSnapshot(
                 windowId = windowId,
                 entries = entryInfoMap,
-                generatedAt = now
+                generatedAt = now,
+                scope = effectiveRequest.scope
             ))
         }
 
@@ -191,7 +199,7 @@ class ContextManagementService(
             contradictions = contradictions,
             bucketStats = bucketStats,
             totalCharCount = selected.sumOf { it.charCount },
-            goalDriven = !request.goals.isNullOrEmpty(),
+            goalDriven = !effectiveRequest.goals.isNullOrEmpty(),
             knowledgeGeneration = currentGen,
             generatedAt = now
         )
@@ -255,9 +263,13 @@ class ContextManagementService(
                 reason = "no previous session found"
             )
 
+        // Inherit scope from the previous snapshot when not explicitly provided,
+        // so the diff stays within the same conversation scope.
+        val effectiveScope = request.scope ?: previousSnapshot.scope
+
         val currentWindow = optimizeContext(store, OptimizeContextRequest(
             maxFacts = request.maxFacts,
-            scope = request.scope,
+            scope = effectiveScope,
             predicates = request.predicates,
             goals = request.goals,
             sessionId = request.sessionId,
@@ -482,7 +494,7 @@ class ContextManagementService(
                         .filter { it.isValidAt(now) }
                         .forEach { result ->
                             relevant.add(result)
-                            collectPremises(result, relevant)
+                            collectPremises(result, relevant, scope)
                         }
                 } catch (e: Exception) {
                     logger.debug("Backward chaining failed for goal {}: {}", goalAtom, e.message)
@@ -493,11 +505,13 @@ class ContextManagementService(
         return relevant.toList()
     }
 
-    private fun collectPremises(fact: Atom, collected: MutableSet<Atom>) {
+    private fun collectPremises(fact: Atom, collected: MutableSet<Atom>, scope: String? = null) {
         val derivation = provenanceTracker?.getDerivation(fact) ?: return
         for (premise in derivation.premises) {
+            // Skip premises from other scopes to prevent cross-conversation leaks
+            if (scope != null && premise.scope != null && premise.scope != scope) continue
             if (collected.add(premise)) {
-                collectPremises(premise, collected)
+                collectPremises(premise, collected, scope)
             }
         }
     }
@@ -910,5 +924,6 @@ data class SnapshotEntryInfo(
 data class ContextSnapshot(
     val windowId: String,
     val entries: Map<String, SnapshotEntryInfo>,
-    val generatedAt: Long
+    val generatedAt: Long,
+    val scope: String? = null
 )

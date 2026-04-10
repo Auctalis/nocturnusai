@@ -30,7 +30,8 @@ LABEL org.opencontainers.image.vendor="Essaouira LLC"
 ENV PORT=9300 \
     HOST=0.0.0.0 \
     STORAGE_DIR=/data \
-    EXTRACTION_ENABLED=true
+    EXTRACTION_ENABLED=true \
+    LLM_BASE_URL=http://host.docker.internal:11434/v1
 
 EXPOSE ${PORT} 9443
 

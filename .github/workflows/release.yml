@@ -311,7 +311,7 @@ jobs:
             curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
             ```
 
-            **Docker (server only)**
+            **Docker (server only — connects to host Ollama by default)**
             ```bash
             docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:${{ github.ref_name }}
             ```

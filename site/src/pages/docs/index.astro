@@ -31,14 +31,16 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       "User cannot log in after Okta cutover.",
       "CRM says enterprise tier and billing current.",
       "Audit log shows SAML issuer mismatch."
-    ]
+    ],
+    "scope": "ticket-4821",
+    "sessionId": "ticket-4821"
   &#125;'</code></pre>
 
   <div class="callout callout-warning">
     <strong>LLM extraction required for <code>POST /context</code>.</strong>
-    This endpoint extracts structured facts from raw text using an LLM.
-    Set <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, or configure <code>LLM_BASE_URL</code>/<code>LLM_MODEL</code> (e.g. Ollama).
-    Without LLM config, start with <code>POST /tell</code> to assert facts directly, then use <code>POST /memory/context</code> — no LLM needed.
+    The Docker image connects to <a href="https://ollama.com">Ollama</a> on your host by default &mdash; just install Ollama and run <code>ollama pull granite3.3:8b</code>.
+    Or pass <code>-e ANTHROPIC_API_KEY</code> to <code>docker run</code> for a cloud LLM.
+    Without an LLM, start with <code>POST /tell</code> to assert facts directly, then use <code>POST /memory/context</code> &mdash; no LLM needed.
   </div>
 
   <h2>Where to go next</h2>

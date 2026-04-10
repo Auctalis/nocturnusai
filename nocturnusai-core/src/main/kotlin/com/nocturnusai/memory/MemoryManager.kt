@@ -98,6 +98,7 @@ class MemoryManager(
             .filter { it.isValidAt(now) }
             .filter { atomScope == null || it.scope == atomScope }
             .filter { predicates == null || it.predicate in predicates }
+            .toList()
 
         val scored = allAtoms.map { atom ->
             ScoredAtom(atom, salienceTracker.computeSalience(atom, now))
@@ -111,7 +112,7 @@ class MemoryManager(
 
         return ContextWindow(
             facts = scored,
-            totalAvailable = store.getAllAtoms().count(),
+            totalAvailable = allAtoms.size,
             windowSize = scored.size,
             predicateDistribution = byPredicate,
             generatedAt = now
