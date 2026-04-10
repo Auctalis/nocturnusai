@@ -4,24 +4,6 @@ import Navbar from '../components/Navbar.astro';
 import Footer from '../components/Footer.astro';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const heroPairs = [
-  {
-    old: 'You are paying for old context.',
-    next: 'Nocturnus cuts it.',
-  },
-  {
-    old: 'OpenClaw can burn tokens on history and tool junk.',
-    next: 'Nocturnus strips it out.',
-  },
-  {
-    old: 'Long prompts cost more and think worse.',
-    next: 'Nocturnus keeps the prompt tight.',
-  },
-  {
-    old: 'Your model should not read the whole thread.',
-    next: 'Nocturnus sends the live state.',
-  },
-];
 ---
 
 <Layout
@@ -34,7 +16,7 @@ const heroPairs = [
     <section class="hero-cut" id="top">
       <div class="hero-cut-top">
         <div class="hero-question-wrap">
-          <h1 class="hero-question" id="hero-question">{heroPairs[0].old}</h1>
+          <h1 class="hero-question">Messy turns go in. Clean context comes out.</h1>
         </div>
       </div>
 
@@ -42,349 +24,201 @@ const heroPairs = [
 
       <div class="hero-cut-bottom">
         <div class="hero-answer-wrap">
-          <p class="hero-answer" id="hero-answer">{heroPairs[0].next}</p>
+          <p class="hero-answer">Each turn, the model only sees what changed.</p>
         </div>
 
         <div class="hero-footer">
           <p class="hero-support">
-            Nocturnus shrinks bloated turn arrays before the model call. Lower spend. Cleaner prompts. Better answers.
+            NocturnusAI sits between your agent and the model call. It extracts, remembers, and returns a short LLM-ready briefing instead of replaying the whole thread.
           </p>
           <div class="hero-cta-row">
-            <a href={`${base}/docs/context`} class="button-primary">Cut prompt cost</a>
-            <a href={`${base}/docs/openclaw`} class="button-secondary">Use with OpenClaw</a>
+            <a href="#try-it" class="button-primary">Try it now</a>
+            <a href={`${base}/docs`} class="button-secondary">Read the docs</a>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="site-section" id="economics">
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TRY IT — two copyable curls, real output                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section" id="try-it">
       <div class="site-container">
         <div class="section-head reveal">
-          <div class="site-kicker">Economics</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.3rem);">Most of the bill is replay.</h2>
+          <div class="site-kicker">Try It</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">Two curls. See the difference.</h2>
           <p class="site-subtitle">
-            If your agent keeps replaying old context, that is the bill.
+            Start the server, paste these, see what comes back.
           </p>
         </div>
 
-        <div class="economics-layout reveal reveal-delay-1">
-          <div class="equation-box">
-            <span class="box-label">Current equation</span>
-            <pre>Prompt bill =
-  Active work
-  + replayed turns
-  + tool chatter
-  + stale summaries</pre>
-          </div>
-
-          <div class="equation-box is-new">
-            <span class="box-label">After reduction</span>
-            <pre>Prompt bill =
-  Active work
-  + reduced window
-  + later-turn diffs</pre>
+        <!-- Start server -->
+        <div class="reveal reveal-delay-1" style="margin-bottom: var(--space-5);">
+          <div class="panel-dark" style="padding: var(--space-3) var(--space-4);">
+            <div class="panel-label">Start the server</div>
+            <pre style="margin: 0; font-size: 0.92rem; line-height: 1.8; white-space: pre-wrap;">docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:v0.3.0</pre>
           </div>
         </div>
 
-        <div class="economics-control reveal reveal-delay-2">
-          <label for="replay-share">How much of a monthly prompt bill is replayed context?</label>
-          <div class="range-wrap">
-            <input type="range" id="replay-share" min="40" max="90" value="80" step="5" />
-            <div class="range-markers">
-              <span>40%</span>
-              <span>55%</span>
-              <span>70%</span>
-              <span>90%</span>
-            </div>
-          </div>
-
-          <div class="economics-results">
-            <div class="result">
-              <span class="result-label">Monthly prompt bill</span>
-              <span class="result-value" id="bill-current">$10,000</span>
-            </div>
-            <div class="result">
-              <span class="result-label">Replay share</span>
-              <span class="result-value" id="bill-replay">80%</span>
-            </div>
-            <div class="result">
-              <span class="result-label">Illustrative savings</span>
-              <span class="result-value" id="bill-saved">$7,360</span>
-            </div>
-          </div>
-
-          <div class="bar-stack" aria-hidden="true">
-            <div class="bar-row">
-              <div class="bar-label">Current replay</div>
-              <div class="bar-track"><div id="bar-old" class="bar-fill old" style="width: 80%;"></div></div>
-            </div>
-            <div class="bar-row">
-              <div class="bar-label">After Nocturnus</div>
-              <div class="bar-track"><div id="bar-new" class="bar-fill new" style="width: 26.4%;"></div></div>
-            </div>
-          </div>
-
-          <p class="bar-caption" id="bill-caption">
-            At an $10k monthly prompt bill, 80% replay share, and a 92% reduction of that replayed slice,
-            the expensive part of the bill drops sharply while the active work stays intact.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <section class="site-section-tight" id="how-it-fits">
-      <div class="site-container">
-        <div class="section-head reveal">
-          <div class="site-kicker">How It Fits</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">Keep the stack. Cut the prompt bill.</h2>
-          <p class="site-subtitle">
-            Put Nocturnus in front of the model. Leave the rest alone.
-          </p>
-        </div>
-
-        <div class="fits-diagram reveal reveal-delay-1">
-          <div class="fits-stage">
-            <h3>Your current app</h3>
-            <ul>
-              <li>Conversation turns</li>
-              <li>Tool traces</li>
-              <li>CRM and system notes</li>
-              <li>Previous summaries and retries</li>
-            </ul>
-          </div>
-          <div class="fits-stage is-accent">
-            <h3>NocturnusAI</h3>
-            <ul>
-              <li><code>POST /context</code> with <code>sessionId</code></li>
-              <li>Server tracks turns, extracts facts</li>
-              <li>Returns <code>briefingDelta</code> — just what's new</li>
-            </ul>
-          </div>
-          <div class="fits-stage">
-            <h3>Same model call</h3>
-            <ul>
-              <li>Smaller system payload</li>
-              <li>Less prompt noise</li>
-              <li>Better accuracy on the next step</li>
-              <li>Lower repeated input spend</li>
-              <li>No framework rewrite</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="plain-card fits-note reveal reveal-delay-2">
-          <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-muted-soft); margin-bottom: 0.8rem;">OpenClaw</div>
-          <h3>Easy add. Full takeover later.</h3>
-          <p>
-            OpenClaw counts history, tool output, compaction, and system prompt overhead in the context window. Bigger payload, bigger bill. Nocturnus plugs in fast with <code>openclaw mcp set</code> or takes over fully as the Context Engine.
-          </p>
-        </div>
-
-        <div class="fits-comparison reveal reveal-delay-3">
-          <div class="panel-dark" style="padding: var(--space-4);">
-            <div class="panel-label">Before — every model call pays for the full thread</div>
-            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;">messages = [
-  system(full_thread + tools + notes),
-  user(next_question),
-]</pre>
-          </div>
-          <div class="panel-dark" style="padding: var(--space-4);">
-            <div class="panel-label">After — each call only sees what changed</div>
-            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;">r = POST /context(
-  turns, scope, sessionId
-)
-messages = [
-  system(r.briefingDelta),
-  user(next_question),
-]</pre>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="site-section-tight" id="see-it-work">
-      <div class="site-container">
-        <div class="section-head reveal">
-          <div class="site-kicker">See It Work</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">One support ticket. Four turns. Watch the waste disappear.</h2>
-          <p class="site-subtitle">
-            Raw turns go in. A clean LLM-ready briefing comes out. Each turn, the model only sees what changed.
-            <span style="display: block; margin-top: 0.5rem; font-size: 0.85rem; color: var(--site-muted-soft);">Real output from a running server. Exact phrasing varies by LLM model.</span>
-          </p>
-        </div>
-
-        <!-- Step 1 -->
+        <!-- Turn 1 -->
         <div class="walkthrough-step reveal reveal-delay-1">
           <div class="step-marker">
             <span class="step-number">1</span>
-            <span class="step-label">Turn 1 &mdash; Opening context</span>
+            <span class="step-label">Send the first turns</span>
           </div>
-          <div class="step-columns">
-            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
-              <div class="panel-label">Raw turns in</div>
-              <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap; font-family: var(--font-display); color: rgba(255,255,255,0.85);">User: We can't log in after the Okta cutover.
 
-Tool crm_lookup: account=acme tier=enterprise</pre>
-            </div>
-            <div class="plain-card" style="flex: 1.2; border-left: 3px solid var(--site-accent);">
-              <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">LLM context out &mdash; briefingDelta</div>
-              <pre style="margin: 0; font-size: 0.95rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">## Login Issue
-Login is currently failing following the Okta cutover. Acme is on the enterprise tier.</pre>
-              <p style="margin-top: 1rem; font-size: 0.88rem; color: var(--site-muted);">
-                Two messy messages become two clean sentences. This is what goes straight into the system prompt.
-              </p>
-            </div>
+          <div class="panel-dark" style="padding: var(--space-4); margin-bottom: var(--space-3);">
+            <div class="panel-label">Copy this</div>
+            <pre style="margin: 0; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap;">curl -s -X POST http://localhost:9300/context \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "turns": [
+      "User: We cannot log in after the Okta cutover.",
+      "Tool crm_lookup: account=acme tier=enterprise"
+    ],
+    "scope": "ticket-4821",
+    "sessionId": "ticket-4821"
+  &#125;' | python3 -m json.tool</pre>
+          </div>
+
+          <div class="plain-card" style="border-left: 3px solid var(--site-accent);">
+            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">What comes back &mdash; briefingDelta</div>
+            <pre style="margin: 0; font-size: 1.05rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">## Login Issue
+Login is currently failing following the Okta cutover.
+Acme is on the enterprise tier.</pre>
+            <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--site-muted);">
+              Two messy messages became two clean sentences. Put this in your system prompt.
+            </p>
           </div>
         </div>
 
-        <!-- Step 2 -->
+        <!-- Turn 2 -->
         <div class="walkthrough-step reveal reveal-delay-2">
           <div class="step-marker">
             <span class="step-number">2</span>
-            <span class="step-label">Turn 2 &mdash; New tool results</span>
+            <span class="step-label">Send the next turns &mdash; only what's new</span>
           </div>
-          <div class="step-columns">
-            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
-              <div class="panel-label">Raw turns in (just the new ones)</div>
-              <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap; font-family: var(--font-display); color: rgba(255,255,255,0.85);">Tool auth_audit: 14 failed SAML assertions since 09:12 UTC.
 
-Tool auth_audit: issuer mismatch detected after IdP migration.</pre>
-              <p style="margin-top: 0.8rem; font-size: 0.82rem; color: rgba(255,255,255,0.5);">
-                You only send the new turns. The server feeds turn 1 to the LLM automatically.
-              </p>
-            </div>
-            <div class="plain-card" style="flex: 1.2; border-left: 3px solid var(--site-accent);">
-              <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">briefingDelta &mdash; only what's new</div>
-              <pre style="margin: 0; font-size: 0.95rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">## SAML Assertion Failure
-There were 14 failed SAML assertions starting at 09:12 UTC. An issuer mismatch was detected following the IdP migration.</pre>
-              <p style="margin-top: 1rem; font-size: 0.88rem; color: var(--site-muted);">
-                Turn 1 context (login failure, enterprise tier) is <strong>not repeated</strong>. The model already has it. Only the SAML findings are new.
-              </p>
-            </div>
+          <div class="panel-dark" style="padding: var(--space-4); margin-bottom: var(--space-3);">
+            <div class="panel-label">Copy this (same scope + sessionId)</div>
+            <pre style="margin: 0; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap;">curl -s -X POST http://localhost:9300/context \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "turns": [
+      "Tool auth_audit: 14 failed SAML assertions since 09:12 UTC.",
+      "Tool auth_audit: issuer mismatch after IdP migration."
+    ],
+    "scope": "ticket-4821",
+    "sessionId": "ticket-4821"
+  &#125;' | python3 -m json.tool</pre>
+          </div>
+
+          <div class="plain-card" style="border-left: 3px solid var(--site-accent);">
+            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">briefingDelta &mdash; only what's new</div>
+            <pre style="margin: 0; font-size: 1.05rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">## SAML Assertion Failure
+There were 14 failed SAML assertions starting at 09:12 UTC.
+An issuer mismatch was detected following the IdP migration.</pre>
+            <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--site-muted);">
+              Turn 1 context (login failure, enterprise tier) is <strong>not repeated</strong>. The model already has it. Only the SAML audit findings are new.
+            </p>
           </div>
         </div>
 
-        <!-- Step 3 -->
-        <div class="walkthrough-step reveal reveal-delay-3">
-          <div class="step-marker">
-            <span class="step-number">3</span>
-            <span class="step-label">Turn 3 &mdash; Agent makes a commitment</span>
-          </div>
-          <div class="step-columns">
-            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
-              <div class="panel-label">Raw turn in</div>
-              <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap; font-family: var(--font-display); color: rgba(255,255,255,0.85);">Agent: If outage exceeds 4 hours, Acme gets a service credit.</pre>
-            </div>
-            <div class="plain-card" style="flex: 1.2; border-left: 3px solid var(--site-accent);">
-              <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">briefingDelta</div>
-              <pre style="margin: 0; font-size: 0.95rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">## Service Credit Proposal
-A service credit is being proposed for Acme. The outage threshold is 4 hours.</pre>
-              <p style="margin-top: 1rem; font-size: 0.88rem; color: var(--site-muted);">
-                Just the commitment. Not the 9 facts from turns 1&ndash;2. The server remembers everything &mdash; the model only sees what it needs.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Step 4 -->
-        <div class="walkthrough-step reveal reveal-delay-4">
-          <div class="step-marker">
-            <span class="step-number">4</span>
-            <span class="step-label">Turn 4 &mdash; Resolution</span>
-          </div>
-          <div class="step-columns">
-            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
-              <div class="panel-label">Raw turns in</div>
-              <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap; font-family: var(--font-display); color: rgba(255,255,255,0.85);">Tool statuspage: identity service recovered.
-
-User: Confirmed &mdash; all teams can log in.</pre>
-            </div>
-            <div class="plain-card" style="flex: 1.2; border-left: 3px solid var(--site-accent);">
-              <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">briefingDelta</div>
-              <pre style="margin: 0; font-size: 0.95rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">## Login Status
-All user teams can log in again. The identity service is confirmed recovered.</pre>
-            </div>
-          </div>
-        </div>
-
-        <!-- The payoff -->
-        <div class="walkthrough-payoff reveal reveal-delay-5">
-          <h3 style="margin: 0 0 var(--space-3); font-size: 1.15rem;">The next model call</h3>
+        <!-- The point -->
+        <div class="walkthrough-payoff reveal reveal-delay-3">
           <div class="payoff-columns">
             <div class="payoff-left">
+              <h3>What your model sees</h3>
               <div class="panel-dark" style="padding: var(--space-4);">
-                <div class="panel-label">With Nocturnus &mdash; system prompt</div>
-                <pre style="margin: 0; font-size: 0.95rem; line-height: 1.8; white-space: pre-wrap; font-family: var(--font-display); color: rgba(255,255,255,0.9);">Case update:
-
-All user teams can log in again.
-The identity service is confirmed recovered.</pre>
+                <pre style="margin: 0; font-size: 1rem; line-height: 1.8; white-space: pre-wrap; font-family: var(--font-display); color: rgba(255,255,255,0.9);">14 failed SAML assertions at 09:12 UTC.
+Issuer mismatch after IdP migration.</pre>
               </div>
-              <p style="margin-top: 0.8rem; font-size: 0.95rem; color: var(--site-text); font-weight: 600;">
-                2 sentences. ~30 tokens.
-              </p>
+              <p style="margin-top: 0.8rem; font-weight: 600;">~30 tokens</p>
             </div>
             <div class="payoff-right">
-              <div class="equation-box" style="padding: var(--space-4); opacity: 0.6;">
-                <span class="box-label">Without Nocturnus &mdash; system prompt</span>
-                <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;">User: We can't log in after the Okta cutover.
+              <h3>Without Nocturnus</h3>
+              <div class="equation-box" style="padding: var(--space-4); opacity: 0.55;">
+                <pre style="margin: 0; font-size: 0.82rem; line-height: 1.6; white-space: pre-wrap;">User: We can't log in after the Okta cutover.
 Tool crm_lookup: account=acme tier=enterprise
 Tool auth_audit: 14 failed SAML assertions...
 Tool auth_audit: issuer mismatch after IdP...
-Agent: If outage exceeds 4h, Acme gets credit.
-Tool statuspage: identity service recovered.
-User: Confirmed — all teams can log in.
-Internal notes...
-Previous ticket history...
-System events...</pre>
++ internal notes, retries, system events...</pre>
               </div>
-              <p style="margin-top: 0.8rem; font-size: 0.95rem; color: var(--site-muted);">
-                10+ messages. ~2,400 tokens. Replayed every call.
-              </p>
+              <p style="margin-top: 0.8rem; color: var(--site-muted);">~2,400 tokens. Replayed every call.</p>
             </div>
           </div>
         </div>
 
-        <!-- API shape note -->
-        <div class="plain-card reveal" style="margin-top: var(--space-5); text-align: center;">
-          <p style="margin: 0; font-size: 0.92rem; color: var(--site-muted); line-height: 1.7;">
-            One API call per turn: <code>POST /context</code> with <code>scope</code> + <code>sessionId</code>. The response includes structured facts for programmatic use <em>and</em> the LLM-ready <code>briefingDelta</code>. Use whichever fits your stack.
-          </p>
+        <p class="reveal" style="text-align: center; margin-top: var(--space-5); font-size: 0.88rem; color: var(--site-muted-soft);">
+          Requires an LLM provider (Ollama, OpenAI, Anthropic, or Google). Run <code>nocturnusai setup</code> to auto-configure.
+          <br/>Exact output phrasing varies by model.
+        </p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- HOW IT WORKS — minimal, one sentence each                         -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="how">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">How It Works</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">One call per turn. The server handles the rest.</h2>
         </div>
 
-        <!-- Cleanup -->
-        <div class="walkthrough-step reveal" style="margin-top: var(--space-6);">
-          <div class="step-marker">
-            <span class="step-number" style="background: var(--site-muted-soft);">5</span>
-            <span class="step-label">Ticket closed &mdash; clean up</span>
+        <div class="feature-grid reveal reveal-delay-1">
+          <div class="plain-card">
+            <h3>Extracts</h3>
+            <p>The LLM pulls structured facts from your raw turns and stores them under the conversation scope.</p>
           </div>
-          <div class="step-columns">
-            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
-              <div class="panel-label">Two calls. Everything gone.</div>
-              <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.5);">// Delete the conversation facts</span>
-DELETE /scope/ticket-4821
-
-<span style="color: rgba(255,255,255,0.5);">// Clear the snapshot</span>
-POST /context/session/clear
-&#123; "sessionId": "ticket-4821" &#125;</pre>
-            </div>
-            <div class="plain-card" style="flex: 1;">
-              <h3 style="font-size: 1rem;">Promote what matters first</h3>
-              <p>Before deleting, move durable facts to the tenant layer so the <em>next</em> conversation with Acme remembers they are enterprise tier. Ephemeral turn noise is gone. Customer knowledge stays.</p>
-            </div>
+          <div class="plain-card">
+            <h3>Remembers</h3>
+            <p>Prior turns are fed back automatically so references like "the account" resolve correctly across turns.</p>
+          </div>
+          <div class="plain-card">
+            <h3>Returns the delta</h3>
+            <p>Each call returns <code>briefingDelta</code> &mdash; a short natural-language summary of only what's new since the last turn.</p>
           </div>
         </div>
 
-        <!-- SDK examples -->
-        <div class="walkthrough-sdk reveal" style="margin-top: var(--space-7);">
-          <h3 style="text-align: center; margin-bottom: var(--space-3);">Same flow in code</h3>
-          <div class="sdk-tabs">
-            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
-              <div class="panel-label">Python</div>
-              <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;">from nocturnusai import SyncNocturnusAIClient
+        <div class="fits-comparison reveal reveal-delay-2">
+          <div class="panel-dark" style="padding: var(--space-4);">
+            <div class="panel-label">Your code</div>
+            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.5);">// Each turn — one call</span>
+r = POST /context(turns, scope, sessionId)
+
+<span style="color: rgba(255,255,255,0.5);">// Feed the delta to your model</span>
+messages = [
+  system(r.briefingDelta),
+  user(next_question),
+]
+
+<span style="color: rgba(255,255,255,0.5);">// Done with the conversation? Clean up.</span>
+DELETE /scope/ticket-4821</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- SDK QUICKSTART — copyable code                                    -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="sdks">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">SDKs</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Or use Python / TypeScript.</h2>
+        </div>
+
+        <div class="sdk-tabs reveal reveal-delay-1">
+          <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
+            <div class="panel-label">pip install nocturnusai</div>
+            <pre style="margin: 0; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap;">from nocturnusai import SyncNocturnusAIClient
 
 c = SyncNocturnusAIClient("http://localhost:9300")
 
-<span style="color: rgba(255,255,255,0.5);"># Turn 1</span>
 r = c.process_turns(
     turns=["User: Can't log in after Okta cutover."],
     scope="ticket-4821",
@@ -392,108 +226,58 @@ r = c.process_turns(
 )
 print(r.briefing_delta)
 <span style="color: rgba(255,255,255,0.5);"># "Login is currently failing following the
-#  Okta cutover. Acme is enterprise tier."</span>
-
-<span style="color: rgba(255,255,255,0.5);"># Turn 2 — only new turns, server builds context</span>
-r = c.process_turns(
-    turns=["Tool: 14 failed SAML assertions."],
-    scope="ticket-4821",
-    session_id="ticket-4821",
-)
-print(r.briefing_delta)
-<span style="color: rgba(255,255,255,0.5);"># "There were 14 failed SAML assertions..."</span></pre>
-            </div>
-            <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
-              <div class="panel-label">TypeScript</div>
-              <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;">import &#123; NocturnusAIClient &#125; from 'nocturnusai-sdk';
+#  Okta cutover. Acme is enterprise tier."</span></pre>
+          </div>
+          <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
+            <div class="panel-label">npm install nocturnusai-sdk</div>
+            <pre style="margin: 0; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap;">import &#123; NocturnusAIClient &#125; from 'nocturnusai-sdk';
 
 const c = new NocturnusAIClient(&#123;
   baseUrl: 'http://localhost:9300',
 &#125;);
 
-<span style="color: rgba(255,255,255,0.5);">// Turn 1</span>
-let r = await c.processTurns(&#123;
+const r = await c.processTurns(&#123;
   turns: ["User: Can't log in after Okta cutover."],
   scope: 'ticket-4821',
   sessionId: 'ticket-4821',
 &#125;);
-console.log(r.briefingDelta);
-<span style="color: rgba(255,255,255,0.5);">// "Login is currently failing following the
-//  Okta cutover. Acme is enterprise tier."</span>
-
-<span style="color: rgba(255,255,255,0.5);">// Turn 2</span>
-r = await c.processTurns(&#123;
-  turns: ['Tool: 14 failed SAML assertions.'],
-  scope: 'ticket-4821',
-  sessionId: 'ticket-4821',
-&#125;);
-console.log(r.briefingDelta);
-<span style="color: rgba(255,255,255,0.5);">// "There were 14 failed SAML assertions..."</span></pre>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <section class="site-section-tight" id="who-this-is-for">
-      <div class="site-container">
-        <div class="section-head reveal">
-          <div class="site-kicker">Who This Is For</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Who feels the bill first.</h2>
-          <p class="site-subtitle">
-            Different teams. Same problem: too much prompt waste.
-          </p>
-        </div>
-
-        <div class="audience-grid reveal reveal-delay-1">
-          <div class="audience-card">
-            <div class="audience-tag">Agent platform teams</div>
-            <h3>Keep the framework.</h3>
-            <p>Cut cost without another stack rewrite.</p>
-          </div>
-          <div class="audience-card">
-            <div class="audience-tag">Product teams</div>
-            <h3>Stop thread bloat.</h3>
-            <p>Keep long-running agents from dragging old junk into every call.</p>
-          </div>
-          <div class="audience-card">
-            <div class="audience-tag">Infra and cost owners</div>
-            <h3>Find the waste.</h3>
-            <p>Measure replay. Cut it. Watch the bill drop.</p>
+console.log(r.briefingDelta);</pre>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- CTA                                                                -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section class="site-section cta-band" id="get-started">
       <div class="site-container">
         <div class="section-head reveal">
-          <div class="site-kicker">Get Started</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem); color: var(--site-dark-text);">Run a cost check locally.</h2>
-          <p class="site-subtitle">
-            Run one real thread through <code>POST /context</code>. Compare before and after.
-          </p>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem); color: var(--site-dark-text);">Start here.</h2>
         </div>
 
         <div class="statement-grid reveal reveal-delay-1">
           <div class="plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none;">
-            <h3 style="color: var(--site-dark-text);">Check one real thread</h3>
-            <p style="color: rgba(255,255,255,0.72);">Post one real turn array. Measure the cut.</p>
-            <div style="margin-top: 1rem;">
-              <span class="command-chip" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.18); color: var(--site-dark-text); box-shadow: none;">
-                <span class="prompt">$</span>
-                <span>curl localhost:9300/health</span>
-              </span>
+            <h3 style="color: var(--site-dark-text);">Docs</h3>
+            <p style="color: rgba(255,255,255,0.72);">Full context workflow, API reference, SDKs, MCP, CLI.</p>
+            <div class="button-row" style="margin-top: 1rem;">
+              <a href={`${base}/docs`} class="button-primary">Open the docs</a>
             </div>
           </div>
 
           <div class="plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none;">
-            <h3 style="color: var(--site-dark-text);">Route the cheaper path</h3>
-            <p style="color: rgba(255,255,255,0.72);">Use REST, SDKs, MCP, or CLI in the stack you already run.</p>
+            <h3 style="color: var(--site-dark-text);">Features</h3>
+            <p style="color: rgba(255,255,255,0.72);">Memory lifecycle, three-layer model, goal-driven context, scope management.</p>
             <div class="button-row" style="margin-top: 1rem;">
-              <a href={`${base}/docs`} class="button-primary">Open the docs</a>
-              <a href={`${base}/features`} class="button-secondary">Why it works</a>
+              <a href={`${base}/features`} class="button-secondary">See features</a>
+            </div>
+          </div>
+
+          <div class="plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none;">
+            <h3 style="color: var(--site-dark-text);">GitHub</h3>
+            <p style="color: rgba(255,255,255,0.72);">Source, issues, Docker images, native binaries.</p>
+            <div class="button-row" style="margin-top: 1rem;">
+              <a href="https://github.com/Auctalis/nocturnusai" class="button-secondary">View on GitHub</a>
             </div>
           </div>
         </div>
@@ -502,81 +286,4 @@ console.log(r.briefingDelta);
   </main>
 
   <Footer />
-
-  <script is:inline define:vars={{ heroPairs }}>
-    (() => {
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      const questionEl = document.getElementById('hero-question');
-      const answerEl = document.getElementById('hero-answer');
-      if (!questionEl || !answerEl || heroPairs.length < 2) return;
-
-      let index = 0;
-      const hold = 3200;
-      const fade = 500;
-
-      const show = (el, text) => {
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(10px)';
-        el.textContent = text;
-        requestAnimationFrame(() => {
-          el.style.transition = `opacity ${fade}ms ease, transform ${fade}ms ease`;
-          el.style.opacity = '1';
-          el.style.transform = 'translateY(0)';
-        });
-      };
-
-      const hide = (el) => {
-        el.style.transition = `opacity ${Math.round(fade / 2)}ms ease`;
-        el.style.opacity = '0';
-      };
-
-      const cycle = () => {
-        const pair = heroPairs[index];
-        show(questionEl, pair.old);
-        setTimeout(() => show(answerEl, pair.next), 120);
-        setTimeout(() => {
-          hide(questionEl);
-          hide(answerEl);
-          setTimeout(() => {
-            index = (index + 1) % heroPairs.length;
-            cycle();
-          }, Math.round(fade / 2) + 120);
-        }, hold);
-      };
-
-      cycle();
-    })();
-  </script>
-
-  <script is:inline>
-    (() => {
-      const slider = document.getElementById('replay-share');
-      const replayEl = document.getElementById('bill-replay');
-      const savedEl = document.getElementById('bill-saved');
-      const captionEl = document.getElementById('bill-caption');
-      const currentEl = document.getElementById('bill-current');
-      const oldBar = document.getElementById('bar-old');
-      const newBar = document.getElementById('bar-new');
-      if (!(slider instanceof HTMLInputElement) || !replayEl || !savedEl || !captionEl || !currentEl || !oldBar || !newBar) return;
-
-      const monthlySpend = 10000;
-      const replayReduction = 0.92;
-      const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-
-      const render = () => {
-        const replayShare = Number(slider.value) / 100;
-        const saved = monthlySpend * replayShare * replayReduction;
-        const newBill = monthlySpend - saved;
-        replayEl.textContent = `${Math.round(replayShare * 100)}%`;
-        savedEl.textContent = usd.format(saved);
-        currentEl.textContent = usd.format(monthlySpend);
-        oldBar.style.width = `${replayShare * 100}%`;
-        newBar.style.width = `${(newBill / monthlySpend) * 100}%`;
-        captionEl.textContent = `At a ${usd.format(monthlySpend)} monthly prompt bill, ${Math.round(replayShare * 100)}% replay share, and a ${Math.round(replayReduction * 100)}% reduction of that replayed slice, the expensive part of the bill drops while the active work stays intact.`;
-      };
-
-      slider.addEventListener('input', render);
-      render();
-    })();
-  </script>
 </Layout>
