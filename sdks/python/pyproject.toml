@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nocturnusai"
-version = "0.2.4"
+version = "0.3.0"
 description = "Python SDK for NocturnusAI — a logic-based inference engine and knowledge database"
 readme = "README.md"
 license = {text = "Business Source License 1.1"}
