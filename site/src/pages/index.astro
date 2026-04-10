@@ -7,8 +7,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <Layout
-  title="Nocturnus.AI - Cut Prompt Spend Without Replacing Your Stack"
-  description="Nocturnus.AI cuts bloated turn arrays into smaller prompts so agent teams spend less and get cleaner model input."
+  title="Nocturnus.AI - 97% Fewer Tokens Per Turn"
+  description="Open-source context server for AI agents. Extracts, remembers, and returns only the delta — cutting prompt tokens by 97% and spend from $54K to $240/month."
 >
   <Navbar />
 
@@ -24,7 +24,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
       <div class="hero-cut-bottom">
         <div class="hero-answer-wrap">
-          <p class="hero-answer">Each turn, the model only sees what changed.</p>
+          <p class="hero-answer">Each turn, the model only sees what changed. First briefing in 2 minutes.</p>
         </div>
 
         <div class="hero-footer">
@@ -259,6 +259,34 @@ messages = [
 <span style="color: rgba(255,255,255,0.5);">// Done with the conversation? Clean up.</span>
 DELETE /scope/ticket-4821</pre>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- WHERE IT FITS — architecture diagram                              -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="fits">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Where It Fits</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">One server between your agent and the model.</h2>
+        </div>
+
+        <div class="reveal reveal-delay-1" style="max-width: 700px; margin: 0 auto;">
+          <div class="panel-dark" style="padding: var(--space-5) var(--space-4); text-align: center;">
+            <pre style="margin: 0; font-size: clamp(0.82rem, 1.5vw, 1rem); line-height: 2.2; white-space: pre-wrap; font-family: var(--font-mono); color: rgba(255,255,255,0.88);">Your Agent Code       NocturnusAI         LLM API
+<span style="color: var(--site-muted-soft);">  (turns)</span>     <span style="color: var(--site-accent);">&rarr;</span>    <span style="color: var(--site-muted-soft);">(extract, store,</span>   <span style="color: var(--site-accent);">&rarr;</span>   <span style="color: var(--site-muted-soft);">(receives only</span>
+                       <span style="color: var(--site-muted-soft);"> diff, rank)</span>          <span style="color: var(--site-muted-soft);">the delta)</span></pre>
+          </div>
+          <p style="text-align: center; margin-top: var(--space-3); font-size: 0.85rem; color: var(--site-muted-soft);">
+            Self-hosted. Open source. Not a memory store &mdash; a prompt compression server.
+            <br/>
+            <a href="https://github.com/Auctalis/nocturnusai" style="color: var(--site-accent); text-decoration: none;">
+              <img src="https://img.shields.io/github/stars/Auctalis/nocturnusai?style=flat&amp;color=f59e0b" alt="GitHub stars" style="vertical-align: middle; margin-right: 0.3rem; height: 20px;" />
+              Star on GitHub
+            </a>
+          </p>
         </div>
       </div>
     </section>
