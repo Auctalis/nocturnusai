@@ -53,21 +53,27 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           </p>
         </div>
 
-        <!-- Prerequisites + Start server -->
-        <div class="reveal reveal-delay-1" style="margin-bottom: var(--space-5);">
-          <div class="panel-dark" style="padding: var(--space-3) var(--space-4); margin-bottom: var(--space-3);">
-            <div class="panel-label">Prerequisites (one-time)</div>
-            <pre style="margin: 0; font-size: 0.92rem; line-height: 1.8; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.45);"># Install Ollama from https://ollama.com, then:</span>
-ollama pull granite3.3:8b</pre>
+        <!-- Start server — two paths -->
+        <div class="reveal reveal-delay-1" style="margin-bottom: var(--space-5); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+          <div class="panel-dark" style="padding: var(--space-3) var(--space-4);">
+            <div class="panel-label">Option A &mdash; Ollama (free, local)</div>
+            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.45);"># one-time: install from https://ollama.com</span>
+ollama pull granite3.3:8b
+
+<span style="color: rgba(255,255,255,0.45);"># start</span>
+docker run -p 9300:9300 \
+  ghcr.io/auctalis/nocturnusai:latest</pre>
           </div>
           <div class="panel-dark" style="padding: var(--space-3) var(--space-4);">
-            <div class="panel-label">Start the server</div>
-            <pre style="margin: 0; font-size: 0.92rem; line-height: 1.8; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.45);"># With Ollama (free, local)</span>
-docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+            <div class="panel-label">Option B &mdash; Cloud LLM (faster)</div>
+            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.45);"># pick one</span>
+docker run -p 9300:9300 \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  ghcr.io/auctalis/nocturnusai:latest
 
-<span style="color: rgba(255,255,255,0.45);"># Or with a cloud LLM (faster inference)</span>
-docker run -p 9300:9300 -e ANTHROPIC_API_KEY=sk-ant-... ghcr.io/auctalis/nocturnusai:latest
-docker run -p 9300:9300 -e OPENAI_API_KEY=sk-... ghcr.io/auctalis/nocturnusai:latest</pre>
+docker run -p 9300:9300 \
+  -e OPENAI_API_KEY=sk-... \
+  ghcr.io/auctalis/nocturnusai:latest</pre>
           </div>
         </div>
 
