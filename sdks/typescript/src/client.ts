@@ -858,6 +858,86 @@ export class NocturnusAIClient {
   }
 
   // -----------------------------------------------------------------------
+  // Scope management
+  // -----------------------------------------------------------------------
+
+  /**
+   * List all scopes in the current database/tenant.
+   *
+   * @returns An array of scope name strings.
+   *
+   * @example
+   * ```ts
+   * const scopes = await client.listScopes();
+   * console.log(scopes); // ["ticket-4821", "ticket-5000"]
+   * ```
+   */
+  async listScopes(): Promise<string[]> {
+    return this.requestJson<string[]>('GET', '/scopes');
+  }
+
+  /**
+   * Delete a scope and all facts within it.
+   *
+   * @param scope - The scope name to delete.
+   * @returns An object with `scope` and `deleted` (number of facts removed).
+   *
+   * @example
+   * ```ts
+   * const result = await client.deleteScope("ticket-4821");
+   * console.log(`Deleted ${result.deleted} facts`);
+   * ```
+   */
+  async deleteScope(scope: string): Promise<{ scope: string; deleted: number }> {
+    return this.requestJson('DELETE', `/scope/${encodeURIComponent(scope)}`);
+  }
+
+  /**
+   * Fork (copy) all facts from one scope into a new scope.
+   *
+   * @param source - The source scope to copy from.
+   * @param target - The new scope name to create.
+   * @returns An object with `source`, `target`, and `copied` count.
+   *
+   * @example
+   * ```ts
+   * const result = await client.forkScope("production", "hypothesis-1");
+   * console.log(`Copied ${result.copied} facts`);
+   * ```
+   */
+  async forkScope(source: string, target: string): Promise<{ source: string; target: string; copied: number }> {
+    return this.requestJson('POST', '/scope/fork', { source, target });
+  }
+
+  /**
+   * Diff two scopes to see what facts differ.
+   *
+   * @param source - First scope name.
+   * @param target - Second scope name.
+   * @returns Diff information including `onlyInSource`, `onlyInTarget`, and `inBoth`.
+   */
+  async diffScope(source: string, target: string): Promise<Record<string, unknown>> {
+    return this.requestJson('POST', '/scope/diff', { source, target });
+  }
+
+  /**
+   * Merge facts from one scope into another.
+   *
+   * @param source - The scope to merge from.
+   * @param target - The scope to merge into.
+   * @param strategy - Conflict resolution: `"SOURCE_WINS"`, `"TARGET_WINS"`, `"KEEP_BOTH"`, or `"REJECT"`.
+   * @returns Merge results.
+   *
+   * @example
+   * ```ts
+   * const result = await client.mergeScope("experiment", "main");
+   * ```
+   */
+  async mergeScope(source: string, target: string, strategy: string = 'SOURCE_WINS'): Promise<Record<string, unknown>> {
+    return this.requestJson('POST', '/scope/merge', { source, target, strategy });
+  }
+
+  // -----------------------------------------------------------------------
   // Auth / key management
   // -----------------------------------------------------------------------
 

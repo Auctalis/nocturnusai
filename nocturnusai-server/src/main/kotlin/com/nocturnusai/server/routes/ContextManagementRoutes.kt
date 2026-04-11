@@ -327,6 +327,7 @@ fun Route.contextManagementRoutes(
             val allText = req.turns.joinToString("\n")
             var newFactsExtracted = 0
             var warning: String? = null
+            val newlyAssertedAtoms = mutableListOf<com.nocturnusai.core.Atom>()
 
             if (extractor != null) {
                 try {
@@ -334,7 +335,7 @@ fun Route.contextManagementRoutes(
                     for (fact in facts) {
                         val terms = fact.args.map { com.nocturnusai.core.Term.Identifier(it) }
                         val atom = com.nocturnusai.core.Atom(fact.predicate, terms, scope = req.scope)
-                        try { db.assertFact(atom, tenantId); newFactsExtracted++ } catch (_: Exception) { }
+                        try { db.assertFact(atom, tenantId); newFactsExtracted++; newlyAssertedAtoms.add(atom) } catch (_: Exception) { }
                     }
                     // Also assert any extracted rules
                     val llmExtractor = extractor as? com.nocturnusai.server.llm.LlmFactExtractor
@@ -417,10 +418,21 @@ fun Route.contextManagementRoutes(
                 if (req.sessionId != null) result.entries else emptyList()
             }
 
-            val briefingDelta: String? = if (addedEntries.isNotEmpty() && llmContextFormatter != null) {
+            // If the optimized window didn't surface any new entries (e.g. when
+            // maxFacts is reached and older high-salience facts dominate), fall
+            // back to the atoms we just extracted this turn so the briefingDelta
+            // always reflects what was *learned*, not just what fits the window.
+            val deltaAtoms: List<ScoredAtom> = if (addedEntries.isNotEmpty()) {
+                addedEntries.map { ScoredAtom(it.atom, it.salience) }
+            } else if (newlyAssertedAtoms.isNotEmpty()) {
+                newlyAssertedAtoms.map { ScoredAtom(it, 0.5) }
+            } else {
+                emptyList()
+            }
+
+            val briefingDelta: String? = if (deltaAtoms.isNotEmpty() && llmContextFormatter != null) {
                 try {
-                    val scored = addedEntries.map { ScoredAtom(it.atom, it.salience) }
-                    llmContextFormatter.format(scored, result.relevantRules)
+                    llmContextFormatter.format(deltaAtoms, result.relevantRules)
                 } catch (e: Exception) {
                     call.application.environment.log.warn("Briefing delta formatting failed: ${e.message}")
                     null

@@ -1136,6 +1136,121 @@ class NocturnusAIClient:
     # Schema Discovery
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Scope management
+    # ------------------------------------------------------------------
+
+    async def list_scopes(self) -> list[str]:
+        """List all scopes in the current database/tenant.
+
+        Returns:
+            A list of scope name strings.
+
+        Example::
+
+            scopes = await client.list_scopes()
+            print(scopes)  # ["ticket-4821", "ticket-5000"]
+        """
+        result = await self._request("GET", "/scopes")
+        if isinstance(result, list):
+            return result
+        return []
+
+    async def delete_scope(self, scope: str) -> dict[str, Any]:
+        """Delete a scope and all facts within it.
+
+        Use this to clean up conversation data when a session is done.
+
+        Args:
+            scope: The scope name to delete (e.g., a ticket or conversation id).
+
+        Returns:
+            A dict with ``"scope"`` and ``"deleted"`` (number of facts removed).
+
+        Example::
+
+            result = await client.delete_scope("ticket-4821")
+            print(f"Deleted {result['deleted']} facts")
+        """
+        result = await self._request("DELETE", f"/scope/{scope}")
+        if isinstance(result, dict):
+            return result
+        return {"scope": scope, "deleted": 0}
+
+    async def fork_scope(self, source: str, target: str) -> dict[str, Any]:
+        """Fork (copy) all facts from one scope into a new scope.
+
+        Useful for hypothetical reasoning or A/B testing.
+
+        Args:
+            source: The source scope to copy from.
+            target: The new scope name to create.
+
+        Returns:
+            A dict with ``"source"``, ``"target"``, and ``"copied"`` count.
+
+        Example::
+
+            result = await client.fork_scope("production", "hypothesis-1")
+            print(f"Copied {result['copied']} facts")
+        """
+        body = {"source": source, "target": target}
+        result = await self._request("POST", "/scope/fork", json_body=body)
+        if isinstance(result, dict):
+            return result
+        return {"source": source, "target": target, "copied": 0}
+
+    async def diff_scope(self, source: str, target: str) -> dict[str, Any]:
+        """Diff two scopes to see what facts differ.
+
+        Args:
+            source: First scope name.
+            target: Second scope name.
+
+        Returns:
+            A dict with ``"onlyInSource"``, ``"onlyInTarget"``,
+            and ``"inBoth"`` counts.
+
+        Example::
+
+            diff = await client.diff_scope("main", "experiment")
+            print(f"Only in experiment: {diff['onlyInTarget']}")
+        """
+        body = {"source": source, "target": target}
+        result = await self._request("POST", "/scope/diff", json_body=body)
+        if isinstance(result, dict):
+            return result
+        return {}
+
+    async def merge_scope(
+        self,
+        source: str,
+        target: str,
+        strategy: str = "SOURCE_WINS",
+    ) -> dict[str, Any]:
+        """Merge facts from one scope into another.
+
+        Args:
+            source: The scope to merge from.
+            target: The scope to merge into.
+            strategy: Conflict resolution strategy. One of
+                ``"SOURCE_WINS"``, ``"TARGET_WINS"``,
+                ``"KEEP_BOTH"``, ``"REJECT"``.
+
+        Returns:
+            A dict with merge results.
+
+        Example::
+
+            result = await client.merge_scope("experiment", "main")
+            print(result)
+        """
+        body = {"source": source, "target": target, "strategy": strategy}
+        result = await self._request("POST", "/scope/merge", json_body=body)
+        if isinstance(result, dict):
+            return result
+        return {}
+
     async def predicates(self, scope: str | None = None) -> dict[str, Any]:
         """Discover the knowledge base schema.
 
@@ -1774,6 +1889,30 @@ class SyncNocturnusAIClient:
     def health(self) -> dict[str, Any]:
         """Check server health. See :meth:`NocturnusAIClient.health`."""
         return self._run(self._async_client.health())
+
+    # ------------------------------------------------------------------
+    # Scope management
+    # ------------------------------------------------------------------
+
+    def list_scopes(self) -> list[str]:
+        """List all scopes. See :meth:`NocturnusAIClient.list_scopes`."""
+        return self._run(self._async_client.list_scopes())
+
+    def delete_scope(self, scope: str) -> dict[str, Any]:
+        """Delete a scope. See :meth:`NocturnusAIClient.delete_scope`."""
+        return self._run(self._async_client.delete_scope(scope))
+
+    def fork_scope(self, source: str, target: str) -> dict[str, Any]:
+        """Fork a scope. See :meth:`NocturnusAIClient.fork_scope`."""
+        return self._run(self._async_client.fork_scope(source, target))
+
+    def diff_scope(self, source: str, target: str) -> dict[str, Any]:
+        """Diff two scopes. See :meth:`NocturnusAIClient.diff_scope`."""
+        return self._run(self._async_client.diff_scope(source, target))
+
+    def merge_scope(self, source: str, target: str, strategy: str = "SOURCE_WINS") -> dict[str, Any]:
+        """Merge scopes. See :meth:`NocturnusAIClient.merge_scope`."""
+        return self._run(self._async_client.merge_scope(source, target, strategy))
 
     def predicates(self, scope: str | None = None) -> dict[str, Any]:
         """Discover the KB schema. See :meth:`NocturnusAIClient.predicates`."""
