@@ -1910,7 +1910,9 @@ class SyncNocturnusAIClient:
         """Diff two scopes. See :meth:`NocturnusAIClient.diff_scope`."""
         return self._run(self._async_client.diff_scope(source, target))
 
-    def merge_scope(self, source: str, target: str, strategy: str = "SOURCE_WINS") -> dict[str, Any]:
+    def merge_scope(
+        self, source: str, target: str, strategy: str = "SOURCE_WINS",
+    ) -> dict[str, Any]:
         """Merge scopes. See :meth:`NocturnusAIClient.merge_scope`."""
         return self._run(self._async_client.merge_scope(source, target, strategy))
 
