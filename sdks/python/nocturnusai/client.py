@@ -1456,7 +1456,7 @@ class NocturnusAIClient:
         payload: dict[str, Any] = {
             "operation": op,
             "predicate": predicate,
-            "args": args if args is not None else ["?_0"],
+            **({"args": args} if args is not None else {}),
         }
         if arg_index is not None:
             payload["argIndex"] = arg_index
@@ -1510,8 +1510,9 @@ class NocturnusAIClient:
             result = await client.retract_pattern("temp_location")
             print(f"Retracted {result['retracted']} facts")
         """
-        effective_args = args if args is not None else ["?_0"]
-        payload: dict[str, Any] = {"predicate": predicate, "args": effective_args}
+        payload: dict[str, Any] = {"predicate": predicate}
+        if args is not None:
+            payload["args"] = args
         if scope is not None:
             payload["scope"] = scope
         return await self._request("POST", "/retract/pattern", json_body=payload)
@@ -1635,6 +1636,8 @@ class NocturnusAIClient:
             await client.commit_transaction(tx_id)
         """
         result = await self._request("POST", "/tx/begin")
+        if isinstance(result, dict) and "transactionId" in result:
+            return str(result["transactionId"])
         return str(result) if not isinstance(result, str) else result
 
     async def commit_transaction(self, transaction_id: int | str) -> str:

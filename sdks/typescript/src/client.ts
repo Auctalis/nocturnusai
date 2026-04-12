@@ -166,6 +166,7 @@ export class NocturnusAIClient {
     if (opts?.validFrom !== undefined) body.validFrom = opts.validFrom;
     if (opts?.validUntil !== undefined) body.validUntil = opts.validUntil;
     if (opts?.ttl !== undefined) body.ttl = opts.ttl;
+    if (opts?.confidence !== undefined) body.confidence = opts.confidence;
 
     const headers: Record<string, string> = {};
     if (opts?.transactionId !== undefined) {
@@ -797,7 +798,8 @@ export class NocturnusAIClient {
    * ```
    */
   async beginTransaction(): Promise<string> {
-    return this.requestText('POST', '/tx/begin');
+    const result = await this.requestJson<{ transactionId: number | string }>('POST', '/tx/begin');
+    return String(result.transactionId);
   }
 
   /**
@@ -1149,7 +1151,8 @@ export class NocturnusAIClient {
    * ```
    */
   async aggregate(op: string, predicate: string, options?: { args?: string[]; argIndex?: number; scope?: string }): Promise<AggregateResult> {
-    const payload: Record<string, unknown> = { operation: op, predicate, args: options?.args ?? ['?_0'] };
+    const payload: Record<string, unknown> = { operation: op, predicate };
+    if (options?.args) payload.args = options.args;
     if (options?.argIndex !== undefined) payload.argIndex = options.argIndex;
     if (options?.scope) payload.scope = options.scope;
     return this.requestJson<AggregateResult>('POST', '/aggregate', payload);
@@ -1188,7 +1191,8 @@ export class NocturnusAIClient {
    * ```
    */
   async retractPattern(predicate: string, args?: string[], scope?: string): Promise<RetractPatternResult> {
-    const payload: Record<string, unknown> = { predicate, args: args ?? ['?_0'] };
+    const payload: Record<string, unknown> = { predicate };
+    if (args) payload.args = args;
     if (scope) payload.scope = scope;
     return this.requestJson<RetractPatternResult>('POST', '/retract/pattern', payload);
   }

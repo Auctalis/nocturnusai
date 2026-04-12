@@ -185,54 +185,87 @@ That is the backend. The front-of-product story is still turn reduction.
 
 ## Quick Start
 
-### Path 1: Try it locally now
+### Docker (fastest)
+
+```bash
+docker run -d --name nocturnusai -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+```
+
+Verify it's running:
+
+```bash
+curl http://localhost:9300/health
+```
+
+Try the first reduction from the working loop above:
+
+```bash
+curl -X POST http://localhost:9300/context \
+  -H 'Content-Type: application/json' \
+  -H 'X-Tenant-ID: default' \
+  -d '{
+    "turns": [
+      "user: Customer says they are enterprise and blocked on SLA credits.",
+      "tool: CRM says account is Acme Corp with a 2M ARR contract."
+    ],
+    "maxFacts": 12
+  }'
+```
+
+That's it. Server is running, persists data to a Docker volume, and restarts automatically.
+
+### Docker with Ollama (enables natural-language extraction)
+
+If you have [Ollama](https://ollama.com) running locally:
+
+```bash
+docker run -d --name nocturnusai -p 9300:9300 \
+  --add-host=host.docker.internal:host-gateway \
+  -e LLM_PROVIDER=ollama \
+  -e LLM_MODEL=granite3.3:8b \
+  -e LLM_BASE_URL=http://host.docker.internal:11434/v1 \
+  -e EXTRACTION_ENABLED=true \
+  ghcr.io/auctalis/nocturnusai:latest
+```
+
+### Install script (CLI + setup wizard)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
 ```
 
-This is the primary install path. It downloads the CLI and immediately launches the interactive `nocturnusai setup` wizard so the developer can choose:
+Downloads the CLI binary and launches an interactive setup wizard where you choose your LLM provider (Ollama, Anthropic, OpenAI, Google, or skip). Creates a persistent Docker Compose install.
 
-- Ollama
-- Anthropic
-- OpenAI
-- Google
-- Or skip LLM setup for now
-
-The install remains persistent because it finishes by creating a Docker Compose install and starting the server.
-
-Optional shortcuts if you already know what you want:
+Shortcuts if you already know what you want:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --host-ollama
-curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --ollama
-curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash -s -- --key sk-ant-your-key
+curl -fsSL ... | bash -s -- --host-ollama    # Reuse local Ollama
+curl -fsSL ... | bash -s -- --ollama         # Bundle Ollama in Docker
+curl -fsSL ... | bash -s -- --key sk-ant-... # Use Anthropic
 ```
 
-### Path 1b: From this repo
-
-```bash
-make up-ollama
-make smoke
-```
-
-This is the repo-local/manual path for contributors working from a checkout. It is not the primary first-run install story.
-
-### Path 2: Python app
+### Python SDK
 
 ```bash
 pip install nocturnusai
 ```
 
-### Path 3: TypeScript app
+### TypeScript SDK
 
 ```bash
 npm install nocturnusai-sdk
 ```
 
-### Path 4: MCP client
+### MCP client
 
 Copy one of the configs from [`mcp-configs/`](./mcp-configs).
+
+### From this repo (contributors)
+
+```bash
+make up-ollama
+make smoke
+```
 
 ---
 
@@ -267,15 +300,17 @@ Full docs: **[auctalis.github.io/nocturnusai](https://auctalis.github.io/nocturn
 
 ---
 
-## Docker Compose
+## Docker Compose (advanced)
+
+For persistent config, monitoring, or Ollama bundling:
 
 ```bash
 git clone https://github.com/Auctalis/nocturnusai.git && cd nocturnusai
 
-make up                                        # Server using .env.example defaults or .env overrides
-make up-ollama                                 # Repo-local Ollama shortcut
+make up                                        # Server using .env.example defaults
+make up-ollama                                 # + Ollama (reuses host or starts bundled)
 make up-monitoring                             # + Prometheus + Grafana
-make smoke                                     # Verify health + text extraction
+make smoke                                     # Verify health + context endpoint
 ```
 
 ---
