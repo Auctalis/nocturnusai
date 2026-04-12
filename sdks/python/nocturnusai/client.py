@@ -1449,16 +1449,15 @@ class NocturnusAIClient:
             params["scope"] = scope
         url = f"{self._base_url}/memory/events"
         headers = self._build_headers()
-        async with httpx.AsyncClient(timeout=None) as sse_client:
-            async with sse_client.stream(
-                "GET", url, headers=headers, params=params
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if line.startswith("data:"):
-                        data = line[5:].strip()
-                        if data:
-                            await callback(json_mod.loads(data))
+        async with httpx.AsyncClient(timeout=None) as sse_client, sse_client.stream(
+            "GET", url, headers=headers, params=params
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if line.startswith("data:"):
+                    data = line[5:].strip()
+                    if data:
+                        await callback(json_mod.loads(data))
 
     async def predicates(self, scope: str | None = None) -> dict[str, Any]:
         """Discover the knowledge base schema.

@@ -1025,7 +1025,7 @@ describe('Retry logic', () => {
     const promise = makeRetryClient().health().catch((e: unknown) => e);
     await vi.runAllTimersAsync();
     const err = await promise;
-    expect((err as Error).message).toBe('connection refused');
+    expect((err as Error).message).toBe('Connection failed: connection refused');
     expect(mockFetch).toHaveBeenCalledTimes(4);
   });
 
