@@ -48,7 +48,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <p>
         In a typical setup, agents stuff 150K+ tokens of context into every LLM request at $15/M tokens (GPT-4o, Claude Sonnet). That's $2.25 per request. NocturnusAI's Context Management Engine uses goal-driven backward chaining to deliver only relevant facts — typically 820 tokens for the same query. That's <strong>$0.01 per request</strong>, a 97% reduction. At 1,000 requests/hour, that's the difference between $54,000/month and $240/month.
     </p>
-    <p><a href="/docs/concepts#context-optimization">Learn about context optimization →</a></p>
+    <p><a href={`${base}/docs/concepts#context-optimization`}>Learn about context optimization →</a></p>
 
     <hr />
 
@@ -56,13 +56,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <p>
         It's a goal-driven optimization pipeline that sits between your knowledge base and your LLM. You tell it what your agent needs to know (via goals), and it uses backward chaining, salience ranking, contradiction detection, and deduplication to produce a minimal, consistent context window. The pipeline runs in under 50ms and supports incremental diffs for multi-turn conversations.
     </p>
-    <p><a href="/docs/concepts#context-optimization">See how it works →</a></p>
+    <p><a href={`${base}/docs/concepts#context-optimization`}>See how it works →</a></p>
 
     <hr />
 
     <h3 id="sdk-vs-mcp-context">Should I use SDK context APIs or MCP context tools?</h3>
     <p>
-        Use MCP when you want plug-and-play tool access from an MCP-compatible agent. Use SDK/HTTP context APIs when you need goal-driven windows, <code>sessionId</code>-based diffs, and explicit orchestration. A common production setup is MCP for tool calling plus <code>/context/optimize</code> + <code>/context/diff</code> from your orchestrator.
+        Use MCP when you want plug-and-play tool access from an MCP-compatible agent. Use SDK/HTTP context APIs when you need goal-driven windows, <code>sessionId</code>-based diffs, and explicit orchestration. A common production setup is MCP for tool calling plus <code>POST /memory/context</code> (with <code>goals</code>) + <code>/context/diff</code> from your orchestrator.
     </p>
     <p><a href={`${base}/docs/sdks`}>See SDK details &rarr;</a> · <a href={`${base}/docs/mcp`}>See MCP details &rarr;</a></p>
 

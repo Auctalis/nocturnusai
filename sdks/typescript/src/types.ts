@@ -63,6 +63,9 @@ export interface Atom {
 
   /** Time-to-live in milliseconds. The atom auto-expires after this duration. */
   ttl?: number | null;
+
+  /** Confidence score in the range 0.0–1.0. */
+  confidence?: number | null;
 }
 
 /**
@@ -1006,6 +1009,49 @@ export interface SchemaDiscovery {
   totalPredicates: number;
   totalFacts: number;
   totalRules: number;
+}
+
+// ---------------------------------------------------------------------------
+// Aggregate / bulk / pattern types
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of POST /aggregate.
+ */
+export interface AggregateResult {
+  /** Aggregation operation that was performed. */
+  op: string;
+
+  /** Predicate that was aggregated over. */
+  predicate: string;
+
+  /** Computed aggregate value. */
+  result: number;
+
+  /** Number of matching facts included in the computation. */
+  count: number;
+}
+
+/**
+ * Result of POST /assert/facts (bulk assert).
+ */
+export interface BulkAssertResult {
+  /** Number of facts successfully asserted. */
+  asserted: number;
+
+  /** Number of facts that failed to assert. */
+  failed: number;
+}
+
+/**
+ * Result of POST /retract/pattern.
+ */
+export interface RetractPatternResult {
+  /** Number of directly matched facts retracted. */
+  retracted: number;
+
+  /** Number of derived facts cascade-retracted by the Truth Maintenance System. */
+  derivedRetracted: number;
 }
 
 // ---------------------------------------------------------------------------

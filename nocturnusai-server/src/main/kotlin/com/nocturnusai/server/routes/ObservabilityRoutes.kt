@@ -24,6 +24,79 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.io.File
+import kotlinx.serialization.Serializable
+
+// ── A2A Agent Card serializable model ──────────────────────────────────────
+
+@Serializable
+data class AgentCard(
+    val name: String,
+    val description: String,
+    val url: String,
+    val version: String,
+    val documentationUrl: String,
+    val provider: AgentProvider,
+    val capabilities: AgentCapabilities,
+    val authentication: AgentAuthentication,
+    val defaultInputModes: List<String>,
+    val defaultOutputModes: List<String>,
+    val skills: List<AgentSkill>,
+    val protocolSupport: AgentProtocolSupport
+)
+
+@Serializable
+data class AgentProvider(
+    val organization: String
+)
+
+@Serializable
+data class AgentCapabilities(
+    val streaming: Boolean,
+    val pushNotifications: Boolean,
+    val stateTransitionHistory: Boolean
+)
+
+@Serializable
+data class AgentAuthentication(
+    val schemes: List<String>,
+    val credentials: AgentAuthCredentials
+)
+
+@Serializable
+data class AgentAuthCredentials(
+    val headerName: String,
+    val alternativeHeader: String,
+    val bootstrapEndpoint: String,
+    val keyManagementEndpoint: String
+)
+
+@Serializable
+data class AgentSkill(
+    val id: String,
+    val name: String,
+    val description: String,
+    val tags: List<String>,
+    val examples: List<String>
+)
+
+@Serializable
+data class AgentProtocolSupport(
+    val mcp: McpProtocol,
+    val rest: RestProtocol
+)
+
+@Serializable
+data class McpProtocol(
+    val endpoint: String,
+    val sseEndpoint: String,
+    val protocolVersion: String
+)
+
+@Serializable
+data class RestProtocol(
+    val baseUrl: String,
+    val headers: Map<String, String>
+)
 
 fun Route.observabilityRoutes(appMicrometerRegistry: PrometheusMeterRegistry, dbManager: DatabaseManager, storageDir: File, llmConfigured: Boolean = false) {
     get("/metrics") {
@@ -70,98 +143,98 @@ fun Route.observabilityRoutes(appMicrometerRegistry: PrometheusMeterRegistry, db
         val scheme = if (com.nocturnusai.server.ServerConfig.tlsEnabled) "https" else "http"
         val baseUrl = "$scheme://$host:$port"
 
-        val agentCard = mapOf(
-            "name" to "NocturnusAI",
-            "description" to "The knowledge and reasoning backend for AI agents. Tell it facts, teach it rules, ask it questions — and get deterministic, provable answers. Manages agent memory with temporal awareness, relevance scoring, and automatic cleanup.",
-            "url" to baseUrl,
-            "version" to "0.2.4",
-            "documentationUrl" to "$baseUrl/userguide",
-            "provider" to mapOf(
-                "organization" to "NocturnusAI"
+        val agentCard = AgentCard(
+            name = "NocturnusAI",
+            description = "The knowledge and reasoning backend for AI agents. Tell it facts, teach it rules, ask it questions — and get deterministic, provable answers. Manages agent memory with temporal awareness, relevance scoring, and automatic cleanup.",
+            url = baseUrl,
+            version = "0.2.4",
+            documentationUrl = "$baseUrl/userguide",
+            provider = AgentProvider(
+                organization = "NocturnusAI"
             ),
-            "capabilities" to mapOf(
-                "streaming" to true,
-                "pushNotifications" to true,
-                "stateTransitionHistory" to false
+            capabilities = AgentCapabilities(
+                streaming = true,
+                pushNotifications = true,
+                stateTransitionHistory = false
             ),
-            "authentication" to mapOf(
-                "schemes" to listOf("apiKey"),
-                "credentials" to mapOf(
-                    "headerName" to "X-API-Key",
-                    "alternativeHeader" to "Authorization: Bearer <key>",
-                    "bootstrapEndpoint" to "/auth/bootstrap",
-                    "keyManagementEndpoint" to "/auth/keys"
+            authentication = AgentAuthentication(
+                schemes = listOf("apiKey"),
+                credentials = AgentAuthCredentials(
+                    headerName = "X-API-Key",
+                    alternativeHeader = "Authorization: Bearer <key>",
+                    bootstrapEndpoint = "/auth/bootstrap",
+                    keyManagementEndpoint = "/auth/keys"
                 )
             ),
-            "defaultInputModes" to listOf("application/json"),
-            "defaultOutputModes" to listOf("application/json", "text/event-stream"),
-            "skills" to listOf(
-                mapOf(
-                    "id" to "tell",
-                    "name" to "Tell",
-                    "description" to "Tell NocturnusAI something it should know. Store facts with optional auto-expiration (TTL).",
-                    "tags" to listOf("knowledge", "store", "facts"),
-                    "examples" to listOf("Tell it that Alice is Bob's parent", "Store a user preference that expires in 1 hour")
+            defaultInputModes = listOf("application/json"),
+            defaultOutputModes = listOf("application/json", "text/event-stream"),
+            skills = listOf(
+                AgentSkill(
+                    id = "tell",
+                    name = "Tell",
+                    description = "Tell NocturnusAI something it should know. Store facts with optional auto-expiration (TTL).",
+                    tags = listOf("knowledge", "store", "facts"),
+                    examples = listOf("Tell it that Alice is Bob's parent", "Store a user preference that expires in 1 hour")
                 ),
-                mapOf(
-                    "id" to "teach",
-                    "name" to "Teach",
-                    "description" to "Teach NocturnusAI a rule so it can derive new knowledge automatically. Define if-then relationships between concepts.",
-                    "tags" to listOf("rules", "reasoning", "logic"),
-                    "examples" to listOf("If X is parent of Y and Y is parent of Z, then X is grandparent of Z")
+                AgentSkill(
+                    id = "teach",
+                    name = "Teach",
+                    description = "Teach NocturnusAI a rule so it can derive new knowledge automatically. Define if-then relationships between concepts.",
+                    tags = listOf("rules", "reasoning", "logic"),
+                    examples = listOf("If X is parent of Y and Y is parent of Z, then X is grandparent of Z")
                 ),
-                mapOf(
-                    "id" to "ask",
-                    "name" to "Ask",
-                    "description" to "Ask NocturnusAI a question and get provable answers derived from stored facts and rules. Optionally see the full reasoning chain.",
-                    "tags" to listOf("query", "reasoning", "answers"),
-                    "examples" to listOf("Who are Alice's grandchildren?", "Is Bob authorized to access this resource?")
+                AgentSkill(
+                    id = "ask",
+                    name = "Ask",
+                    description = "Ask NocturnusAI a question and get provable answers derived from stored facts and rules. Optionally see the full reasoning chain.",
+                    tags = listOf("query", "reasoning", "answers"),
+                    examples = listOf("Who are Alice's grandchildren?", "Is Bob authorized to access this resource?")
                 ),
-                mapOf(
-                    "id" to "forget",
-                    "name" to "Forget",
-                    "description" to "Make NocturnusAI forget a fact. Any knowledge that was derived from it is also automatically forgotten.",
-                    "tags" to listOf("retract", "cleanup", "knowledge"),
-                    "examples" to listOf("Forget that Alice is Bob's parent")
+                AgentSkill(
+                    id = "forget",
+                    name = "Forget",
+                    description = "Make NocturnusAI forget a fact. Any knowledge that was derived from it is also automatically forgotten.",
+                    tags = listOf("retract", "cleanup", "knowledge"),
+                    examples = listOf("Forget that Alice is Bob's parent")
                 ),
-                mapOf(
-                    "id" to "context",
-                    "name" to "Get Context",
-                    "description" to "Get the most relevant knowledge for the current reasoning step, ranked by recency, frequency, and priority.",
-                    "tags" to listOf("memory", "context", "relevance"),
-                    "examples" to listOf("Get the 50 most relevant facts for the current conversation")
+                AgentSkill(
+                    id = "context",
+                    name = "Get Context",
+                    description = "Get the most relevant knowledge for the current reasoning step, ranked by recency, frequency, and priority.",
+                    tags = listOf("memory", "context", "relevance"),
+                    examples = listOf("Get the 50 most relevant facts for the current conversation")
                 ),
-                mapOf(
-                    "id" to "recall",
-                    "name" to "Recall",
-                    "description" to "Recall what was known at a specific point in time. Time-travel queries for historical reasoning.",
-                    "tags" to listOf("temporal", "history", "recall"),
-                    "examples" to listOf("What was the user's location at 3pm yesterday?")
+                AgentSkill(
+                    id = "recall",
+                    name = "Recall",
+                    description = "Recall what was known at a specific point in time. Time-travel queries for historical reasoning.",
+                    tags = listOf("temporal", "history", "recall"),
+                    examples = listOf("What was the user's location at 3pm yesterday?")
                 ),
-                mapOf(
-                    "id" to "memory",
-                    "name" to "Memory Management",
-                    "description" to "Compress repeated patterns into summaries and clean up expired/irrelevant knowledge. Essential for long-running sessions.",
-                    "tags" to listOf("memory", "compress", "cleanup"),
-                    "examples" to listOf("Compress repeated user queries into interest summaries", "Clean up low-relevance facts")
+                AgentSkill(
+                    id = "memory",
+                    name = "Memory Management",
+                    description = "Compress repeated patterns into summaries and clean up expired/irrelevant knowledge. Essential for long-running sessions.",
+                    tags = listOf("memory", "compress", "cleanup"),
+                    examples = listOf("Compress repeated user queries into interest summaries", "Clean up low-relevance facts")
                 ),
-                mapOf(
-                    "id" to "predicates",
-                    "name" to "Schema Discovery",
-                    "description" to "Discover the knowledge base schema — list all predicate types with fact/rule counts and arity. Useful for understanding available knowledge before querying.",
-                    "tags" to listOf("schema", "discovery", "predicates"),
-                    "examples" to listOf("What predicates are stored?", "How many facts exist for each relationship type?")
+                AgentSkill(
+                    id = "predicates",
+                    name = "Schema Discovery",
+                    description = "Discover the knowledge base schema — list all predicate types with fact/rule counts and arity. Useful for understanding available knowledge before querying.",
+                    tags = listOf("schema", "discovery", "predicates"),
+                    examples = listOf("What predicates are stored?", "How many facts exist for each relationship type?")
                 )
             ),
-            "protocolSupport" to mapOf(
-                "mcp" to mapOf(
-                    "endpoint" to "$baseUrl/mcp",
-                    "sseEndpoint" to "$baseUrl/mcp/sse",
-                    "protocolVersion" to "2025-11-25"
+            protocolSupport = AgentProtocolSupport(
+                mcp = McpProtocol(
+                    endpoint = "$baseUrl/mcp",
+                    sseEndpoint = "$baseUrl/mcp/sse",
+                    protocolVersion = "2025-11-25"
                 ),
-                "rest" to mapOf(
-                    "baseUrl" to baseUrl,
-                    "headers" to mapOf(
+                rest = RestProtocol(
+                    baseUrl = baseUrl,
+                    headers = mapOf(
                         "X-Database" to "Database name (default: 'default')",
                         "X-Tenant-ID" to "Tenant ID for multi-tenancy",
                         "X-API-Key" to "API key for authentication"

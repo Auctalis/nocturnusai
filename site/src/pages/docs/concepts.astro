@@ -16,7 +16,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <hr />
 
-    <h2 id="pipeline">Backend Pipeline</h2>
+    <h2 id="context-optimization">Backend Pipeline &amp; Context Optimization</h2>
     <p>The backend path from raw turns to a smaller context window is roughly:</p>
     <ol>
         <li><strong>Turns arrive</strong> as raw text, tool output, or already-structured facts.</li>
@@ -29,8 +29,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <pre><code class="language-bash"># Broad first pass
 POST /context
 
-# Goal-specific pass
-POST /context/optimize
+# Goal-specific pass (unified endpoint — use goals parameter)
+POST /memory/context
 
 # Later turns
 POST /context/diff
@@ -83,7 +83,7 @@ POST /context/session/clear</code></pre>
 
     <h2 id="sessions">Session Snapshots and Diffs</h2>
     <p>
-        When you call <code>/context/optimize</code> with a <code>sessionId</code>, the backend stores a snapshot of that window. Later, <code>/context/diff</code> compares the new window to the old one and returns only the additions and removals.
+        When you call <code>/memory/context</code> with a <code>sessionId</code>, the backend stores a snapshot of that window. Later, <code>/context/diff</code> compares the new window to the old one and returns only the additions and removals.
     </p>
 
     <p>
@@ -134,7 +134,7 @@ NOT billing_blocked(acme_corp)</code></pre>
 
     <h3 id="inference">Inference</h3>
     <p>
-        The backend supports backward chaining for question-driven proof and forward chaining for reactive derivation. This is why <code>/context/optimize</code> can work from goals instead of only from surface frequency.
+        The backend supports backward chaining for question-driven proof and forward chaining for reactive derivation. This is why <code>/memory/context</code> with <code>goals</code> can work from goals instead of only from surface frequency.
     </p>
 
     <h3 id="temporal">Temporal State</h3>

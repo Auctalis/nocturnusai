@@ -16,13 +16,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   </div>
 
   <h2>Start in four moves</h2>
-  <ol>
-    <li>Send raw turns to <code>POST /context</code> (requires LLM — see note below).</li>
-    <li>Narrow the next decision with <code>POST /memory/context</code> and <code>goals</code>.</li>
-    <li>Reuse the same <code>sessionId</code> with <code>POST /context/diff</code>.</li>
-    <li>Clear the session when the thread ends.</li>
-  </ol>
 
+  <p><strong>Move 1.</strong> Send raw turns to <code>POST /context</code> — returns a structured briefing. Requires LLM (see note below).</p>
   <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context \
   -H "Content-Type: application/json" \
   -H "X-Tenant-ID: default" \
@@ -36,7 +31,31 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     "sessionId": "ticket-4821"
   &#125;'</code></pre>
 
-  <div class="callout callout-warning">
+  <p><strong>Move 2.</strong> Narrow the next decision with <code>POST /memory/context</code> and <code>goals</code> — returns only goal-relevant facts.</p>
+  <pre data-lang="bash"><code>curl -X POST http://localhost:9300/memory/context \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "goals": [&#123;"predicate": "next_best_action", "args": ["acme_corp"]&#125;],
+    "scope": "ticket-4821",
+    "sessionId": "ticket-4821",
+    "maxFacts": 10,
+    "format": "natural"
+  &#125;'</code></pre>
+
+  <p><strong>Move 3.</strong> Reuse the same <code>sessionId</code> with <code>POST /context/diff</code> on later turns — returns only what changed.</p>
+  <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context/diff \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"sessionId": "ticket-4821"&#125;'</code></pre>
+
+  <p><strong>Move 4.</strong> Clear the session when the thread ends.</p>
+  <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context/session/clear \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"sessionId": "ticket-4821"&#125;'</code></pre>
+
+  <div id="natural-language" class="callout callout-warning">
     <strong>LLM extraction required for <code>POST /context</code>.</strong>
     The Docker image connects to <a href="https://ollama.com">Ollama</a> on your host by default &mdash; just install Ollama and run <code>ollama pull granite3.3:8b</code>.
     Or pass <code>-e ANTHROPIC_API_KEY</code> to <code>docker run</code> for a cloud LLM.
@@ -68,7 +87,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   </div>
 
   <NextSteps links={[
-    { title: 'Context Workflow', description: 'Walk through /context, /context/optimize, and /context/diff', href: `${base}/docs/context` },
+    { title: 'Context Workflow', description: 'Walk through /context, /memory/context, and /context/diff', href: `${base}/docs/context` },
     { title: 'API Reference', description: 'See every HTTP endpoint and request shape', href: `${base}/docs/api` },
     { title: 'SDKs and MCP', description: 'Pick the integration surface that matches your stack', href: `${base}/docs/sdks` },
     { title: 'How It Works', description: 'Read the backend mechanics after the workflow is clear', href: `${base}/docs/concepts` },

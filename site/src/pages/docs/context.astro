@@ -273,6 +273,30 @@ curl -X POST http://localhost:9300/context/session/clear \
         The easiest approach: pass <code>"format": "natural"</code> and use the <code>formattedText</code> field directly in your system prompt. No manual formatting needed.
     </p>
 
+    <p>Using the Python SDK (recommended):</p>
+    <pre data-lang="python"><code>from nocturnusai import SyncNocturnusAIClient
+from openai import OpenAI
+
+nocturnus = SyncNocturnusAIClient("http://localhost:9300", tenant_id="default")
+openai_client = OpenAI()
+
+ctx = nocturnus.context(
+    session_id="support-thread-4821",
+    max_facts=10,
+    goals=[&#123;"predicate": "next_best_action", "args": ["acme_corp"]&#125;],
+    format="natural",
+)
+context_text = ctx.formatted_text or ""
+
+response = openai_client.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        &#123;"role": "system", "content": "Use only this reduced context:\n" + context_text&#125;,
+        &#123;"role": "user", "content": "Write the next support reply."&#125;,
+    ],
+)</code></pre>
+
+    <p class="text-slate-400 text-sm">Or with raw HTTP if you prefer no SDK dependency:</p>
     <pre data-lang="python"><code>import requests
 from openai import OpenAI
 

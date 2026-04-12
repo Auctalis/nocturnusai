@@ -54,6 +54,9 @@ import type {
   KeyInfo,
   WhoAmI,
   SchemaDiscovery,
+  AggregateResult,
+  BulkAssertResult,
+  RetractPatternResult,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -222,8 +225,8 @@ export class NocturnusAIClient {
   /**
    * Query facts matching a pattern in the knowledge base.
    *
-   * Unlike {@link infer}, this only matches directly stored facts and does not
-   * apply logical rules.
+   * Alias for infer() — both use backward chaining via POST /infer. Prefer
+   * infer() for explicit naming. Unlike a raw fact lookup, rules are applied.
    *
    * @param predicate - The predicate to match.
    * @param args - Arguments. Use "?x", "?y" etc. for wildcard positions.
@@ -268,10 +271,12 @@ export class NocturnusAIClient {
    * const proofs = await client.infer('grandparent', ['?who', 'charlie'], { withProof: true });
    * ```
    */
-  async infer(predicate: string, args: string[], opts?: InferOptions): Promise<Atom[] | ProofTree[]> {
+  async infer(predicate: string, args?: (string | null)[], opts?: InferOptions & { withProof: true }): Promise<ProofTree[]>;
+  async infer(predicate: string, args?: (string | null)[], opts?: InferOptions & { withProof?: false }): Promise<Atom[]>;
+  async infer(predicate: string, args?: (string | null)[], opts?: InferOptions): Promise<Atom[] | ProofTree[]> {
     const body: Record<string, unknown> = {
       predicate,
-      args,
+      args: args ?? [],
       truthVal: opts?.negated ? false : true,
       negated: opts?.negated ?? false,
     };
@@ -873,7 +878,7 @@ export class NocturnusAIClient {
    * ```
    */
   async listScopes(): Promise<string[]> {
-    return this.requestJson<string[]>('GET', '/scopes');
+    return (await this.requestJson<{ scopes: string[]; count: number }>('GET', '/scopes')).scopes;
   }
 
   /**
@@ -906,7 +911,7 @@ export class NocturnusAIClient {
    * ```
    */
   async forkScope(source: string, target: string): Promise<{ source: string; target: string; copied: number }> {
-    return this.requestJson('POST', '/scope/fork', { source, target });
+    return this.requestJson('POST', '/scope/fork', { sourceScope: source, targetScope: target });
   }
 
   /**
@@ -917,7 +922,7 @@ export class NocturnusAIClient {
    * @returns Diff information including `onlyInSource`, `onlyInTarget`, and `inBoth`.
    */
   async diffScope(source: string, target: string): Promise<Record<string, unknown>> {
-    return this.requestJson('POST', '/scope/diff', { source, target });
+    return this.requestJson('POST', '/scope/diff', { scopeA: source, scopeB: target });
   }
 
   /**
@@ -934,7 +939,7 @@ export class NocturnusAIClient {
    * ```
    */
   async mergeScope(source: string, target: string, strategy: string = 'SOURCE_WINS'): Promise<Record<string, unknown>> {
-    return this.requestJson('POST', '/scope/merge', { source, target, strategy });
+    return this.requestJson('POST', '/scope/merge', { sourceScope: source, targetScope: target, strategy });
   }
 
   // -----------------------------------------------------------------------
@@ -1040,6 +1045,126 @@ export class NocturnusAIClient {
    */
   async whoami(): Promise<WhoAmI> {
     return this.requestJson<WhoAmI>('GET', '/auth/whoami');
+  }
+
+  // -----------------------------------------------------------------------
+  // Aggregate / bulk / pattern operations
+  // -----------------------------------------------------------------------
+
+  /**
+   * Run an aggregation query over matching facts.
+   *
+   * @param op - Aggregation operation: COUNT, SUM, MIN, MAX, or AVG
+   * @param predicate - The predicate to aggregate over
+   * @param options - Optional argIndex and scope
+   * @returns Aggregation result with the computed value and matching count.
+   *
+   * @example
+   * ```ts
+   * const result = await client.aggregate('COUNT', 'purchase');
+   * console.log(result.result); // number of purchases
+   * ```
+   */
+  async aggregate(op: string, predicate: string, options?: { argIndex?: number; scope?: string }): Promise<AggregateResult> {
+    const payload: Record<string, unknown> = { op, predicate };
+    if (options?.argIndex !== undefined) payload.argIndex = options.argIndex;
+    if (options?.scope) payload.scope = options.scope;
+    return this.requestJson<AggregateResult>('POST', '/aggregate', payload);
+  }
+
+  /**
+   * Assert multiple facts in a single request.
+   *
+   * @param facts - Array of fact objects with predicate and args
+   * @returns Count of asserted and failed facts.
+   *
+   * @example
+   * ```ts
+   * const result = await client.bulkAssert([
+   *   { predicate: 'parent', args: ['alice', 'bob'] },
+   *   { predicate: 'parent', args: ['alice', 'carol'] },
+   * ]);
+   * console.log(`Asserted ${result.asserted} facts`);
+   * ```
+   */
+  async bulkAssert(facts: Array<{ predicate: string; args: string[]; truthValue?: boolean; scope?: string; confidence?: number; ttl?: number; metadata?: Record<string, string> }>): Promise<BulkAssertResult> {
+    return this.requestJson<BulkAssertResult>('POST', '/assert/facts', { facts });
+  }
+
+  /**
+   * Retract all facts matching a predicate pattern.
+   *
+   * @param predicate - The predicate to match
+   * @param scope - Optional scope filter
+   * @returns Count of directly retracted and cascade-retracted facts.
+   *
+   * @example
+   * ```ts
+   * const result = await client.retractPattern('temp_fact');
+   * console.log(`Retracted ${result.retracted} facts`);
+   * ```
+   */
+  async retractPattern(predicate: string, scope?: string): Promise<RetractPatternResult> {
+    const payload: Record<string, unknown> = { predicate };
+    if (scope) payload.scope = scope;
+    return this.requestJson<RetractPatternResult>('POST', '/retract/pattern', payload);
+  }
+
+  // -----------------------------------------------------------------------
+  // Tenant management
+  // -----------------------------------------------------------------------
+
+  /**
+   * Create a new tenant in the specified database.
+   *
+   * @param tenantId - The tenant ID to create
+   * @param database - The database name. Defaults to the client's configured database.
+   * @returns Server confirmation message.
+   *
+   * @example
+   * ```ts
+   * await client.createTenant('acme');
+   * ```
+   */
+  async createTenant(tenantId: string, database?: string): Promise<string> {
+    const db = database ?? this.database;
+    return this.requestText('POST', `/admin/databases/${encodeURIComponent(db)}/tenants`, {
+      tenantId,
+    });
+  }
+
+  // -----------------------------------------------------------------------
+  // CLI/MCP vocabulary aliases
+  // -----------------------------------------------------------------------
+
+  /** Alias for assertFact(). Matches CLI/MCP vocabulary. */
+  async tell(predicate: string, args: string[], options?: FactOptions): Promise<string> {
+    return this.assertFact(predicate, args, options);
+  }
+
+  /** Alias for infer(). Matches CLI/MCP vocabulary. */
+  async ask(predicate: string, args?: (string | null)[], options?: InferOptions & { withProof: true }): Promise<ProofTree[]>;
+  async ask(predicate: string, args?: (string | null)[], options?: InferOptions & { withProof?: false }): Promise<Atom[]>;
+  async ask(predicate: string, args?: (string | null)[], options?: InferOptions): Promise<Atom[] | ProofTree[]> {
+    const body: Record<string, unknown> = {
+      predicate,
+      args: args ?? [],
+      truthVal: options?.negated ? false : true,
+      negated: options?.negated ?? false,
+    };
+    if (options?.scope !== undefined) body.scope = options.scope;
+    const queryParams = options?.withProof ? '?proof=true' : '';
+    return this.requestJson<Atom[] | ProofTree[]>('POST', `/infer${queryParams}`, body);
+  }
+
+  /** Alias for assertRule(). Matches CLI/MCP vocabulary. */
+  async teach(head: RuleHead, body: RuleBody, opts?: RuleOptions): Promise<string> {
+    return this.assertRule(head, body, opts);
+  }
+
+  /** Alias for retract(). Matches CLI/MCP vocabulary. */
+  async forget(predicate: string, args: string[], opts?: Pick<FactOptions, 'negated' | 'scope' | 'transactionId'>): Promise<string> {
+    return this.retract(predicate, args, opts);
   }
 
   // -----------------------------------------------------------------------
@@ -1199,18 +1324,25 @@ export class NocturnusAIClient {
     extraHeaders?: Record<string, string>,
   ): Promise<T> {
     const response = await this.fetchWithRetry(method, path, body, extraHeaders);
-    const text = await response.text();
 
+    if (!response.ok) {
+      let errorBody: NocturnusAIError | undefined;
+      try {
+        errorBody = (await response.json()) as NocturnusAIError;
+      } catch {
+        // Not a JSON error response — fall through to use statusText
+      }
+      throw new NocturnusAIRequestError(
+        errorBody?.message ?? `Request failed with status ${response.status}`,
+        response.status,
+        errorBody,
+      );
+    }
+
+    const text = await response.text();
     try {
       return JSON.parse(text) as T;
     } catch {
-      // If JSON parsing fails, check if this is an error response
-      if (!response.ok) {
-        throw new NocturnusAIRequestError(
-          `Request failed: ${response.status} ${response.statusText} - ${text}`,
-          response.status,
-        );
-      }
       throw new Error(`Failed to parse JSON response: ${text}`);
     }
   }
@@ -1286,11 +1418,17 @@ export class NocturnusAIClient {
 
         await this.sleep(delayMs);
       } catch (err) {
+        if (err instanceof NocturnusAIRequestError) throw err;
+
         lastError = err instanceof Error ? err : new Error(String(err));
 
         // Network errors are retryable
         if (attempt === this.maxRetries) {
-          throw lastError;
+          throw new NocturnusAIRequestError(
+            `Connection failed: ${lastError.message}`,
+            0,
+            undefined,
+          );
         }
 
         const delayMs = BASE_RETRY_DELAY_MS * Math.pow(2, attempt) + Math.random() * 100;

@@ -135,18 +135,18 @@ tools = get_nocturnusai_tool_definitions()
             <tbody class="text-slate-400">
                 <tr class="border-b border-white/5">
                     <td class="py-2">LangChain / CrewAI / AutoGen / OpenAI Agents / Anthropic (Python SDK)</td>
-                    <td class="py-2 font-mono"><code>context_window()</code> or framework context tool</td>
-                    <td class="py-2 font-mono"><code>optimize_context()</code>, <code>diff_context()</code>, <code>clear_context_session()</code></td>
+                    <td class="py-2 font-mono"><code>context()</code> or framework context tool <span class="text-slate-500 text-xs">(deprecated: <code>context_window()</code>)</span></td>
+                    <td class="py-2 font-mono"><code>context(goals=...)</code>, <code>diff_context()</code>, <code>clear_context_session()</code> <span class="text-slate-500 text-xs">(deprecated: <code>optimize_context()</code>)</span></td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2">MCP clients (Cursor, Claude Desktop, Windsurf)</td>
                     <td class="py-2 font-mono">JSON-RPC <code>tools/call</code> with tool <code>context</code></td>
-                    <td class="py-2 font-mono">HTTP <code>POST /context/optimize</code> + <code>POST /context/diff</code></td>
+                    <td class="py-2 font-mono">MCP <code>context</code> tool (with <code>goals</code>) + HTTP <code>POST /context/diff</code></td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2">TypeScript apps</td>
-                    <td class="py-2 font-mono"><code>contextWindow()</code></td>
-                    <td class="py-2 font-mono"><code>optimizeContext()</code>, <code>diffContext()</code>, <code>clearContextSession()</code></td>
+                    <td class="py-2 font-mono"><code>context()</code> <span class="text-slate-500 text-xs">(deprecated: <code>contextWindow()</code>)</span></td>
+                    <td class="py-2 font-mono"><code>context(&#123;goals&#125;)</code>, <code>diffContext()</code>, <code>clearContextSession()</code> <span class="text-slate-500 text-xs">(deprecated: <code>optimizeContext()</code>)</span></td>
                 </tr>
             </tbody>
         </table>
@@ -156,7 +156,7 @@ tools = get_nocturnusai_tool_definitions()
 from nocturnusai import SyncNocturnusAIClient
 
 client = SyncNocturnusAIClient("http://localhost:9300")
-ctx = client.optimize_context(
+ctx = client.context(
     goals=[&#123;"predicate": "eligible_for_sla", "args": ["acme_corp"]&#125;],
     max_facts=25,
     session_id="session-42",

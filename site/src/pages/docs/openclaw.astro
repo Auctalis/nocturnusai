@@ -92,7 +92,7 @@ export default definePluginEntry(&#123;
       async assemble(&#123; messages, tokenBudget &#125;) &#123;
         // Use latest user intent as goal, then ask Nocturnus for optimized context.
         const latest = messages[messages.length - 1];
-        const ctx = await fetch(`$&#123;NOCTURNUS&#125;/context/optimize`, &#123;
+        const ctx = await fetch(`$&#123;NOCTURNUS&#125;/memory/context`, &#123;
           method: "POST",
           headers: HEADERS,
           body: JSON.stringify(&#123;
@@ -168,7 +168,7 @@ cat ~/.openclaw/openclaw.json | jq '.plugins.slots.contextEngine'
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2 font-mono">assemble</td>
-                    <td class="py-2 font-mono text-cyan-400">POST /context/optimize</td>
+                    <td class="py-2 font-mono text-cyan-400">POST /memory/context</td>
                     <td class="py-2">Goal-driven, deduplicated context with contradiction handling.</td>
                 </tr>
                 <tr class="border-b border-white/5">
@@ -199,7 +199,7 @@ cat ~/.openclaw/openclaw.json | jq '.plugins.slots.contextEngine'
     </ul>
 
     <NextSteps links={[
-        { title: "API Reference", description: "Use /context and /context/optimize as your assembly backend", href: `${base}/docs/api#context-management` },
+        { title: "API Reference", description: "Use /context and /memory/context as your assembly backend", href: `${base}/docs/api#context-management` },
         { title: "MCP Integration", description: "Connect Nocturnus over MCP when you need tool-level integration", href: `${base}/docs/mcp` },
         { title: "Core Concepts", description: "Understand salience, contradiction handling, and proofs", href: `${base}/docs/concepts` },
     ]} />

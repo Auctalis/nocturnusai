@@ -61,6 +61,34 @@ async with NocturnusAIClient("http://localhost:9300") as client:
     results = await client.infer("mortal", ["?who"])
     print(results)</code></pre>
 
+    <h3 id="process-turns">process_turns() — Conversation Ingestion</h3>
+    <p>
+        <code>process_turns()</code> is the primary entry point for feeding raw conversation turns into Nocturnus.
+        It extracts structured facts, stores them under the given scope, and returns a briefing ready for your system prompt —
+        including an incremental delta so you only send what changed.
+    </p>
+    <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
+
+client = SyncNocturnusAIClient("http://localhost:9300", database="mydb", tenant_id="agent-1")
+
+# Process raw conversation turns into an optimized context window
+result = client.process_turns(
+    turns=[
+        &#123;"role": "user", "content": "Reset my password for john@example.com"&#125;,
+        &#123;"role": "assistant", "content": "I'll look up your account now."&#125;,
+        &#123;"role": "tool", "content": "Account found: John Doe, plan: Enterprise"&#125;,
+    ],
+    scope="support-session",
+    session_id="sess-42",
+)
+
+print(result.briefing)        # Full context window
+print(result.briefing_delta)  # Only what changed since last call
+print(result.facts_extracted) # Structured facts pulled from turns</code></pre>
+    <div class="callout callout-info">
+        <strong>briefing_delta is the key field.</strong> On the first call it equals the full briefing. On subsequent calls with the same <code>session_id</code>, it contains only the additions — so you can append it to your system prompt instead of replacing the whole thing.
+    </div>
+
     <h3>Context Optimization</h3>
     <p>The Python SDK includes full support for the Context Management Engine — the feature that cuts token costs by 97%. Use the unified <code>client.context()</code> method for both simple and goal-driven windows:</p>
     <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
@@ -423,6 +451,33 @@ await client.assertRule(
 // Infer
 const results = await client.infer('grandparent', ['?who', 'charlie']);
 console.log(results);</code></pre>
+
+    <h3 id="process-turns-ts">processTurns() — Conversation Ingestion</h3>
+    <p>
+        <code>processTurns()</code> is the primary entry point for feeding raw conversation turns into Nocturnus.
+        Returns a briefing and a delta field so you only send what changed to the model.
+    </p>
+    <pre><code class="language-typescript">import &#123; NocturnusAIClient &#125; from 'nocturnusai-sdk';
+
+const client = new NocturnusAIClient(&#123;
+  baseUrl: 'http://localhost:9300',
+  database: 'mydb',
+  tenantId: 'agent-1',
+&#125;);
+
+const result = await client.processTurns(&#123;
+  turns: [
+    &#123; role: 'user', content: 'Reset my password for john@example.com' &#125;,
+    &#123; role: 'assistant', content: "I'll look up your account now." &#125;,
+    &#123; role: 'tool', content: 'Account found: John Doe, plan: Enterprise' &#125;,
+  ],
+  scope: 'support-session',
+  sessionId: 'sess-42',
+&#125;);
+
+console.log(result.briefing);       // Full context window
+console.log(result.briefingDelta);  // Only what changed
+console.log(result.factsExtracted); // Structured facts</code></pre>
 
     <h3>Context Optimization with TypeScript</h3>
     <p>

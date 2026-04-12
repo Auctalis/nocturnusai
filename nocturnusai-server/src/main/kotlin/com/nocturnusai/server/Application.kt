@@ -117,13 +117,28 @@ fun Application.moduleWithStorageDir(storageDir: File) {
 
     install(StatusPages) {
         exception<TenantNotFoundException> { call, cause ->
-            call.respond(HttpStatusCode.NotFound, ErrorResponse("TENANT_NOT_FOUND", cause.message ?: "Tenant not found"))
+            val dbHeaderPresent = call.request.header("X-Database") != null
+            val message = if (!dbHeaderPresent) {
+                "Tenant '${cause.tenantId}' not found in database 'default'. Did you forget the X-Database header?"
+            } else {
+                cause.message ?: "Tenant not found"
+            }
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("TENANT_NOT_FOUND", message))
         }
         exception<ValidationException> { call, cause ->
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", cause.message ?: "Validation error"))
         }
         exception<DatabaseNotFoundException> { call, cause ->
             call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", cause.message ?: "Database not found"))
+        }
+        exception<io.ktor.server.plugins.ContentTransformationException> { call, cause ->
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("BAD_REQUEST", "Invalid request body: ${cause.message}"))
+        }
+        exception<kotlinx.serialization.SerializationException> { call, cause ->
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("BAD_REQUEST", "Invalid request body: ${cause.message}"))
+        }
+        status(HttpStatusCode.NotFound) { call, status ->
+            call.respond(status, ErrorResponse("NOT_FOUND", "No route matched: ${call.request.uri}"))
         }
     }
 

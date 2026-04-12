@@ -186,7 +186,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <p>For multi-turn conversations, combine extraction and context APIs:</p>
     <ol>
         <li>Use <code>/extract</code> (or <code>/context/ingest</code>) to convert raw language into facts.</li>
-        <li>Use <code>/context/optimize</code> with a stable <code>sessionId</code> to build the prompt window.</li>
+        <li>Use <code>/memory/context</code> with <code>goals</code> and a stable <code>sessionId</code> to build the prompt window.</li>
         <li>Use <code>/context/diff</code> on subsequent turns so only changes are sent to the model.</li>
     </ol>
 
@@ -206,7 +206,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <p>Every LLM call costs money — OpenAI charges $15/M tokens for GPT-4o, Anthropic charges $15/M for Claude Sonnet. NocturnusAI reduces your bill in two ways:</p>
     <ol>
         <li><strong>Smart extraction</strong> — <code>/extract</code> converts unstructured text into compact structured facts. A 500-word paragraph becomes 3-5 predicate/args pairs.</li>
-        <li><strong>Goal-driven context</strong> — <code>/context/optimize</code> delivers only the facts your agent needs for a specific question. 500 facts → 15 facts → 820 tokens instead of 150K.</li>
+        <li><strong>Goal-driven context</strong> — <code>/memory/context</code> with <code>goals</code> delivers only the facts your agent needs for a specific question. 500 facts → 15 facts → 820 tokens instead of 150K.</li>
     </ol>
     <p>At scale (1,000 requests/hour), this is the difference between <strong>$54,000/month</strong> and <strong>$240/month</strong> in LLM costs.</p>
 

@@ -142,31 +142,32 @@ class ObservabilityRoutesTest {
 
     // ─────────────────────────────────────────────────────────────────────────
     // GET /.well-known/agent.json
-    //
-    // NOTE: The server builds the agent card as a Map<String, Any> and passes it to
-    // call.respond(). kotlinx.serialization cannot serialize a heterogeneous Any map,
-    // so the endpoint currently throws SerializationException and returns 500.
-    // The tests below document the current (failing) behaviour so the build stays
-    // honest. Once the route is fixed to use a properly @Serializable data class the
-    // assertions should be updated to check for 200 and the body content.
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `GET well-known agent json - endpoint exists (known serialization bug)`() = testApplication {
+    fun `GET well-known agent json - returns 200 with agent card JSON`() = testApplication {
         application { module() }
 
-        // BUG: The route builds an untyped Map<String, Any> and passes it to call.respond().
-        // kotlinx.serialization cannot serialize a heterogeneous Any map, so the response
-        // pipeline throws SerializationException. This test documents the current behaviour.
-        // Fix: replace with a @Serializable AgentCard data class.
-        try {
-            val response = client.get("/.well-known/agent.json")
-            // If it doesn't throw, any non-404 status means the route is registered
-            assertNotEquals(HttpStatusCode.NotFound, response.status,
-                "/.well-known/agent.json should be a registered route")
-        } catch (_: Exception) {
-            // SerializationException propagates through the test pipeline — expected for now
-        }
+        val response = client.get("/.well-known/agent.json")
+
+        assertEquals(HttpStatusCode.OK, response.status,
+            "/.well-known/agent.json should return 200")
+        val body = response.bodyAsText()
+        assertTrue(body.contains("NocturnusAI"), "Expected 'NocturnusAI' in agent card: $body")
+        assertTrue(body.contains("skills"), "Expected 'skills' array in agent card: $body")
+        assertTrue(body.contains("capabilities"), "Expected 'capabilities' in agent card: $body")
+    }
+
+    @Test
+    fun `GET well-known agent json - Content-Type is application-json`() = testApplication {
+        application { module() }
+
+        val response = client.get("/.well-known/agent.json")
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val contentType = response.contentType()
+        assertNotNull(contentType)
+        assertEquals(ContentType.Application.Json.withParameter("charset", "UTF-8"), contentType)
     }
 
     // ─────────────────────────────────────────────────────────────────────────

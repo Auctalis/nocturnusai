@@ -386,6 +386,9 @@ class NocturnusAIClient:
     ) -> list[Atom]:
         """Query facts matching a pattern via inference.
 
+        Alias for :meth:`infer` — both use backward chaining. Prefer
+        :meth:`infer` for clarity.
+
         This sends a query to the ``/infer`` endpoint, which performs
         backward-chaining inference to find all matching facts. Use
         ``?``-prefixed strings for variable positions.
@@ -1123,8 +1126,8 @@ class NocturnusAIClient:
 
         Example::
 
-            result = await client.execute("ASSERT parent(alice, bob).")
-            result = await client.execute("QUERY parent(?x, bob).")
+            result = await client.execute("ASSERT parent(alice, bob);")
+            result = await client.execute("INFER parent(?x, bob);")
         """
         body = {"command": command}
         result = await self._request("POST", "/execute", json_body=body)
@@ -1194,7 +1197,7 @@ class NocturnusAIClient:
             result = await client.fork_scope("production", "hypothesis-1")
             print(f"Copied {result['copied']} facts")
         """
-        body = {"source": source, "target": target}
+        body = {"sourceScope": source, "targetScope": target}
         result = await self._request("POST", "/scope/fork", json_body=body)
         if isinstance(result, dict):
             return result
@@ -1216,7 +1219,7 @@ class NocturnusAIClient:
             diff = await client.diff_scope("main", "experiment")
             print(f"Only in experiment: {diff['onlyInTarget']}")
         """
-        body = {"source": source, "target": target}
+        body = {"scopeA": source, "scopeB": target}
         result = await self._request("POST", "/scope/diff", json_body=body)
         if isinstance(result, dict):
             return result
@@ -1245,11 +1248,171 @@ class NocturnusAIClient:
             result = await client.merge_scope("experiment", "main")
             print(result)
         """
-        body = {"source": source, "target": target, "strategy": strategy}
+        body = {"sourceScope": source, "targetScope": target, "strategy": strategy}
         result = await self._request("POST", "/scope/merge", json_body=body)
         if isinstance(result, dict):
             return result
         return {}
+
+    # ------------------------------------------------------------------
+    # Aggregate / Bulk operations
+    # ------------------------------------------------------------------
+
+    async def aggregate(
+        self,
+        op: str,
+        predicate: str,
+        *,
+        arg_index: int | None = None,
+        scope: str | None = None,
+    ) -> dict[str, Any]:
+        """Run an aggregation query (COUNT/SUM/MIN/MAX/AVG) over matching facts.
+
+        Args:
+            op: Aggregation operation — one of ``COUNT``, ``SUM``, ``MIN``,
+                ``MAX``, ``AVG``.
+            predicate: The predicate to aggregate over.
+            arg_index: Index of the argument to aggregate. Required for
+                ``SUM``/``MIN``/``MAX``/``AVG``; not needed for ``COUNT``.
+            scope: Optional scope to filter by.
+
+        Returns:
+            A dict with the aggregation result (e.g., ``{"result": 42}``).
+
+        Example::
+
+            count = await client.aggregate("COUNT", "parent")
+            total = await client.aggregate("SUM", "price", arg_index=1)
+        """
+        payload: dict[str, Any] = {"op": op, "predicate": predicate}
+        if arg_index is not None:
+            payload["argIndex"] = arg_index
+        if scope is not None:
+            payload["scope"] = scope
+        return await self._request("POST", "/aggregate", json_body=payload)
+
+    async def bulk_assert(self, facts: list[dict[str, Any]]) -> dict[str, Any]:
+        """Assert multiple facts in a single request.
+
+        Args:
+            facts: List of fact dicts, each with ``"predicate"`` and ``"args"``
+                keys, and optionally ``"truthValue"``, ``"scope"``,
+                ``"confidence"``, ``"ttl"``, ``"metadata"``.
+
+        Returns:
+            A dict with the server's bulk-assert response.
+
+        Example::
+
+            await client.bulk_assert([
+                {"predicate": "parent", "args": ["alice", "bob"]},
+                {"predicate": "parent", "args": ["alice", "carol"]},
+            ])
+        """
+        return await self._request(
+            "POST", "/assert/facts", json_body={"facts": facts}
+        )
+
+    async def retract_pattern(
+        self,
+        predicate: str,
+        *,
+        scope: str | None = None,
+    ) -> dict[str, Any]:
+        """Retract all facts matching a predicate pattern.
+
+        Args:
+            predicate: The predicate to match for retraction.
+            scope: Optional scope to filter by.
+
+        Returns:
+            A dict with the server's retraction response (e.g.,
+            ``{"retracted": 5}``).
+
+        Example::
+
+            result = await client.retract_pattern("temp_location")
+            print(f"Retracted {result['retracted']} facts")
+        """
+        payload: dict[str, Any] = {"predicate": predicate}
+        if scope is not None:
+            payload["scope"] = scope
+        return await self._request("POST", "/retract/pattern", json_body=payload)
+
+    # ------------------------------------------------------------------
+    # CLI/MCP vocabulary aliases
+    # ------------------------------------------------------------------
+
+    async def tell(self, predicate: str, args: list[str], **kwargs: Any) -> dict[str, Any]:
+        """Alias for :meth:`assert_fact`. Matches CLI/MCP vocabulary."""
+        return await self.assert_fact(predicate, args, **kwargs)
+
+    async def ask(
+        self,
+        predicate: str,
+        args: list[str] | None = None,
+        **kwargs: Any,
+    ) -> list[Atom] | list[ProofTree]:
+        """Alias for :meth:`infer`. Matches CLI/MCP vocabulary."""
+        return await self.infer(predicate, args or [], **kwargs)
+
+    async def teach(
+        self,
+        head: dict[str, Any],
+        body: list[dict[str, Any]],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Alias for :meth:`assert_rule`. Matches CLI/MCP vocabulary."""
+        return await self.assert_rule(head, body, **kwargs)
+
+    async def forget(self, predicate: str, args: list[str], **kwargs: Any) -> dict[str, Any]:
+        """Alias for :meth:`retract`. Matches CLI/MCP vocabulary."""
+        return await self.retract(predicate, args, **kwargs)
+
+    # ------------------------------------------------------------------
+    # SSE event streaming
+    # ------------------------------------------------------------------
+
+    async def subscribe_events(
+        self,
+        callback: Any,
+        *,
+        scope: str | None = None,
+    ) -> None:
+        """Subscribe to real-time knowledge change events via SSE.
+
+        Streams events from ``GET /memory/events`` and calls ``callback``
+        for each event received.
+
+        Args:
+            callback: Async callable that receives parsed event dicts.
+                Each event has at minimum a ``"type"`` key.
+            scope: Optional scope filter.
+
+        Example::
+
+            async def on_event(event):
+                print(event["type"], event.get("data"))
+
+            await client.subscribe_events(on_event, scope="ticket-4821")
+        """
+        import json as json_mod
+
+        params: dict[str, str] = {}
+        if scope:
+            params["scope"] = scope
+        url = f"{self._base_url}/memory/events"
+        headers = self._build_headers()
+        async with httpx.AsyncClient(timeout=None) as sse_client:
+            async with sse_client.stream(
+                "GET", url, headers=headers, params=params
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if line.startswith("data:"):
+                        data = line[5:].strip()
+                        if data:
+                            await callback(json_mod.loads(data))
 
     async def predicates(self, scope: str | None = None) -> dict[str, Any]:
         """Discover the knowledge base schema.
@@ -1541,7 +1704,11 @@ class SyncNocturnusAIClient:
     """Synchronous wrapper around :class:`NocturnusAIClient`.
 
     Provides the same API as the async client but blocks on each call.
-    Suitable for scripts, notebooks, and non-async application code.
+    Suitable for scripts and non-async application code.
+
+    Note: Creates its own asyncio event loop. Do not use inside an existing
+    async context (e.g., Jupyter notebook). Use NocturnusAIClient directly
+    for async environments.
 
     Args:
         base_url: The base URL of the NocturnusAI server.
@@ -1979,6 +2146,63 @@ class SyncNocturnusAIClient:
     def whoami(self) -> dict[str, Any]:
         """Get current key info. See :meth:`NocturnusAIClient.whoami`."""
         return self._run(self._async_client.whoami())
+
+    def aggregate(
+        self,
+        op: str,
+        predicate: str,
+        *,
+        arg_index: int | None = None,
+        scope: str | None = None,
+    ) -> dict[str, Any]:
+        """Run an aggregation query. See :meth:`NocturnusAIClient.aggregate`."""
+        return self._run(
+            self._async_client.aggregate(
+                op=op,
+                predicate=predicate,
+                arg_index=arg_index,
+                scope=scope,
+            )
+        )
+
+    def bulk_assert(self, facts: list[dict[str, Any]]) -> dict[str, Any]:
+        """Assert multiple facts. See :meth:`NocturnusAIClient.bulk_assert`."""
+        return self._run(self._async_client.bulk_assert(facts))
+
+    def retract_pattern(
+        self,
+        predicate: str,
+        *,
+        scope: str | None = None,
+    ) -> dict[str, Any]:
+        """Retract all facts matching a predicate. See :meth:`NocturnusAIClient.retract_pattern`."""
+        return self._run(self._async_client.retract_pattern(predicate, scope=scope))
+
+    def tell(self, predicate: str, args: list[str], **kwargs: Any) -> dict[str, Any]:
+        """Alias for assert_fact. Matches CLI/MCP vocabulary."""
+        return self._run(self._async_client.tell(predicate, args, **kwargs))
+
+    def ask(
+        self,
+        predicate: str,
+        args: list[str] | None = None,
+        **kwargs: Any,
+    ) -> list[Atom] | list[ProofTree]:
+        """Alias for infer. Matches CLI/MCP vocabulary."""
+        return self._run(self._async_client.ask(predicate, args, **kwargs))
+
+    def teach(
+        self,
+        head: dict[str, Any],
+        body: list[dict[str, Any]],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Alias for assert_rule. Matches CLI/MCP vocabulary."""
+        return self._run(self._async_client.teach(head, body, **kwargs))
+
+    def forget(self, predicate: str, args: list[str], **kwargs: Any) -> dict[str, Any]:
+        """Alias for retract. Matches CLI/MCP vocabulary."""
+        return self._run(self._async_client.forget(predicate, args, **kwargs))
 
     def close(self) -> None:
         """Close the underlying client and event loop."""

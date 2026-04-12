@@ -96,9 +96,9 @@ curl -X POST http://localhost:9300/ask \
         <li><strong>Database</strong> = environment boundary (dev/staging/prod)</li>
         <li><strong>Tenant</strong> = customer or agent boundary</li>
         <li><strong>Scope</strong> = per-conversation or per-document slice</li>
-        <li><strong>sessionId</strong> = diff state for <code>/context/optimize</code> and <code>/context/diff</code></li>
+        <li><strong>sessionId</strong> = diff state for <code>/memory/context</code> and <code>/context/diff</code></li>
     </ul>
-    <pre><code class="language-bash">curl -X POST http://localhost:9300/context/optimize \
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/memory/context \
   -H "Content-Type: application/json" \
   -H "X-Database: production" \
   -H "X-Tenant-ID: acme_corp" \

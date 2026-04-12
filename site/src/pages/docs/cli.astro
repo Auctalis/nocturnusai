@@ -330,7 +330,7 @@ default&gt; cleanup 0.1
 <span class="syn-ok">Cleanup — 3 expired, 5 evicted (threshold=0.1)</span></code></pre>
 
     <div class="callout callout-info">
-        <strong>Context optimization from CLI workflows.</strong> Use <code>context</code> for salience-ranked retrieval in interactive sessions, then run <code>compress</code> and <code>cleanup</code> regularly. For goal-driven context windows and diff sessions, call <code>/context/optimize</code> and <code>/context/diff</code> from the HTTP API alongside CLI usage.
+        <strong>Context optimization from CLI workflows.</strong> Use <code>context</code> for salience-ranked retrieval in interactive sessions, then run <code>compress</code> and <code>cleanup</code> regularly. For goal-driven context windows and diff sessions, call <code>/memory/context</code> (with <code>goals</code>) and <code>/context/diff</code> from the HTTP API alongside CLI usage.
     </div>
 
     <div class="overflow-x-auto">
@@ -361,7 +361,7 @@ default&gt; cleanup 0.1
                 <tr class="border-b border-white/5">
                     <td class="py-2">Goal-driven context</td>
                     <td class="py-2">API-only</td>
-                    <td class="py-2 font-mono"><code>POST /context/optimize</code></td>
+                    <td class="py-2 font-mono"><code>POST /memory/context</code></td>
                 </tr>
                 <tr class="border-b border-white/5">
                     <td class="py-2">Incremental context diff</td>
