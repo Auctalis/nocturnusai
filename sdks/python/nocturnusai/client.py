@@ -1890,7 +1890,7 @@ class SyncNocturnusAIClient:
     ) -> list[Atom] | list[ProofTree]:
         """Run inference. See :meth:`NocturnusAIClient.infer`."""
         return self._run(
-            self._async_client.infer(
+            self._async_client.infer(  # type: ignore[call-overload]
                 predicate=predicate,
                 args=args,
                 scope=scope,
