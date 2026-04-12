@@ -118,6 +118,10 @@ export type {
   PredicateInfo,
   SchemaDiscovery,
 
+  // Scope results
+  ScopeDiffResult,
+  ScopeMergeResult,
+
   // MCP types
   JsonRpcRequest,
   JsonRpcResponse,

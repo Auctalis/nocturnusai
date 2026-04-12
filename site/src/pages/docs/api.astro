@@ -20,6 +20,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <li><code>Authorization: Bearer &lt;key&gt;</code> — required when auth is enabled</li>
     </ul>
 
+    <h3 id="error-format">Error Responses</h3>
+    <p>All endpoints return errors as JSON with a consistent shape:</p>
+    <pre><code class="language-json">&#123;
+  "code": "VALIDATION_ERROR",
+  "message": "Missing required header: X-Tenant-ID",
+  "details": null
+&#125;</code></pre>
+    <p>Common error codes: <code>VALIDATION_ERROR</code>, <code>NOT_FOUND</code>, <code>CONFLICT</code>, <code>UNAUTHORIZED</code>, <code>RATE_LIMITED</code>.</p>
+
     <h3 id="api-smoke">API Smoke Test (Copy/Paste)</h3>
     <p>Use this first. It validates <code>/tell</code>, <code>/teach</code>, and <code>/ask</code> directly from the API reference.</p>
     <pre><code class="language-bash">export NOCTURNUS_BASE_URL=http://localhost:9300
@@ -165,7 +174,8 @@ curl -sS -X POST "$NOCTURNUS_BASE_URL/ask" \
     <p>Only <code>predicate</code> and <code>args</code> are required. All other fields are optional.</p>
 
     <h3>Response</h3>
-    <pre><code class="language-json">&#123; "status": "ok", "atom": "parent(alice, bob)" &#125;</code></pre>
+    <p>Returns plain text (not JSON):</p>
+    <pre><code>Fact Asserted: parent(alice, bob)</code></pre>
 
     <hr />
 
@@ -216,7 +226,20 @@ curl -sS -X POST "$NOCTURNUS_BASE_URL/ask" \
 &#125;</code></pre>
 
     <h3>Response</h3>
-    <pre><code class="language-json">&#123; "results": ["grandparent(alice, charlie)"] &#125;</code></pre>
+    <pre><code class="language-json">[
+  &#123;
+    "predicate": "grandparent",
+    "args": ["alice", "charlie"],
+    "negated": false,
+    "scope": null,
+    "metadata": &#123;&#125;,
+    "createdAt": null,
+    "validFrom": null,
+    "validUntil": null,
+    "ttl": null,
+    "confidence": null
+  &#125;
+]</code></pre>
 
     <hr />
 
@@ -252,6 +275,63 @@ curl -sS -X POST "$NOCTURNUS_BASE_URL/ask" \
   "predicate": "parent",
   "args": ["alice", "bob"]
 &#125;</code></pre>
+
+    <hr />
+
+    <h2 id="aggregate">POST /aggregate</h2>
+    <p>Run aggregation operations over matched facts. Supports <code>COUNT</code>, <code>SUM</code>, <code>MIN</code>, <code>MAX</code>, and <code>AVG</code>.</p>
+    <h3>cURL</h3>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/aggregate \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"predicate":"salary","op":"AVG","argIndex":1&#125;'</code></pre>
+    <h3>Request</h3>
+    <pre><code class="language-json">&#123;
+  "predicate": "salary",
+  "op": "AVG",
+  "argIndex": 1,
+  "scope": null
+&#125;</code></pre>
+    <p><code>op</code> is one of: <code>COUNT</code>, <code>SUM</code>, <code>MIN</code>, <code>MAX</code>, <code>AVG</code>. <code>argIndex</code> selects which argument to aggregate over (required for numeric ops, not needed for <code>COUNT</code>). <code>scope</code> is optional.</p>
+    <h3>Response</h3>
+    <pre><code class="language-json">&#123; "result": 75000.0 &#125;</code></pre>
+
+    <hr />
+
+    <h2 id="bulk-assert">POST /assert/facts (Bulk Assert)</h2>
+    <p>Assert multiple facts in a single request.</p>
+    <h3>cURL</h3>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/assert/facts \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"facts":[
+    &#123;"predicate":"role","args":["alice","engineer"]&#125;,
+    &#123;"predicate":"role","args":["bob","manager"]&#125;
+  ]&#125;'</code></pre>
+    <h3>Request</h3>
+    <pre><code class="language-json">&#123;
+  "facts": [
+    &#123; "predicate": "role", "args": ["alice", "engineer"] &#125;,
+    &#123; "predicate": "role", "args": ["bob", "manager"] &#125;
+  ]
+&#125;</code></pre>
+
+    <hr />
+
+    <h2 id="retract-pattern">POST /retract/pattern</h2>
+    <p>Retract all facts matching a predicate pattern. Use <code>null</code> in the args array as a wildcard.</p>
+    <h3>cURL</h3>
+    <pre><code class="language-bash">curl -X POST http://localhost:9300/retract/pattern \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"predicate":"role","args":[null,"engineer"]&#125;'</code></pre>
+    <h3>Request</h3>
+    <pre><code class="language-json">&#123;
+  "predicate": "role",
+  "args": [null, "engineer"],
+  "scope": null
+&#125;</code></pre>
+    <p>This retracts all facts with predicate <code>role</code> where the second argument is <code>"engineer"</code>, regardless of the first argument.</p>
 
     <hr />
 

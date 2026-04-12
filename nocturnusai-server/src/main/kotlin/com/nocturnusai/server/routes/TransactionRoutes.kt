@@ -26,7 +26,7 @@ fun Route.transactionRoutes(dbManager: DatabaseManager) {
         try {
             val (db, tenantId) = call.getContext(dbManager)
             val id = db.transactionManager.begin(tenantId)
-            call.respondText(id.toString())
+            call.respond(mapOf("transactionId" to id))
         } catch (e: DatabaseNotFoundException) {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", e.message ?: "Not found"))
         } catch (e: IllegalStateException) {

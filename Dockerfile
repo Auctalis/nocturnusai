@@ -42,10 +42,10 @@ RUN apk add --no-cache curl tini
 RUN addgroup -S nocturnusai && adduser -S nocturnusai -G nocturnusai
 
 # App and data directories
-RUN mkdir -p /app /data && \
-    chown -R nocturnusai:nocturnusai /app /data
+RUN mkdir -p /app /data /backups && \
+    chown -R nocturnusai:nocturnusai /app /data /backups
 
-VOLUME ["/data"]
+VOLUME ["/data", "/backups"]
 
 USER nocturnusai
 

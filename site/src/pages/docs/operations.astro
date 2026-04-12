@@ -47,7 +47,7 @@ curl http://localhost:9300/health/ready</code></pre>
     <p>Nocturnus uses structured JSON logging via SLF4J. Configure via environment variables:</p>
     <pre><code class="language-bash"># .env
 LOG_LEVEL=INFO          # DEBUG, INFO, WARN, ERROR
-LOG_FORMAT=json         # json or plain</code></pre>
+LOG_FORMAT=text         # text (default) or json</code></pre>
 
     <p>Every request gets a <code>X-Request-ID</code> response header for correlation.</p>
 
@@ -76,8 +76,7 @@ REPLICATION_MODE=LEADER
     <h3>Follower</h3>
     <pre><code class="language-bash"># .env (follower)
 REPLICATION_MODE=FOLLOWER
-LEADER_URL=http://leader-host:9300
-REPLICATION_POLL_INTERVAL_MS=5000</code></pre>
+LEADER_URL=http://leader-host:9300</code></pre>
     <p>Followers automatically poll the leader's WAL and apply changes locally. Queries against followers are eventually consistent.</p>
 
     <hr />
@@ -94,7 +93,7 @@ spec:
     spec:
       containers:
         - name: nocturnusai
-          image: nocturnusai/server:latest
+          image: ghcr.io/auctalis/nocturnusai:latest
           ports:
             - containerPort: 9300
           livenessProbe:

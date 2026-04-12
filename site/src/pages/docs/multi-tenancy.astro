@@ -61,7 +61,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <hr />
 
     <h2 id="using-tenants">Using Tenants</h2>
-    <p>Create tenants before using them. A <code>"default"</code> tenant is auto-created in every database, but custom tenants must be created explicitly:</p>
+    <div class="callout callout-info">
+        <strong>Default tenant.</strong> A <code>"default"</code> tenant exists automatically in every new database. You can start using it immediately without creating it.
+    </div>
+    <p>Custom tenants must be created explicitly before use:</p>
     <pre><code class="language-bash"># Create tenants in the production database
 curl -X POST http://localhost:9300/admin/databases/production/tenants \
   -H "Content-Type: application/json" \
@@ -179,7 +182,7 @@ curl http://localhost:9300/admin/databases/production/tenants \
 curl -X POST http://localhost:9300/admin/databases/production/tenants \
   -H "Authorization: Bearer $ADMIN_KEY" \
   -H "Content-Type: application/json" \
-  -d '&#123;"name": "acme_corp"&#125;'
+  -d '&#123;"tenantId": "acme_corp"&#125;'
 
 # Delete a tenant and all its data
 curl -X DELETE http://localhost:9300/admin/databases/production/tenants/acme_corp \

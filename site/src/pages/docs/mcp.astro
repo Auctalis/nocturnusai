@@ -17,7 +17,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <hr />
 
     <h2 id="what-is-mcp">What is MCP?</h2>
-    <p>The <a href="https://modelcontextprotocol.io/" target="_blank">Model Context Protocol (MCP)</a> is an open standard that lets AI agents discover and use tools via a universal interface. Nocturnus implements the MCP 2025-11-25 specification using HTTP+SSE transport.</p>
+    <p>The <a href="https://modelcontextprotocol.io/" target="_blank">Model Context Protocol (MCP)</a> is an open standard that lets AI agents discover and use tools via a universal interface. Nocturnus implements MCP using HTTP+SSE transport. The server reports its own protocol version string (e.g. <code>2025-11-25</code>) during initialization -- this is the server's internal version identifier, not an official MCP specification version number.</p>
     <p>When an agent connects to Nocturnus via MCP, it automatically discovers tools for storing facts, querying knowledge, running logical inference, and managing memory — all without writing integration code.</p>
 
     <hr />

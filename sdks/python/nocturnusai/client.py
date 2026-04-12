@@ -19,6 +19,7 @@ import asyncio
 import contextlib
 import logging
 import random
+import warnings
 from typing import Any, Literal, overload
 
 import httpx
@@ -577,6 +578,11 @@ class NocturnusAIClient:
             for scored in window.facts:
                 print(f"[{scored.salience:.3f}] {scored.atom.predicate}")
         """
+        warnings.warn(
+            "context_window() is deprecated, use context() instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         body: dict[str, Any] = {
             "maxFacts": max_facts,
             "minSalience": min_salience,
@@ -730,6 +736,11 @@ class NocturnusAIClient:
             for entry in ctx.entries:
                 print(f"[{entry.salience:.2f}] {entry.predicate}({', '.join(entry.args)})")
         """
+        warnings.warn(
+            "optimize_context() is deprecated, use context() instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         body: dict[str, Any] = {"maxFacts": max_facts}
         if goals is not None:
             body["goals"] = goals
@@ -1145,6 +1156,123 @@ class NocturnusAIClient:
         return result
 
     # ------------------------------------------------------------------
+    # Simplified Memory Routes
+    # ------------------------------------------------------------------
+
+    async def recall(
+        self,
+        predicate: str,
+        args: list[str],
+        timestamp: int,
+        *,
+        scope: str | None = None,
+    ) -> list[Any]:
+        """Recall facts valid at a specific point in time (POST /memory/recall).
+
+        Args:
+            predicate: The predicate to recall.
+            args: Arguments with ``?``-prefixed variables for wildcards.
+            timestamp: Epoch milliseconds representing the point in time.
+            scope: Optional scope filter.
+
+        Returns:
+            A list of matching facts.
+
+        Example::
+
+            import time
+            one_hour_ago = int((time.time() - 3600) * 1000)
+            results = await client.recall("location", ["alice", "?where"], one_hour_ago)
+        """
+        body: dict[str, Any] = {"predicate": predicate, "args": args, "timestamp": timestamp}
+        if scope:
+            body["scope"] = scope
+        return await self._request("POST", "/memory/recall", json_body=body)
+
+    async def compress(self) -> dict[str, Any]:
+        """Compress repeated patterns into summary knowledge (POST /memory/compress).
+
+        Returns:
+            A dict with compression results.
+
+        Example::
+
+            result = await client.compress()
+            print(result)
+        """
+        return await self._request("POST", "/memory/compress", json_body={})
+
+    async def cleanup(self, threshold: float = 0.05) -> dict[str, Any]:
+        """Clean up stale/low-salience facts (POST /memory/cleanup).
+
+        Args:
+            threshold: Salience threshold below which facts are removed.
+
+        Returns:
+            A dict with cleanup results.
+
+        Example::
+
+            result = await client.cleanup(threshold=0.1)
+            print(result)
+        """
+        return await self._request("POST", "/memory/cleanup", json_body={"threshold": threshold})
+
+    async def prioritize(self, predicate: str, args: list[str], priority: float) -> str:
+        """Set priority for a specific fact (POST /memory/prioritize).
+
+        Args:
+            predicate: The predicate of the target fact.
+            args: Arguments of the target fact.
+            priority: Priority value between 0.0 and 1.0.
+
+        Returns:
+            Confirmation message.
+
+        Example::
+
+            await client.prioritize("user_goal", ["complete_task"], 0.9)
+        """
+        body = {"predicate": predicate, "args": args, "priority": priority}
+        result = await self._request("POST", "/memory/prioritize", json_body=body)
+        return result if isinstance(result, str) else str(result)
+
+    async def salient_query(
+        self,
+        predicate: str,
+        args: list[str],
+        *,
+        limit: int = 50,
+        min_salience: float = 0.0,
+        scope: str | None = None,
+    ) -> list[Any]:
+        """Query facts ranked by salience (POST /memory/query/salient).
+
+        Args:
+            predicate: The predicate to query.
+            args: Arguments with ``?``-prefixed variables for wildcards.
+            limit: Maximum number of results.
+            min_salience: Minimum salience score (0.0 to 1.0).
+            scope: Optional scope filter.
+
+        Returns:
+            A list of facts ranked by salience.
+
+        Example::
+
+            results = await client.salient_query("likes", ["alice", "?what"], limit=10)
+        """
+        body: dict[str, Any] = {
+            "predicate": predicate,
+            "args": args,
+            "limit": limit,
+            "minSalience": min_salience,
+        }
+        if scope:
+            body["scope"] = scope
+        return await self._request("POST", "/memory/query/salient", json_body=body)
+
+    # ------------------------------------------------------------------
     # DSL / Execute
     # ------------------------------------------------------------------
 
@@ -1191,6 +1319,8 @@ class NocturnusAIClient:
             print(scopes)  # ["ticket-4821", "ticket-5000"]
         """
         result = await self._request("GET", "/scopes")
+        if isinstance(result, dict):
+            return result.get("scopes", [])
         if isinstance(result, list):
             return result
         return []
@@ -1326,7 +1456,7 @@ class NocturnusAIClient:
         payload: dict[str, Any] = {
             "operation": op,
             "predicate": predicate,
-            "args": args or [],
+            "args": args if args is not None else ["?_0"],
         }
         if arg_index is not None:
             payload["argIndex"] = arg_index
@@ -1380,7 +1510,8 @@ class NocturnusAIClient:
             result = await client.retract_pattern("temp_location")
             print(f"Retracted {result['retracted']} facts")
         """
-        payload: dict[str, Any] = {"predicate": predicate, "args": args or []}
+        effective_args = args if args is not None else ["?_0"]
+        payload: dict[str, Any] = {"predicate": predicate, "args": effective_args}
         if scope is not None:
             payload["scope"] = scope
         return await self._request("POST", "/retract/pattern", json_body=payload)
@@ -1920,7 +2051,10 @@ class SyncNocturnusAIClient:
         predicates: list[str] | None = None,
         scope: str | None = None,
     ) -> ContextWindow:
-        """Get context window. See :meth:`NocturnusAIClient.context_window`."""
+        """Get context window. See :meth:`NocturnusAIClient.context_window`.
+
+        .. deprecated:: Use :meth:`context` instead.
+        """
         return self._run(
             self._async_client.context_window(
                 max_facts=max_facts,
@@ -2004,6 +2138,55 @@ class SyncNocturnusAIClient:
             )
         )
 
+    def recall(
+        self,
+        predicate: str,
+        args: list[str],
+        timestamp: int,
+        *,
+        scope: str | None = None,
+    ) -> list[Any]:
+        """Recall facts at a point in time. See :meth:`NocturnusAIClient.recall`."""
+        return self._run(
+            self._async_client.recall(
+                predicate=predicate, args=args,
+                timestamp=timestamp, scope=scope,
+            )
+        )
+
+    def compress(self) -> dict[str, Any]:
+        """Compress repeated patterns. See :meth:`NocturnusAIClient.compress`."""
+        return self._run(self._async_client.compress())
+
+    def cleanup(self, threshold: float = 0.05) -> dict[str, Any]:
+        """Clean up stale facts. See :meth:`NocturnusAIClient.cleanup`."""
+        return self._run(self._async_client.cleanup(threshold=threshold))
+
+    def prioritize(self, predicate: str, args: list[str], priority: float) -> str:
+        """Set fact priority. See :meth:`NocturnusAIClient.prioritize`."""
+        return self._run(
+            self._async_client.prioritize(
+                predicate=predicate, args=args, priority=priority,
+            )
+        )
+
+    def salient_query(
+        self,
+        predicate: str,
+        args: list[str],
+        *,
+        limit: int = 50,
+        min_salience: float = 0.0,
+        scope: str | None = None,
+    ) -> list[Any]:
+        """Query facts by salience. See :meth:`NocturnusAIClient.salient_query`."""
+        return self._run(
+            self._async_client.salient_query(
+                predicate=predicate, args=args, limit=limit,
+                min_salience=min_salience, scope=scope,
+            )
+        )
+
     def optimize_context(
         self,
         goals: list[dict[str, Any]] | None = None,
@@ -2015,7 +2198,10 @@ class SyncNocturnusAIClient:
         predicates: list[str] | None = None,
         scope: str | None = None,
     ) -> OptimizedContext:
-        """Get goal-driven optimized context. See :meth:`NocturnusAIClient.optimize_context`."""
+        """Get goal-driven optimized context. See :meth:`NocturnusAIClient.optimize_context`.
+
+        .. deprecated:: Use :meth:`context` with goals/session_id parameters instead.
+        """
         return self._run(
             self._async_client.optimize_context(
                 goals=goals, max_facts=max_facts,

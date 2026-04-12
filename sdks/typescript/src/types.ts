@@ -671,6 +671,9 @@ export interface FactOptions {
   /** Time-to-live in milliseconds. */
   ttl?: number;
 
+  /** Confidence score in the range 0.0–1.0. */
+  confidence?: number;
+
   /** Transaction ID for transactional operations. */
   transactionId?: number | string;
 }
@@ -1012,6 +1015,44 @@ export interface SchemaDiscovery {
 }
 
 // ---------------------------------------------------------------------------
+// Scope result types
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of diffing two scopes via POST /scope/diff.
+ */
+export interface ScopeDiffResult {
+  /** Atoms only present in scope A. */
+  onlyInA: Atom[];
+
+  /** Atoms only present in scope B. */
+  onlyInB: Atom[];
+
+  /** Atoms present in both scopes. */
+  inBoth: Atom[];
+
+  /** Conflicting atoms between the scopes. */
+  conflicts: Atom[];
+}
+
+/**
+ * Result of merging two scopes via POST /scope/merge.
+ */
+export interface ScopeMergeResult {
+  /** Number of atoms merged. */
+  merged: number;
+
+  /** Number of conflicts resolved during merge. */
+  conflictsResolved: number;
+
+  /** Strategy used for conflict resolution. */
+  strategy: string;
+
+  /** ISO timestamp of when the merge was performed. */
+  timestamp: string;
+}
+
+// ---------------------------------------------------------------------------
 // Aggregate / bulk / pattern types
 // ---------------------------------------------------------------------------
 
@@ -1041,6 +1082,12 @@ export interface BulkAssertResult {
 
   /** Number of facts that failed to assert. */
   failed: number;
+
+  /** Details of individual assertion failures. */
+  errors: Array<{ fact: string; error: string }>;
+
+  /** ISO timestamp of when the bulk assert was performed. */
+  timestamp: string;
 }
 
 /**

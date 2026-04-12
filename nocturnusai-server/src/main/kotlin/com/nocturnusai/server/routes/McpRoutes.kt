@@ -67,11 +67,14 @@ data class JsonRpcRequest(
     val params: JsonObject? = null
 )
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class JsonRpcResponse(
     val jsonrpc: String = "2.0",
     val id: JsonElement? = null,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     val result: JsonElement? = null,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     val error: JsonRpcError? = null
 )
 
@@ -212,7 +215,7 @@ private fun handleInitialize(request: JsonRpcRequest): JsonRpcResponse {
         )),
         "serverInfo" to JsonObject(mapOf(
             "name" to JsonPrimitive("nocturnusai"),
-            "version" to JsonPrimitive("0.3.2")
+            "version" to JsonPrimitive("0.3.3")
         ))
     ))
     return JsonRpcResponse(id = request.id, result = result)
@@ -337,7 +340,7 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
             name = "bulk_assert",
             description = "Assert multiple facts in a single call. Non-transactional: each fact is attempted independently — contradictions are reported as errors rather than aborting the batch. Returns counts of successful and failed assertions.",
             properties = mapOf(
-                "facts" to propArray("Array of fact objects, each with 'predicate', 'args', optional 'negated', 'scope', 'ttl', 'validUntil'")
+                "facts" to propFactArray("Array of fact objects, each with 'predicate', 'args', optional 'negated', 'scope', 'ttl', 'validUntil'")
             ),
             required = listOf("facts")
         ))
@@ -951,6 +954,23 @@ private fun propObject(description: String, props: Map<String, JsonObject>): Jso
     "type" to JsonPrimitive("object"),
     "description" to JsonPrimitive(description),
     "properties" to JsonObject(props)
+))
+
+private fun propFactArray(description: String): JsonObject = JsonObject(mapOf(
+    "type" to JsonPrimitive("array"),
+    "description" to JsonPrimitive(description),
+    "items" to JsonObject(mapOf(
+        "type" to JsonPrimitive("object"),
+        "properties" to JsonObject(mapOf(
+            "predicate" to JsonObject(mapOf("type" to JsonPrimitive("string"), "description" to JsonPrimitive("The relationship or property name"))),
+            "args" to JsonObject(mapOf("type" to JsonPrimitive("array"), "items" to JsonObject(mapOf("type" to JsonPrimitive("string"))), "description" to JsonPrimitive("The entities involved"))),
+            "negated" to JsonObject(mapOf("type" to JsonPrimitive("boolean"), "description" to JsonPrimitive("Set true to store the negation"))),
+            "scope" to JsonObject(mapOf("type" to JsonPrimitive("string"), "description" to JsonPrimitive("Optional isolation scope"))),
+            "ttl" to JsonObject(mapOf("type" to JsonPrimitive("number"), "description" to JsonPrimitive("Auto-expire after this many milliseconds"))),
+            "validUntil" to JsonObject(mapOf("type" to JsonPrimitive("number"), "description" to JsonPrimitive("Epoch ms when this fact expires")))
+        )),
+        "required" to buildJsonArray { add(JsonPrimitive("predicate")); add(JsonPrimitive("args")) }
+    ))
 ))
 
 private fun propGoalArray(description: String): JsonObject = JsonObject(mapOf(

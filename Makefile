@@ -23,7 +23,7 @@ setup: ## First-time setup: use defaults, create data dir
 
 # ── Docker Compose ───────────────────────────────────────────────────────────
 up: env-check ## Start server using .env overrides or .env.example defaults
-	$(COMPOSE) up -d
+	@$(COMPOSE) up -d || { echo "\033[33mHint: If port $${PORT:-9300} is in use, try: PORT=9301 make up\033[0m"; exit 1; }
 	@$(MAKE) wait-for-health
 	@echo ""
 	@echo "\033[32mNocturnusAI running at http://localhost:$${PORT:-9300}\033[0m"

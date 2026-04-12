@@ -43,17 +43,67 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     "format": "natural"
   &#125;'</code></pre>
 
-  <p><strong>Move 3.</strong> Reuse the same <code>sessionId</code> with <code>POST /context/diff</code> on later turns — returns only what changed.</p>
+  <p><strong>Move 3.</strong> Reuse the <code>sessionId</code> from Move 1 with <code>POST /context/diff</code> on later turns — returns only what changed since the last window.</p>
   <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context/diff \
   -H "Content-Type: application/json" \
   -H "X-Tenant-ID: default" \
   -d '&#123;"sessionId": "ticket-4821"&#125;'</code></pre>
 
-  <p><strong>Move 4.</strong> Clear the session when the thread ends.</p>
+  <p><strong>Move 4.</strong> Clear the session when the thread ends. Use the same <code>sessionId</code> from Move 1 so the server knows which diff state to discard.</p>
   <pre data-lang="bash"><code>curl -X POST http://localhost:9300/context/session/clear \
   -H "Content-Type: application/json" \
   -H "X-Tenant-ID: default" \
   -d '&#123;"sessionId": "ticket-4821"&#125;'</code></pre>
+
+  <h2 id="complete-example">Complete Example</h2>
+  <p>Copy and paste this script to run all four moves end-to-end against a local server:</p>
+  <pre data-lang="bash"><code>#!/bin/bash
+# Complete NocturnusAI context workflow — all 4 moves
+BASE=http://localhost:9300
+TENANT=default
+SESSION=ticket-4821
+
+# Move 1: Send raw turns → get structured briefing (requires LLM)
+curl -sS -X POST "$BASE/context" \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '&#123;
+    "turns": [
+      "User cannot log in after Okta cutover.",
+      "CRM says enterprise tier and billing current.",
+      "Audit log shows SAML issuer mismatch."
+    ],
+    "scope": "'"$SESSION"'",
+    "sessionId": "'"$SESSION"'"
+  &#125;'
+echo ""
+
+# Move 2: Goal-driven context narrowing
+curl -sS -X POST "$BASE/memory/context" \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '&#123;
+    "goals": [&#123;"predicate": "next_best_action", "args": ["acme_corp"]&#125;],
+    "scope": "'"$SESSION"'",
+    "sessionId": "'"$SESSION"'",
+    "maxFacts": 10,
+    "format": "natural"
+  &#125;'
+echo ""
+
+# Move 3: Diff — only what changed since last window
+curl -sS -X POST "$BASE/context/diff" \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '&#123;"sessionId": "'"$SESSION"'"&#125;'
+echo ""
+
+# Move 4: Clean up session when thread ends
+curl -sS -X POST "$BASE/context/session/clear" \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '&#123;"sessionId": "'"$SESSION"'"&#125;'
+echo ""</code></pre>
 
   <div id="natural-language" class="callout callout-warning">
     <strong>LLM extraction required for <code>POST /context</code>.</strong>
@@ -64,26 +114,26 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
   <h2>Where to go next</h2>
   <div class="docs-card-grid">
-    <div class="docs-card">
+    <a href={`${base}/docs/context`} class="docs-card" style="text-decoration:none;color:inherit;">
       <div class="docs-tag">Workflow</div>
       <h3>See the real loop</h3>
       <p>The context workflow page walks through first-pass reduction, goal-specific narrowing, and later-turn diffs.</p>
-    </div>
-    <div class="docs-card">
+    </a>
+    <a href={`${base}/docs/api`} class="docs-card" style="text-decoration:none;color:inherit;">
       <div class="docs-tag">Integration</div>
       <h3>Pick your surface</h3>
       <p>Use the API, SDKs, CLI, or MCP depending on where your app or agent runtime already lives.</p>
-    </div>
-    <div class="docs-card">
+    </a>
+    <a href={`${base}/docs/concepts`} class="docs-card" style="text-decoration:none;color:inherit;">
       <div class="docs-tag">Backend mechanics</div>
       <h3>Read this second</h3>
       <p>Predicates, rules, salience, and truth maintenance still matter, but they belong behind the reduction story, not in front of it.</p>
-    </div>
-    <div class="docs-card">
+    </a>
+    <a href={`${base}/docs/operations`} class="docs-card" style="text-decoration:none;color:inherit;">
       <div class="docs-tag">Operations</div>
       <h3>Run it safely</h3>
       <p>Security, multi-tenancy, and operations remain documented, but they stay in the operating lane rather than the front-page lane.</p>
-    </div>
+    </a>
   </div>
 
   <NextSteps links={[

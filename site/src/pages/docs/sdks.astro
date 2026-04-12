@@ -35,7 +35,7 @@ pip install nocturnusai[all]</code></pre>
     <h3>Sync Client</h3>
     <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
 
-with SyncNocturnusAIClient("http://localhost:9300") as client:
+with SyncNocturnusAIClient("http://localhost:9300", tenant_id="default") as client:
     # Store facts
     client.assert_fact("parent", ["alice", "bob"])
     client.assert_fact("parent", ["bob", "charlie"])
@@ -69,22 +69,20 @@ async with NocturnusAIClient("http://localhost:9300") as client:
     </p>
     <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
 
-client = SyncNocturnusAIClient("http://localhost:9300", database="mydb", tenant_id="agent-1")
+with SyncNocturnusAIClient("http://localhost:9300", database="mydb", tenant_id="agent-1") as client:
+    # Process raw conversation turns into an optimized context window
+    result = client.process_turns(
+        turns=[
+            "user: Reset my password for john@example.com",
+            "assistant: I'll look up your account now.",
+            "tool: Account found: John Doe, plan: Enterprise",
+        ],
+        scope="support-session",
+        session_id="sess-42",
+    )
 
-# Process raw conversation turns into an optimized context window
-result = client.process_turns(
-    turns=[
-        &#123;"role": "user", "content": "Reset my password for john@example.com"&#125;,
-        &#123;"role": "assistant", "content": "I'll look up your account now."&#125;,
-        &#123;"role": "tool", "content": "Account found: John Doe, plan: Enterprise"&#125;,
-    ],
-    scope="support-session",
-    session_id="sess-42",
-)
-
-print(result.briefing)        # Full context window
-print(result.briefing_delta)  # Only what changed since last call
-print(result.facts_extracted) # Structured facts pulled from turns</code></pre>
+    print(result.briefing_delta)       # Only what changed since last call (equals full briefing on first call)
+    print(result.new_facts_extracted)  # Number of structured facts pulled from turns</code></pre>
     <div class="callout callout-info">
         <strong>briefing_delta is the key field.</strong> On the first call it equals the full briefing. On subsequent calls with the same <code>session_id</code>, it contains only the additions — so you can append it to your system prompt instead of replacing the whole thing.
     </div>
@@ -467,17 +465,16 @@ const client = new NocturnusAIClient(&#123;
 
 const result = await client.processTurns(&#123;
   turns: [
-    &#123; role: 'user', content: 'Reset my password for john@example.com' &#125;,
-    &#123; role: 'assistant', content: "I'll look up your account now." &#125;,
-    &#123; role: 'tool', content: 'Account found: John Doe, plan: Enterprise' &#125;,
+    'user: Reset my password for john@example.com',
+    'assistant: I\'ll look up your account now.',
+    'tool: Account found: John Doe, plan: Enterprise',
   ],
   scope: 'support-session',
   sessionId: 'sess-42',
 &#125;);
 
-console.log(result.briefing);       // Full context window
-console.log(result.briefingDelta);  // Only what changed
-console.log(result.factsExtracted); // Structured facts</code></pre>
+console.log(result.briefingDelta);      // Only what changed (equals full briefing on first call)
+console.log(result.newFactsExtracted);  // Number of structured facts</code></pre>
 
     <h3>Context Optimization with TypeScript</h3>
     <p>

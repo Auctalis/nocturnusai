@@ -95,13 +95,13 @@ curl -X POST http://localhost:9300/auth/keys \
     "description": "Read-only for tenant A"
   &#125;'
 
-# Rotate a key
-curl -X POST http://localhost:9300/auth/keys/$KEY_ID/rotate \
-  -H "Authorization: Bearer $ADMIN_KEY"
-
 # Revoke a key
 curl -X DELETE http://localhost:9300/auth/keys/$KEY_ID \
   -H "Authorization: Bearer $ADMIN_KEY"</code></pre>
+
+    <div class="callout callout-info">
+        <strong>Key rotation.</strong> There is no dedicated rotation endpoint. To rotate a key, revoke the old one and create a new one with the same role and scoping.
+    </div>
 
     <hr />
 

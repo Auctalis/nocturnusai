@@ -12,25 +12,36 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
+import kotlinx.serialization.json.*
 import kotlin.test.*
 
 /**
  * Integration tests for ACID transaction routes.
  *
  * Covers:
- *   POST /tx/begin              — begin a transaction, returns numeric ID
+ *   POST /tx/begin              — begin a transaction, returns JSON {"transactionId": N}
  *   POST /tx/commit/{id}        — commit, makes buffered operations visible
  *   POST /tx/rollback/{id}      — rollback, discards buffered operations
  *   POST /tell (X-Transaction-ID) — buffer a fact inside an open transaction
  */
 class TransactionRoutesTest {
 
+    /** Extract transactionId from JSON response of POST /tx/begin. */
+    private suspend fun beginTx(client: io.ktor.client.HttpClient, tenant: String = "default"): String {
+        val response = client.post("/tx/begin") {
+            header("X-Tenant-ID", tenant)
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val json = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        return json["transactionId"]!!.jsonPrimitive.content
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // POST /tx/begin
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `POST tx-begin - returns a numeric transaction ID`() = testApplication {
+    fun `POST tx-begin - returns JSON with numeric transactionId`() = testApplication {
         application { module() }
 
         val response = client.post("/tx/begin") {
@@ -38,8 +49,10 @@ class TransactionRoutesTest {
         }
 
         assertEquals(HttpStatusCode.OK, response.status)
-        val body = response.bodyAsText().trim()
-        assertNotNull(body.toLongOrNull(), "Expected numeric transaction ID, got: $body")
+        val json = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        assertNotNull(json["transactionId"], "Expected transactionId in JSON response")
+        assertNotNull(json["transactionId"]!!.jsonPrimitive.longOrNull,
+            "Expected numeric transactionId, got: ${json["transactionId"]}")
     }
 
     @Test
@@ -55,13 +68,8 @@ class TransactionRoutesTest {
     fun `POST tx-begin - each call returns a distinct ID`() = testApplication {
         application { module() }
 
-        val id1 = client.post("/tx/begin") {
-            header("X-Tenant-ID", "default")
-        }.bodyAsText().trim().toLong()
-
-        val id2 = client.post("/tx/begin") {
-            header("X-Tenant-ID", "default")
-        }.bodyAsText().trim().toLong()
+        val id1 = beginTx(client)
+        val id2 = beginTx(client)
 
         assertNotEquals(id1, id2, "Each transaction begin should return a unique ID")
     }
@@ -74,9 +82,7 @@ class TransactionRoutesTest {
     fun `POST tx commit - after begin returns 200 with Committed message`() = testApplication {
         application { module() }
 
-        val txId = client.post("/tx/begin") {
-            header("X-Tenant-ID", "default")
-        }.bodyAsText().trim()
+        val txId = beginTx(client)
 
         val response = client.post("/tx/commit/$txId") {
             header("X-Tenant-ID", "default")
@@ -91,9 +97,7 @@ class TransactionRoutesTest {
     fun `POST tx commit - fact buffered in transaction is visible after commit`() = testApplication {
         application { module() }
 
-        val txId = client.post("/tx/begin") {
-            header("X-Tenant-ID", "default")
-        }.bodyAsText().trim()
+        val txId = beginTx(client)
 
         // Buffer a fact inside the transaction
         client.post("/tell") {
@@ -169,9 +173,7 @@ class TransactionRoutesTest {
     fun `POST tx rollback - after begin returns 200 with Rolled back message`() = testApplication {
         application { module() }
 
-        val txId = client.post("/tx/begin") {
-            header("X-Tenant-ID", "default")
-        }.bodyAsText().trim()
+        val txId = beginTx(client)
 
         val response = client.post("/tx/rollback/$txId") {
             header("X-Tenant-ID", "default")
@@ -188,9 +190,7 @@ class TransactionRoutesTest {
         testApplication {
             application { module() }
 
-            val txId = client.post("/tx/begin") {
-                header("X-Tenant-ID", "default")
-            }.bodyAsText().trim()
+            val txId = beginTx(client)
 
             // Buffer a fact inside the transaction
             client.post("/tell") {
@@ -238,9 +238,7 @@ class TransactionRoutesTest {
     fun `POST teach with X-Transaction-ID - rule is buffered and committed`() = testApplication {
         application { module() }
 
-        val txId = client.post("/tx/begin") {
-            header("X-Tenant-ID", "default")
-        }.bodyAsText().trim()
+        val txId = beginTx(client)
 
         // Buffer a rule in the transaction
         client.post("/teach") {
@@ -289,9 +287,7 @@ class TransactionRoutesTest {
         testApplication {
             application { module() }
 
-            val txId = client.post("/tx/begin") {
-                header("X-Tenant-ID", "default")
-            }.bodyAsText().trim()
+            val txId = beginTx(client)
 
             val response = client.post("/assert/fact") {
                 header("X-Tenant-ID", "default")

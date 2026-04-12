@@ -323,6 +323,10 @@ fun Route.memoryRoutes(dbManager: DatabaseManager, llmContextFormatter: com.noct
         try {
             val (db, tenantId) = call.getContext(dbManager)
             val req = call.receive<SetPriorityRequest>()
+            if (req.priority < 0.0 || req.priority > 1.0) {
+                call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", "Priority must be between 0.0 and 1.0, got ${req.priority}"))
+                return@post
+            }
             val terms = req.args.map { parseTerm(it) }
             val fact = com.nocturnusai.core.Atom(req.predicate, terms, req.truthVal, scope = req.scope)
 

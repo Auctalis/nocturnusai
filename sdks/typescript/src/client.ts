@@ -57,6 +57,8 @@ import type {
   AggregateResult,
   BulkAssertResult,
   RetractPatternResult,
+  ScopeDiffResult,
+  ScopeMergeResult,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -696,6 +698,84 @@ export class NocturnusAIClient {
     return this.requestText('POST', '/memory/priority', body);
   }
 
+  /**
+   * Recall facts matching a predicate at a specific point in time.
+   *
+   * Simplified alias for temporal queries via the `/memory/recall` endpoint.
+   *
+   * @param predicate - The predicate to recall.
+   * @param args - Arguments. Use "?prefix" for variables.
+   * @param timestamp - Epoch milliseconds for the point-in-time query.
+   * @param scope - Optional isolation scope.
+   * @returns List of matching atoms valid at the given timestamp.
+   *
+   * @example
+   * ```ts
+   * const facts = await client.recall('location', ['alice', '?place'], Date.now() - 3600000);
+   * ```
+   */
+  async recall(predicate: string, args: string[], timestamp: number, scope?: string): Promise<Atom[]> {
+    const body: Record<string, unknown> = { predicate, args, timestamp };
+    if (scope) body.scope = scope;
+    return this.requestJson<Atom[]>('POST', '/memory/recall', body);
+  }
+
+  /**
+   * Run memory compression (consolidation via simplified endpoint).
+   *
+   * Detects repeated episodic patterns and compresses them into semantic
+   * summary facts. Simplified alias for the `/memory/compress` endpoint.
+   *
+   * @returns Consolidation result with counts and new summary facts.
+   *
+   * @example
+   * ```ts
+   * const result = await client.compress();
+   * console.log(`Compressed ${result.factsConsolidated} patterns`);
+   * ```
+   */
+  async compress(): Promise<ConsolidationResult> {
+    return this.requestJson<ConsolidationResult>('POST', '/memory/compress', {});
+  }
+
+  /**
+   * Run memory cleanup (decay via simplified endpoint).
+   *
+   * Expires TTL'd facts and evicts low-salience facts when over capacity.
+   * Simplified alias for the `/memory/cleanup` endpoint.
+   *
+   * @param threshold - Salience threshold below which facts are evicted. Defaults to 0.05.
+   * @returns Decay result with counts and list of removed atoms.
+   *
+   * @example
+   * ```ts
+   * const result = await client.cleanup(0.1);
+   * console.log(`Cleaned up ${result.expiredCount + result.evictedCount} facts`);
+   * ```
+   */
+  async cleanup(threshold: number = 0.05): Promise<DecayResult> {
+    return this.requestJson<DecayResult>('POST', '/memory/cleanup', { threshold });
+  }
+
+  /**
+   * Set fact priority via the simplified endpoint.
+   *
+   * Simplified alias for the `/memory/prioritize` endpoint.
+   *
+   * @param predicate - The predicate of the fact.
+   * @param args - Arguments of the fact.
+   * @param priority - Priority value from 0.0 to 1.0.
+   * @returns Server confirmation message.
+   *
+   * @example
+   * ```ts
+   * await client.prioritize('user_preference', ['alice', 'dark_mode'], 0.9);
+   * ```
+   */
+  async prioritize(predicate: string, args: string[], priority: number): Promise<string> {
+    return this.requestText('POST', '/memory/prioritize', { predicate, args, priority });
+  }
+
   // -----------------------------------------------------------------------
   // Transaction operations
   // -----------------------------------------------------------------------
@@ -924,7 +1004,7 @@ export class NocturnusAIClient {
    * @param target - Second scope name.
    * @returns Diff information including `onlyInSource`, `onlyInTarget`, and `inBoth`.
    */
-  async diffScope(source: string, target: string): Promise<Record<string, unknown>> {
+  async diffScope(source: string, target: string): Promise<ScopeDiffResult> {
     return this.requestJson('POST', '/scope/diff', { scopeA: source, scopeB: target });
   }
 
@@ -941,7 +1021,7 @@ export class NocturnusAIClient {
    * const result = await client.mergeScope("experiment", "main");
    * ```
    */
-  async mergeScope(source: string, target: string, strategy: string = 'SOURCE_WINS'): Promise<Record<string, unknown>> {
+  async mergeScope(source: string, target: string, strategy: string = 'SOURCE_WINS'): Promise<ScopeMergeResult> {
     return this.requestJson('POST', '/scope/merge', { sourceScope: source, targetScope: target, strategy });
   }
 
@@ -1069,7 +1149,7 @@ export class NocturnusAIClient {
    * ```
    */
   async aggregate(op: string, predicate: string, options?: { args?: string[]; argIndex?: number; scope?: string }): Promise<AggregateResult> {
-    const payload: Record<string, unknown> = { operation: op, predicate, args: options?.args ?? [] };
+    const payload: Record<string, unknown> = { operation: op, predicate, args: options?.args ?? ['?_0'] };
     if (options?.argIndex !== undefined) payload.argIndex = options.argIndex;
     if (options?.scope) payload.scope = options.scope;
     return this.requestJson<AggregateResult>('POST', '/aggregate', payload);
@@ -1107,8 +1187,8 @@ export class NocturnusAIClient {
    * console.log(`Retracted ${result.retracted} facts`);
    * ```
    */
-  async retractPattern(predicate: string, scope?: string): Promise<RetractPatternResult> {
-    const payload: Record<string, unknown> = { predicate, args: [] };
+  async retractPattern(predicate: string, args?: string[], scope?: string): Promise<RetractPatternResult> {
+    const payload: Record<string, unknown> = { predicate, args: args ?? ['?_0'] };
     if (scope) payload.scope = scope;
     return this.requestJson<RetractPatternResult>('POST', '/retract/pattern', payload);
   }
@@ -1149,15 +1229,7 @@ export class NocturnusAIClient {
   async ask(predicate: string, args?: (string | null)[], options?: InferOptions & { withProof: true }): Promise<ProofTree[]>;
   async ask(predicate: string, args?: (string | null)[], options?: InferOptions & { withProof?: false }): Promise<Atom[]>;
   async ask(predicate: string, args?: (string | null)[], options?: InferOptions): Promise<Atom[] | ProofTree[]> {
-    const body: Record<string, unknown> = {
-      predicate,
-      args: args ?? [],
-      truthVal: options?.negated ? false : true,
-      negated: options?.negated ?? false,
-    };
-    if (options?.scope !== undefined) body.scope = options.scope;
-    const queryParams = options?.withProof ? '?proof=true' : '';
-    return this.requestJson<Atom[] | ProofTree[]>('POST', `/infer${queryParams}`, body);
+    return this.infer(predicate, args, options as InferOptions & { withProof?: false });
   }
 
   /** Alias for assertRule(). Matches CLI/MCP vocabulary. */

@@ -54,6 +54,11 @@ class Atom(BaseModel):
 
     model_config = {"populate_by_name": True}
 
+    def __repr__(self) -> str:
+        neg = "NOT " if self.negated else ""
+        args_str = ", ".join(self.args)
+        return f"{neg}{self.predicate}({args_str})"
+
 
 class ScoredAtom(BaseModel):
     """An atom paired with its salience score.

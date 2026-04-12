@@ -132,10 +132,19 @@ fun Application.moduleWithStorageDir(storageDir: File) {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", cause.message ?: "Database not found"))
         }
         exception<io.ktor.server.plugins.ContentTransformationException> { call, cause ->
-            call.respond(HttpStatusCode.BadRequest, ErrorResponse("BAD_REQUEST", "Invalid request body: ${cause.message}"))
+            // Sanitize message to avoid exposing internal class names
+            val safeMessage = cause.message?.let { msg ->
+                if (msg.contains("class ")) "Invalid request body: check required fields and types"
+                else "Invalid request body: $msg"
+            } ?: "Invalid request body: check required fields and types"
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("BAD_REQUEST", safeMessage))
         }
         exception<kotlinx.serialization.SerializationException> { call, cause ->
-            call.respond(HttpStatusCode.BadRequest, ErrorResponse("BAD_REQUEST", "Invalid request body: ${cause.message}"))
+            val safeMessage = cause.message?.let { msg ->
+                if (msg.contains("class ")) "Invalid request body: check required fields and types"
+                else "Invalid request body: $msg"
+            } ?: "Invalid request body: check required fields and types"
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("BAD_REQUEST", safeMessage))
         }
         status(HttpStatusCode.NotFound) { call, status ->
             call.respond(status, ErrorResponse("NOT_FOUND", "No route matched: ${call.request.uri}"))

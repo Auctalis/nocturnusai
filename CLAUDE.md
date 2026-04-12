@@ -102,7 +102,7 @@ Built on Ktor 2.3.7 with Netty. Depends on `:nocturnusai-core`.
 - `AuthRoutes` — `POST /auth/bootstrap`, `GET /auth/status`, `POST /auth/keys`, `GET /auth/keys`, `GET /auth/keys/{id}`, `PATCH /auth/keys/{id}`, `DELETE /auth/keys/{id}`, `GET /auth/whoami`
 - `ExtractionRoutes` — `POST /extract`, `POST /extract/batch`
 - `SynthesisRoutes` — `POST /synthesize`
-- `McpRoutes` — `POST /mcp` (JSON-RPC 2.0), `GET /mcp/sse` (MCP streaming transport). MCP tools: `tell`, `ask`, `teach`, `forget`, `inspect`, `context`, `aggregate`, `bulk_assert`, `retract_pattern`, `fork_scope`, `merge_scope`, `list_scopes`, `delete_scope`. The `teach` tool maps both `negated` (→ `truthVal=false`) and `naf` (→ `Atom.naf=true`) fields on body atoms.
+- `McpRoutes` — `POST /mcp` (JSON-RPC 2.0), `GET /mcp/sse` (MCP streaming transport). MCP tools: `tell`, `ask`, `teach`, `forget`, `predicates`, `context`, `aggregate`, `bulk_assert`, `retract_pattern`, `fork_scope`, `merge_scope`, `list_scopes`, `delete_scope`. The `teach` tool maps both `negated` (→ `truthVal=false`) and `naf` (→ `Atom.naf=true`) fields on body atoms.
 - `AdminRoutes` — `GET/POST/DELETE /admin/databases`, facts/rules listing, tenant management
 - `TransactionRoutes` — `POST /tx/begin`, `/tx/commit/{id}`, `/tx/rollback/{id}`
 - `ObservabilityRoutes` — `GET /health`, `/metrics` (Prometheus), `/llm.txt`, `GET /.well-known/agent.json` (A2A Agent Card)
