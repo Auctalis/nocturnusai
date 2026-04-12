@@ -106,20 +106,19 @@ curl -X POST http://localhost:9300/context/session/clear \
 from nocturnusai import SyncNocturnusAIClient
 
 with SyncNocturnusAIClient("http://localhost:9300") as client:
-    ctx = client.ingest_and_optimize(
-        text="""
-        user: Customer says they are enterprise and blocked on SLA credits.
-        tool: CRM says account is Acme Corp with a 2M ARR contract.
-        """,
-        goals=[{"predicate": "eligible_for_sla", "args": ["acme_corp"]}],
-        max_facts=12,
+    ctx = client.process_turns(
+        turns=[
+            "user: Customer says they are enterprise and blocked on SLA credits.",
+            "tool: CRM says account is Acme Corp with a 2M ARR contract.",
+        ],
+        scope="ticket-42",
         session_id="ticket-42",
     )
 
     diff = client.diff_context(session_id="ticket-42", max_facts=12)
     client.clear_context_session("ticket-42")
 
-    print(ctx.total_facts_included, len(diff.added))
+    print(ctx.briefing_delta)
 ```
 
 ### TypeScript SDK
@@ -132,9 +131,12 @@ const client = new NocturnusAIClient({
   tenantId: 'default',
 });
 
-const optimized = await client.optimizeContext({
-  goals: [{ predicate: 'eligible_for_sla', args: ['acme_corp'] }],
-  maxFacts: 12,
+const ctx = await client.processTurns({
+  turns: [
+    'user: Customer says they are enterprise and blocked on SLA credits.',
+    'tool: CRM says account is Acme Corp with a 2M ARR contract.',
+  ],
+  scope: 'ticket-42',
   sessionId: 'ticket-42',
 });
 
@@ -144,7 +146,7 @@ const diff = await client.diffContext({
 });
 
 await client.clearContextSession('ticket-42');
-console.log(optimized.totalFactsIncluded, diff.added.length);
+console.log(ctx.briefingDelta);
 ```
 
 ### MCP

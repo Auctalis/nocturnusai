@@ -38,6 +38,16 @@ class LlmFactExtractor(
 
     private val logger = LoggerFactory.getLogger(LlmFactExtractor::class.java)
 
+    /** Lenient JSON parser that tolerates common LLM output quirks. */
+    private val lenientJson = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
+
+    /** Strip trailing commas before ] and } that LLMs commonly produce. */
+    private fun sanitizeJson(json: String): String =
+        json.replace(Regex(",\\s*]"), "]").replace(Regex(",\\s*}"), "}")
+
     private val systemPrompt = """
 You are a thorough fact and rule extraction engine. Extract EVERY distinct piece of information from the text. Each unique claim, event, quote, number, date, person, place, and causal relationship gets its own fact. Do not skip anything — but never state the same information twice.
 
@@ -143,10 +153,11 @@ Rules:
     }
 
     private fun parseResponseFull(response: String): ExtractionResult {
-        val jsonStr = extractJson(response)
+        val rawJson = extractJson(response)
+        val jsonStr = sanitizeJson(rawJson)
 
         val element = try {
-            Json.parseToJsonElement(jsonStr)
+            lenientJson.parseToJsonElement(jsonStr)
         } catch (e: Exception) {
             logger.error("Failed to parse LLM response as JSON: $response")
             throw RuntimeException("LLM returned invalid JSON: ${e.message}")
@@ -174,7 +185,8 @@ Rules:
             try {
                 val obj = element.jsonObject
                 val predicate = obj["predicate"]?.jsonPrimitive?.content ?: continue
-                val args = obj["args"]?.jsonArray?.map { it.jsonPrimitive.content } ?: continue
+                val argsElement = obj["args"]?.jsonArray ?: continue
+                val args = argsElement.mapNotNull { coerceArgToString(it) }
                 val confidence = obj["confidence"]?.jsonPrimitive?.floatOrNull ?: 1.0f
                 if (predicate.isBlank() || args.isEmpty() || args.size > 3) continue
                 if (confidence < 0f || confidence > 1f) continue
@@ -184,6 +196,19 @@ Rules:
             }
         }
         return facts
+    }
+
+    /**
+     * Coerce a JSON element inside an args array to a plain string.
+     * Handles: primitives (string/number/bool), and objects with
+     * "name" or "value" keys (which some LLMs produce instead of strings).
+     */
+    private fun coerceArgToString(element: JsonElement): String? = when (element) {
+        is JsonPrimitive -> element.content
+        is JsonObject -> element["name"]?.jsonPrimitive?.content
+            ?: element["value"]?.jsonPrimitive?.content
+            ?: element["content"]?.jsonPrimitive?.content
+        else -> null
     }
 
     private fun parseRulesArray(jsonArray: JsonArray): List<ExtractedRule> {
@@ -212,7 +237,8 @@ Rules:
 
     private fun parseAtom(obj: JsonObject): ExtractedAtom? {
         val predicate = obj["predicate"]?.jsonPrimitive?.content ?: return null
-        val args = obj["args"]?.jsonArray?.map { it.jsonPrimitive.content } ?: return null
+        val argsArray = obj["args"]?.jsonArray ?: return null
+        val args = argsArray.mapNotNull { coerceArgToString(it) }
         if (predicate.isBlank() || args.isEmpty()) return null
         return ExtractedAtom(predicate, args)
     }

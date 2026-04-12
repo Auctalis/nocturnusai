@@ -274,9 +274,11 @@ export class NocturnusAIClient {
   async infer(predicate: string, args?: (string | null)[], opts?: InferOptions & { withProof: true }): Promise<ProofTree[]>;
   async infer(predicate: string, args?: (string | null)[], opts?: InferOptions & { withProof?: false }): Promise<Atom[]>;
   async infer(predicate: string, args?: (string | null)[], opts?: InferOptions): Promise<Atom[] | ProofTree[]> {
+    // Convert null args to auto-generated variable names for wildcard matching
+    const resolvedArgs = (args ?? []).map((a, i) => a ?? `?_${i}`);
     const body: Record<string, unknown> = {
       predicate,
-      args: args ?? [],
+      args: resolvedArgs,
       truthVal: opts?.negated ? false : true,
       negated: opts?.negated ?? false,
     };
@@ -809,7 +811,8 @@ export class NocturnusAIClient {
    *
    * @example
    * ```ts
-   * const result = await client.execute('ASSERT parent(alice, bob).');
+   * const result = await client.execute('ASSERT parent(alice, bob);');
+   * const inferred = await client.execute('INFER grandparent(?x, ?z);');
    * ```
    */
   async execute(command: string): Promise<string> {
@@ -910,7 +913,7 @@ export class NocturnusAIClient {
    * console.log(`Copied ${result.copied} facts`);
    * ```
    */
-  async forkScope(source: string, target: string): Promise<{ source: string; target: string; copied: number }> {
+  async forkScope(source: string, target: string): Promise<{ sourceScope: string | null; targetScope: string; copied: number }> {
     return this.requestJson('POST', '/scope/fork', { sourceScope: source, targetScope: target });
   }
 
@@ -1065,8 +1068,8 @@ export class NocturnusAIClient {
    * console.log(result.result); // number of purchases
    * ```
    */
-  async aggregate(op: string, predicate: string, options?: { argIndex?: number; scope?: string }): Promise<AggregateResult> {
-    const payload: Record<string, unknown> = { op, predicate };
+  async aggregate(op: string, predicate: string, options?: { args?: string[]; argIndex?: number; scope?: string }): Promise<AggregateResult> {
+    const payload: Record<string, unknown> = { operation: op, predicate, args: options?.args ?? [] };
     if (options?.argIndex !== undefined) payload.argIndex = options.argIndex;
     if (options?.scope) payload.scope = options.scope;
     return this.requestJson<AggregateResult>('POST', '/aggregate', payload);
@@ -1105,7 +1108,7 @@ export class NocturnusAIClient {
    * ```
    */
   async retractPattern(predicate: string, scope?: string): Promise<RetractPatternResult> {
-    const payload: Record<string, unknown> = { predicate };
+    const payload: Record<string, unknown> = { predicate, args: [] };
     if (scope) payload.scope = scope;
     return this.requestJson<RetractPatternResult>('POST', '/retract/pattern', payload);
   }

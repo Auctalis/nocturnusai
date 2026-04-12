@@ -921,9 +921,9 @@ export interface NocturnusAIError {
  * Response from the auth status endpoint.
  */
 export interface AuthStatus {
-  authEnabled: boolean;
   mode: string;
-  hasKeys: boolean;
+  bootstrapRequired: boolean;
+  keyCount: number;
 }
 
 /**
@@ -1020,7 +1020,7 @@ export interface SchemaDiscovery {
  */
 export interface AggregateResult {
   /** Aggregation operation that was performed. */
-  op: string;
+  operation: string;
 
   /** Predicate that was aggregated over. */
   predicate: string;
@@ -1029,7 +1029,7 @@ export interface AggregateResult {
   result: number;
 
   /** Number of matching facts included in the computation. */
-  count: number;
+  matchedFacts: number;
 }
 
 /**
@@ -1050,8 +1050,8 @@ export interface RetractPatternResult {
   /** Number of directly matched facts retracted. */
   retracted: number;
 
-  /** Number of derived facts cascade-retracted by the Truth Maintenance System. */
-  derivedRetracted: number;
+  /** Atoms that were retracted. */
+  atoms: Atom[];
 }
 
 // ---------------------------------------------------------------------------

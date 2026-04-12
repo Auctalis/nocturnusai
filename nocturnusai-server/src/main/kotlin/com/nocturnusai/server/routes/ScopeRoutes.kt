@@ -48,6 +48,22 @@ data class DiffScopesRequest(
     val scopeB: String? = null
 )
 
+@Serializable
+data class ScopeDiffResponse(
+    val onlyInA: List<AtomResponse>,
+    val onlyInB: List<AtomResponse>,
+    val inBoth: List<AtomResponse>,
+    val conflicts: List<ScopeConflictResponse>
+)
+
+@Serializable
+data class ScopeConflictResponse(
+    val predicate: String,
+    val args: List<String>,
+    val inA: AtomResponse,
+    val inB: AtomResponse
+)
+
 // ── Scope DAG (Item 4: Counterfactual Simulation) ────────────────────────────
 
 @Serializable
@@ -147,7 +163,19 @@ fun Route.scopeRoutes(dbManager: DatabaseManager) {
             val (db, tenantId) = call.getContext(dbManager)
             val req = call.receive<DiffScopesRequest>()
             val diff = db.diffScopes(req.scopeA, req.scopeB, tenantId)
-            call.respond(diff)
+            call.respond(ScopeDiffResponse(
+                onlyInA = diff.onlyInA.map { AtomResponse.from(it) },
+                onlyInB = diff.onlyInB.map { AtomResponse.from(it) },
+                inBoth = diff.inBoth.map { AtomResponse.from(it) },
+                conflicts = diff.conflicts.map { c ->
+                    ScopeConflictResponse(
+                        predicate = c.predicate,
+                        args = c.args.map { it.toString() },
+                        inA = AtomResponse.from(c.inA),
+                        inB = AtomResponse.from(c.inB)
+                    )
+                }
+            ))
         } catch (e: ValidationException) {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
         } catch (e: DatabaseNotFoundException) {

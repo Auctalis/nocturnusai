@@ -119,9 +119,9 @@ pip install nocturnusai
 from nocturnusai import SyncNocturnusAIClient
 
 with SyncNocturnusAIClient("http://localhost:9300") as client:
-    ctx = client.optimize_context(
-        goals=[{"predicate": "eligible_for_sla", "args": ["acme_corp"]}],
-        max_facts=10,
+    ctx = client.process_turns(
+        turns=["user: Customer is enterprise, blocked on SLA credits."],
+        scope="ticket-42",
         session_id="ticket-42",
     )
     diff = client.diff_context(session_id="ticket-42", max_facts=10)
@@ -138,9 +138,9 @@ npm install nocturnusai-sdk
 import { NocturnusAIClient } from 'nocturnusai-sdk';
 
 const client = new NocturnusAIClient({ baseUrl: 'http://localhost:9300' });
-const ctx = await client.optimizeContext({
-  goals: [{ predicate: 'eligible_for_sla', args: ['acme_corp'] }],
-  maxFacts: 10,
+const ctx = await client.processTurns({
+  turns: ['user: Customer is enterprise, blocked on SLA credits.'],
+  scope: 'ticket-42',
   sessionId: 'ticket-42',
 });
 const diff = await client.diffContext({ sessionId: 'ticket-42', maxFacts: 10 });

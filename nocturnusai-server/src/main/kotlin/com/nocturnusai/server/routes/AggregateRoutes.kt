@@ -30,7 +30,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AggregateRequest(
     val predicate: String,
-    val args: List<String>,
+    val args: List<String> = emptyList(),
     val operation: String,       // COUNT | SUM | MIN | MAX | AVG
     val argIndex: Int = 0,       // which arg position to aggregate (SUM/MIN/MAX/AVG)
     val scope: String? = null
@@ -61,7 +61,7 @@ data class BulkAssertResponse(
 @Serializable
 data class RetractPatternRequest(
     val predicate: String,
-    val args: List<String>,
+    val args: List<String> = emptyList(),
     val scope: String? = null
 )
 

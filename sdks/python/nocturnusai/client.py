@@ -19,7 +19,7 @@ import asyncio
 import contextlib
 import logging
 import random
-from typing import Any
+from typing import Any, Literal, overload
 
 import httpx
 
@@ -248,6 +248,23 @@ class NocturnusAIClient:
                     await asyncio.sleep(delay)
                     continue
 
+            except httpx.ReadError as exc:
+                last_exception = NocturnusAIConnectionError(
+                    f"Connection lost during response on {method} {path}: {exc}"
+                )
+                if attempt < self._max_retries:
+                    delay = _compute_backoff_delay(attempt)
+                    logger.warning(
+                        "ReadError on %s %s, retrying in %.2fs (attempt %d/%d)",
+                        method,
+                        path,
+                        delay,
+                        attempt + 1,
+                        self._max_retries,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+
         # All retries exhausted.
         if last_exception is not None:
             raise last_exception
@@ -417,6 +434,25 @@ class NocturnusAIClient:
 
         result = await self._request("POST", "/infer", json_body=body)
         return _parse_atom_list(result)
+
+    @overload
+    async def infer(
+        self,
+        predicate: str,
+        args: list[str],
+        scope: str | None = None,
+        with_proof: Literal[False] = False,
+    ) -> list[Atom]: ...
+
+    @overload
+    async def infer(
+        self,
+        predicate: str,
+        args: list[str],
+        scope: str | None = None,
+        *,
+        with_proof: Literal[True],
+    ) -> list[ProofTree]: ...
 
     async def infer(
         self,
@@ -1263,6 +1299,7 @@ class NocturnusAIClient:
         op: str,
         predicate: str,
         *,
+        args: list[str] | None = None,
         arg_index: int | None = None,
         scope: str | None = None,
     ) -> dict[str, Any]:
@@ -1272,6 +1309,8 @@ class NocturnusAIClient:
             op: Aggregation operation — one of ``COUNT``, ``SUM``, ``MIN``,
                 ``MAX``, ``AVG``.
             predicate: The predicate to aggregate over.
+            args: Pattern arguments for matching. Use ``["?x", "?y"]`` for
+                wildcards. Defaults to empty (matches all arities).
             arg_index: Index of the argument to aggregate. Required for
                 ``SUM``/``MIN``/``MAX``/``AVG``; not needed for ``COUNT``.
             scope: Optional scope to filter by.
@@ -1282,9 +1321,13 @@ class NocturnusAIClient:
         Example::
 
             count = await client.aggregate("COUNT", "parent")
-            total = await client.aggregate("SUM", "price", arg_index=1)
+            total = await client.aggregate("SUM", "price", args=["?x", "?y"], arg_index=1)
         """
-        payload: dict[str, Any] = {"op": op, "predicate": predicate}
+        payload: dict[str, Any] = {
+            "operation": op,
+            "predicate": predicate,
+            "args": args or [],
+        }
         if arg_index is not None:
             payload["argIndex"] = arg_index
         if scope is not None:
@@ -1317,12 +1360,15 @@ class NocturnusAIClient:
         self,
         predicate: str,
         *,
+        args: list[str] | None = None,
         scope: str | None = None,
     ) -> dict[str, Any]:
         """Retract all facts matching a predicate pattern.
 
         Args:
             predicate: The predicate to match for retraction.
+            args: Pattern arguments for matching. Use ``["?x", "?y"]`` for
+                wildcards. Defaults to empty (matches all arities).
             scope: Optional scope to filter by.
 
         Returns:
@@ -1334,7 +1380,7 @@ class NocturnusAIClient:
             result = await client.retract_pattern("temp_location")
             print(f"Retracted {result['retracted']} facts")
         """
-        payload: dict[str, Any] = {"predicate": predicate}
+        payload: dict[str, Any] = {"predicate": predicate, "args": args or []}
         if scope is not None:
             payload["scope"] = scope
         return await self._request("POST", "/retract/pattern", json_body=payload)
@@ -1818,6 +1864,24 @@ class SyncNocturnusAIClient:
         """Query facts matching a pattern. See :meth:`NocturnusAIClient.query`."""
         return self._run(self._async_client.query(predicate=predicate, args=args, scope=scope))
 
+    @overload
+    def infer(
+        self,
+        predicate: str,
+        args: list[str],
+        scope: str | None = None,
+        with_proof: Literal[False] = False,
+    ) -> list[Atom]: ...
+
+    @overload
+    def infer(
+        self,
+        predicate: str,
+        args: list[str],
+        scope: str | None = None,
+        with_proof: Literal[True] = ...,
+    ) -> list[ProofTree]: ...
+
     def infer(
         self,
         predicate: str,
@@ -2152,6 +2216,7 @@ class SyncNocturnusAIClient:
         op: str,
         predicate: str,
         *,
+        args: list[str] | None = None,
         arg_index: int | None = None,
         scope: str | None = None,
     ) -> dict[str, Any]:
@@ -2160,6 +2225,7 @@ class SyncNocturnusAIClient:
             self._async_client.aggregate(
                 op=op,
                 predicate=predicate,
+                args=args,
                 arg_index=arg_index,
                 scope=scope,
             )
@@ -2173,10 +2239,13 @@ class SyncNocturnusAIClient:
         self,
         predicate: str,
         *,
+        args: list[str] | None = None,
         scope: str | None = None,
     ) -> dict[str, Any]:
         """Retract all facts matching a predicate. See :meth:`NocturnusAIClient.retract_pattern`."""
-        return self._run(self._async_client.retract_pattern(predicate, scope=scope))
+        return self._run(
+            self._async_client.retract_pattern(predicate, args=args, scope=scope)
+        )
 
     def tell(self, predicate: str, args: list[str], **kwargs: Any) -> dict[str, Any]:
         """Alias for assert_fact. Matches CLI/MCP vocabulary."""
