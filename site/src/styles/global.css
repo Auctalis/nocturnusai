@@ -561,6 +561,48 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0 0.5rem;
 }
 
+/* ── Hero cost callout ───────────────────────────────────────────────── */
+
+.hero-cost-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.8rem;
+  margin-bottom: var(--space-5);
+}
+
+.hero-cost-new {
+  font-family: var(--font-mono);
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 700;
+  color: var(--site-accent);
+  letter-spacing: -0.03em;
+}
+
+.hero-cost-vs {
+  font-size: 0.85rem;
+  color: rgba(240, 235, 225, 0.3);
+  font-weight: 400;
+}
+
+.hero-cost-old {
+  font-family: var(--font-mono);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 600;
+  color: rgba(240, 235, 225, 0.22);
+  text-decoration: line-through;
+  text-decoration-color: rgba(240, 235, 225, 0.15);
+  letter-spacing: -0.03em;
+}
+
+@media (max-width: 640px) {
+  .hero-cost-line {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+  }
+}
+
 /* ── Hero inline terminal ────────────────────────────────────────────── */
 
 .hero-terminal {

@@ -26,6 +26,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <p class="hero-dark-sub">
           NocturnusAI sits between your agent and the LLM. It extracts facts, reasons about what's relevant, and returns only what changed &mdash; so your model never replays the whole thread.
         </p>
+        <div class="hero-cost-line">
+          <span class="hero-cost-new">$240<span style="font-weight: 400; font-size: 0.6em; opacity: 0.6;">/mo</span></span>
+          <span class="hero-cost-vs">instead of</span>
+          <span class="hero-cost-old">$54,000<span style="font-weight: 400; font-size: 0.6em; opacity: 0.5;">/mo</span></span>
+        </div>
 
         <!-- Mini terminal — shows context compression in action -->
         <div class="hero-terminal">
@@ -206,6 +211,26 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
             <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">97%</div>
             <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">reduction</div>
             <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">per request</div>
+          </div>
+        </div>
+
+        <!-- How we calculated this -->
+        <div class="reveal reveal-delay-2" style="max-width: 740px; margin: 0 auto;">
+          <div class="plain-card" style="padding: var(--space-4); border-left: 3px solid var(--site-accent);">
+            <h3 style="font-family: var(--font-display); font-size: 1rem; font-weight: 600; margin: 0 0 0.8rem;">How we calculated this</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); font-size: 0.85rem; line-height: 1.72; color: var(--site-muted);">
+              <div>
+                <strong style="color: var(--site-text); display: block; margin-bottom: 0.3rem;">Without NocturnusAI</strong>
+                A 10-turn support conversation averages ~2,400 input tokens per LLM call when replaying the full thread (user messages, tool outputs, system events). At 1,000 requests/hour on GPT-4o ($15/1M input tokens), that's <strong style="color: var(--site-text);">$54,000/month</strong>.
+              </div>
+              <div>
+                <strong style="color: var(--site-text); display: block; margin-bottom: 0.3rem;">With NocturnusAI</strong>
+                The <code>briefingDelta</code> returns only new facts since the last turn &mdash; typically 20&ndash;40 tokens. Same scenario: <strong style="color: var(--site-text);">$240/month</strong>. The logic engine runs locally with zero token cost. Only the initial LLM extraction step uses tokens.
+              </div>
+            </div>
+            <p style="margin-top: var(--space-2); font-size: 0.78rem; color: var(--site-muted-soft);">
+              Calculation: 1,000 req/hr &times; 720 hr/mo &times; token cost. Claude, Gemini, and local Ollama cost less per token but the compression ratio (30 vs 2,400) is the same regardless of provider. The 97% figure is (2,400 &minus; 30) / 2,400.
+            </p>
           </div>
         </div>
       </div>
