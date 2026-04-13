@@ -164,7 +164,7 @@ with SyncNocturnusAIClient("http://localhost:9300") as client:
     <hr />
 
     <h2 id="langchain">LangChain Integration</h2>
-    <p>Drop Nocturnus into any LangChain agent in one line. Six pre-built tools map directly to the core API:</p>
+    <p>Drop Nocturnus into any LangChain agent in one line. Seven pre-built tools map directly to the core API:</p>
 
     <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
@@ -192,9 +192,24 @@ with SyncNocturnusAIClient("http://localhost:9300") as client:
                     <td class="py-2">Run logical inference</td>
                 </tr>
                 <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">nocturnusai_teach</td>
+                    <td class="py-2 font-mono">/teach</td>
+                    <td class="py-2">Define a logical rule</td>
+                </tr>
+                <tr class="border-b border-white/5">
                     <td class="py-2 font-mono text-cyan-400">nocturnusai_context</td>
                     <td class="py-2 font-mono">/memory/context</td>
                     <td class="py-2">Get salience-ranked context window</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">nocturnusai_optimize</td>
+                    <td class="py-2 font-mono">/memory/context</td>
+                    <td class="py-2">Goal-driven optimized context</td>
+                </tr>
+                <tr class="border-b border-white/5">
+                    <td class="py-2 font-mono text-cyan-400">nocturnusai_extract</td>
+                    <td class="py-2 font-mono">/extract</td>
+                    <td class="py-2">Extract facts from raw text (requires LLM)</td>
                 </tr>
             </tbody>
         </table>
@@ -541,7 +556,7 @@ const result = await mcp.callTool('ask', &#123;
 &#125;);</code></pre>
 
     <NextSteps links={[
-        { title: "Integrations", description: "Quick-start cards for all 6 framework integrations", href: `${base}/docs/integrations` },
+        { title: "Integrations", description: "Quick-start cards for all framework integrations", href: `${base}/docs/integrations` },
         { title: "API Reference", description: "Every endpoint with full request/response shapes", href: `${base}/docs/api` },
         { title: "MCP Integration", description: "Connect via Model Context Protocol in 30 seconds", href: `${base}/docs/mcp` },
     ]} />

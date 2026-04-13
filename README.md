@@ -303,6 +303,7 @@ Full docs: **[auctalis.github.io/nocturnusai](https://auctalis.github.io/nocturn
 | [Context Workflow](https://auctalis.github.io/nocturnusai/docs/context) | Raw turns -> optimize -> diff -> clear |
 | [API Reference](https://auctalis.github.io/nocturnusai/docs/api) | REST endpoints and response shapes |
 | [SDKs](https://auctalis.github.io/nocturnusai/docs/sdks) | Python and TypeScript client methods |
+| [Integrations](https://auctalis.github.io/nocturnusai/integrations) | LangChain, CrewAI, AutoGen, LangGraph, OpenAI Agents, Anthropic, MCP |
 | [MCP Integration](https://auctalis.github.io/nocturnusai/docs/mcp) | MCP config plus companion context API usage |
 | [How It Works on the Backend](https://auctalis.github.io/nocturnusai/docs/concepts) | Facts, rules, inference, salience, scopes |
 | [Security & Auth](https://auctalis.github.io/nocturnusai/docs/security) | API keys, RBAC, TLS, encryption at rest |
