@@ -1,24 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --site-bg: #f7f3ec;
-  --site-surface: #fffdf8;
-  --site-surface-soft: #efe7db;
-  --site-panel: #f2ebe0;
-  --site-text: #211c17;
-  --site-muted: #6a6257;
+  --site-bg: #F5F0E8;
+  --site-surface: #FDFBF7;
+  --site-surface-soft: #ece5d9;
+  --site-panel: #f0e9de;
+  --site-text: #1A1714;
+  --site-muted: #6D645A;
   --site-muted-soft: #8d8376;
-  --site-line: #d9cfbf;
-  --site-accent: #c86522;
-  --site-accent-deep: #9d4a16;
+  --site-line: #d6ccbb;
+  --site-accent: #D4883A;
+  --site-accent-deep: #8B4513;
   --site-accent-soft: #f2decd;
-  --site-dark: #1d1916;
-  --site-dark-surface: #2a241f;
-  --site-dark-border: #3d352d;
-  --site-dark-text: #fbf8f2;
+  --site-dark: #0F0D0A;
+  --site-dark-surface: #1A1612;
+  --site-dark-border: #2E2820;
+  --site-dark-text: #F0EBE1;
   --site-max: 1160px;
-  --font-display: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-display: 'Instrument Sans', 'Outfit', system-ui, -apple-system, sans-serif;
+  --font-body: 'Outfit', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Commit Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
   --space-1: 0.5rem;
   --space-2: 1rem;
   --space-3: 1.5rem;
@@ -31,7 +33,7 @@
   --radius-sm: 3px;
   --radius-md: 8px;
   --radius-lg: 14px;
-  --shadow-soft: 0 16px 40px rgba(23, 18, 13, 0.06);
+  --shadow-soft: 0 16px 40px rgba(15, 13, 10, 0.07);
 }
 
 *,
@@ -42,7 +44,7 @@
 
 html {
   scroll-behavior: smooth;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   background: var(--site-bg);
   color: var(--site-text);
   -webkit-font-smoothing: antialiased;
@@ -92,7 +94,11 @@ samp {
 }
 
 ::selection {
-  background: rgba(200, 101, 34, 0.18);
+  background: rgba(212, 136, 58, 0.2);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
 }
 
 .site-container {
@@ -123,10 +129,11 @@ samp {
 }
 
 .site-title {
+  font-family: var(--font-display);
   font-size: clamp(2.2rem, 5vw, 4.4rem);
   line-height: 1.05;
   font-weight: 600;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
   margin: 0 0 var(--space-2);
 }
 
@@ -172,7 +179,7 @@ samp {
   min-height: 46px;
   padding: 0.8rem 1.3rem;
   border-radius: var(--radius-sm);
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  transition: background 0.18s var(--ease-out-expo), color 0.18s var(--ease-out-expo), border-color 0.18s var(--ease-out-expo), transform 0.18s var(--ease-out-expo);
 }
 
 .button-primary {
@@ -264,12 +271,30 @@ samp {
   box-shadow: var(--shadow-soft);
 }
 
+.plain-card,
+.metric-card,
+.audience-card,
+.integration-card,
+.docs-card,
+.next-card {
+  transition: transform 0.2s var(--ease-out-expo), box-shadow 0.2s var(--ease-out-expo);
+}
+
+.plain-card:hover,
+.docs-card:hover,
+.next-card:hover,
+.integration-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 50px rgba(15, 13, 10, 0.1);
+}
+
 .plain-card h3,
 .metric-card h3,
 .audience-card h3,
 .integration-card h3,
 .docs-card h3,
 .next-card h4 {
+  font-family: var(--font-display);
   margin: 0 0 0.6rem;
   font-size: 1.1rem;
   line-height: 1.25;
@@ -341,10 +366,10 @@ samp {
 
 .site-nav.is-solid,
 .site-nav.is-scrolled {
-  background: rgba(247, 243, 236, 0.92);
+  background: rgba(245, 240, 232, 0.92);
   backdrop-filter: blur(10px);
-  border-bottom-color: rgba(33, 28, 23, 0.08);
-  box-shadow: 0 10px 30px rgba(23, 18, 13, 0.04);
+  border-bottom-color: rgba(26, 23, 20, 0.08);
+  box-shadow: 0 10px 30px rgba(15, 13, 10, 0.04);
 }
 
 .site-nav-inner {
@@ -1240,7 +1265,7 @@ samp {
 .motion-ok .reveal {
   opacity: 0;
   transform: translateY(16px);
-  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.7s var(--ease-out-expo), transform 0.7s var(--ease-out-expo);
 }
 
 .motion-ok .reveal.is-visible {
@@ -1259,6 +1284,83 @@ samp {
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+/* ── Hero character-level animation ─────────────────────────────────────── */
+
+.hero-text-reveal .char {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.motion-ok .hero-text-reveal .char {
+  animation: charReveal 0.45s var(--ease-out-expo) forwards;
+}
+
+@keyframes charReveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Signature ledger line between sections ─────────────────────────────── */
+
+.section-rule {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 2%, var(--site-accent) 20%, var(--site-accent) 80%, transparent 98%);
+  opacity: 0.2;
+  margin: 0;
+  border: none;
+}
+
+/* ── Asymmetric feature layout (Why NocturnusAI) ────────────────────────── */
+
+.feature-asymmetric {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  grid-template-rows: auto auto;
+  gap: var(--space-3);
+}
+
+.feature-asymmetric .feature-hero-card {
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--site-dark);
+  color: var(--site-dark-text);
+  border: 1px solid var(--site-dark-border);
+  border-top: 2px solid var(--site-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-5) var(--space-4);
+  box-shadow: 0 20px 50px rgba(15, 13, 10, 0.15);
+}
+
+.feature-asymmetric .feature-hero-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--site-accent);
+  margin: 0 0 0.8rem;
+}
+
+.feature-asymmetric .feature-hero-card p {
+  color: rgba(240, 235, 225, 0.78);
+  line-height: 1.72;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .feature-asymmetric {
+    grid-template-columns: 1fr;
+  }
+  .feature-asymmetric .feature-hero-card {
+    grid-row: auto;
+  }
 }
 
 /* ── Walkthrough steps (homepage "See It Work") ───────────────────────────── */

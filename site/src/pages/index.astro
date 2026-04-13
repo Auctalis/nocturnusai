@@ -7,16 +7,20 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <Layout
-  title="Nocturnus.AI - 97% Fewer Tokens Per Turn"
-  description="Open-source context server for AI agents. Extracts, remembers, and returns only the delta — cutting prompt tokens by 97% and spend from $54K to $240/month."
+  title="Nocturnus.AI - Reasoning Engine for AI Agents"
+  description="Open-source logic engine for AI agents. Deterministic inference, truth maintenance, and salience-ranked context — cutting prompt tokens by 97%."
 >
   <Navbar />
 
   <main>
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- HERO — Category-defining claim, not cost claim                    -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section class="hero-cut" id="top">
       <div class="hero-cut-top">
         <div class="hero-question-wrap">
-          <h1 class="hero-question">Your agents replay the entire thread every call. That costs $54K/month.</h1>
+          <div class="site-kicker" style="color: var(--site-accent-deep); margin-bottom: var(--space-3);">REASONING FOR AI AGENTS</div>
+          <h1 class="hero-question hero-text-reveal" id="hero-headline">Memory stores retrieve what looks similar. NocturnusAI derives what must be true.</h1>
         </div>
       </div>
 
@@ -24,13 +28,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
       <div class="hero-cut-bottom">
         <div class="hero-answer-wrap">
-          <p class="hero-answer">Send the delta instead. $240/month.</p>
-          <p class="hero-subtext">97% fewer tokens &middot; same answers &middot; first briefing in 2 minutes</p>
+          <p class="hero-answer">97% fewer tokens. Deterministic. Zero hallucinations in the reasoning layer.</p>
+          <p class="hero-subtext">open source &middot; single container &middot; first result in 2 minutes &middot; no signup</p>
         </div>
 
         <div class="hero-footer">
           <p class="hero-support">
-            NocturnusAI is an open-source context server that sits between your agent and the LLM. It extracts facts from each turn, remembers what came before, and returns only what changed &mdash; a short briefing instead of the whole thread.
+            NocturnusAI is an open-source logic engine that sits between your agent and the LLM. It stores facts, runs inference with proof chains, and returns only what changed &mdash; a short briefing instead of the whole thread.
           </p>
           <div class="hero-cta-row">
             <a href="#try-it" class="button-primary">Try it now</a>
@@ -40,8 +44,165 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       </div>
     </section>
 
+    <hr class="section-rule" />
+
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- TRY IT — two tiers: instant (no LLM) + full (with LLM)           -->
+    <!-- THE NUMBERS — proof of the category claim                         -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="numbers">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">The Numbers</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">The result: 97% fewer tokens. Same answers.</h2>
+          <p class="site-subtitle">Every call that replays old context is money burned. NocturnusAI sends only the delta.</p>
+        </div>
+
+        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin-bottom: var(--space-6);">
+          <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3);">
+            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">~30</div>
+            <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">tokens per turn</div>
+            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">with NocturnusAI</div>
+          </div>
+          <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3); opacity: 0.35;">
+            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); line-height: 1;">~2,400</div>
+            <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">tokens per turn</div>
+            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">full replay</div>
+          </div>
+          <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3);">
+            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">97%</div>
+            <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">reduction</div>
+            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">per request</div>
+          </div>
+        </div>
+
+        <div class="reveal reveal-delay-2" style="display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--space-4); align-items: center; max-width: 700px; margin: 0 auto;">
+          <div class="panel-dark" style="text-align: center; padding: var(--space-5) var(--space-4); border: 2px solid var(--site-accent);">
+            <div style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent);">$240</div>
+            <div style="font-size: 0.85rem; color: var(--site-muted);">/month</div>
+            <div style="font-size: 0.78rem; color: var(--site-muted-soft); margin-top: 0.5rem;">With NocturnusAI</div>
+          </div>
+          <div style="font-size: 1.2rem; font-weight: 600; color: var(--site-muted-soft);">vs</div>
+          <div class="panel-dark" style="text-align: center; padding: var(--space-5) var(--space-4); opacity: 0.35;">
+            <div style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; font-family: var(--font-mono);">$54,000</div>
+            <div style="font-size: 0.85rem; color: var(--site-muted);">/month</div>
+            <div style="font-size: 0.78rem; color: var(--site-muted-soft); margin-top: 0.5rem;">Full replay</div>
+          </div>
+        </div>
+
+        <p class="reveal reveal-delay-3" style="text-align: center; margin-top: var(--space-4); font-size: 0.82rem; color: var(--site-muted-soft);">
+          At 1,000 requests/hour on GPT-4o ($15/M input tokens). Claude, Gemini, and local Ollama cost less but the ratio holds.
+        </p>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- WHY NOCTURNUSAI — competitive positioning (moved up for Skeptic)   -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="compare">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Why NocturnusAI</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Not another vector store. A reasoning engine.</h2>
+          <p class="site-subtitle">Memory stores retrieve what looks similar. NocturnusAI derives what must be true.</p>
+        </div>
+
+        <!-- Asymmetric layout: hero card (reasoning) + 3 supporting cards -->
+        <div class="feature-asymmetric reveal reveal-delay-1" style="margin-bottom: var(--space-5);">
+          <div class="feature-hero-card">
+            <h3>Deterministic reasoning</h3>
+            <p>Backward-chaining inference with proof chains, truth maintenance, negation-as-failure, and ACID transactions. The same query always returns the same answer. No hallucinations in the reasoning layer.</p>
+            <p style="margin-top: 1rem; font-family: var(--font-mono); font-size: 0.78rem; color: rgba(240,235,225,0.5);">BACKWARD CHAINING &middot; FORWARD CHAINING &middot; UNIFICATION &middot; PROOF CHAINS</p>
+          </div>
+          <div class="plain-card">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Works without any LLM</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Fact storage, rules, inference, salience ranking, and context windows all run deterministically. No API keys, no token cost, sub-millisecond latency.</p>
+          </div>
+          <div class="plain-card">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Single Docker container</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">No Postgres, no Redis, no Neo4j, no vector database. One container, one port, persistent volume. Runs on a $5/month VPS or your laptop.</p>
+          </div>
+        </div>
+
+        <div class="reveal reveal-delay-1" style="margin-bottom: var(--space-5);">
+          <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Hypothetical reasoning</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Fork a knowledge scope, try a hypothesis, diff it against the original, merge or discard. Git-like branching for knowledge &mdash; no other agent memory system offers this.</p>
+          </div>
+        </div>
+
+        <div class="reveal reveal-delay-2" style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--site-line);">
+                <th style="text-align: left; padding: 0.75rem 1rem; font-weight: 600;"></th>
+                <th style="text-align: center; padding: 0.75rem 1rem; font-weight: 600; color: var(--site-accent);">NocturnusAI</th>
+                <th style="text-align: center; padding: 0.75rem 1rem; font-weight: 500; color: var(--site-muted);">Mem0</th>
+                <th style="text-align: center; padding: 0.75rem 1rem; font-weight: 500; color: var(--site-muted);">Zep</th>
+                <th style="text-align: center; padding: 0.75rem 1rem; font-weight: 500; color: var(--site-muted);">Letta</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid var(--site-line);">
+                <td style="padding: 0.6rem 1rem;">Works without LLM</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">Yes</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--site-line);">
+                <td style="padding: 0.6rem 1rem;">Logical inference</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">Backward + forward chaining</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--site-line);">
+                <td style="padding: 0.6rem 1rem;">Context delta compression</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">briefingDelta</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Summarization</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Compaction</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--site-line);">
+                <td style="padding: 0.6rem 1rem;">Hypothetical reasoning</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">Fork / diff / merge</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--site-line);">
+                <td style="padding: 0.6rem 1rem;">MCP tools</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">16 tools</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">9 tools</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Experimental</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Consumer only</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--site-line);">
+                <td style="padding: 0.6rem 1rem;">Framework integrations</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">6</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">4</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">2</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">2</td>
+              </tr>
+              <tr>
+                <td style="padding: 0.6rem 1rem;">Self-hosted complexity</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">1 container</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">3 containers</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Graph DB required</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">DB required</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TRY IT — zero-friction first value                                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section class="site-section" id="try-it">
       <div class="site-container">
@@ -53,12 +214,14 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           </p>
         </div>
 
-        <!-- Instant start — no LLM needed -->
-        <div class="reveal reveal-delay-1" style="margin-bottom: var(--space-5);">
-          <div class="panel-dark" style="padding: var(--space-3) var(--space-4);">
-            <div class="panel-label">Start the server (Docker)</div>
-            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;">docker run -d --name nocturnusai -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
-curl http://localhost:9300/health</pre>
+        <!-- Quick-start TL;DR -->
+        <div class="reveal" style="margin-bottom: var(--space-5);">
+          <div class="panel-dark" style="padding: var(--space-3) var(--space-4); border-top: 2px solid var(--site-accent);">
+            <div class="panel-label">Fastest path &mdash; 3 lines, no signup</div>
+            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.9; white-space: pre-wrap;">docker run -d --name nocturnusai -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+curl -s -X POST localhost:9300/tell -H "Content-Type: application/json" -H "X-Tenant-ID: default" -d '&#123;"predicate":"likes","args":["alice","logic"]&#125;'
+curl -s -X POST localhost:9300/ask  -H "Content-Type: application/json" -H "X-Tenant-ID: default" -d '&#123;"predicate":"likes","args":["alice","?what"]&#125;'
+<span style="color: rgba(255,255,255,0.45);"># &rarr; likes(alice, logic)  &mdash; deterministic, sub-millisecond, zero token cost</span></pre>
           </div>
         </div>
 
@@ -154,7 +317,7 @@ curl -s -X POST http://localhost:9300/ask \
           </div>
 
           <div class="plain-card" style="border-left: 3px solid var(--site-accent);">
-            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">briefingDelta &mdash; the LLM extracts facts, Nocturnus returns only what's new</div>
+            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">briefingDelta &mdash; the LLM extracts facts, NocturnusAI returns only what's new</div>
             <pre style="margin: 0; font-size: 1.05rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">## Login Issue
 Login is currently failing following the Okta cutover.
 Acme is on the enterprise tier.</pre>
@@ -176,8 +339,8 @@ Issuer mismatch after IdP migration.</pre>
               <p style="margin-top: 0.8rem; font-weight: 600;">~30 tokens &middot; $0.01/request</p>
             </div>
             <div class="payoff-right">
-              <h3>Without Nocturnus</h3>
-              <div class="equation-box" style="padding: var(--space-4); opacity: 0.55;">
+              <h3>Without NocturnusAI</h3>
+              <div class="equation-box" style="padding: var(--space-4); opacity: 0.35;">
                 <pre style="margin: 0; font-size: 0.82rem; line-height: 1.6; white-space: pre-wrap;">User: We can't log in after the Okta cutover.
 Tool crm_lookup: account=acme tier=enterprise
 Tool auth_audit: 14 failed SAML assertions...
@@ -196,56 +359,7 @@ Tool auth_audit: issuer mismatch after IdP...
       </div>
     </section>
 
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- THE NUMBERS — cost and token impact made visceral                  -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <section class="site-section-tight" id="numbers">
-      <div class="site-container">
-        <div class="section-head reveal">
-          <div class="site-kicker">The Numbers</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">97% fewer tokens. Same answers.</h2>
-          <p class="site-subtitle">Every call that replays old context is money burned. Nocturnus sends only the delta.</p>
-        </div>
-
-        <!-- Big stat row -->
-        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin-bottom: var(--space-6);">
-          <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3);">
-            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">~30</div>
-            <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">tokens per turn</div>
-            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">with Nocturnus</div>
-          </div>
-          <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3); opacity: 0.5;">
-            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); line-height: 1;">~2,400</div>
-            <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">tokens per turn</div>
-            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">full replay</div>
-          </div>
-          <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3);">
-            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">97%</div>
-            <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">reduction</div>
-            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">per request</div>
-          </div>
-        </div>
-
-        <!-- Monthly cost comparison -->
-        <div class="reveal reveal-delay-2" style="display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--space-4); align-items: center; max-width: 700px; margin: 0 auto;">
-          <div class="panel-dark" style="text-align: center; padding: var(--space-5) var(--space-4); border: 2px solid var(--site-accent);">
-            <div style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent);">$240</div>
-            <div style="font-size: 0.85rem; color: var(--site-muted);">/month</div>
-            <div style="font-size: 0.78rem; color: var(--site-muted-soft); margin-top: 0.5rem;">With Nocturnus</div>
-          </div>
-          <div style="font-size: 1.2rem; font-weight: 600; color: var(--site-muted-soft);">vs</div>
-          <div class="panel-dark" style="text-align: center; padding: var(--space-5) var(--space-4); opacity: 0.55;">
-            <div style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; font-family: var(--font-mono);">$54,000</div>
-            <div style="font-size: 0.85rem; color: var(--site-muted);">/month</div>
-            <div style="font-size: 0.78rem; color: var(--site-muted-soft); margin-top: 0.5rem;">Full replay</div>
-          </div>
-        </div>
-
-        <p class="reveal reveal-delay-3" style="text-align: center; margin-top: var(--space-4); font-size: 0.82rem; color: var(--site-muted-soft);">
-          At 1,000 requests/hour on GPT-4o ($15/M input tokens). Claude, Gemini, and local Ollama cost less but the ratio holds.
-        </p>
-      </div>
-    </section>
+    <hr class="section-rule" />
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- HOW IT WORKS — minimal, one sentence each                         -->
@@ -291,8 +405,10 @@ DELETE /scope/ticket-4821</pre>
       </div>
     </section>
 
+    <hr class="section-rule" />
+
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- WHERE IT FITS — architecture diagram                              -->
+    <!-- WHERE IT FITS — upgraded architecture diagram                      -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section class="site-section-tight" id="fits">
       <div class="site-container">
@@ -301,14 +417,25 @@ DELETE /scope/ticket-4821</pre>
           <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">One server between your agent and the model.</h2>
         </div>
 
-        <div class="reveal reveal-delay-1" style="max-width: 700px; margin: 0 auto;">
-          <div class="panel-dark" style="padding: var(--space-5) var(--space-4); text-align: center;">
-            <pre style="margin: 0; font-size: clamp(0.82rem, 1.5vw, 1rem); line-height: 2.2; white-space: pre-wrap; font-family: var(--font-mono); color: rgba(255,255,255,0.88);">Your Agent Code       NocturnusAI         LLM API
-<span style="color: var(--site-muted-soft);">  (turns)</span>     <span style="color: var(--site-accent);">&rarr;</span>    <span style="color: var(--site-muted-soft);">(extract, store,</span>   <span style="color: var(--site-accent);">&rarr;</span>   <span style="color: var(--site-muted-soft);">(receives only</span>
-                       <span style="color: var(--site-muted-soft);"> diff, rank)</span>          <span style="color: var(--site-muted-soft);">the delta)</span></pre>
+        <div class="reveal reveal-delay-1" style="max-width: 800px; margin: 0 auto;">
+          <div style="display: grid; grid-template-columns: 1fr auto 1.2fr auto 1fr; gap: 0; align-items: center;">
+            <div class="panel-dark" style="padding: var(--space-3) var(--space-4); text-align: center; border-top: 2px solid var(--site-muted-soft);">
+              <div style="font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.5); margin-bottom: 0.4rem;">Your Agent</div>
+              <div style="font-size: 0.88rem; color: var(--site-dark-text);">Sends raw turns</div>
+            </div>
+            <div style="font-size: 1.2rem; color: var(--site-accent); padding: 0 0.6rem;">&rarr;</div>
+            <div class="panel-dark" style="padding: var(--space-3) var(--space-4); text-align: center; border-top: 2px solid var(--site-accent);">
+              <div style="font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--site-accent); margin-bottom: 0.4rem;">NocturnusAI</div>
+              <div style="font-size: 0.82rem; color: var(--site-dark-text);">Extract &middot; Store &middot; Infer &middot; Rank &middot; Diff</div>
+            </div>
+            <div style="font-size: 1.2rem; color: var(--site-accent); padding: 0 0.6rem;">&rarr;</div>
+            <div class="panel-dark" style="padding: var(--space-3) var(--space-4); text-align: center; border-top: 2px solid var(--site-muted-soft);">
+              <div style="font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.5); margin-bottom: 0.4rem;">LLM API</div>
+              <div style="font-size: 0.88rem; color: var(--site-dark-text);">Receives only the delta</div>
+            </div>
           </div>
           <p style="text-align: center; margin-top: var(--space-3); font-size: 0.85rem; color: var(--site-muted-soft);">
-            Self-hosted. Open source. Not a memory store &mdash; a prompt compression server.
+            Self-hosted. Open source. Not a memory store &mdash; a reasoning engine.
             <br/>
             <a href="https://github.com/Auctalis/nocturnusai" style="color: var(--site-accent); text-decoration: none;">
               <img src="https://img.shields.io/github/stars/Auctalis/nocturnusai?style=flat&amp;color=f59e0b" alt="GitHub stars" style="vertical-align: middle; margin-right: 0.3rem; height: 20px;" />
@@ -319,95 +446,7 @@ DELETE /scope/ticket-4821</pre>
       </div>
     </section>
 
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- WHY NOT JUST — competitive positioning                            -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <section class="site-section-tight" id="compare">
-      <div class="site-container">
-        <div class="section-head reveal">
-          <div class="site-kicker">Why NocturnusAI</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Not another vector store. A reasoning engine.</h2>
-          <p class="site-subtitle">Memory stores retrieve what looks similar. NocturnusAI derives what must be true.</p>
-        </div>
-
-        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); margin-bottom: var(--space-5);">
-          <div class="plain-card">
-            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Works without any LLM</h3>
-            <p style="font-size: 0.88rem; color: var(--site-muted);">Fact storage, rules, inference, salience ranking, and context windows all run deterministically. No API keys, no token cost, sub-millisecond latency. Add an LLM only when you want natural-language extraction.</p>
-          </div>
-          <div class="plain-card">
-            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Deterministic reasoning</h3>
-            <p style="font-size: 0.88rem; color: var(--site-muted);">Backward-chaining inference with proof chains, truth maintenance, negation-as-failure, and ACID transactions. The same query always returns the same answer. No hallucinations in the reasoning layer.</p>
-          </div>
-          <div class="plain-card">
-            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Single Docker container</h3>
-            <p style="font-size: 0.88rem; color: var(--site-muted);">No Postgres, no Redis, no Neo4j, no vector database. One container, one port, persistent volume. Runs on a $5/month VPS or your laptop.</p>
-          </div>
-          <div class="plain-card">
-            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Hypothetical reasoning</h3>
-            <p style="font-size: 0.88rem; color: var(--site-muted);">Fork a knowledge scope, try a hypothesis, diff it against the original, merge or discard. Git-like branching for knowledge &mdash; no other agent memory system offers this.</p>
-          </div>
-        </div>
-
-        <div class="reveal reveal-delay-2" style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-            <thead>
-              <tr style="border-bottom: 2px solid var(--site-line);">
-                <th style="text-align: left; padding: 0.75rem 1rem; font-weight: 600;"></th>
-                <th style="text-align: center; padding: 0.75rem 1rem; font-weight: 600; color: var(--site-accent);">NocturnusAI</th>
-                <th style="text-align: center; padding: 0.75rem 1rem; font-weight: 500; color: var(--site-muted);">Mem0</th>
-                <th style="text-align: center; padding: 0.75rem 1rem; font-weight: 500; color: var(--site-muted);">Zep</th>
-                <th style="text-align: center; padding: 0.75rem 1rem; font-weight: 500; color: var(--site-muted);">Letta</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style="border-bottom: 1px solid var(--site-line);">
-                <td style="padding: 0.6rem 1rem;">Works without LLM</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">Yes</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
-              </tr>
-              <tr style="border-bottom: 1px solid var(--site-line);">
-                <td style="padding: 0.6rem 1rem;">Logical inference</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">Backward + forward chaining</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
-              </tr>
-              <tr style="border-bottom: 1px solid var(--site-line);">
-                <td style="padding: 0.6rem 1rem;">Context delta compression</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">briefingDelta</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Summarization</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Compaction</td>
-              </tr>
-              <tr style="border-bottom: 1px solid var(--site-line);">
-                <td style="padding: 0.6rem 1rem;">MCP tools</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">16 tools</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">9 tools</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Experimental</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Consumer only</td>
-              </tr>
-              <tr style="border-bottom: 1px solid var(--site-line);">
-                <td style="padding: 0.6rem 1rem;">Framework integrations</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">6</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">4</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">2</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">2</td>
-              </tr>
-              <tr>
-                <td style="padding: 0.6rem 1rem;">Self-hosted complexity</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">1 container</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">3 containers</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Graph DB required</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">DB required</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
+    <hr class="section-rule" />
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- INTEGRATIONS — framework logos and one-liner setup                 -->
@@ -458,6 +497,8 @@ DELETE /scope/ticket-4821</pre>
         </p>
       </div>
     </section>
+
+    <hr class="section-rule" />
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- SDK QUICKSTART — copyable code                                    -->
@@ -517,12 +558,13 @@ const results = await c.ask('grandparent', ['?who', 'charlie']);
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- CTA                                                                -->
+    <!-- CTA — with enterprise signals                                      -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section class="site-section cta-band" id="get-started">
       <div class="site-container">
         <div class="section-head reveal">
           <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem); color: var(--site-dark-text);">Start here.</h2>
+          <p style="font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.06em; color: rgba(255,255,255,0.45); margin-top: 0.5rem;">764 TESTS &middot; ACID TRANSACTIONS &middot; OPEN SOURCE &middot; SINGLE CONTAINER</p>
         </div>
 
         <div class="statement-grid reveal reveal-delay-1">
@@ -555,4 +597,23 @@ const results = await c.ask('grandparent', ['?who', 'charlie']);
   </main>
 
   <Footer />
+
+  <!-- Hero character-level animation — uses safe DOM methods, no innerHTML -->
+  <script is:inline>
+    (() => {
+      const el = document.getElementById('hero-headline');
+      if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const text = el.textContent || '';
+      while (el.firstChild) el.removeChild(el.firstChild);
+      let delay = 0;
+      for (let i = 0; i < text.length; i++) {
+        const span = document.createElement('span');
+        span.className = 'char';
+        span.textContent = text[i] === ' ' ? '\u00A0' : text[i];
+        span.style.animationDelay = delay + 'ms';
+        el.appendChild(span);
+        if (text[i] !== ' ') delay += 12;
+      }
+    })();
+  </script>
 </Layout>
