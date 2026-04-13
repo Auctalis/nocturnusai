@@ -96,41 +96,58 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <hr class="section-rule" />
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- WHY NOCTURNUSAI — competitive positioning (moved up for Skeptic)   -->
+    <!-- HOW IT COMPRESSES — reasoning is the mechanism, context is result  -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section class="site-section-tight" id="compare">
       <div class="site-container">
         <div class="section-head reveal">
-          <div class="site-kicker">Why NocturnusAI</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Not another vector store. A reasoning engine.</h2>
-          <p class="site-subtitle">Memory stores retrieve what looks similar. NocturnusAI derives what must be true.</p>
+          <div class="site-kicker">How It Compresses</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Reasoning is how you get 97% compression.</h2>
+          <p class="site-subtitle">Vector stores retrieve everything that looks vaguely related &mdash; so your context window fills with noise. NocturnusAI uses logical inference to keep only what must be true. That's the difference between ~2,400 tokens and ~30.</p>
         </div>
 
-        <!-- Asymmetric layout: hero card (reasoning) + 3 supporting cards -->
-        <div class="feature-asymmetric reveal reveal-delay-1" style="margin-bottom: var(--space-5);">
-          <div class="feature-hero-card">
-            <h3>Deterministic reasoning</h3>
-            <p>Backward-chaining inference with proof chains, truth maintenance, negation-as-failure, and ACID transactions. The same query always returns the same answer. No hallucinations in the reasoning layer.</p>
-            <p style="margin-top: 1rem; font-family: var(--font-mono); font-size: 0.78rem; color: rgba(240,235,225,0.5);">BACKWARD CHAINING &middot; FORWARD CHAINING &middot; UNIFICATION &middot; PROOF CHAINS</p>
-          </div>
-          <div class="plain-card">
-            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Works without any LLM</h3>
-            <p style="font-size: 0.88rem; color: var(--site-muted);">Fact storage, rules, inference, salience ranking, and context windows all run deterministically. No API keys, no token cost, sub-millisecond latency.</p>
-          </div>
-          <div class="plain-card">
-            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Single Docker container</h3>
-            <p style="font-size: 0.88rem; color: var(--site-muted);">No Postgres, no Redis, no Neo4j, no vector database. One container, one port, persistent volume. Runs on a $5/month VPS or your laptop.</p>
-          </div>
-        </div>
-
-        <div class="reveal reveal-delay-1" style="margin-bottom: var(--space-5);">
+        <!-- 3-card mechanism: how reasoning → compression → savings -->
+        <div class="feature-grid reveal reveal-delay-1" style="margin-bottom: var(--space-6);">
           <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
-            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Hypothetical reasoning</h3>
-            <p style="font-size: 0.88rem; color: var(--site-muted);">Fork a knowledge scope, try a hypothesis, diff it against the original, merge or discard. Git-like branching for knowledge &mdash; no other agent memory system offers this.</p>
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.6rem;">Step 1</div>
+            <h3 style="font-size: 1.05rem; margin-bottom: 0.6rem;">Extracts facts, not chunks</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">The LLM pulls structured predicates from raw turns. No embeddings, no chunks, no similarity matching. Just clean facts: <code>customer_tier(acme, enterprise)</code>.</p>
+          </div>
+          <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.6rem;">Step 2</div>
+            <h3 style="font-size: 1.05rem; margin-bottom: 0.6rem;">Infers what's relevant</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Backward chaining finds only facts reachable from your agent's current goals. Everything else stays out of the context window. This is why it's 97%, not 30%.</p>
+          </div>
+          <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.6rem;">Step 3</div>
+            <h3 style="font-size: 1.05rem; margin-bottom: 0.6rem;">Returns only the delta</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Each turn returns a <code>briefingDelta</code> &mdash; what changed since last time. On turn 10, your model sees 30 tokens instead of the full 2,400-token thread replay.</p>
           </div>
         </div>
 
-        <div class="reveal reveal-delay-2" style="overflow-x: auto;">
+        <!-- Compact feature bar: the engineering details -->
+        <div class="reveal reveal-delay-2" style="display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: center; margin-bottom: var(--space-6);">
+          <span style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; background: var(--site-surface); border: 1px solid var(--site-line); border-radius: var(--radius-sm); font-size: 0.82rem; color: var(--site-muted);">
+            <strong style="color: var(--site-text);">No LLM required</strong> for inference
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; background: var(--site-surface); border: 1px solid var(--site-line); border-radius: var(--radius-sm); font-size: 0.82rem; color: var(--site-muted);">
+            <strong style="color: var(--site-text);">1 container</strong> &mdash; no Postgres, Redis, or vector DB
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; background: var(--site-surface); border: 1px solid var(--site-line); border-radius: var(--radius-sm); font-size: 0.82rem; color: var(--site-muted);">
+            <strong style="color: var(--site-text);">ACID transactions</strong> with truth maintenance
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; background: var(--site-surface); border: 1px solid var(--site-line); border-radius: var(--radius-sm); font-size: 0.82rem; color: var(--site-muted);">
+            <strong style="color: var(--site-text);">Fork/diff/merge</strong> for hypothetical reasoning
+          </span>
+        </div>
+
+        <!-- Comparison table: reframed around context outcomes -->
+        <div class="section-head reveal reveal-delay-2" style="margin-bottom: var(--space-3);">
+          <h3 style="font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; margin: 0;">Why not Mem0, Zep, or Letta?</h3>
+          <p style="font-size: 0.88rem; color: var(--site-muted); margin-top: 0.4rem;">They store and retrieve. NocturnusAI reasons and compresses.</p>
+        </div>
+
+        <div class="reveal reveal-delay-3" style="overflow-x: auto;">
           <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
             <thead>
               <tr style="border-bottom: 2px solid var(--site-line);">
@@ -143,32 +160,32 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
             </thead>
             <tbody>
               <tr style="border-bottom: 1px solid var(--site-line);">
-                <td style="padding: 0.6rem 1rem;">Works without LLM</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">Yes</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
+                <td style="padding: 0.6rem 1rem;">Context strategy</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">Goal-driven inference</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Similarity search</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Graph retrieval</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Agent-managed</td>
               </tr>
               <tr style="border-bottom: 1px solid var(--site-line);">
-                <td style="padding: 0.6rem 1rem;">Logical inference</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">Backward + forward chaining</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
-              </tr>
-              <tr style="border-bottom: 1px solid var(--site-line);">
-                <td style="padding: 0.6rem 1rem;">Context delta compression</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">briefingDelta</td>
+                <td style="padding: 0.6rem 1rem;">Compression method</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">briefingDelta (only what changed)</td>
                 <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
                 <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Summarization</td>
                 <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Compaction</td>
               </tr>
               <tr style="border-bottom: 1px solid var(--site-line);">
-                <td style="padding: 0.6rem 1rem;">Hypothetical reasoning</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">Fork / diff / merge</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
+                <td style="padding: 0.6rem 1rem;">Works without LLM</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">Yes &mdash; inference is deterministic</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--site-line);">
+                <td style="padding: 0.6rem 1rem;">Self-hosted complexity</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">1 container, 1 port</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">3 containers</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Graph DB required</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">DB required</td>
               </tr>
               <tr style="border-bottom: 1px solid var(--site-line);">
                 <td style="padding: 0.6rem 1rem;">MCP tools</td>
@@ -177,19 +194,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
                 <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Experimental</td>
                 <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Consumer only</td>
               </tr>
-              <tr style="border-bottom: 1px solid var(--site-line);">
+              <tr>
                 <td style="padding: 0.6rem 1rem;">Framework integrations</td>
                 <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">6</td>
                 <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">4</td>
                 <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">2</td>
                 <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">2</td>
-              </tr>
-              <tr>
-                <td style="padding: 0.6rem 1rem;">Self-hosted complexity</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">1 container</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">3 containers</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Graph DB required</td>
-                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">DB required</td>
               </tr>
             </tbody>
           </table>
