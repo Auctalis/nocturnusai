@@ -27,16 +27,23 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           NocturnusAI sits between your agent and the LLM. It extracts facts, reasons about what's relevant, and returns only what changed &mdash; so your model never replays the whole thread.
         </p>
 
-        <!-- Mini terminal in hero -->
+        <!-- Mini terminal — shows context compression in action -->
         <div class="hero-terminal">
           <div class="hero-terminal-bar">
             <span class="hero-terminal-dot"></span>
             <span class="hero-terminal-dot"></span>
             <span class="hero-terminal-dot"></span>
           </div>
-          <pre class="hero-terminal-code"><span class="hero-t-dim">$</span> docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai
-<span class="hero-t-dim">$</span> curl localhost:9300/tell -d '&#123;"predicate":"likes","args":["alice","logic"]&#125;'
-<span class="hero-t-ok">&#10003;</span> <span class="hero-t-dim">No signup. No API key. Running.</span></pre>
+          <pre class="hero-terminal-code"><span class="hero-t-dim"># Send raw conversation turns</span>
+<span class="hero-t-dim">$</span> curl localhost:9300/context -d '&#123;
+    "turns": ["User: login broken after Okta cutover",
+              "Tool crm: account=acme tier=enterprise"],
+    "sessionId": "ticket-42"
+  &#125;'
+
+<span class="hero-t-dim"># NocturnusAI returns only the delta</span>
+<span class="hero-t-ok">&#10003;</span> briefingDelta: <span style="color: var(--site-dark-text);">"Login failing post-Okta cutover. Acme is enterprise tier."</span>
+  <span class="hero-t-dim">~30 tokens instead of ~2,400</span></pre>
         </div>
 
         <div class="hero-dark-ctas">
@@ -55,57 +62,6 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         </div>
       </div>
     </section>
-
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- THE NUMBERS — proof of the category claim                         -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <section class="site-section-tight" id="numbers">
-      <div class="site-container">
-        <div class="section-head reveal">
-          <div class="site-kicker">The Numbers</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">The result: 97% fewer tokens. Same answers.</h2>
-          <p class="site-subtitle">Every call that replays old context is money burned. NocturnusAI sends only the delta.</p>
-        </div>
-
-        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin-bottom: var(--space-6);">
-          <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3);">
-            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">~30</div>
-            <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">tokens per turn</div>
-            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">with NocturnusAI</div>
-          </div>
-          <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3); opacity: 0.35;">
-            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); line-height: 1;">~2,400</div>
-            <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">tokens per turn</div>
-            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">full replay</div>
-          </div>
-          <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3);">
-            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">97%</div>
-            <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">reduction</div>
-            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">per request</div>
-          </div>
-        </div>
-
-        <div class="reveal reveal-delay-2" style="display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--space-4); align-items: center; max-width: 700px; margin: 0 auto;">
-          <div class="panel-dark" style="text-align: center; padding: var(--space-5) var(--space-4); border: 2px solid var(--site-accent);">
-            <div style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent);">$240</div>
-            <div style="font-size: 0.85rem; color: var(--site-muted);">/month</div>
-            <div style="font-size: 0.78rem; color: var(--site-muted-soft); margin-top: 0.5rem;">With NocturnusAI</div>
-          </div>
-          <div style="font-size: 1.2rem; font-weight: 600; color: var(--site-muted-soft);">vs</div>
-          <div class="panel-dark" style="text-align: center; padding: var(--space-5) var(--space-4); opacity: 0.35;">
-            <div style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; font-family: var(--font-mono);">$54,000</div>
-            <div style="font-size: 0.85rem; color: var(--site-muted);">/month</div>
-            <div style="font-size: 0.78rem; color: var(--site-muted-soft); margin-top: 0.5rem;">Full replay</div>
-          </div>
-        </div>
-
-        <p class="reveal reveal-delay-3" style="text-align: center; margin-top: var(--space-4); font-size: 0.82rem; color: var(--site-muted-soft);">
-          At 1,000 requests/hour on GPT-4o ($15/M input tokens). Claude, Gemini, and local Ollama cost less but the ratio holds.
-        </p>
-      </div>
-    </section>
-
-    <hr class="section-rule" />
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- HOW IT COMPRESSES — reasoning is the mechanism, context is result  -->
@@ -215,6 +171,42 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
               </tr>
             </tbody>
           </table>
+        </div>
+        <p class="reveal reveal-delay-3" style="text-align: center; margin-top: var(--space-4); font-size: 0.88rem;">
+          <a href={`${base}/how-it-works`} style="color: var(--site-accent); font-weight: 500;">How the logic engine compresses context &rarr;</a>
+        </p>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- THE NUMBERS — cost proof                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="numbers">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">The Cost</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">$240/month instead of $54,000.</h2>
+          <p class="site-subtitle">At 1,000 requests/hour on GPT-4o. The ratio holds across providers.</p>
+        </div>
+
+        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin-bottom: var(--space-5);">
+          <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3);">
+            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">~30</div>
+            <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">tokens per turn</div>
+            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">with NocturnusAI</div>
+          </div>
+          <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3); opacity: 0.35;">
+            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); line-height: 1;">~2,400</div>
+            <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">tokens per turn</div>
+            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">full replay</div>
+          </div>
+          <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3);">
+            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">97%</div>
+            <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">reduction</div>
+            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">per request</div>
+          </div>
         </div>
       </div>
     </section>

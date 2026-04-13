@@ -1,0 +1,357 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Navbar from '../components/Navbar.astro';
+import Footer from '../components/Footer.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout
+  title="How It Works - NocturnusAI Context Compression"
+  description="How NocturnusAI compresses agent context by 97% using logical inference instead of similarity search. Deep dive into the extraction, reasoning, and delta pipeline."
+>
+  <Navbar />
+
+  <main>
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- HERO                                                               -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section" style="padding-top: 7rem;">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">How It Works</div>
+          <h1 class="site-title">How NocturnusAI compresses context by 97%.</h1>
+          <p class="site-subtitle" style="max-width: 52rem;">
+            Most agent memory systems store embeddings and retrieve by similarity &mdash; so your context window fills with everything that <em>looks</em> related.
+            NocturnusAI takes a different approach: it extracts structured facts, reasons about what's actually relevant to the current goal, and returns only what changed.
+            That's logical compression, not summarization.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- THE PROBLEM                                                        -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">The Problem</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Your agent replays the entire thread every call.</h2>
+        </div>
+
+        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
+          <div>
+            <p style="font-size: 0.95rem; line-height: 1.72; color: var(--site-muted);">
+              In a typical agentic workflow, every LLM call includes the full conversation history. By turn 10, your model is processing thousands of tokens of old context &mdash; most of which it already knows. You're paying to re-read the same information over and over.
+            </p>
+            <p style="font-size: 0.95rem; line-height: 1.72; color: var(--site-muted); margin-top: var(--space-2);">
+              The standard "fix" is RAG &mdash; store embeddings, retrieve by cosine similarity. But similarity search returns everything that <em>looks</em> related, not what the agent actually needs for its next step. The context window is smaller, but full of noise.
+            </p>
+          </div>
+          <div class="panel-dark" style="padding: var(--space-4);">
+            <div class="panel-label">What your LLM sees on turn 10</div>
+            <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap; color: rgba(255,255,255,0.55);">Turn 1: User said X
+Turn 2: Tool returned Y
+Turn 3: Agent decided Z
+Turn 4: User clarified W
+Turn 5: Tool returned more data
+Turn 6: Agent updated plan
+Turn 7: User confirmed
+Turn 8: Tool ran query
+Turn 9: Agent summarized
+<span style="color: var(--site-accent);">Turn 10: New question &mdash; but model re-reads ALL of this</span>
+
+<span style="color: rgba(255,255,255,0.35);">~2,400 tokens &middot; $2.25/request &middot; ~$54,000/month</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- THE PIPELINE                                                       -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">The Pipeline</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Three steps. Extract, infer, return the delta.</h2>
+          <p class="site-subtitle">NocturnusAI sits between your agent and the LLM. Each turn passes through a compression pipeline powered by a logic engine &mdash; not vector search.</p>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: auto 1fr; gap: var(--space-4); margin-bottom: var(--space-6); align-items: start;">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--site-accent); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 1.1rem; flex-shrink: 0;">1</div>
+          <div>
+            <h3 style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 600; margin: 0 0 0.6rem;">Extract structured facts</h3>
+            <p style="font-size: 0.95rem; line-height: 1.72; color: var(--site-muted); margin-bottom: var(--space-3);">
+              When your agent sends raw conversation turns to <code>POST /context</code>, an LLM extracts structured predicates. Not embeddings &mdash; actual facts with defined relationships.
+            </p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+              <div class="panel-dark" style="padding: var(--space-3);">
+                <div class="panel-label">Raw turn</div>
+                <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap;">"User: We can't log in after
+the Okta cutover. Account is
+Acme Corp, enterprise tier."</pre>
+              </div>
+              <div class="plain-card" style="border-left: 3px solid var(--site-accent); padding: var(--space-3);">
+                <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.5rem;">Extracted facts</div>
+                <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap; color: var(--site-text);">login_status(acme, failing)
+cause(login_failure, okta_cutover)
+customer_tier(acme, enterprise)</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: auto 1fr; gap: var(--space-4); margin-bottom: var(--space-6); align-items: start;">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--site-accent); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 1.1rem; flex-shrink: 0;">2</div>
+          <div>
+            <h3 style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 600; margin: 0 0 0.6rem;">Infer what's relevant to the current goal</h3>
+            <p style="font-size: 0.95rem; line-height: 1.72; color: var(--site-muted); margin-bottom: var(--space-3);">
+              This is where NocturnusAI diverges from every other memory system. Instead of "find similar facts," it runs <strong>backward-chaining inference</strong> &mdash; starting from the agent's current goals and working backward through the knowledge base to find only the facts that are logically reachable.
+            </p>
+            <div class="panel-dark" style="padding: var(--space-4); margin-bottom: var(--space-3);">
+              <div class="panel-label">Backward chaining in action</div>
+              <pre style="margin: 0; font-size: 0.82rem; line-height: 1.8; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.45);"># Agent's goal: resolve the login issue</span>
+<span style="color: var(--site-accent);">Goal:</span>  resolution(login_failure, ?fix)
+
+<span style="color: rgba(255,255,255,0.45);"># Engine traces backward through rules and facts:</span>
+<span style="color: rgba(255,255,255,0.7);">resolution(X, ?fix)</span> <span style="color: var(--site-accent);">:- </span><span style="color: rgba(255,255,255,0.7);">cause(X, ?cause), fix_for(?cause, ?fix)</span>
+  <span style="color: rgba(255,255,255,0.45);">&rarr; needs cause(login_failure, ?cause)</span>
+  <span style="color: rgba(255,255,255,0.45);">&rarr; found: cause(login_failure, okta_cutover)</span>
+  <span style="color: rgba(255,255,255,0.45);">&rarr; needs fix_for(okta_cutover, ?fix)</span>
+
+<span style="color: rgba(255,255,255,0.45);"># Only these facts are relevant. Everything else stays out.</span>
+<span style="color: var(--site-accent);">Context window:</span> 3 facts, not 47</pre>
+            </div>
+            <p style="font-size: 0.88rem; line-height: 1.72; color: var(--site-muted);">
+              Similarity search would return every fact that <em>mentions</em> login, Okta, or Acme. Backward chaining returns only facts in the logical chain from the goal. That's why the compression is 97%, not 30%.
+            </p>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: auto 1fr; gap: var(--space-4); margin-bottom: var(--space-4); align-items: start;">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--site-accent); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 1.1rem; flex-shrink: 0;">3</div>
+          <div>
+            <h3 style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 600; margin: 0 0 0.6rem;">Return only the delta</h3>
+            <p style="font-size: 0.95rem; line-height: 1.72; color: var(--site-muted); margin-bottom: var(--space-3);">
+              The response includes a <code>briefingDelta</code> &mdash; a natural-language summary of only what's new since the last turn. Your agent feeds this to the LLM instead of replaying the entire thread.
+            </p>
+            <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: var(--space-3);">
+              <div class="plain-card" style="border-left: 3px solid var(--site-accent); padding: var(--space-3);">
+                <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.5rem;">What your model sees (turn 2+)</div>
+                <pre style="margin: 0; font-size: 0.95rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">14 failed SAML assertions at 09:12 UTC.
+Issuer mismatch after IdP migration.</pre>
+                <p style="margin-top: 0.8rem; font-weight: 600; font-size: 0.88rem;">~30 tokens &middot; $0.01/request</p>
+              </div>
+              <div class="plain-card" style="padding: var(--space-3); opacity: 0.45;">
+                <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-muted-soft); margin-bottom: 0.5rem;">Without NocturnusAI</div>
+                <pre style="margin: 0; font-size: 0.78rem; line-height: 1.6; white-space: pre-wrap; color: var(--site-muted);">Full thread replay:
+all turns, tool calls,
+system events, retries...</pre>
+                <p style="margin-top: 0.8rem; color: var(--site-muted); font-size: 0.88rem;">~2,400 tokens &middot; $2.25/request</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- INSIDE THE ENGINE                                                  -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Inside the Engine</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">A logic engine, not a vector database.</h2>
+          <p class="site-subtitle">NocturnusAI stores facts in a Hexastore (6-way indexed triple store) and reasons over them with two inference engines. No embeddings. No cosine similarity. Deterministic results.</p>
+        </div>
+
+        <div class="feature-grid reveal reveal-delay-1" style="margin-bottom: var(--space-5);">
+          <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Hexastore</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Facts are indexed 6 ways (SPO, SOP, PSO, POS, OSP, OPS) for sub-millisecond pattern matching regardless of which terms are bound vs variable. No table scans.</p>
+          </div>
+          <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Backward Chainer</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Goal-driven SLD resolution with unification. Given a goal, it finds all facts and rules that can prove it &mdash; and nothing else. This is how context windows shrink by 97%.</p>
+          </div>
+          <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Rete Engine</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Forward chaining triggered on fact assertion. When new facts arrive, rules fire automatically to derive new conclusions. Supports negation-as-failure (NAF) for closed-world reasoning.</p>
+          </div>
+        </div>
+
+        <div class="feature-grid reveal reveal-delay-2" style="margin-bottom: var(--space-5);">
+          <div class="plain-card">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Truth Maintenance</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">The provenance tracker records why each fact was derived. When a premise is retracted, all dependent conclusions are automatically removed. No stale facts in your context.</p>
+          </div>
+          <div class="plain-card">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Salience Scoring</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Composite scores from recency, access frequency, and explicit priority determine which facts matter most. When the context window has a budget, salience decides what makes the cut.</p>
+          </div>
+          <div class="plain-card">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Temporal Awareness</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Facts carry <code>validFrom</code>, <code>validUntil</code>, and <code>ttl</code> fields. Expired facts are automatically excluded. Point-in-time queries return what was true at any moment.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- WHY NOT SIMILARITY SEARCH                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">The Difference</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Inference vs similarity search.</h2>
+        </div>
+
+        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-5);">
+          <div class="panel-dark" style="padding: var(--space-4); border-top: 2px solid var(--site-accent);">
+            <h3 style="color: var(--site-accent); font-size: 1rem; margin: 0 0 0.8rem;">NocturnusAI (inference)</h3>
+            <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.88rem; line-height: 1.8; color: rgba(240,235,225,0.72);">
+              <li>Finds facts that are <strong style="color: var(--site-dark-text);">logically reachable</strong> from the goal</li>
+              <li><strong style="color: var(--site-dark-text);">Deterministic</strong> &mdash; same query, same result, every time</li>
+              <li>Derives <strong style="color: var(--site-dark-text);">new facts</strong> from rules (not just retrieval)</li>
+              <li>Returns a <strong style="color: var(--site-dark-text);">delta</strong> &mdash; only what changed</li>
+              <li>Works <strong style="color: var(--site-dark-text);">without an LLM</strong> for the reasoning step</li>
+              <li>No hallucinations in the reasoning layer</li>
+            </ul>
+          </div>
+          <div class="plain-card" style="padding: var(--space-4); opacity: 0.65;">
+            <h3 style="color: var(--site-muted); font-size: 1rem; margin: 0 0 0.8rem;">Vector RAG (similarity)</h3>
+            <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.88rem; line-height: 1.8; color: var(--site-muted);">
+              <li>Finds facts that <em>look similar</em> to the query</li>
+              <li>Probabilistic &mdash; results vary with embedding model</li>
+              <li>Can only retrieve, not derive new conclusions</li>
+              <li>Returns a ranked list, not a diff</li>
+              <li>Requires LLM or embedding model for every operation</li>
+              <li>Similarity ≠ relevance (noise in context window)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- THE API                                                            -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">The API</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">One endpoint. One call per turn.</h2>
+          <p class="site-subtitle">Your agent sends raw turns to <code>POST /context</code>. NocturnusAI handles extraction, storage, inference, and delta generation. The response includes everything your LLM needs.</p>
+        </div>
+
+        <div class="reveal reveal-delay-1">
+          <div class="panel-dark" style="padding: var(--space-4); margin-bottom: var(--space-3);">
+            <div class="panel-label">POST /context</div>
+            <pre style="margin: 0; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap;">curl -s -X POST http://localhost:9300/context \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "turns": [
+      "User: We cannot log in after the Okta cutover.",
+      "Tool crm_lookup: account=acme tier=enterprise",
+      "Tool auth_audit: 14 failed SAML assertions since 09:12 UTC"
+    ],
+    "scope": "ticket-4821",
+    "sessionId": "ticket-4821"
+  &#125;'</pre>
+          </div>
+
+          <div class="plain-card" style="border-left: 3px solid var(--site-accent); margin-bottom: var(--space-4);">
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.5rem;">Response</div>
+            <pre style="margin: 0; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-mono);">&#123;
+  "briefingDelta": "Login failing post-Okta cutover. 14 failed SAML
+    assertions since 09:12. Acme is enterprise tier.",
+  "factsExtracted": 4,
+  "factsInScope": 4,
+  "contextWindowTokens": 28,
+  "sessionId": "ticket-4821"
+&#125;</pre>
+          </div>
+        </div>
+
+        <div class="reveal reveal-delay-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+          <div class="plain-card">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Your agent code</h3>
+            <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap; color: var(--site-muted); font-family: var(--font-mono);"><span style="color: var(--site-text);">r = POST /context(turns, scope, sessionId)</span>
+
+messages = [
+  system(r.briefingDelta),  <span style="color: var(--site-accent);"># ~30 tokens</span>
+  user(next_question),
+]
+
+llm_response = call_llm(messages)
+<span style="color: var(--site-accent);"># LLM sees only what changed — not the whole thread</span></pre>
+          </div>
+          <div class="plain-card">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">What you skip</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted); line-height: 1.72;">
+              No embedding pipeline. No vector database. No retrieval tuning. No chunking strategy. No re-ranking. The logic engine handles relevance through inference, not similarity. You send turns, you get a delta.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- CTA                                                                -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section cta-band">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem); color: var(--site-dark-text);">Try it yourself.</h2>
+          <p style="font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.06em; color: rgba(255,255,255,0.45); margin-top: 0.5rem;">DOCKER &middot; NO SIGNUP &middot; FIRST RESULT IN 2 MINUTES</p>
+        </div>
+
+        <div class="statement-grid reveal reveal-delay-1">
+          <div class="plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none;">
+            <h3 style="color: var(--site-dark-text);">Quick Start</h3>
+            <p style="color: rgba(255,255,255,0.72);">Docker one-liner, zero config. Running in 10 seconds.</p>
+            <div class="button-row" style="margin-top: 1rem;">
+              <a href={`${base}/docs/context`} class="button-primary">Context workflow &rarr;</a>
+            </div>
+          </div>
+          <div class="plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none;">
+            <h3 style="color: var(--site-dark-text);">API Reference</h3>
+            <p style="color: rgba(255,255,255,0.72);">Full endpoint docs, SDK examples, MCP tools.</p>
+            <div class="button-row" style="margin-top: 1rem;">
+              <a href={`${base}/docs/api`} class="button-secondary">API docs &rarr;</a>
+            </div>
+          </div>
+          <div class="plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none;">
+            <h3 style="color: var(--site-dark-text);">Concepts</h3>
+            <p style="color: rgba(255,255,255,0.72);">Predicates, rules, inference, salience &mdash; the backend mechanics.</p>
+            <div class="button-row" style="margin-top: 1rem;">
+              <a href={`${base}/docs/concepts`} class="button-secondary">Learn more &rarr;</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</Layout>
