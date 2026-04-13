@@ -489,22 +489,28 @@ h1, h2, h3, h4, h5, h6 {
   position: relative;
   background: var(--site-dark);
   color: var(--site-dark-text);
+}
+
+.hero-split {
+  width: min(var(--site-max), calc(100% - 3rem));
+  margin: 0 auto;
+  padding: 7rem 0 4rem;
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: var(--space-7);
+  align-items: center;
+}
+
+.hero-split-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.hero-split-right {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.hero-dark-inner {
-  position: relative;
-  z-index: 1;
-  width: min(860px, calc(100% - 3rem));
-  margin: 0 auto;
-  padding: 7rem 0 5rem;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
 }
 
 .hero-dark-kicker {
@@ -513,21 +519,16 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--site-accent);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .hero-dark-headline {
   font-family: var(--font-display);
-  font-size: clamp(2.8rem, 7vw, 5.5rem);
+  font-size: clamp(2.4rem, 4.5vw, 4rem);
   font-weight: 700;
-  line-height: 1.02;
+  line-height: 1.05;
   letter-spacing: -0.04em;
-  margin: 0 0 var(--space-4);
-  text-wrap: balance;
-}
-
-.hero-dim {
-  color: rgba(240, 235, 225, 0.35);
+  margin: 0 0 var(--space-3);
 }
 
 .hero-accent {
@@ -536,24 +537,21 @@ h1, h2, h3, h4, h5, h6 {
 
 .hero-dark-sub {
   font-family: var(--font-body);
-  font-size: clamp(1rem, 1.8vw, 1.15rem);
+  font-size: clamp(0.95rem, 1.4vw, 1.08rem);
   line-height: 1.65;
-  color: rgba(240, 235, 225, 0.6);
-  max-width: 560px;
+  color: rgba(240, 235, 225, 0.55);
+  max-width: 480px;
   margin: 0 0 var(--space-4);
-  text-wrap: balance;
 }
 
 .hero-dark-stats {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 0.5rem 0;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   letter-spacing: 0.06em;
-  color: rgba(240, 235, 225, 0.4);
-  margin-bottom: var(--space-5);
+  color: rgba(240, 235, 225, 0.35);
 }
 
 .hero-stat-dot {
@@ -565,90 +563,94 @@ h1, h2, h3, h4, h5, h6 {
 .hero-cost-line {
   display: flex;
   align-items: baseline;
-  justify-content: center;
-  gap: 0.8rem;
-  margin-bottom: var(--space-5);
+  gap: 0.7rem;
+  margin-bottom: var(--space-4);
 }
 
 .hero-cost-new {
   font-family: var(--font-mono);
-  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
   font-weight: 700;
   color: var(--site-accent);
   letter-spacing: -0.03em;
 }
 
 .hero-cost-vs {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: rgba(240, 235, 225, 0.3);
   font-weight: 400;
 }
 
 .hero-cost-old {
   font-family: var(--font-mono);
-  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-size: clamp(1.2rem, 2.5vw, 1.7rem);
   font-weight: 600;
-  color: rgba(240, 235, 225, 0.22);
+  color: rgba(240, 235, 225, 0.2);
   text-decoration: line-through;
-  text-decoration-color: rgba(240, 235, 225, 0.15);
+  text-decoration-color: rgba(240, 235, 225, 0.12);
   letter-spacing: -0.03em;
 }
 
-@media (max-width: 640px) {
-  .hero-cost-line {
-    flex-direction: column;
-    align-items: center;
-    gap: 0.2rem;
-  }
-}
+/* ── Hero light terminal (pops against dark bg) ─────────────────────── */
 
-/* ── Hero inline terminal ────────────────────────────────────────────── */
-
-.hero-terminal {
-  width: min(520px, 100%);
-  background: #161210;
-  border: 1px solid rgba(240, 235, 225, 0.1);
-  border-radius: var(--radius-md);
+.hero-terminal-light {
+  width: 100%;
+  background: #FDFBF7;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  margin-bottom: var(--space-5);
-  text-align: left;
+  box-shadow:
+    0 0 0 1px rgba(212, 136, 58, 0.15),
+    0 24px 60px rgba(0, 0, 0, 0.35),
+    0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
-.hero-terminal-bar {
+.hero-tl-bar {
   display: flex;
-  gap: 6px;
-  padding: 10px 14px;
-  background: rgba(240, 235, 225, 0.04);
-  border-bottom: 1px solid rgba(240, 235, 225, 0.06);
+  align-items: center;
+  gap: 7px;
+  padding: 12px 16px;
+  background: #F5F0E8;
+  border-bottom: 1px solid #e8e0d4;
 }
 
-.hero-terminal-dot {
-  width: 8px;
-  height: 8px;
+.hero-tl-dot {
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: rgba(240, 235, 225, 0.12);
 }
 
-.hero-terminal-code {
+.hero-tl-label {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: #8d8376;
+}
+
+.hero-tl-code {
   margin: 0;
-  padding: 14px 18px;
+  padding: 18px 20px;
   font-family: var(--font-mono);
   font-size: 0.78rem;
-  line-height: 1.8;
-  color: rgba(240, 235, 225, 0.75);
+  line-height: 1.75;
+  color: #1A1714;
   white-space: pre-wrap;
   word-break: break-all;
 }
 
-.hero-t-dim { color: rgba(240, 235, 225, 0.3); }
-.hero-t-ok { color: var(--site-accent); }
+.htl-comment { color: #6D9A5B; font-style: italic; }
+.htl-str { color: #B5602A; }
+.htl-num { color: #C26A2F; }
+.htl-key { color: #2E6B8A; font-weight: 600; }
+.htl-ok { color: #3A9A5B; font-weight: 700; }
+.htl-accent { color: var(--site-accent-deep); font-weight: 700; }
+.htl-muted { color: #8d8376; }
 
 .hero-dark-ctas {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .hero-btn-primary {
@@ -698,15 +700,36 @@ h1, h2, h3, h4, h5, h6 {
   border-bottom: 2px solid var(--site-accent);
 }
 
-@media (max-width: 640px) {
-  .hero-dark-inner {
+@media (max-width: 900px) {
+  .hero-split {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
     padding: 6rem 0 3rem;
   }
-  .hero-dark-headline {
-    font-size: clamp(2.2rem, 10vw, 3.5rem);
+  .hero-split-left {
+    align-items: center;
+    text-align: center;
   }
   .hero-dark-sub {
-    font-size: 0.92rem;
+    max-width: 100%;
+  }
+  .hero-cost-line {
+    justify-content: center;
+  }
+  .hero-dark-ctas {
+    justify-content: center;
+  }
+  .hero-dark-stats {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-split {
+    padding: 5.5rem 0 2.5rem;
+  }
+  .hero-dark-headline {
+    font-size: clamp(2rem, 8vw, 3rem);
   }
   .hero-dark-stats {
     font-size: 0.65rem;
@@ -716,6 +739,9 @@ h1, h2, h3, h4, h5, h6 {
   }
   .hero-dark-stats span {
     padding: 0.15rem 0.5rem;
+  }
+  .hero-tl-code {
+    font-size: 0.7rem;
   }
 }
 

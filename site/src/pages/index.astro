@@ -17,53 +17,58 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <!-- HERO — Dark premium hero with amber accents                       -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section class="hero-dark" id="top">
-      <div class="hero-dark-inner">
-        <div class="hero-dark-kicker">CONTEXT SERVER FOR AI AGENTS</div>
-        <h1 class="hero-dark-headline">
-          Send <span class="hero-accent">30 tokens</span><br/>
-          instead of 2,400.
-        </h1>
-        <p class="hero-dark-sub">
-          NocturnusAI sits between your agent and the LLM. It extracts facts, reasons about what's relevant, and returns only what changed &mdash; so your model never replays the whole thread.
-        </p>
-        <div class="hero-cost-line">
-          <span class="hero-cost-new">$240<span style="font-weight: 400; font-size: 0.6em; opacity: 0.6;">/mo</span></span>
-          <span class="hero-cost-vs">instead of</span>
-          <span class="hero-cost-old">$54,000<span style="font-weight: 400; font-size: 0.6em; opacity: 0.5;">/mo</span></span>
-        </div>
-
-        <!-- Mini terminal — shows context compression in action -->
-        <div class="hero-terminal">
-          <div class="hero-terminal-bar">
-            <span class="hero-terminal-dot"></span>
-            <span class="hero-terminal-dot"></span>
-            <span class="hero-terminal-dot"></span>
+      <div class="hero-split">
+        <div class="hero-split-left">
+          <div class="hero-dark-kicker">CONTEXT SERVER FOR AI AGENTS</div>
+          <h1 class="hero-dark-headline">
+            Send <span class="hero-accent">30 tokens</span>
+            instead of 2,400.
+          </h1>
+          <p class="hero-dark-sub">
+            NocturnusAI sits between your agent and the LLM. It extracts facts, reasons about what's relevant, and returns only what changed.
+          </p>
+          <div class="hero-cost-line">
+            <span class="hero-cost-new">$240<span style="font-weight: 400; font-size: 0.6em; opacity: 0.6;">/mo</span></span>
+            <span class="hero-cost-vs">instead of</span>
+            <span class="hero-cost-old">$54,000<span style="font-weight: 400; font-size: 0.6em; opacity: 0.5;">/mo</span></span>
           </div>
-          <pre class="hero-terminal-code"><span class="hero-t-dim"># Send raw conversation turns</span>
-<span class="hero-t-dim">$</span> curl localhost:9300/context -d '&#123;
-    "turns": ["User: login broken after Okta cutover",
-              "Tool crm: account=acme tier=enterprise"],
+          <div class="hero-dark-ctas">
+            <a href="#try-it" class="hero-btn-primary">Try it now</a>
+            <a href={`${base}/docs`} class="hero-btn-secondary">Read the docs</a>
+          </div>
+          <div class="hero-dark-stats">
+            <span>97% fewer tokens</span>
+            <span class="hero-stat-dot">&middot;</span>
+            <span>open source</span>
+            <span class="hero-stat-dot">&middot;</span>
+            <span>single container</span>
+          </div>
+        </div>
+
+        <div class="hero-split-right">
+          <div class="hero-terminal-light">
+            <div class="hero-tl-bar">
+              <span class="hero-tl-dot" style="background: #FF5F57;"></span>
+              <span class="hero-tl-dot" style="background: #FFBD2E;"></span>
+              <span class="hero-tl-dot" style="background: #28C840;"></span>
+              <span class="hero-tl-label">POST /context</span>
+            </div>
+            <pre class="hero-tl-code"><span class="htl-comment"># Send raw conversation turns</span>
+$ curl localhost:<span class="htl-num">9300</span>/context \
+  -d <span class="htl-str">'&#123;
+    "turns": [
+      "User: login broken after Okta cutover",
+      "Tool crm: account=acme tier=enterprise"
+    ],
     "sessionId": "ticket-42"
-  &#125;'
+  &#125;'</span>
 
-<span class="hero-t-dim"># NocturnusAI returns only the delta</span>
-<span class="hero-t-ok">&#10003;</span> briefingDelta: <span style="color: var(--site-dark-text);">"Login failing post-Okta cutover. Acme is enterprise tier."</span>
-  <span class="hero-t-dim">~30 tokens instead of ~2,400</span></pre>
-        </div>
+<span class="htl-comment"># NocturnusAI returns only the delta</span>
+<span class="htl-ok">&#10003;</span> <span class="htl-key">briefingDelta</span>: <span class="htl-str">"Login failing post-Okta
+  cutover. Acme is enterprise tier."</span>
 
-        <div class="hero-dark-ctas">
-          <a href="#try-it" class="hero-btn-primary">Try it now</a>
-          <a href={`${base}/docs`} class="hero-btn-secondary">Read the docs</a>
-        </div>
-
-        <div class="hero-dark-stats">
-          <span>97% fewer tokens</span>
-          <span class="hero-stat-dot">&middot;</span>
-          <span>$240/mo vs $54K</span>
-          <span class="hero-stat-dot">&middot;</span>
-          <span>open source</span>
-          <span class="hero-stat-dot">&middot;</span>
-          <span>single container</span>
+  <span class="htl-accent">~30 tokens</span> <span class="htl-muted">instead of ~2,400</span></pre>
+          </div>
         </div>
       </div>
     </section>
