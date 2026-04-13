@@ -655,7 +655,7 @@ if _LANGCHAIN_AVAILABLE:
             Action: nocturnusai_teach
             Action Input: {
                 "head": "{\"predicate\": \"grandparent\", \"args\": [\"?x\", \"?z\"]}",
-                "body": "[{\"predicate\": \"parent\", \"args\": [\"?x\", \"?y\"]}, {\"predicate\": \"parent\", \"args\": [\"?y\", \"?z\"]}]"
+                "body": "[{\"predicate\": \"parent\", \"args\": [\"?x\", \"?y\"]}]"
             }
         """
 
@@ -684,16 +684,20 @@ if _LANGCHAIN_AVAILABLE:
             try:
                 parsed_head = json.loads(head)
                 parsed_body = json.loads(body)
-                result = self.client.assert_rule(
+                self.client.assert_rule(
                     head=parsed_head,
                     body=parsed_body,
                     scope=scope,
                 )
                 h = parsed_head
+                body_strs = [
+                    f"{c['predicate']}({', '.join(c['args'])})"
+                    for c in parsed_body
+                ]
                 return (
                     f"Taught rule: {h['predicate']}"
                     f"({', '.join(h['args'])}) :- "
-                    f"{', '.join(c['predicate'] + '(' + ', '.join(c['args']) + ')' for c in parsed_body)}"
+                    f"{', '.join(body_strs)}"
                 )
             except json.JSONDecodeError as e:
                 return f"Error: head and body must be valid JSON. {e}"
