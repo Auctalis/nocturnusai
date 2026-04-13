@@ -121,6 +121,8 @@ module = [
     "crewai.*",
     "autogen_agentchat",
     "autogen_agentchat.*",
+    "autogen_core",
+    "autogen_core.*",
     "langgraph",
     "langgraph.*",
 ]

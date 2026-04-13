@@ -60,6 +60,24 @@ def _parse_json_list(value: str) -> list[str]:
     return [s.strip().strip("\"'") for s in value.split(",") if s.strip()]
 
 
+def _format_proof_node(node: Any, lines: list[str], indent: int = 2) -> None:
+    """Recursively format a ProofNode into human-readable lines."""
+    prefix = " " * indent
+    goal = node.goal
+    neg = "NOT " if goal.negated else ""
+    lines.append(f"{prefix}Goal: {neg}{goal.predicate}({', '.join(goal.args)})")
+
+    step = node.step
+    if step.type == "fact_match" and step.fact:
+        f = step.fact
+        lines.append(f"{prefix}  Proved by fact: {f.predicate}({', '.join(f.args)})")
+    elif step.type == "rule_application" and step.rule:
+        lines.append(f"{prefix}  Applied rule: {step.rule}")
+        if step.body_proofs:
+            for sub in step.body_proofs:
+                _format_proof_node(sub, lines, indent + 4)
+
+
 # All LangChain-dependent classes are defined inside this block so that the
 # module can be safely imported even when langchain_core is not installed.
 # The public entry point is get_nocturnusai_tools(), which checks availability.
@@ -177,6 +195,26 @@ if _LANGCHAIN_AVAILABLE:
         scope: str | None = Field(
             default=None,
             description="Optional scope filter.",
+        )
+
+    class TeachInput(BaseModel):
+        """Input schema for the NocturnusAI teach tool."""
+
+        head: str = Field(
+            description=(
+                "JSON object with 'predicate' and 'args' for the rule head. "
+                "Example: '{\"predicate\": \"mortal\", \"args\": [\"?x\"]}'"
+            ),
+        )
+        body: str = Field(
+            description=(
+                "JSON array of condition objects for the rule body. "
+                "Example: '[{\"predicate\": \"human\", \"args\": [\"?x\"]}]'"
+            ),
+        )
+        scope: str | None = Field(
+            default=None,
+            description="Optional scope for rule isolation.",
         )
 
     class ExtractInput(BaseModel):
@@ -378,6 +416,7 @@ if _LANGCHAIN_AVAILABLE:
                             f"  Result: {pt.result.predicate}"
                             f"({', '.join(pt.result.args)})"
                         )
+                        _format_proof_node(pt.proof, lines, indent=4)
                     return "\n".join(lines)
                 else:
                     lines = [f"Inferred {len(results)} result(s):"]
@@ -423,11 +462,10 @@ if _LANGCHAIN_AVAILABLE:
 
         name: str = "nocturnusai_context"
         description: str = (
-            "Get the most relevant facts from NocturnusAI for the current reasoning "
-            "context. Returns facts ranked by salience (a composite of recency, "
-            "access frequency, and priority). Use this to efficiently load your "
-            "context with the most important knowledge. Optionally filter by "
-            "predicate names and minimum salience."
+            "Get a general overview of the most relevant facts from NocturnusAI, "
+            "ranked by salience (recency, frequency, priority). Use this when you "
+            "need broad situational awareness without a specific reasoning goal. "
+            "For goal-directed reasoning, use nocturnusai_optimize instead."
         )
         args_schema: type[BaseModel] = ContextInput
         client: Any = None
@@ -512,10 +550,11 @@ if _LANGCHAIN_AVAILABLE:
         name: str = "nocturnusai_optimize"
         description: str = (
             "Get a goal-driven optimized context window from NocturnusAI. "
-            "Unlike the basic context tool, this uses backward chaining to find "
-            "facts reachable from your goals, deduplicates, detects contradictions, "
-            "and applies relevance buckets. Returns the minimal set of facts needed "
-            "for reasoning. Use this instead of nocturnusai_context for better results."
+            "Unlike the basic context tool (which returns all facts ranked by "
+            "salience), this uses backward chaining to find only facts reachable "
+            "from your goals, deduplicates, and detects contradictions. "
+            "Use this when you have specific reasoning goals; use "
+            "nocturnusai_context when you want a general overview."
         )
         args_schema: type[BaseModel] = OptimizeInput
         client: Any = None
@@ -549,38 +588,35 @@ if _LANGCHAIN_AVAILABLE:
                     return "Error: 'relevance_buckets' must be a valid JSON array."
 
             try:
-                result = self.client.optimize_context(
+                window = self.client.context(
                     goals=parsed_goals,
                     max_facts=max_facts,
                     session_id=session_id,
                     relevance_buckets=parsed_buckets,
                     scope=scope,
                 )
-                included = result.total_facts_included
-                available = result.total_facts_available
-                generation = getattr(result, "knowledge_generation", 0)
-                found = result.contradictions_found
-                resolved = result.contradictions_resolved
-                rules = result.relevant_rules
-                entries = result.entries
+                total = window.total_available
+                size = window.window_size
+                generation = window.knowledge_generation or 0
+                found = window.contradictions_found or 0
+                resolved = window.contradictions_resolved or 0
+                rules = window.rules or []
                 goal_label = "goal-driven" if parsed_goals else "global"
 
                 lines = [
-                    f"Optimized Context ({included}/{available} facts, generation={generation}):",
+                    f"Optimized Context ({size}/{total} facts, generation={generation}):",
                     f"Goals: [{goal_label}]",
                     f"Contradictions: {found} found, {resolved} resolved",
                     f"Rules: {rules}",
                     "",
                     "Facts:",
                 ]
-                for entry in entries:
-                    salience = entry.salience
-                    category = getattr(entry, "category", "unknown")
-                    predicate = entry.predicate
-                    args = entry.args
+                for scored in window.facts:
+                    atom = scored.atom
+                    neg = "NOT " if atom.negated else ""
                     lines.append(
-                        f"  [salience={salience:.2f}, {category}] "
-                        f"{predicate}({', '.join(args)})"
+                        f"  [salience={scored.salience:.2f}] "
+                        f"{neg}{atom.predicate}({', '.join(atom.args)})"
                     )
                 return "\n".join(lines)
             except Exception as e:
@@ -607,6 +643,78 @@ if _LANGCHAIN_AVAILABLE:
                 ),
             )
 
+    class NocturnusAITeachTool(BaseTool):
+        """LangChain tool for teaching logical rules to NocturnusAI.
+
+        Define Horn clause rules like
+        ``grandparent(?x,?z) :- parent(?x,?y), parent(?y,?z)``.
+        Rules enable multi-step inference via backward chaining.
+
+        Example invocation by an LLM agent::
+
+            Action: nocturnusai_teach
+            Action Input: {
+                "head": "{\"predicate\": \"grandparent\", \"args\": [\"?x\", \"?z\"]}",
+                "body": "[{\"predicate\": \"parent\", \"args\": [\"?x\", \"?y\"]}, {\"predicate\": \"parent\", \"args\": [\"?y\", \"?z\"]}]"
+            }
+        """
+
+        name: str = "nocturnusai_teach"
+        description: str = (
+            "Teach a logical rule to NocturnusAI. Rules are Horn clauses: "
+            "if all body conditions are true, the head conclusion is derived. "
+            "This enables multi-step deductive reasoning via the infer tool. "
+            "Head is a JSON object with 'predicate' and 'args'. Body is a JSON "
+            "array of condition objects."
+        )
+        args_schema: type[BaseModel] = TeachInput
+        client: Any = None
+
+        model_config = {"arbitrary_types_allowed": True}
+
+        def _run(
+            self,
+            head: str,
+            body: str,
+            scope: str | None = None,
+        ) -> str:
+            """Execute the teach tool synchronously."""
+            if self.client is None:
+                return "Error: NocturnusAI client not configured."
+            try:
+                parsed_head = json.loads(head)
+                parsed_body = json.loads(body)
+                result = self.client.assert_rule(
+                    head=parsed_head,
+                    body=parsed_body,
+                    scope=scope,
+                )
+                h = parsed_head
+                return (
+                    f"Taught rule: {h['predicate']}"
+                    f"({', '.join(h['args'])}) :- "
+                    f"{', '.join(c['predicate'] + '(' + ', '.join(c['args']) + ')' for c in parsed_body)}"
+                )
+            except json.JSONDecodeError as e:
+                return f"Error: head and body must be valid JSON. {e}"
+            except Exception as e:
+                return f"Error teaching rule: {e}"
+
+        async def _arun(
+            self,
+            head: str,
+            body: str,
+            scope: str | None = None,
+        ) -> str:
+            """Async execution — runs sync client in a thread executor."""
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None,
+                functools.partial(
+                    self._run, head=head, body=body, scope=scope,
+                ),
+            )
+
     class NocturnusAIExtractTool(BaseTool):
         """LangChain tool for extracting structured facts from raw text.
 
@@ -628,8 +736,8 @@ if _LANGCHAIN_AVAILABLE:
             "Extract structured facts from raw text using LLM-powered extraction. "
             "Send free-form text (conversation transcript, document, tool output) "
             "and get back structured predicate-argument facts. Optionally auto-asserts "
-            "them into the knowledge base. Requires an LLM provider to be configured "
-            "on the server."
+            "them into the knowledge base. NOTE: requires an LLM provider (e.g. "
+            "OPENAI_API_KEY) to be configured on the NocturnusAI server."
         )
         args_schema: type[BaseModel] = ExtractInput
         client: Any = None
@@ -693,7 +801,8 @@ def get_nocturnusai_tools(client: Any) -> list[Any]:
         client: A :class:`~nocturnusai.client.SyncNocturnusAIClient` instance.
 
     Returns:
-        A list of six LangChain tools: assert, query, infer, context, optimize, and extract.
+        A list of seven LangChain tools: assert, query, infer, teach, context,
+        optimize, and extract.
 
     Raises:
         ImportError: If ``langchain-core`` is not installed.
@@ -716,6 +825,7 @@ def get_nocturnusai_tools(client: Any) -> list[Any]:
         NocturnusAIAssertTool(client=client),
         NocturnusAIQueryTool(client=client),
         NocturnusAIInferTool(client=client),
+        NocturnusAITeachTool(client=client),
         NocturnusAIContextTool(client=client),
         NocturnusAIOptimizeTool(client=client),
         NocturnusAIExtractTool(client=client),

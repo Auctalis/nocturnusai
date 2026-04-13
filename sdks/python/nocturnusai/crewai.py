@@ -323,17 +323,22 @@ class NocturnusAIStorage:
             logger.exception("Failed to save memory to NocturnusAI")
 
     def search(self, query: str) -> dict[str, Any]:
-        """Search memory by querying NocturnusAI facts."""
+        """Search memory by querying NocturnusAI facts.
+
+        Filters results to those containing the query string
+        (case-insensitive substring match).
+        """
         try:
             results = self._client.query(
                 predicate="crew_memory",
                 args=["?agent", "?value"],
             )
-            return {
-                "results": [
-                    {"value": ", ".join(a.args)} for a in results
-                ]
-            }
+            matched = [
+                {"value": ", ".join(a.args)}
+                for a in results
+                if query.lower() in ", ".join(a.args).lower()
+            ]
+            return {"results": matched}
         except Exception:
             logger.exception("Failed to search NocturnusAI memory")
             return {"results": []}

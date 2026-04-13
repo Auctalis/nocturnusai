@@ -87,14 +87,15 @@ pip install nocturnusai[all]               <span style="color: rgba(255,255,255,
         <div class="reveal" style="display: grid; grid-template-columns: 1fr 1.4fr; gap: var(--space-5); align-items: start;">
           <div>
             <div class="site-kicker">LangChain</div>
-            <h2 style="font-family: var(--font-display); font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 600; margin: 0.5rem 0 0.8rem; letter-spacing: -0.02em;">Six tools for any LangChain agent.</h2>
+            <h2 style="font-family: var(--font-display); font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 600; margin: 0.5rem 0 0.8rem; letter-spacing: -0.02em;">Seven tools for any LangChain agent.</h2>
             <p style="font-size: 0.92rem; line-height: 1.72; color: var(--site-muted); margin-bottom: var(--space-3);">
-              Assert facts, query with inference, get salience-ranked context, run goal-driven optimization, and extract structured facts from raw text. All as native <code>BaseTool</code> subclasses with Pydantic schemas.
+              Assert facts, teach rules, query with inference, get salience-ranked context, run goal-driven optimization, and extract structured facts from raw text. All as native <code>BaseTool</code> subclasses with Pydantic schemas.
             </p>
             <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: var(--space-2);">
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">assert</span>
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">query</span>
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">infer</span>
+              <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">teach</span>
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">context</span>
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">optimize</span>
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">extract</span>
@@ -106,15 +107,20 @@ pip install nocturnusai[all]               <span style="color: rgba(255,255,255,
 from nocturnusai.langchain import get_nocturnusai_tools
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
 
 client = SyncNocturnusAIClient("http://localhost:9300")
-tools = get_nocturnusai_tools(client)
+tools = get_nocturnusai_tools(client)  <span style="color: rgba(255,255,255,0.45);"># 7 tools</span>
 
 llm = ChatOpenAI(model="gpt-4o")
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "Use NocturnusAI for reasoning."),
+    ("human", "&#123;input&#125;"),
+    ("placeholder", "&#123;agent_scratchpad&#125;"),
+])
 agent = create_tool_calling_agent(llm, tools, prompt)
 executor = AgentExecutor(agent=agent, tools=tools)
 
-<span style="color: rgba(255,255,255,0.45);"># Agent now has deterministic reasoning + context compression</span>
 result = executor.invoke(&#123;
     "input": "Who is the grandparent of charlie?"
 &#125;)</pre>
@@ -233,6 +239,7 @@ result = app.invoke(input_data, config)</pre>
             <pre style="margin: 0; font-size: 0.82rem; line-height: 1.75; white-space: pre-wrap;">from nocturnusai import SyncNocturnusAIClient
 from nocturnusai.autogen import get_nocturnusai_tools, NocturnusAIMemory
 from autogen_agentchat.agents import AssistantAgent
+from autogen_core.tools import FunctionTool
 
 client = SyncNocturnusAIClient("http://localhost:9300")
 tools = get_nocturnusai_tools(client)
@@ -241,7 +248,7 @@ memory = NocturnusAIMemory(client=client)
 agent = AssistantAgent(
     name="reasoner",
     model_client=model_client,
-    tools=[FunctionTool(t) for t in tools],
+    tools=[FunctionTool(t, name=t.__name__) for t in tools],
     memory=[memory],
 )
 
@@ -435,42 +442,6 @@ const ctx = await client.context(&#123;
       </div>
     </section>
 
-    <hr class="section-rule" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- CTA                                                                -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <section class="site-section cta-band">
-      <div class="site-container">
-        <div class="section-head reveal">
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem); color: var(--site-dark-text);">Start with your framework.</h2>
-        </div>
-
-        <div class="statement-grid reveal reveal-delay-1">
-          <div class="plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none;">
-            <h3 style="color: var(--site-dark-text);">SDK Reference</h3>
-            <p style="color: rgba(255,255,255,0.72);">Full API docs for Python (48 methods) and TypeScript (46 methods).</p>
-            <div class="button-row" style="margin-top: 1rem;">
-              <a href={`${base}/docs/sdks`} class="button-primary">SDK docs &rarr;</a>
-            </div>
-          </div>
-          <div class="plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none;">
-            <h3 style="color: var(--site-dark-text);">MCP Setup</h3>
-            <p style="color: rgba(255,255,255,0.72);">Configure Claude Desktop, Cursor, Windsurf, or VS Code in 2 minutes.</p>
-            <div class="button-row" style="margin-top: 1rem;">
-              <a href={`${base}/docs/mcp`} class="button-secondary">MCP docs &rarr;</a>
-            </div>
-          </div>
-          <div class="plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none;">
-            <h3 style="color: var(--site-dark-text);">Context Workflow</h3>
-            <p style="color: rgba(255,255,255,0.72);">End-to-end guide: how to compress agent context by 97%.</p>
-            <div class="button-row" style="margin-top: 1rem;">
-              <a href={`${base}/docs/context`} class="button-secondary">Context guide &rarr;</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
   </main>
 
   <Footer />

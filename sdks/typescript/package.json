@@ -2,6 +2,7 @@
   "name": "nocturnusai-sdk",
   "version": "0.3.5",
   "description": "TypeScript SDK for NocturnusAI — a logic-based inference engine and knowledge database",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
