@@ -41,51 +41,105 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- TRY IT — two copyable curls, real output                          -->
+    <!-- TRY IT — two tiers: instant (no LLM) + full (with LLM)           -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section class="site-section" id="try-it">
       <div class="site-container">
         <div class="section-head reveal">
           <div class="site-kicker">Try It</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">Two curls. See the difference.</h2>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">Running in 10 seconds. No API keys.</h2>
           <p class="site-subtitle">
-            Start the server, paste these, see what comes back.
+            The logic engine, fact storage, inference, and context ranking all work instantly. Add an LLM later for natural-language extraction.
           </p>
         </div>
 
-        <!-- Start server — two paths -->
-        <div class="reveal reveal-delay-1" style="margin-bottom: var(--space-5); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+        <!-- Instant start — no LLM needed -->
+        <div class="reveal reveal-delay-1" style="margin-bottom: var(--space-5);">
           <div class="panel-dark" style="padding: var(--space-3) var(--space-4);">
-            <div class="panel-label">Option A &mdash; Ollama (free, local)</div>
-            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.45);"># one-time: install from https://ollama.com</span>
-ollama pull granite3.3:8b
-
-<span style="color: rgba(255,255,255,0.45);"># start</span>
-docker run -p 9300:9300 \
-  ghcr.io/auctalis/nocturnusai:latest</pre>
-          </div>
-          <div class="panel-dark" style="padding: var(--space-3) var(--space-4);">
-            <div class="panel-label">Option B &mdash; Cloud LLM (faster)</div>
-            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.45);"># pick one</span>
-docker run -p 9300:9300 \
-  -e ANTHROPIC_API_KEY=sk-ant-... \
-  ghcr.io/auctalis/nocturnusai:latest
-
-docker run -p 9300:9300 \
-  -e OPENAI_API_KEY=sk-... \
-  ghcr.io/auctalis/nocturnusai:latest</pre>
+            <div class="panel-label">Start the server (Docker)</div>
+            <pre style="margin: 0; font-size: 0.88rem; line-height: 1.8; white-space: pre-wrap;">docker run -d --name nocturnusai -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+curl http://localhost:9300/health</pre>
           </div>
         </div>
 
-        <!-- Turn 1 -->
+        <!-- Step 1: Store facts, run inference — works instantly -->
         <div class="walkthrough-step reveal reveal-delay-1">
           <div class="step-marker">
             <span class="step-number">1</span>
-            <span class="step-label">Send the first turns</span>
+            <span class="step-label">Store facts and run inference &mdash; instant, no LLM</span>
           </div>
 
           <div class="panel-dark" style="padding: var(--space-4); margin-bottom: var(--space-3);">
             <div class="panel-label">Copy this</div>
+            <pre style="margin: 0; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap;"><span style="color: rgba(255,255,255,0.45);"># Store facts</span>
+curl -s -X POST http://localhost:9300/tell \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"predicate":"customer_tier","args":["acme_corp","enterprise"]&#125;'
+
+curl -s -X POST http://localhost:9300/tell \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"predicate":"contract_value","args":["acme_corp","2000000"]&#125;'
+
+<span style="color: rgba(255,255,255,0.45);"># Query them back</span>
+curl -s -X POST http://localhost:9300/ask \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;"predicate":"customer_tier","args":["acme_corp","?tier"]&#125;'</pre>
+          </div>
+
+          <div class="plain-card" style="border-left: 3px solid var(--site-accent);">
+            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">Instant response &mdash; deterministic, no LLM call</div>
+            <pre style="margin: 0; font-size: 1.05rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">customer_tier(acme_corp, enterprise)</pre>
+            <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--site-muted);">
+              Sub-millisecond. Deterministic. The same query always returns the same answer. No token cost.
+            </p>
+          </div>
+        </div>
+
+        <!-- Step 2: Context-ranked retrieval — also no LLM -->
+        <div class="walkthrough-step reveal reveal-delay-2">
+          <div class="step-marker">
+            <span class="step-number">2</span>
+            <span class="step-label">Get a salience-ranked context window &mdash; still no LLM</span>
+          </div>
+
+          <div class="panel-dark" style="padding: var(--space-4); margin-bottom: var(--space-3);">
+            <div class="panel-label">Goal-driven context for your agent's next step</div>
+            <pre style="margin: 0; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap;">curl -s -X POST http://localhost:9300/memory/context \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -d '&#123;
+    "goals": [&#123;"predicate":"customer_tier","args":["acme_corp","?tier"]&#125;],
+    "maxFacts": 10,
+    "sessionId": "ticket-42"
+  &#125;' | python3 -m json.tool</pre>
+          </div>
+
+          <div class="plain-card" style="border-left: 3px solid var(--site-accent);">
+            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">Only goal-relevant facts, ranked by salience</div>
+            <pre style="margin: 0; font-size: 0.95rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-mono);">&#123; "windowSize": 1, "goalDriven": true,
+  "facts": [&#123;"predicate":"customer_tier", "args":["acme_corp","enterprise"], "salience":0.65&#125;] &#125;</pre>
+            <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--site-muted);">
+              Backward chaining finds only facts reachable from your goals. Feed this to your LLM instead of the whole thread.
+            </p>
+          </div>
+        </div>
+
+        <!-- Step 3: Turn compression — requires LLM -->
+        <div class="walkthrough-step reveal reveal-delay-3">
+          <div class="step-marker">
+            <span class="step-number">3</span>
+            <span class="step-label">Turn compression &mdash; add an LLM for natural-language extraction</span>
+          </div>
+
+          <div style="background: var(--site-accent-soft); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); margin-bottom: var(--space-3); font-size: 0.85rem; color: var(--site-text);">
+            <strong>Requires an LLM.</strong> Restart with Ollama (<code>ollama pull granite3.3:8b</code>) or add <code>-e ANTHROPIC_API_KEY=sk-ant-...</code> to your Docker command. <a href={`${base}/docs`} style="color: var(--site-accent-deep);">Setup guide &rarr;</a>
+          </div>
+
+          <div class="panel-dark" style="padding: var(--space-4); margin-bottom: var(--space-3);">
+            <div class="panel-label">Send raw conversation turns</div>
             <pre style="margin: 0; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap;">curl -s -X POST http://localhost:9300/context \
   -H "Content-Type: application/json" \
   -H "X-Tenant-ID: default" \
@@ -100,45 +154,12 @@ docker run -p 9300:9300 \
           </div>
 
           <div class="plain-card" style="border-left: 3px solid var(--site-accent);">
-            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">What comes back &mdash; briefingDelta</div>
+            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">briefingDelta &mdash; the LLM extracts facts, Nocturnus returns only what's new</div>
             <pre style="margin: 0; font-size: 1.05rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">## Login Issue
 Login is currently failing following the Okta cutover.
 Acme is on the enterprise tier.</pre>
             <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--site-muted);">
-              Two messy messages became two clean sentences. Put this in your system prompt.
-            </p>
-          </div>
-        </div>
-
-        <!-- Turn 2 -->
-        <div class="walkthrough-step reveal reveal-delay-2">
-          <div class="step-marker">
-            <span class="step-number">2</span>
-            <span class="step-label">Send the next turns &mdash; only what's new</span>
-          </div>
-
-          <div class="panel-dark" style="padding: var(--space-4); margin-bottom: var(--space-3);">
-            <div class="panel-label">Copy this (same scope + sessionId)</div>
-            <pre style="margin: 0; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap;">curl -s -X POST http://localhost:9300/context \
-  -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: default" \
-  -d '&#123;
-    "turns": [
-      "Tool auth_audit: 14 failed SAML assertions since 09:12 UTC.",
-      "Tool auth_audit: issuer mismatch after IdP migration."
-    ],
-    "scope": "ticket-4821",
-    "sessionId": "ticket-4821"
-  &#125;' | python3 -m json.tool</pre>
-          </div>
-
-          <div class="plain-card" style="border-left: 3px solid var(--site-accent);">
-            <div class="section-label" style="font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.8rem;">briefingDelta &mdash; only what's new</div>
-            <pre style="margin: 0; font-size: 1.05rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">## SAML Assertion Failure
-There were 14 failed SAML assertions starting at 09:12 UTC.
-An issuer mismatch was detected following the IdP migration.</pre>
-            <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--site-muted);">
-              Turn 1 context (login failure, enterprise tier) is <strong>not repeated</strong>. The model already has it. Only the SAML audit findings are new.
+              Two messy messages became two clean sentences. On the next turn, only the delta comes back. <a href={`${base}/docs/context`} style="color: var(--site-accent);">Full context workflow &rarr;</a>
             </p>
           </div>
         </div>
@@ -147,7 +168,7 @@ An issuer mismatch was detected following the IdP migration.</pre>
         <div class="walkthrough-payoff reveal reveal-delay-3">
           <div class="payoff-columns">
             <div class="payoff-left">
-              <h3>What your model sees</h3>
+              <h3>What your model sees (turn 2+)</h3>
               <div class="panel-dark" style="padding: var(--space-4);">
                 <pre style="margin: 0; font-size: 1rem; line-height: 1.8; white-space: pre-wrap; font-family: var(--font-display); color: rgba(255,255,255,0.9);">14 failed SAML assertions at 09:12 UTC.
 Issuer mismatch after IdP migration.</pre>
@@ -169,7 +190,7 @@ Tool auth_audit: issuer mismatch after IdP...
         </div>
 
         <p class="reveal" style="text-align: center; margin-top: var(--space-5); font-size: 0.88rem; color: var(--site-muted-soft);">
-          Runs on Ollama locally &mdash; free, no API keys needed. First calls take 10&ndash;30s on local hardware.
+          Steps 1&ndash;2 work instantly with zero dependencies. Step 3 adds LLM extraction &mdash; Ollama locally (free) or any cloud provider.
           <br/>Exact output phrasing varies by model. Cloud LLMs (Anthropic, OpenAI) are faster but require an API key.
         </p>
       </div>
@@ -299,13 +320,153 @@ DELETE /scope/ticket-4821</pre>
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- WHY NOT JUST — competitive positioning                            -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="compare">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Why NocturnusAI</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Not another vector store. A reasoning engine.</h2>
+          <p class="site-subtitle">Memory stores retrieve what looks similar. NocturnusAI derives what must be true.</p>
+        </div>
+
+        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); margin-bottom: var(--space-5);">
+          <div class="plain-card">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Works without any LLM</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Fact storage, rules, inference, salience ranking, and context windows all run deterministically. No API keys, no token cost, sub-millisecond latency. Add an LLM only when you want natural-language extraction.</p>
+          </div>
+          <div class="plain-card">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Deterministic reasoning</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Backward-chaining inference with proof chains, truth maintenance, negation-as-failure, and ACID transactions. The same query always returns the same answer. No hallucinations in the reasoning layer.</p>
+          </div>
+          <div class="plain-card">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Single Docker container</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">No Postgres, no Redis, no Neo4j, no vector database. One container, one port, persistent volume. Runs on a $5/month VPS or your laptop.</p>
+          </div>
+          <div class="plain-card">
+            <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Hypothetical reasoning</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Fork a knowledge scope, try a hypothesis, diff it against the original, merge or discard. Git-like branching for knowledge &mdash; no other agent memory system offers this.</p>
+          </div>
+        </div>
+
+        <div class="reveal reveal-delay-2" style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--site-line);">
+                <th style="text-align: left; padding: 0.75rem 1rem; font-weight: 600;"></th>
+                <th style="text-align: center; padding: 0.75rem 1rem; font-weight: 600; color: var(--site-accent);">NocturnusAI</th>
+                <th style="text-align: center; padding: 0.75rem 1rem; font-weight: 500; color: var(--site-muted);">Mem0</th>
+                <th style="text-align: center; padding: 0.75rem 1rem; font-weight: 500; color: var(--site-muted);">Zep</th>
+                <th style="text-align: center; padding: 0.75rem 1rem; font-weight: 500; color: var(--site-muted);">Letta</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid var(--site-line);">
+                <td style="padding: 0.6rem 1rem;">Works without LLM</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">Yes</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">No</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--site-line);">
+                <td style="padding: 0.6rem 1rem;">Logical inference</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">Backward + forward chaining</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--site-line);">
+                <td style="padding: 0.6rem 1rem;">Context delta compression</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">briefingDelta</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">&mdash;</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Summarization</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Compaction</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--site-line);">
+                <td style="padding: 0.6rem 1rem;">MCP tools</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">16 tools</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">9 tools</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Experimental</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Consumer only</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--site-line);">
+                <td style="padding: 0.6rem 1rem;">Framework integrations</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">6</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">4</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">2</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">2</td>
+              </tr>
+              <tr>
+                <td style="padding: 0.6rem 1rem;">Self-hosted complexity</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-accent); font-weight: 600;">1 container</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">3 containers</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">Graph DB required</td>
+                <td style="text-align: center; padding: 0.6rem; color: var(--site-muted-soft);">DB required</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- INTEGRATIONS — framework logos and one-liner setup                 -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="integrations">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Integrations</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Drop into your existing stack.</h2>
+          <p class="site-subtitle">Native tools for the frameworks you already use. One import, one line.</p>
+        </div>
+
+        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4);">
+          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">LangChain</h3>
+            <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">6 tools + agent example</p>
+            <code style="font-size: 0.72rem; color: var(--site-accent);">pip install nocturnusai[langchain]</code>
+          </div>
+          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">CrewAI</h3>
+            <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">5 tools + Storage backend</p>
+            <code style="font-size: 0.72rem; color: var(--site-accent);">pip install nocturnusai[crewai]</code>
+          </div>
+          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">AutoGen</h3>
+            <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">5 tools + Memory protocol</p>
+            <code style="font-size: 0.72rem; color: var(--site-accent);">pip install nocturnusai[autogen]</code>
+          </div>
+          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">LangGraph</h3>
+            <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">Checkpoint saver</p>
+            <code style="font-size: 0.72rem; color: var(--site-accent);">pip install nocturnusai[langgraph]</code>
+          </div>
+          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">OpenAI Agents</h3>
+            <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">5 function tools</p>
+            <code style="font-size: 0.72rem; color: var(--site-accent);">pip install nocturnusai[openai-agents]</code>
+          </div>
+          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">MCP</h3>
+            <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">16 tools, 5 IDE configs</p>
+            <code style="font-size: 0.72rem; color: var(--site-accent);">Claude, Cursor, Windsurf, VS Code</code>
+          </div>
+        </div>
+
+        <p class="reveal reveal-delay-2" style="text-align: center; font-size: 0.85rem; color: var(--site-muted);">
+          <a href={`${base}/docs/integrations`} style="color: var(--site-accent);">Full integration docs &rarr;</a> &middot; All integrations include <code>get_nocturnusai_tools(client)</code> for one-line setup.
+        </p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- SDK QUICKSTART — copyable code                                    -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section class="site-section-tight" id="sdks">
       <div class="site-container">
         <div class="section-head reveal">
           <div class="site-kicker">SDKs</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Or use Python / TypeScript.</h2>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Python &amp; TypeScript. Typed. Zero dependencies (TS).</h2>
         </div>
 
         <div class="sdk-tabs reveal reveal-delay-1">
@@ -313,16 +474,18 @@ DELETE /scope/ticket-4821</pre>
             <div class="panel-label">pip install nocturnusai</div>
             <pre style="margin: 0; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap;">from nocturnusai import SyncNocturnusAIClient
 
-c = SyncNocturnusAIClient("http://localhost:9300")
-
-r = c.process_turns(
-    turns=["User: Can't log in after Okta cutover."],
-    scope="ticket-4821",
-    session_id="ticket-4821",
-)
-print(r.briefing_delta)
-<span style="color: rgba(255,255,255,0.5);"># "Login is currently failing following the
-#  Okta cutover. Acme is enterprise tier."</span></pre>
+with SyncNocturnusAIClient("http://localhost:9300") as c:
+    c.tell("parent", ["alice", "bob"])
+    c.tell("parent", ["bob", "charlie"])
+    c.teach(
+        head=&#123;"predicate": "grandparent", "args": ["?x", "?z"]&#125;,
+        body=[
+            &#123;"predicate": "parent", "args": ["?x", "?y"]&#125;,
+            &#123;"predicate": "parent", "args": ["?y", "?z"]&#125;,
+        ],
+    )
+    results = c.ask("grandparent", ["?who", "charlie"])
+    <span style="color: rgba(255,255,255,0.5);"># [Atom(predicate='grandparent', args=['alice', 'charlie'])]</span></pre>
           </div>
           <div class="panel-dark" style="padding: var(--space-4); flex: 1;">
             <div class="panel-label">npm install nocturnusai-sdk</div>
@@ -332,14 +495,24 @@ const c = new NocturnusAIClient(&#123;
   baseUrl: 'http://localhost:9300',
 &#125;);
 
-const r = await c.processTurns(&#123;
-  turns: ["User: Can't log in after Okta cutover."],
-  scope: 'ticket-4821',
-  sessionId: 'ticket-4821',
-&#125;);
-console.log(r.briefingDelta);</pre>
+await c.tell('parent', ['alice', 'bob']);
+await c.tell('parent', ['bob', 'charlie']);
+await c.teach(
+  &#123; predicate: 'grandparent', args: ['?x', '?z'] &#125;,
+  [
+    &#123; predicate: 'parent', args: ['?x', '?y'] &#125;,
+    &#123; predicate: 'parent', args: ['?y', '?z'] &#125;,
+  ],
+);
+const results = await c.ask('grandparent', ['?who', 'charlie']);
+<span style="color: rgba(255,255,255,0.5);">// [&#123; predicate: 'grandparent', args: ['alice', 'charlie'] &#125;]</span></pre>
           </div>
         </div>
+
+        <p class="reveal reveal-delay-2" style="text-align: center; margin-top: var(--space-3); font-size: 0.85rem; color: var(--site-muted);">
+          48 methods (Python) &middot; 46 methods (TypeScript) &middot; Full async support &middot; Typed returns &middot; Retry with backoff
+          <br/><a href={`${base}/docs/sdks`} style="color: var(--site-accent);">SDK reference &rarr;</a>
+        </p>
       </div>
     </section>
 
