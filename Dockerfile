@@ -23,8 +23,8 @@ FROM eclipse-temurin:21-jre-alpine
 
 LABEL org.opencontainers.image.title="NocturnusAI"
 LABEL org.opencontainers.image.description="Logic server for Agentic AI — deterministic reasoning, truth maintenance, and agent memory"
-LABEL org.opencontainers.image.url="https://github.com/essaouirallc/logic-server"
-LABEL org.opencontainers.image.vendor="Essaouira LLC"
+LABEL org.opencontainers.image.url="https://github.com/Auctalis/nocturnusai"
+LABEL org.opencontainers.image.vendor="Auctalis"
 
 # ── Defaults (overridden by .env / docker-compose environment) ───────────────
 ENV PORT=9300 \
