@@ -327,7 +327,7 @@ class NocturnusAIStorage:
         try:
             results = self._client.query(
                 predicate="crew_memory",
-                args=["?agent", "?value"] if query == "" else ["?x"],
+                args=["?agent", "?value"],
             )
             return {
                 "results": [
@@ -342,7 +342,7 @@ class NocturnusAIStorage:
         """Clear all crew memory facts."""
         try:
             results = self._client.query(
-                predicate="crew_memory", args=["?x"],
+                predicate="crew_memory", args=["?agent", "?value"],
             )
             for atom in results:
                 self._client.retract(

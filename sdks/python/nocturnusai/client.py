@@ -1435,12 +1435,18 @@ class NocturnusAIClient:
     ) -> dict[str, Any]:
         """Run an aggregation query (COUNT/SUM/MIN/MAX/AVG) over matching facts.
 
+        .. important::
+            You **must** provide ``args`` with wildcard variables matching the
+            predicate's arity (e.g., ``["?x", "?y"]`` for binary predicates).
+            Omitting ``args`` causes the server to match zero facts and return 0.
+
         Args:
             op: Aggregation operation — one of ``COUNT``, ``SUM``, ``MIN``,
                 ``MAX``, ``AVG``.
             predicate: The predicate to aggregate over.
             args: Pattern arguments for matching. Use ``["?x", "?y"]`` for
-                wildcards. Defaults to empty (matches all arities).
+                wildcards matching a 2-argument predicate. **Must match the
+                predicate's arity** or no facts will match.
             arg_index: Index of the argument to aggregate. Required for
                 ``SUM``/``MIN``/``MAX``/``AVG``; not needed for ``COUNT``.
             scope: Optional scope to filter by.
@@ -1450,7 +1456,7 @@ class NocturnusAIClient:
 
         Example::
 
-            count = await client.aggregate("COUNT", "parent")
+            count = await client.aggregate("COUNT", "parent", args=["?x", "?y"])
             total = await client.aggregate("SUM", "price", args=["?x", "?y"], arg_index=1)
         """
         payload: dict[str, Any] = {
@@ -1495,10 +1501,16 @@ class NocturnusAIClient:
     ) -> dict[str, Any]:
         """Retract all facts matching a predicate pattern.
 
+        .. important::
+            You **must** provide ``args`` with wildcard variables matching the
+            predicate's arity (e.g., ``["?x", "?y"]`` for binary predicates).
+            Omitting ``args`` causes the server to match zero facts.
+
         Args:
             predicate: The predicate to match for retraction.
             args: Pattern arguments for matching. Use ``["?x", "?y"]`` for
-                wildcards. Defaults to empty (matches all arities).
+                wildcards. **Must match the predicate's arity** or no facts
+                will match.
             scope: Optional scope to filter by.
 
         Returns:
@@ -1507,7 +1519,7 @@ class NocturnusAIClient:
 
         Example::
 
-            result = await client.retract_pattern("temp_location")
+            result = await client.retract_pattern("temp_location", args=["?x", "?y"])
             print(f"Retracted {result['retracted']} facts")
         """
         payload: dict[str, Any] = {"predicate": predicate}
@@ -1697,6 +1709,34 @@ class NocturnusAIClient:
         """
         with contextlib.suppress(NocturnusAIConflictError, NocturnusAIAPIError):
             await self.create_database(name)
+
+    async def create_tenant(
+        self,
+        tenant_id: str,
+        database: str | None = None,
+    ) -> str:
+        """Create a new tenant in the specified database.
+
+        Args:
+            tenant_id: The tenant ID to create.
+            database: Database name. Defaults to this client's ``database`` property.
+
+        Returns:
+            Confirmation message.
+
+        Example::
+
+            await client.create_tenant("my-tenant")
+        """
+        db = database or self._database
+        result = await self._request(
+            "POST",
+            f"/admin/databases/{db}/tenants",
+            json_body={"tenantId": tenant_id},
+        )
+        if isinstance(result, str):
+            return result
+        return str(result)
 
     # ------------------------------------------------------------------
     # Auth / Key Management
@@ -2358,6 +2398,10 @@ class SyncNocturnusAIClient:
     def ensure_database(self, name: str | None = None) -> None:
         """Create DB if missing. See :meth:`NocturnusAIClient.ensure_database`."""
         self._run(self._async_client.ensure_database(name=name))
+
+    def create_tenant(self, tenant_id: str, database: str | None = None) -> str:
+        """Create a tenant. See :meth:`NocturnusAIClient.create_tenant`."""
+        return self._run(self._async_client.create_tenant(tenant_id=tenant_id, database=database))
 
     def auth_status(self) -> dict[str, Any]:
         """Check auth status. See :meth:`NocturnusAIClient.auth_status`."""

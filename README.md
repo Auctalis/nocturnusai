@@ -23,6 +23,8 @@ Predicates, rules, inference, truth maintenance, scopes, and temporal logic are 
 
 ## The Working Loop
 
+> **LLM required for natural-language turns.** The examples below send raw text turns through an LLM to extract structured facts. If you start the server without an LLM provider, natural-language turns will return zero facts. See [Quick Start](#quick-start) for setup options, or use predicate syntax (e.g., `"customer_tier(acme_corp, enterprise)"`) which works without any LLM.
+
 ### 1. First reduction: `POST /context`
 
 ```bash
@@ -40,26 +42,26 @@ curl -X POST http://localhost:9300/context \
   }'
 ```
 
-Response shape:
+Response shape (facts and salience values depend on LLM extraction):
 
 ```json
 {
   "facts": [
-    {"predicate":"customer_tier","args":["acme_corp","enterprise"],"salience":0.96},
-    {"predicate":"contract_value","args":["acme_corp","2000000"],"salience":0.91},
-    {"predicate":"issue","args":["acme_corp","sla_credits"],"salience":0.88}
+    {"predicate":"customer_tier","args":["acme_corp","enterprise"],"salience":0.65},
+    {"predicate":"contract_value","args":["acme_corp","2000000"],"salience":0.65},
+    {"predicate":"issue","args":["acme_corp","sla_credits"],"salience":0.64}
   ],
-  "totalFactsInKB": 127,
+  "totalFactsInKB": 7,
   "factsReturned": 3,
   "contradictions": 0,
   "newFactsExtracted": 3
 }
 ```
 
-### 2. Goal-driven pass: `POST /context/optimize`
+### 2. Goal-driven pass: `POST /memory/context`
 
 ```bash
-curl -X POST http://localhost:9300/context/optimize \
+curl -X POST http://localhost:9300/memory/context \
   -H 'Content-Type: application/json' \
   -H 'X-Tenant-ID: default' \
   -d '{
@@ -188,7 +190,10 @@ That is the backend. The front-of-product story is still turn reduction.
 ### Docker (fastest)
 
 ```bash
-docker run -d --name nocturnusai -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+docker run -d --name nocturnusai -p 9300:9300 \
+  --restart unless-stopped \
+  -v nocturnusai-data:/data \
+  ghcr.io/auctalis/nocturnusai:latest
 ```
 
 Verify it's running:
@@ -197,22 +202,26 @@ Verify it's running:
 curl http://localhost:9300/health
 ```
 
-Try the first reduction from the working loop above:
+Try the logic engine (works immediately, no LLM needed):
 
 ```bash
-curl -X POST http://localhost:9300/context \
+curl -X POST http://localhost:9300/tell \
   -H 'Content-Type: application/json' \
   -H 'X-Tenant-ID: default' \
-  -d '{
-    "turns": [
-      "user: Customer says they are enterprise and blocked on SLA credits.",
-      "tool: CRM says account is Acme Corp with a 2M ARR contract."
-    ],
-    "maxFacts": 12
-  }'
+  -d '{"predicate":"customer_tier","args":["acme_corp","enterprise"]}'
+
+curl -X POST http://localhost:9300/tell \
+  -H 'Content-Type: application/json' \
+  -H 'X-Tenant-ID: default' \
+  -d '{"predicate":"contract_value","args":["acme_corp","2000000"]}'
+
+curl -X POST http://localhost:9300/ask \
+  -H 'Content-Type: application/json' \
+  -H 'X-Tenant-ID: default' \
+  -d '{"predicate":"customer_tier","args":["acme_corp","?tier"]}'
 ```
 
-That's it. Server is running, persists data to a Docker volume, and restarts automatically.
+That's it. Server is running, persists data to a named Docker volume, and restarts automatically. For natural-language turn extraction (the Working Loop above), add an LLM provider -- see the next section.
 
 ### Docker with Ollama (enables natural-language extraction)
 

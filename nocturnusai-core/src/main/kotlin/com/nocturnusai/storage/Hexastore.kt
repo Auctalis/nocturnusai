@@ -266,14 +266,33 @@ class Hexastore {
     }
 
     private fun matchInternal(pattern: Atom, scope: String?): List<Atom> {
+        val effectiveP = if (pattern.truthVal) pattern.predicate else "!${pattern.predicate}"
+        val effectiveScope = scope ?: pattern.scope
+
+        if (pattern.args.isEmpty()) {
+            // No args supplied — match ALL arities for this predicate.
+            // Search both the SPO index (binary facts) and otherAtoms (non-binary).
+            val results = mutableListOf<Atom>()
+
+            // Binary facts from SPO index
+            results.addAll(query(null, effectiveP, null, effectiveScope).toList())
+
+            // Non-binary facts from otherAtoms
+            val others = otherAtoms[effectiveP]
+            if (others != null) {
+                results.addAll(others.filter { candidate ->
+                    if (effectiveScope != null && candidate.scope != effectiveScope) return@filter false
+                    true
+                })
+            }
+            return results
+        }
+
         return if (pattern.args.size == 2) {
             val s = if (pattern.args[0] is Term.Variable) null else pattern.args[0]
             val o = if (pattern.args[1] is Term.Variable) null else pattern.args[1]
-            val p = if (pattern.truthVal) pattern.predicate else "!${pattern.predicate}"
-            val effectiveScope = scope ?: pattern.scope
-            query(s, p, o, effectiveScope).toList()
+            query(s, effectiveP, o, effectiveScope).toList()
         } else {
-            val effectiveP = if (pattern.truthVal) pattern.predicate else "!${pattern.predicate}"
             val candidates = otherAtoms[effectiveP] ?: return emptyList()
             candidates.filter { candidate ->
                 if (scope != null && candidate.scope != scope) return@filter false

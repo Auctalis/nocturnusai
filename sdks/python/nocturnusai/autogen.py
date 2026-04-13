@@ -115,17 +115,51 @@ class NocturnusAIMemory:
     """AutoGen Memory protocol backed by NocturnusAI.
 
     Implements add/query/update_context/clear/close for AutoGen agents.
+
+    Accepts either a ``NocturnusAIClient`` (async, recommended) or a
+    ``SyncNocturnusAIClient`` (sync — will be run in a thread executor
+    to avoid blocking the event loop).
+
+    Example::
+
+        from nocturnusai import NocturnusAIClient
+        from nocturnusai.autogen import NocturnusAIMemory
+
+        client = NocturnusAIClient("http://localhost:9300")
+        memory = NocturnusAIMemory(client)
     """
 
     def __init__(self, client: Any) -> None:
         self._client = client
+        # Detect whether we got an async or sync client.
+        self._is_async = hasattr(client, "__aenter__")
+
+    async def _assert_fact(self, predicate: str, args: list[str]) -> Any:
+        if self._is_async:
+            return await self._client.assert_fact(predicate=predicate, args=args)
+        return self._client.assert_fact(predicate=predicate, args=args)
+
+    async def _query(self, predicate: str, args: list[str]) -> Any:
+        if self._is_async:
+            return await self._client.query(predicate=predicate, args=args)
+        return self._client.query(predicate=predicate, args=args)
+
+    async def _retract(self, predicate: str, args: list[str]) -> Any:
+        if self._is_async:
+            return await self._client.retract(predicate=predicate, args=args)
+        return self._client.retract(predicate=predicate, args=args)
+
+    async def _context(self, **kwargs: Any) -> Any:
+        if self._is_async:
+            return await self._client.context(**kwargs)
+        return self._client.context(**kwargs)
 
     async def add(self, messages: list[Any]) -> None:
         """Store messages as NocturnusAI facts."""
         for msg in messages:
             content = msg.get("content", str(msg)) if isinstance(msg, dict) else str(msg)
             try:
-                self._client.assert_fact(
+                await self._assert_fact(
                     predicate="agent_memory", args=[content],
                 )
             except Exception:
@@ -134,7 +168,7 @@ class NocturnusAIMemory:
     async def query(self, query: str, limit: int = 10) -> list[Any]:
         """Query memory for relevant items."""
         try:
-            results = self._client.query(
+            results = await self._query(
                 predicate="agent_memory", args=["?content"],
             )
             matched = [
@@ -150,7 +184,7 @@ class NocturnusAIMemory:
     async def update_context(self, context: dict[str, Any]) -> None:
         """Inject top salient facts into context."""
         try:
-            window = self._client.context_window(max_facts=20, min_salience=0.1)
+            window = await self._context(max_facts=20, min_salience=0.1)
             facts = [
                 f"{s.atom.predicate}({', '.join(s.atom.args)})"
                 for s in window.facts
@@ -162,11 +196,11 @@ class NocturnusAIMemory:
     async def clear(self) -> None:
         """Clear all agent memory facts."""
         try:
-            results = self._client.query(
+            results = await self._query(
                 predicate="agent_memory", args=["?x"],
             )
             for atom in results:
-                self._client.retract(predicate="agent_memory", args=atom.args)
+                await self._retract(predicate="agent_memory", args=atom.args)
         except Exception:
             logger.exception("Failed to clear memory")
 

@@ -22,6 +22,8 @@ Usage::
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import json
 import logging
 from typing import Any
@@ -249,9 +251,14 @@ if _LANGCHAIN_AVAILABLE:
             scope: str | None = None,
             negated: bool = False,
         ) -> str:
-            """Async execution delegates to sync."""
-            return self._run(
-                predicate=predicate, args=args, scope=scope, negated=negated,
+            """Async execution — runs sync client in a thread executor."""
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None,
+                functools.partial(
+                    self._run,
+                    predicate=predicate, args=args, scope=scope, negated=negated,
+                ),
             )
 
     class NocturnusAIQueryTool(BaseTool):
@@ -309,8 +316,14 @@ if _LANGCHAIN_AVAILABLE:
             args: str,
             scope: str | None = None,
         ) -> str:
-            """Async execution delegates to sync."""
-            return self._run(predicate=predicate, args=args, scope=scope)
+            """Async execution — runs sync client in a thread executor."""
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None,
+                functools.partial(
+                    self._run, predicate=predicate, args=args, scope=scope,
+                ),
+            )
 
     class NocturnusAIInferTool(BaseTool):
         """LangChain tool for running logical inference on NocturnusAI.
@@ -384,12 +397,15 @@ if _LANGCHAIN_AVAILABLE:
             scope: str | None = None,
             with_proof: bool = False,
         ) -> str:
-            """Async execution delegates to sync."""
-            return self._run(
-                predicate=predicate,
-                args=args,
-                scope=scope,
-                with_proof=with_proof,
+            """Async execution — runs sync client in a thread executor."""
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None,
+                functools.partial(
+                    self._run,
+                    predicate=predicate, args=args,
+                    scope=scope, with_proof=with_proof,
+                ),
             )
 
     class NocturnusAIContextTool(BaseTool):
@@ -466,12 +482,15 @@ if _LANGCHAIN_AVAILABLE:
             predicates: str | None = None,
             scope: str | None = None,
         ) -> str:
-            """Async execution delegates to sync."""
-            return self._run(
-                max_facts=max_facts,
-                min_salience=min_salience,
-                predicates=predicates,
-                scope=scope,
+            """Async execution — runs sync client in a thread executor."""
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None,
+                functools.partial(
+                    self._run,
+                    max_facts=max_facts, min_salience=min_salience,
+                    predicates=predicates, scope=scope,
+                ),
             )
 
     class NocturnusAIOptimizeTool(BaseTool):
@@ -537,14 +556,13 @@ if _LANGCHAIN_AVAILABLE:
                     relevance_buckets=parsed_buckets,
                     scope=scope,
                 )
-                included = result.get("included", 0)
-                available = result.get("available", 0)
-                generation = result.get("generation", 0)
-                contradictions = result.get("contradictions", {})
-                found = contradictions.get("found", 0)
-                resolved = contradictions.get("resolved", 0)
-                rules = result.get("rules", [])
-                facts = result.get("facts", [])
+                included = result.total_facts_included
+                available = result.total_facts_available
+                generation = getattr(result, "knowledge_generation", 0)
+                found = result.contradictions_found
+                resolved = result.contradictions_resolved
+                rules = result.relevant_rules
+                entries = result.entries
                 goal_label = "goal-driven" if parsed_goals else "global"
 
                 lines = [
@@ -555,12 +573,11 @@ if _LANGCHAIN_AVAILABLE:
                     "",
                     "Facts:",
                 ]
-                for fact in facts:
-                    salience = fact.get("salience", 0.0)
-                    category = fact.get("category", "unknown")
-                    atom = fact.get("atom", {})
-                    predicate = atom.get("predicate", "?")
-                    args = atom.get("args", [])
+                for entry in entries:
+                    salience = entry.salience
+                    category = getattr(entry, "category", "unknown")
+                    predicate = entry.predicate
+                    args = entry.args
                     lines.append(
                         f"  [salience={salience:.2f}, {category}] "
                         f"{predicate}({', '.join(args)})"
@@ -577,13 +594,17 @@ if _LANGCHAIN_AVAILABLE:
             relevance_buckets: str | None = None,
             scope: str | None = None,
         ) -> str:
-            """Async execution delegates to sync."""
-            return self._run(
-                goals=goals,
-                max_facts=max_facts,
-                session_id=session_id,
-                relevance_buckets=relevance_buckets,
-                scope=scope,
+            """Async execution — runs sync client in a thread executor."""
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None,
+                functools.partial(
+                    self._run,
+                    goals=goals, max_facts=max_facts,
+                    session_id=session_id,
+                    relevance_buckets=relevance_buckets,
+                    scope=scope,
+                ),
             )
 
     class NocturnusAIExtractTool(BaseTool):
@@ -651,11 +672,14 @@ if _LANGCHAIN_AVAILABLE:
             assert_facts: bool = True,
             scope: str | None = None,
         ) -> str:
-            """Async execution delegates to sync."""
-            return self._run(
-                text=text,
-                assert_facts=assert_facts,
-                scope=scope,
+            """Async execution — runs sync client in a thread executor."""
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None,
+                functools.partial(
+                    self._run,
+                    text=text, assert_facts=assert_facts, scope=scope,
+                ),
             )
 
 

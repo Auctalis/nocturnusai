@@ -148,8 +148,11 @@ curl -X POST http://localhost:9300/tell \
 
     <h2 id="encryption">Encryption at Rest</h2>
     <p>Enable AES-256 encryption for WAL files and snapshots:</p>
-    <pre><code class="language-bash"># .env
-ENCRYPTION_KEY=your-256-bit-key-here</code></pre>
+    <pre><code class="language-bash"># Generate a 256-bit key (64 hex characters)
+openssl rand -hex 32
+
+# .env
+ENCRYPTION_KEY=a1b2c3d4e5f6...  # paste the 64-character hex output here</code></pre>
 
     <hr />
 

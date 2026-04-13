@@ -44,15 +44,23 @@ def _check_langgraph() -> None:
 _PREDICATE = "lg_checkpoint"
 
 
-class NocturnusAICheckpointSaver:
+def _make_base_class() -> type:
+    """Return BaseCheckpointSaver if available, else plain object."""
+    if _LANGGRAPH_AVAILABLE:
+        from langgraph.checkpoint.base import BaseCheckpointSaver as _Base
+        return _Base
+    return object
+
+
+class NocturnusAICheckpointSaver(_make_base_class()):  # type: ignore[misc]
     """LangGraph checkpoint saver backed by NocturnusAI.
 
     Maps LangGraph threads to NocturnusAI scopes. Each checkpoint is stored
     as a fact with predicate 'lg_checkpoint' and args [thread_id, state_json, metadata_json].
 
-    Works with or without langgraph installed (does not inherit from
-    BaseCheckpointSaver to avoid import dependency, but implements
-    the same interface).
+    Inherits from ``BaseCheckpointSaver`` when ``langgraph-checkpoint`` is
+    installed, so ``isinstance()`` checks and type validation pass.
+    Falls back to ``object`` when the package is not installed.
     """
 
     def __init__(self, client: Any) -> None:
