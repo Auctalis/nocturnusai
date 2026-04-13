@@ -489,7 +489,6 @@ h1, h2, h3, h4, h5, h6 {
   position: relative;
   background: var(--site-dark);
   color: var(--site-dark-text);
-  min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -500,7 +499,7 @@ h1, h2, h3, h4, h5, h6 {
   z-index: 1;
   width: min(860px, calc(100% - 3rem));
   margin: 0 auto;
-  padding: 8rem 0 6rem;
+  padding: 7rem 0 5rem;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -701,10 +700,13 @@ h1, h2, h3, h4, h5, h6 {
 
 @media (max-width: 640px) {
   .hero-dark-inner {
-    padding: 6.5rem 0 4rem;
+    padding: 6rem 0 3rem;
   }
   .hero-dark-headline {
     font-size: clamp(2.2rem, 10vw, 3.5rem);
+  }
+  .hero-dark-sub {
+    font-size: 0.92rem;
   }
   .hero-dark-stats {
     font-size: 0.65rem;
