@@ -14,37 +14,35 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
   <main>
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- HERO — Category-defining claim, not cost claim                    -->
+    <!-- HERO — Dark premium hero with amber accents                       -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <section class="hero-cut" id="top">
-      <div class="hero-cut-top">
-        <div class="hero-question-wrap">
-          <div class="site-kicker" style="color: var(--site-accent-deep); margin-bottom: var(--space-3);">REASONING FOR AI AGENTS</div>
-          <h1 class="hero-question hero-text-reveal" id="hero-headline">Memory stores retrieve what looks similar. NocturnusAI derives what must be true.</h1>
+    <section class="hero-dark" id="top">
+      <div class="hero-dark-inner">
+        <div class="hero-dark-kicker">REASONING ENGINE FOR AI AGENTS</div>
+        <h1 class="hero-dark-headline">
+          Your agents <span class="hero-dim">recall.</span><br/>
+          Ours <span class="hero-accent">reason.</span>
+        </h1>
+        <p class="hero-dark-sub">
+          Open-source logic engine that sits between your agent and the LLM.
+          Stores facts, runs inference with proof chains, returns only what changed.
+        </p>
+        <div class="hero-dark-stats">
+          <span>97% fewer tokens</span>
+          <span class="hero-stat-dot">&middot;</span>
+          <span>$240/mo vs $54K</span>
+          <span class="hero-stat-dot">&middot;</span>
+          <span>single container</span>
+          <span class="hero-stat-dot">&middot;</span>
+          <span>no signup</span>
+        </div>
+        <div class="hero-dark-ctas">
+          <a href="#try-it" class="hero-btn-primary">Try it now</a>
+          <a href={`${base}/docs`} class="hero-btn-secondary">Read the docs</a>
         </div>
       </div>
-
-      <div class="line-divider" aria-hidden="true"></div>
-
-      <div class="hero-cut-bottom">
-        <div class="hero-answer-wrap">
-          <p class="hero-answer">97% fewer tokens. Deterministic. Zero hallucinations in the reasoning layer.</p>
-          <p class="hero-subtext">open source &middot; single container &middot; first result in 2 minutes &middot; no signup</p>
-        </div>
-
-        <div class="hero-footer">
-          <p class="hero-support">
-            NocturnusAI is an open-source logic engine that sits between your agent and the LLM. It stores facts, runs inference with proof chains, and returns only what changed &mdash; a short briefing instead of the whole thread.
-          </p>
-          <div class="hero-cta-row">
-            <a href="#try-it" class="button-primary">Try it now</a>
-            <a href={`${base}/docs`} class="button-secondary">Read the docs</a>
-          </div>
-        </div>
-      </div>
+      <div class="hero-dark-fade" aria-hidden="true"></div>
     </section>
-
-    <hr class="section-rule" />
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- THE NUMBERS — proof of the category claim                         -->
@@ -598,22 +596,4 @@ const results = await c.ask('grandparent', ['?who', 'charlie']);
 
   <Footer />
 
-  <!-- Hero character-level animation — uses safe DOM methods, no innerHTML -->
-  <script is:inline>
-    (() => {
-      const el = document.getElementById('hero-headline');
-      if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      const text = el.textContent || '';
-      while (el.firstChild) el.removeChild(el.firstChild);
-      let delay = 0;
-      for (let i = 0; i < text.length; i++) {
-        const span = document.createElement('span');
-        span.className = 'char';
-        span.textContent = text[i] === ' ' ? '\u00A0' : text[i];
-        span.style.animationDelay = delay + 'ms';
-        el.appendChild(span);
-        if (text[i] !== ' ') delay += 12;
-      }
-    })();
-  </script>
 </Layout>
