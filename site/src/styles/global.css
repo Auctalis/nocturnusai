@@ -489,11 +489,10 @@ h1, h2, h3, h4, h5, h6 {
   position: relative;
   background: var(--site-dark);
   color: var(--site-dark-text);
-  min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
 }
 
 .hero-dark-inner {
@@ -562,11 +561,53 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0 0.5rem;
 }
 
+/* ── Hero inline terminal ────────────────────────────────────────────── */
+
+.hero-terminal {
+  width: min(520px, 100%);
+  background: #161210;
+  border: 1px solid rgba(240, 235, 225, 0.1);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: var(--space-5);
+  text-align: left;
+}
+
+.hero-terminal-bar {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+  background: rgba(240, 235, 225, 0.04);
+  border-bottom: 1px solid rgba(240, 235, 225, 0.06);
+}
+
+.hero-terminal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(240, 235, 225, 0.12);
+}
+
+.hero-terminal-code {
+  margin: 0;
+  padding: 14px 18px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.8;
+  color: rgba(240, 235, 225, 0.75);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.hero-t-dim { color: rgba(240, 235, 225, 0.3); }
+.hero-t-ok { color: var(--site-accent); }
+
 .hero-dark-ctas {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
 .hero-btn-primary {
@@ -611,29 +652,9 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateY(-1px);
 }
 
-/* Gradient fade from dark hero to parchment body */
-.hero-dark-fade {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 120px;
-  background: linear-gradient(to bottom, transparent, var(--site-bg));
-  z-index: 0;
-}
-
-/* Subtle radial glow behind headline */
-.hero-dark::before {
-  content: '';
-  position: absolute;
-  top: 40%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 600px;
-  height: 400px;
-  background: radial-gradient(ellipse, rgba(212, 136, 58, 0.06) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
+/* Clean bottom edge — amber line instead of muddy gradient */
+.hero-dark {
+  border-bottom: 2px solid var(--site-accent);
 }
 
 @media (max-width: 640px) {
