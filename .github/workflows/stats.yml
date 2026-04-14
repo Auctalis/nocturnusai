@@ -1,0 +1,156 @@
+name: Adoption Stats
+
+# Polls registry + GitHub APIs daily and commits adoption metrics to the
+# `stats` branch. Runs on cron + manual dispatch. Results land in:
+#   stats/latest.json         — most recent snapshot
+#   stats/YYYY-MM-DD.json     — daily snapshot (overwritten if run twice/day)
+#   stats/history.jsonl       — append-only log, one JSON object per run
+#
+# The `stats` branch is an orphan branch (no shared history with main), so it
+# stays tiny and never pollutes the main history.
+#
+# Note on GHCR: GitHub does NOT expose container pull counts via any public or
+# authenticated API. We record the version count as a weak proxy and nothing
+# more. If public pull-count visibility matters, mirror the image to Docker Hub.
+
+on:
+  schedule:
+    - cron: "17 6 * * *" # daily 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: adoption-stats
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    env:
+      NPM_PACKAGE: nocturnusai-sdk
+      PYPI_PACKAGE: nocturnusai
+      REPO_OWNER: Auctalis
+      REPO_NAME: nocturnusai
+      GHCR_OWNER: auctalis
+      GHCR_PACKAGE: nocturnusai
+    steps:
+      - name: Collect adoption metrics
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          DATE=$(date -u +%Y-%m-%d)
+
+          auth_get() {
+            curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+                     -H "Accept: application/vnd.github+json" \
+                     -H "X-GitHub-Api-Version: 2022-11-28" "$1"
+          }
+
+          # --- npm -------------------------------------------------------------
+          NPM_WEEK=$(curl -sS "https://api.npmjs.org/downloads/point/last-week/${NPM_PACKAGE}" | jq '.downloads // 0')
+          NPM_MONTH=$(curl -sS "https://api.npmjs.org/downloads/point/last-month/${NPM_PACKAGE}" | jq '.downloads // 0')
+
+          # --- PyPI (pypistats) ------------------------------------------------
+          PYPI_JSON=$(curl -sS "https://pypistats.org/api/packages/${PYPI_PACKAGE}/recent" || echo '{"data":{}}')
+          PYPI_DAY=$(echo   "$PYPI_JSON" | jq '.data.last_day   // 0')
+          PYPI_WEEK=$(echo  "$PYPI_JSON" | jq '.data.last_week  // 0')
+          PYPI_MONTH=$(echo "$PYPI_JSON" | jq '.data.last_month // 0')
+
+          # --- GitHub repo -----------------------------------------------------
+          REPO_JSON=$(auth_get "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}")
+          STARS=$(echo       "$REPO_JSON" | jq '.stargazers_count  // 0')
+          FORKS=$(echo       "$REPO_JSON" | jq '.forks_count       // 0')
+          WATCHERS=$(echo    "$REPO_JSON" | jq '.subscribers_count // 0')
+          OPEN_ISSUES=$(echo "$REPO_JSON" | jq '.open_issues_count // 0')
+
+          # --- GitHub traffic (14-day rolling; must poll to retain history) ---
+          VIEWS_JSON=$(auth_get  "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/traffic/views")
+          CLONES_JSON=$(auth_get "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/traffic/clones")
+          VIEWS_14D=$(echo         "$VIEWS_JSON"  | jq '.count   // 0')
+          UNIQUE_VIEWS_14D=$(echo  "$VIEWS_JSON"  | jq '.uniques // 0')
+          CLONES_14D=$(echo        "$CLONES_JSON" | jq '.count   // 0')
+          UNIQUE_CLONES_14D=$(echo "$CLONES_JSON" | jq '.uniques // 0')
+
+          # --- GHCR version count (pull counts are not exposed by GitHub) -----
+          GHCR_JSON=$(auth_get "https://api.github.com/orgs/${GHCR_OWNER}/packages/container/${GHCR_PACKAGE}/versions?per_page=100" || echo '[]')
+          GHCR_VERSIONS=$(echo "$GHCR_JSON" | jq 'if type == "array" then length else 0 end')
+
+          # --- Assemble snapshot ----------------------------------------------
+          jq -n \
+            --arg ts "$TS" \
+            --arg date "$DATE" \
+            --argjson npm_week  "$NPM_WEEK" \
+            --argjson npm_month "$NPM_MONTH" \
+            --argjson pypi_day   "$PYPI_DAY" \
+            --argjson pypi_week  "$PYPI_WEEK" \
+            --argjson pypi_month "$PYPI_MONTH" \
+            --argjson stars       "$STARS" \
+            --argjson forks       "$FORKS" \
+            --argjson watchers    "$WATCHERS" \
+            --argjson open_issues "$OPEN_ISSUES" \
+            --argjson views_14d        "$VIEWS_14D" \
+            --argjson unique_views_14d "$UNIQUE_VIEWS_14D" \
+            --argjson clones_14d        "$CLONES_14D" \
+            --argjson unique_clones_14d "$UNIQUE_CLONES_14D" \
+            --argjson ghcr_versions "$GHCR_VERSIONS" \
+            '{
+               timestamp: $ts,
+               date: $date,
+               npm:  { package: "nocturnusai-sdk", last_week: $npm_week, last_month: $npm_month },
+               pypi: { package: "nocturnusai",     last_day: $pypi_day,  last_week: $pypi_week, last_month: $pypi_month },
+               github: {
+                 stars: $stars, forks: $forks, watchers: $watchers, open_issues: $open_issues,
+                 traffic: {
+                   views_14d: $views_14d,   unique_views_14d: $unique_views_14d,
+                   clones_14d: $clones_14d, unique_clones_14d: $unique_clones_14d
+                 }
+               },
+               ghcr: {
+                 package: "auctalis/nocturnusai",
+                 versions_published: $ghcr_versions,
+                 note: "GitHub does not expose container pull counts."
+               }
+             }' > /tmp/latest.json
+
+          echo "Collected snapshot:"
+          cat /tmp/latest.json
+
+      - name: Commit to stats branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          git clone --depth 1 "$REPO_URL" repo
+          cd repo
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          if git ls-remote --exit-code --heads origin stats >/dev/null 2>&1; then
+            git fetch --depth 1 origin stats
+            git checkout stats
+          else
+            # First run: create orphan branch with no shared history.
+            git checkout --orphan stats
+            git rm -rf . 2>/dev/null || true
+          fi
+
+          mkdir -p stats
+          cp /tmp/latest.json stats/latest.json
+          cp /tmp/latest.json "stats/$(date -u +%Y-%m-%d).json"
+          jq -c . /tmp/latest.json >> stats/history.jsonl
+
+          git add stats/
+          if git diff --cached --quiet; then
+            echo "No stats changes — nothing to commit."
+            exit 0
+          fi
+          git commit -m "stats: snapshot $(date -u +%Y-%m-%d)"
+          git push origin stats
