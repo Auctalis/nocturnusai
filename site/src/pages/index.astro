@@ -2,8 +2,20 @@
 import Layout from '../layouts/Layout.astro';
 import Navbar from '../components/Navbar.astro';
 import Footer from '../components/Footer.astro';
+import { getCollection } from 'astro:content';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+// Pull the latest 3 published blog posts for the homepage teaser.
+const latestPosts = (await getCollection('blog', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+  .slice(0, 3);
+
+const blogDateFmt = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+});
 ---
 
 <Layout
@@ -72,6 +84,49 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
         </div>
       </div>
     </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- WHY NOW — the urgency and the inflection                           -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="why-now">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Why Now</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">The context layer is happening. The bill already did.</h2>
+          <p class="site-subtitle">Three things hit production at the same time — and they all compound. A context server is no longer a nice-to-have; it's the layer the agent stack has been missing.</p>
+        </div>
+
+        <div class="feature-grid reveal reveal-delay-1" style="margin-bottom: var(--space-5);">
+          <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.6rem;">Cost</div>
+            <h3 style="font-size: 1.05rem; margin-bottom: 0.6rem;">Agent bills scale exponentially, not linearly.</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">A $500 POC becomes $847k/month without changing a single line of code &mdash; just by adding users. Most of those tokens are the model re-reading what it already knows. That's a structural problem, not a tuning problem.</p>
+          </div>
+          <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.6rem;">Correctness</div>
+            <h3 style="font-size: 1.05rem; margin-bottom: 0.6rem;">Similarity is not truth.</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">When an agent decides based on the current state of a record, a clause, or an inventory level, &ldquo;the most semantically similar document&rdquo; is the wrong abstraction. Vector retrieval cannot fix operational hallucinations. Inference over facts can.</p>
+          </div>
+          <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.6rem;">Latency</div>
+            <h3 style="font-size: 1.05rem; margin-bottom: 0.6rem;">Every prompt token is an attention cost.</h3>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Long-running agents get slower in proportion to their context. Smaller context = faster response. We see 3&times; to 10&times; latency improvements on agents that used to drag as threads grew.</p>
+          </div>
+        </div>
+
+        <div class="reveal reveal-delay-2" style="max-width: 780px; margin: 0 auto; padding: var(--space-4); background: var(--site-surface); border: 1px solid var(--site-line); border-radius: var(--radius-sm);">
+          <p style="margin: 0 0 0.8rem; font-size: 0.95rem; line-height: 1.6;">
+            There is going to be a context infrastructure layer in the agent stack &mdash; the same way there is a vector database layer, an orchestration layer, and a model layer. Within 18 months it will be obvious it was always there.
+          </p>
+          <p style="margin: 0; font-size: 0.88rem; color: var(--site-muted);">
+            Model providers won't build this; they get paid by the token. Agent frameworks won't build this; they need to stay provider-neutral. It's going to be its own layer.
+            <a href={`${base}/blog/stop-sending-the-model-what-it-already-knows/`} style="color: var(--site-accent); font-weight: 500;">Read the launch post &rarr;</a>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- HOW IT COMPRESSES — reasoning is the mechanism, context is result  -->
@@ -600,6 +655,48 @@ const results = await c.ask('grandparent', ['?who', 'charlie']);
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- FROM THE BLOG — latest essays + link to full blog                  -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    {latestPosts.length > 0 && (
+      <section class="site-section-tight" id="from-the-blog">
+        <div class="site-container">
+          <div class="section-head reveal" style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap;">
+            <div>
+              <div class="site-kicker">From the Blog</div>
+              <h2 class="site-title" style="font-size: clamp(1.7rem, 3.2vw, 2.3rem);">Field notes from the context layer.</h2>
+            </div>
+            <a href={`${base}/blog/`} style="font-family: var(--font-mono); font-size: 0.82rem; letter-spacing: 0.04em; color: var(--site-accent); font-weight: 500; white-space: nowrap;">All posts &rarr;</a>
+          </div>
+
+          <div class="feature-grid reveal reveal-delay-1">
+            {latestPosts.map((post) => (
+              <a
+                href={`${base}/blog/${post.id}/`}
+                class="plain-card"
+                style="display: flex; flex-direction: column; gap: 0.6rem; text-decoration: none; color: inherit; transition: transform 180ms ease, border-color 180ms ease;"
+              >
+                <div style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; color: var(--site-muted); display: flex; gap: 0.55rem; align-items: center;">
+                  <time datetime={post.data.date.toISOString()}>{blogDateFmt.format(post.data.date)}</time>
+                  {post.data.tags.length > 0 && (
+                    <>
+                      <span style="opacity: 0.4;">&middot;</span>
+                      <span style="text-transform: uppercase;">{post.data.tags[0]}</span>
+                    </>
+                  )}
+                </div>
+                <h3 style="font-size: 1.1rem; line-height: 1.25; margin: 0;">{post.data.title}</h3>
+                {post.data.subtitle && (
+                  <p style="font-size: 0.9rem; color: var(--site-muted); margin: 0; line-height: 1.5;">{post.data.subtitle}</p>
+                )}
+                <span style="margin-top: auto; font-family: var(--font-mono); font-size: 0.78rem; color: var(--site-accent); padding-top: 0.4rem;">Read post &rarr;</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+    )}
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- CTA — with enterprise signals                                      -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section class="site-section cta-band" id="get-started">
@@ -631,6 +728,14 @@ const results = await c.ask('grandparent', ['?who', 'charlie']);
             <p style="color: rgba(255,255,255,0.72);">Source, issues, Docker images, native binaries.</p>
             <div class="button-row" style="margin-top: 1rem;">
               <a href="https://github.com/Auctalis/nocturnusai" class="button-secondary">View on GitHub</a>
+            </div>
+          </div>
+
+          <div class="plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none;">
+            <h3 style="color: var(--site-dark-text);">Blog</h3>
+            <p style="color: rgba(255,255,255,0.72);">Launch essays, benchmarks, and field notes from the team.</p>
+            <div class="button-row" style="margin-top: 1rem;">
+              <a href={`${base}/blog/`} class="button-secondary">Read the blog</a>
             </div>
           </div>
         </div>
