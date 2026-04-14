@@ -1,0 +1,186 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Navbar from '../../components/Navbar.astro';
+import Footer from '../../components/Footer.astro';
+import { getCollection } from 'astro:content';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+const fmt = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+---
+
+<Layout
+  title="Blog | Nocturnus.AI"
+  description="Essays and announcements from the team building Nocturnus, the context server for AI agents."
+>
+  <Navbar solid />
+
+  <main class="site-container blog-index">
+    <header class="blog-index-header">
+      <div class="docs-kicker">BLOG</div>
+      <h1>Field notes from the context layer.</h1>
+      <p class="lead">
+        Essays, announcements, and benchmarks from the team building Nocturnus.
+      </p>
+    </header>
+
+    <ul class="blog-list">
+      {posts.map((post) => (
+        <li class="blog-list-item">
+          <a href={`${base}/blog/${post.id}/`} class="blog-list-link">
+            <div class="blog-list-meta">
+              <time datetime={post.data.date.toISOString()}>{fmt.format(post.data.date)}</time>
+              {post.data.tags.length > 0 && (
+                <span class="blog-list-tags">
+                  {post.data.tags.slice(0, 3).map((tag) => (
+                    <span class="blog-list-tag">{tag}</span>
+                  ))}
+                </span>
+              )}
+            </div>
+            <h2 class="blog-list-title">{post.data.title}</h2>
+            {post.data.subtitle && (
+              <p class="blog-list-subtitle">{post.data.subtitle}</p>
+            )}
+            <span class="blog-list-readmore">Read post →</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+
+    {posts.length === 0 && (
+      <p class="blog-empty">No posts yet. Check back soon.</p>
+    )}
+  </main>
+
+  <Footer />
+</Layout>
+
+<style>
+  .blog-index {
+    padding-block: clamp(4rem, 10vw, 7rem) clamp(4rem, 8vw, 6rem);
+    max-width: 960px;
+  }
+
+  .blog-index-header {
+    margin-bottom: clamp(3rem, 6vw, 4.5rem);
+    max-width: 720px;
+  }
+
+  .docs-kicker {
+    font-family: 'Commit Mono', ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, currentColor 55%, transparent);
+    margin-bottom: 1rem;
+  }
+
+  .blog-index-header h1 {
+    font-family: 'Outfit', system-ui, sans-serif;
+    font-size: clamp(2.2rem, 4.5vw, 3.2rem);
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    margin: 0 0 1rem;
+  }
+
+  .blog-index-header .lead {
+    font-size: 1.15rem;
+    line-height: 1.55;
+    color: color-mix(in srgb, currentColor 70%, transparent);
+    margin: 0;
+  }
+
+  .blog-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0;
+    border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  }
+
+  .blog-list-item {
+    border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  }
+
+  .blog-list-link {
+    display: block;
+    padding: 2rem 0;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 180ms ease, opacity 180ms ease;
+  }
+
+  .blog-list-link:hover {
+    transform: translateX(4px);
+  }
+
+  .blog-list-link:hover .blog-list-readmore {
+    color: var(--accent, #e6a03c);
+  }
+
+  .blog-list-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    font-family: 'Commit Mono', ui-monospace, monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+    color: color-mix(in srgb, currentColor 55%, transparent);
+    margin-bottom: 0.6rem;
+  }
+
+  .blog-list-tags {
+    display: inline-flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .blog-list-tag {
+    padding: 0.1rem 0.55rem;
+    border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+  }
+
+  .blog-list-title {
+    font-family: 'Outfit', system-ui, sans-serif;
+    font-size: clamp(1.5rem, 2.6vw, 1.85rem);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    margin: 0 0 0.5rem;
+  }
+
+  .blog-list-subtitle {
+    font-size: 1rem;
+    line-height: 1.5;
+    color: color-mix(in srgb, currentColor 65%, transparent);
+    margin: 0 0 0.9rem;
+    max-width: 640px;
+  }
+
+  .blog-list-readmore {
+    font-family: 'Commit Mono', ui-monospace, monospace;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    color: color-mix(in srgb, currentColor 65%, transparent);
+    transition: color 180ms ease;
+  }
+
+  .blog-empty {
+    color: color-mix(in srgb, currentColor 55%, transparent);
+    font-style: italic;
+  }
+</style>

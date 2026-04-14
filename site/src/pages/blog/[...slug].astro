@@ -1,0 +1,180 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Navbar from '../../components/Navbar.astro';
+import Footer from '../../components/Footer.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog', ({ data }) => !data.draft);
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const fmt = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+---
+
+<Layout
+  title={`${post.data.title} | Nocturnus.AI`}
+  description={post.data.subtitle ?? post.data.title}
+>
+  <Navbar solid />
+
+  <main class="site-container blog-post-shell">
+    <a href={`${base}/blog/`} class="blog-back">← All posts</a>
+
+    <article class="blog-post docs-content">
+      <header class="blog-post-header">
+        <div class="blog-post-meta">
+          <time datetime={post.data.date.toISOString()}>{fmt.format(post.data.date)}</time>
+          <span class="blog-post-sep">·</span>
+          <span>{post.data.author}</span>
+        </div>
+        <h1>{post.data.title}</h1>
+        {post.data.subtitle && <p class="blog-post-subtitle">{post.data.subtitle}</p>}
+        {post.data.tags.length > 0 && (
+          <div class="blog-post-tags">
+            {post.data.tags.map((tag) => (
+              <span class="blog-post-tag">{tag}</span>
+            ))}
+          </div>
+        )}
+      </header>
+
+      <div class="blog-post-body">
+        <Content />
+      </div>
+    </article>
+
+    <footer class="blog-post-footer">
+      <a href={`${base}/blog/`} class="blog-back">← All posts</a>
+    </footer>
+  </main>
+
+  <Footer />
+
+  <script is:inline>
+    (() => {
+      document.querySelectorAll('.blog-post-body pre').forEach((pre) => {
+        if (pre.querySelector('.copy-btn')) return;
+        const button = document.createElement('button');
+        button.className = 'copy-btn';
+        button.textContent = 'copy';
+        button.addEventListener('click', async () => {
+          const code = pre.querySelector('code');
+          const text = (code ?? pre).innerText;
+          try {
+            await navigator.clipboard.writeText(text);
+          } catch {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            ta.remove();
+          }
+          button.textContent = 'copied';
+          button.classList.add('copied');
+          setTimeout(() => {
+            button.textContent = 'copy';
+            button.classList.remove('copied');
+          }, 1600);
+        });
+        pre.appendChild(button);
+      });
+    })();
+  </script>
+</Layout>
+
+<style>
+  .blog-post-shell {
+    padding-block: clamp(3rem, 8vw, 6rem) clamp(4rem, 8vw, 6rem);
+    max-width: 760px;
+  }
+
+  .blog-back {
+    display: inline-block;
+    font-family: 'Commit Mono', ui-monospace, monospace;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    color: color-mix(in srgb, currentColor 60%, transparent);
+    text-decoration: none;
+    margin-bottom: 2.5rem;
+    transition: color 180ms ease;
+  }
+
+  .blog-back:hover {
+    color: var(--accent, #e6a03c);
+  }
+
+  .blog-post-header {
+    margin-bottom: clamp(2.5rem, 5vw, 3.5rem);
+    padding-bottom: clamp(1.5rem, 3vw, 2rem);
+    border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  }
+
+  .blog-post-meta {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    font-family: 'Commit Mono', ui-monospace, monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+    color: color-mix(in srgb, currentColor 55%, transparent);
+    margin-bottom: 1rem;
+  }
+
+  .blog-post-sep {
+    opacity: 0.5;
+  }
+
+  .blog-post-header h1 {
+    font-family: 'Outfit', system-ui, sans-serif;
+    font-size: clamp(2.1rem, 4.8vw, 3.1rem);
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.9rem;
+    border: 0;
+    padding: 0;
+  }
+
+  .blog-post-subtitle {
+    font-size: 1.2rem;
+    line-height: 1.5;
+    color: color-mix(in srgb, currentColor 70%, transparent);
+    margin: 0 0 1.3rem;
+    font-style: italic;
+  }
+
+  .blog-post-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .blog-post-tag {
+    font-family: 'Commit Mono', ui-monospace, monospace;
+    padding: 0.15rem 0.6rem;
+    border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: color-mix(in srgb, currentColor 60%, transparent);
+  }
+
+  .blog-post-footer {
+    margin-top: clamp(3rem, 6vw, 4rem);
+    padding-top: clamp(1.5rem, 3vw, 2rem);
+    border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  }
+</style>
