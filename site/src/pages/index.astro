@@ -33,16 +33,17 @@ const blogDateFmt = new Intl.DateTimeFormat('en-US', {
         <div class="hero-split-left">
           <div class="hero-dark-kicker">CONTEXT SERVER FOR AI AGENTS</div>
           <h1 class="hero-dark-headline">
-            Send <span class="hero-accent">30 tokens</span>
-            instead of 2,400.
+            Send <span class="hero-accent">
+              <span class="hero-num" data-count-to="30" data-count-decimals="0" data-count-locale="en-US">0</span> tokens</span>
+            instead of <span class="hero-num" data-count-to="2400" data-count-decimals="0" data-count-locale="en-US">0</span>.
           </h1>
           <p class="hero-dark-sub">
             NocturnusAI sits between your agent and the LLM. It extracts facts, reasons about what's relevant, and returns only what changed.
           </p>
           <div class="hero-cost-line">
-            <span class="hero-cost-new">$240<span style="font-weight: 400; font-size: 0.6em; opacity: 0.6;">/mo</span></span>
+            <span class="hero-cost-new">$<span class="hero-num" data-count-to="240" data-count-decimals="0" data-count-locale="en-US">0</span><span style="font-weight: 400; font-size: 0.6em; opacity: 0.6;">/mo</span></span>
             <span class="hero-cost-vs">instead of</span>
-            <span class="hero-cost-old">$54,000<span style="font-weight: 400; font-size: 0.6em; opacity: 0.5;">/mo</span></span>
+            <span class="hero-cost-old">$<span class="hero-num" data-count-to="54000" data-count-decimals="0" data-count-locale="en-US">0</span><span style="font-weight: 400; font-size: 0.6em; opacity: 0.5;">/mo</span></span>
           </div>
           <div class="hero-dark-ctas">
             <a href="#try-it" class="hero-btn-primary">Try it now</a>
@@ -84,6 +85,56 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
         </div>
       </div>
     </section>
+
+    <style>
+      .hero-num {
+        font-variant-numeric: tabular-nums;
+        display: inline-block;
+      }
+    </style>
+
+    <script is:inline>
+      // Fire-once count-up for the hero numbers. Runs on first paint so the
+      // page feels alive from the moment it loads. Respects reduced-motion.
+      (() => {
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const targets = document.querySelectorAll('.hero-dark .hero-num');
+        if (!targets.length) return;
+
+        const animate = (el) => {
+          const to = Number(el.dataset.countTo) || 0;
+          const decimals = Number(el.dataset.countDecimals) || 0;
+          const locale = el.dataset.countLocale || 'en-US';
+          const fmt = (n) => n.toLocaleString(locale, {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
+          });
+
+          if (reduceMotion) {
+            el.textContent = fmt(to);
+            return;
+          }
+
+          const duration = 900; // ms — fast enough to land before user scrolls
+          const start = performance.now();
+          const easeOutExpo = (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t));
+          const tick = (now) => {
+            const t = Math.min(1, (now - start) / duration);
+            el.textContent = fmt(to * easeOutExpo(t));
+            if (t < 1) requestAnimationFrame(tick);
+            else el.textContent = fmt(to);
+          };
+          requestAnimationFrame(tick);
+        };
+
+        const run = () => targets.forEach(animate);
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', run, { once: true });
+        } else {
+          run();
+        }
+      })();
+    </script>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- WHY NOW — the urgency and the inflection                           -->
@@ -411,13 +462,15 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
       }
 
       .savings-ticker .ticker-value {
-        font-family: var(--font-mono);
-        font-size: clamp(2.2rem, 5vw, 3.2rem);
+        /* Match the hero headline: Instrument Sans / Outfit, heavy, tight */
+        font-family: var(--font-display);
+        font-size: clamp(2.6rem, 6vw, 4rem);
         font-weight: 700;
         line-height: 1;
+        letter-spacing: -0.04em;
         display: inline-flex;
         align-items: baseline;
-        gap: 0.08em;
+        gap: 0.04em;
         font-variant-numeric: tabular-nums;
       }
 
@@ -427,21 +480,25 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
 
       .savings-ticker .ticker-value-big {
         color: var(--site-accent);
-        font-size: clamp(2.6rem, 6vw, 3.8rem);
+        font-size: clamp(3rem, 7vw, 4.8rem);
       }
 
       .savings-ticker .ticker-currency {
-        font-size: 0.55em;
-        font-weight: 500;
-        transform: translateY(-0.6em);
-        opacity: 0.75;
+        font-size: 0.5em;
+        font-weight: 600;
+        transform: translateY(-0.55em);
+        opacity: 0.7;
+        letter-spacing: 0;
       }
 
       .savings-ticker .ticker-unit {
-        font-size: 0.35em;
+        font-family: var(--font-mono);
+        font-size: 0.3em;
         font-weight: 500;
         opacity: 0.55;
-        margin-left: 0.15em;
+        margin-left: 0.2em;
+        letter-spacing: 0.05em;
+        align-self: center;
       }
 
       .savings-ticker .ticker-sub {
