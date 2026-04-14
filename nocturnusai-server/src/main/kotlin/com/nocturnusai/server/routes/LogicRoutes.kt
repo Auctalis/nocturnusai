@@ -254,13 +254,16 @@ fun Route.logicRoutes(dbManager: DatabaseManager) {
             val minConfidence = call.request.queryParameters["minConfidence"]?.toDoubleOrNull()
                 ?: req.confidence // also support in body
 
+            // Cap inference output to guard against OOM from rules that produce
+            // large cartesian result sets. Configurable via INFERENCE_MAX_RESULTS.
+            val maxResults = System.getenv("INFERENCE_MAX_RESULTS")?.toIntOrNull() ?: 10_000
             if (withProof) {
                 val proofTrees = db.inferWithProof(queryAtom, tenantId)
-                val response = proofTrees.map { ProofTreeResponse.from(it) }.toList()
+                val response = proofTrees.map { ProofTreeResponse.from(it) }.take(maxResults).toList()
                 call.respond(response)
             } else {
                 val results = db.infer(queryAtom, tenantId, minConfidence = minConfidence)
-                val response = results.map { AtomResponse.from(it) }.toList()
+                val response = results.map { AtomResponse.from(it) }.take(maxResults).toList()
                 call.respond(response)
             }
         } catch (e: ValidationException) {

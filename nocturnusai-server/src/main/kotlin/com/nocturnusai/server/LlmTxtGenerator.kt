@@ -79,10 +79,23 @@ object LlmTxtGenerator {
         
         val root = application.plugin(Routing)
         val routes = getAllRoutes(root)
-        
-        // Group/Sort routes
-        routes.sortedBy { it }.forEach { routeLine ->
-             sb.append(routeLine).append("\n\n")
+
+        // Filter out sensitive routes from the public-facing catalogue:
+        //   /admin/* — administrative endpoints (key mgmt, nukes, backups)
+        //   /auth/*  — authentication (except /auth/status which is already public)
+        //   /replication/* — leader/follower replication APIs
+        // These remain callable (gated by RBAC permissions) but are not advertised in
+        // the unauthenticated /llm.txt endpoint, where they were previously a
+        // discovery aid for attackers probing the attack surface.
+        val filtered = routes.filter { line ->
+            val sensitive = line.contains(" /admin") ||
+                (line.contains(" /auth") && !line.contains(" /auth/status")) ||
+                line.contains(" /replication")
+            !sensitive
+        }
+
+        filtered.sortedBy { it }.forEach { routeLine ->
+            sb.append(routeLine).append("\n\n")
         }
 
         return sb.toString()

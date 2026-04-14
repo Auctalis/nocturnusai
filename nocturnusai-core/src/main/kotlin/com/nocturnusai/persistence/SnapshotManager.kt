@@ -20,6 +20,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 @Serializable
 data class TenantSnapshotData(
@@ -52,12 +54,23 @@ class SnapshotManager(private val storageDir: File, private val encryption: Encr
         tempFile.writeText(outputText)
 
         val finalFile = File(storageDir, "snapshot.json")
+        // Back up the previous snapshot atomically where the filesystem allows.
+        // Files.move(ATOMIC_MOVE) fails hard if the rename isn't atomic, which is
+        // safer than renameTo()'s silent-boolean-return behaviour.
         if (finalFile.exists()) {
-             val backup = File(storageDir, "snapshot.bak")
-             if (backup.exists()) backup.delete()
-             finalFile.renameTo(backup)
+            val backup = File(storageDir, "snapshot.bak")
+            Files.move(
+                finalFile.toPath(),
+                backup.toPath(),
+                StandardCopyOption.REPLACE_EXISTING
+            )
         }
-        tempFile.renameTo(finalFile)
+        Files.move(
+            tempFile.toPath(),
+            finalFile.toPath(),
+            StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING
+        )
     }
 
     fun loadSnapshot(): SnapshotData? {
@@ -66,12 +79,31 @@ class SnapshotManager(private val storageDir: File, private val encryption: Encr
         return try {
             val rawText = file.readText()
             val jsonText = if (encryption != null) {
-                try { encryption.decryptString(rawText) } catch (_: Exception) { rawText }
-            } else { rawText }
+                try {
+                    encryption.decryptString(rawText)
+                } catch (e: Exception) {
+                    // See WriteAheadLog.decryptLine for rationale. In strict mode (the
+                    // default when encryption is configured) we refuse the plaintext
+                    // fallback and treat the snapshot as unreadable rather than silently
+                    // replaying attacker-controlled plaintext.
+                    if (strictDecrypt) {
+                        System.err.println("Snapshot decryption failed (strict mode): ${e.message}")
+                        return null
+                    }
+                    rawText
+                }
+            } else {
+                rawText
+            }
             json.decodeFromString<SnapshotData>(jsonText)
         } catch (e: Exception) {
             System.err.println("Failed to load snapshot: ${e.message}")
             return null
         }
+    }
+
+    companion object {
+        private val strictDecrypt: Boolean =
+            System.getenv("STORAGE_STRICT_DECRYPT")?.toBoolean() ?: true
     }
 }

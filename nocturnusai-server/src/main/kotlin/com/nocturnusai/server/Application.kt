@@ -180,12 +180,20 @@ fun Application.moduleWithStorageDir(storageDir: File) {
     install(CallLogging) {
         level = Level.INFO
         format { call ->
+            // Sanitize any field derived from request input before writing it to the
+            // log, so a malicious caller can't inject CRLF, NUL, or control characters
+            // to forge log entries or break log parsers.
+            fun sanitize(s: String): String = s.replace(
+                Regex("[\\x00-\\x1f\\x7f]"),
+                "?"
+            ).take(256)
+
             val status = call.response.status()
             val httpMethod = call.request.httpMethod.value
-            val uri = call.request.uri
+            val uri = sanitize(call.request.uri)
             val requestId = call.response.headers["X-Request-ID"] ?: "-"
-            val db = call.request.header("X-Database") ?: "default"
-            val tenant = call.request.header("X-Tenant-ID") ?: "-"
+            val db = sanitize(call.request.header("X-Database") ?: "default")
+            val tenant = sanitize(call.request.header("X-Tenant-ID") ?: "-")
             "[$requestId] $httpMethod $uri -> $status [db=$db t=$tenant]"
         }
     }

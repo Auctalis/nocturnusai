@@ -34,9 +34,22 @@ class Parser(private val tokens: List<Token>) {
     fun parse(): List<Command> {
         val commands = mutableListOf<Command>()
         while (!isAtEnd()) {
+            if (commands.size >= MAX_COMMANDS) {
+                throw IllegalStateException(
+                    "Parser: too many commands in one script (> $MAX_COMMANDS). " +
+                    "Split the request into smaller batches or increase PARSER_MAX_COMMANDS."
+                )
+            }
             commands.add(parseCommand())
         }
         return commands
+    }
+
+    companion object {
+        // Caps the number of commands a single /execute DSL payload can contain.
+        // Combined with the HTTP body-size limit this bounds total parser work.
+        val MAX_COMMANDS: Int =
+            System.getenv("PARSER_MAX_COMMANDS")?.toIntOrNull() ?: 10_000
     }
 
     private fun parseCommand(): Command {

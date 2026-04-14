@@ -20,7 +20,10 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.slf4j.LoggerFactory
 import java.io.File
+
+private val adminLog = LoggerFactory.getLogger("com.nocturnusai.server.routes.AdminRoutes")
 
 fun Route.adminRoutes(dbManager: DatabaseManager) {
     post("/admin/databases") {
@@ -179,19 +182,27 @@ fun Route.adminRoutes(dbManager: DatabaseManager) {
 
     post("/admin/backups") {
          try {
-             val backupDir = File(ServerConfig.storageDir.parentFile, "backups")
-
              val dbName = call.request.queryParameters["db"] ?: "default"
+             // Validate the db name so it can't contain path-traversal characters
+             // or exceed limits before we use it for filesystem operations.
+             Validator.validateDatabaseName(dbName)
+
+             val backupDir = File(ServerConfig.storageDir.parentFile, "backups")
              val db = dbManager.getDatabase(dbName)
              if (db != null) {
                  val path = db.createBackup(backupDir)
-                 call.respondText("Backup created at: ${path.absolutePath}")
+                 // Return only the relative directory name — the absolute server-side
+                 // path was previously leaked to the client, which gave attackers a
+                 // map of the server's filesystem layout.
+                 call.respondText("Backup created: ${path.name}")
              } else {
                  call.respond(HttpStatusCode.NotFound, ErrorResponse("NOT_FOUND", "Database not found"))
              }
-
+         } catch (e: ValidationException) {
+             call.respond(HttpStatusCode.BadRequest, ErrorResponse("VALIDATION_ERROR", e.message ?: "Validation error"))
          } catch (e: Exception) {
-             call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", e.message ?: "Error"))
+             adminLog.error("Backup failed", e)
+             call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", "Backup failed"))
          }
     }
 }

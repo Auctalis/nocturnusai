@@ -89,7 +89,11 @@ object AuthInterceptor {
         RouteMatch("POST", "/assert/template") to Permission.RULE_WRITE,
         RouteMatch("POST", "/infer") to Permission.INFERENCE,
         RouteMatch("POST", "/retract") to Permission.FACT_WRITE,
-        RouteMatch("POST", "/execute") to Permission.FACT_WRITE,
+        // /execute runs arbitrary DSL (asserts, rules, inference, extract, test) —
+        // strictly more powerful than any single /assert/* route. Require the most
+        // privileged write permission so a writer key scoped to one predicate can't
+        // widen its scope by pushing a multi-command DSL script.
+        RouteMatch("POST", "/execute") to Permission.RULE_WRITE,
 
         // Memory routes
         RouteMatch("POST", "/memory/query/temporal") to Permission.MEMORY_READ,
@@ -173,8 +177,11 @@ object AuthInterceptor {
                         return@intercept finish()
                     }
 
-                    // Check rate limit before any key work
-                    val clientIp = call.request.local.remoteHost
+                    // Check rate limit before any key work. Use the trusted-proxy-aware
+                    // extractor so that deployments behind a reverse proxy can't have every
+                    // client share a single rate-limit bucket (and so an attacker can't
+                    // evade the limit by rotating source IPs upstream of the proxy).
+                    val clientIp = ClientIp.of(call)
                     when (val rate = authRateLimiter.check(clientIp)) {
                         is RateLimiter.Result.LockedOut -> {
                             log.warn("Auth rate limit exceeded from $clientIp — locked out for ${rate.retryAfterSeconds}s")

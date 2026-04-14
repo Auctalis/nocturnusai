@@ -23,6 +23,8 @@ import java.security.SecureRandom
 import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * Manages API keys: creation, validation, persistence, and CRUD.
@@ -86,10 +88,17 @@ class ApiKeyManager(private val storageDir: File) {
 
     /**
      * Validate a raw API key and return the authenticated principal, or null if invalid.
+     *
+     * Supports both hash formats for rolling migration: if `API_KEY_PEPPER` is set,
+     * new keys are stored as `HMAC-SHA256(pepper, key)`. For backwards compatibility
+     * we also check the legacy `SHA-256(key)` format so existing keys keep working
+     * until they're rotated.
      */
     fun validate(rawKey: String): AuthPrincipal? {
-        val hash = hashKey(rawKey)
-        val id = hashIndex[hash] ?: return null
+        // Try peppered form first (current), fall back to legacy SHA-256.
+        val peppered = hashKey(rawKey)
+        val legacy = legacyHash(rawKey)
+        val id = hashIndex[peppered] ?: hashIndex[legacy] ?: return null
         val record = keys[id] ?: return null
 
         if (!record.enabled) return null
@@ -170,7 +179,32 @@ class ApiKeyManager(private val storageDir: File) {
         return "axb_${encoded}"
     }
 
+    /**
+     * Canonical storage hash for a raw key.
+     *
+     * If `API_KEY_PEPPER` is set (recommended), we use HMAC-SHA256 with the pepper as
+     * the secret key. This prevents an attacker who exfiltrates `api-keys.json` from
+     * running a precomputed rainbow table or hash-tool against the stored digests
+     * — without also exfiltrating the pepper from the server environment.
+     *
+     * If unset, we fall back to plain SHA-256 (legacy format) so existing databases
+     * keep working. Operators should set `API_KEY_PEPPER` to a random 32+ byte value
+     * and rotate their keys.
+     */
     internal fun hashKey(rawKey: String): String {
+        val pepper = System.getenv("API_KEY_PEPPER")?.ifBlank { null }
+        return if (pepper != null) {
+            val mac = Mac.getInstance("HmacSHA256")
+            mac.init(SecretKeySpec(pepper.toByteArray(Charsets.UTF_8), "HmacSHA256"))
+            val bytes = mac.doFinal(rawKey.toByteArray(Charsets.UTF_8))
+            bytes.joinToString("") { "%02x".format(it) }
+        } else {
+            legacyHash(rawKey)
+        }
+    }
+
+    /** Legacy SHA-256 hash retained for backwards-compatible validation. */
+    private fun legacyHash(rawKey: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val hashBytes = digest.digest(rawKey.toByteArray(Charsets.UTF_8))
         return hashBytes.joinToString("") { "%02x".format(it) }

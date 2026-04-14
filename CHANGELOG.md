@@ -7,6 +7,26 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.3.8] — 2026-04-14
+
+### Security
+- **Trusted-proxy-aware rate limiting** — auth and bootstrap rate limiters now honour `X-Forwarded-For` when the TCP peer is listed in `TRUSTED_PROXY_IPS`. Without this, every client behind a reverse proxy shared a single bucket (DoS vector) and attackers upstream of the proxy could evade the limit.
+- **Strict decrypt for WAL + snapshots** — when `ENCRYPTION_KEY` is configured, lines/files that fail GCM auth are *skipped* rather than silently accepted as plaintext, blocking injection of replayable records by someone with filesystem access. Set `STORAGE_STRICT_DECRYPT=false` for a one-off legacy-data migration window.
+- **Log-injection guard** — CallLogging sanitizes URI and `X-Database`/`X-Tenant-ID` headers before writing them to the log (strips CRLF and other control chars, caps length).
+- **`/admin/backups`** now validates the `db` query param and returns only the relative backup name (previously leaked the absolute server-side path).
+- **`/execute` DSL** now requires `RULE_WRITE` permission — previously `FACT_WRITE`, which let writer-scoped keys run arbitrary rules via the multi-command DSL.
+- **Parser command cap** — `/execute` payloads are capped at `PARSER_MAX_COMMANDS` (default 10 000). Combined with the 10 MB body limit this bounds parse work.
+- **Inference result cap** — `/infer` results are capped at `INFERENCE_MAX_RESULTS` (default 10 000) to prevent OOM from cartesian rule expansion.
+- **API key pepper** — when `API_KEY_PEPPER` is set, new keys are stored as `HMAC-SHA256(pepper, key)`. Legacy SHA-256 keys continue to validate for rolling migration.
+- **`/llm.txt`** no longer advertises `/admin/*`, `/auth/*`, or `/replication/*` routes (it was unauthenticated and functioning as a discovery aid).
+- **Atomic snapshot rename** — `SnapshotManager.saveSnapshot` now uses `Files.move(ATOMIC_MOVE, REPLACE_EXISTING)` instead of the silent-fail `File.renameTo`.
+
+### Notes
+- SSE connection caps / idle timeout are still pending and will land in a follow-up.
+- Several broad `catch (Exception) { e.message }` paths in `AdminRoutes` still echo internal messages; `/admin/backups` is tightened in this release.
+
+---
+
 ## [0.3.7] — 2026-04-14
 
 ### Security

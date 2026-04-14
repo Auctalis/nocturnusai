@@ -210,8 +210,23 @@ class WriteAheadLog(private val walFile: File, private val encryption: Encryptio
         if (encryption == null) return line
         return try {
             encryption.decryptString(line)
-        } catch (_: Exception) {
-            line // fallback: legacy plaintext line
+        } catch (e: Exception) {
+            // When encryption is configured, a line that fails to decrypt is suspicious:
+            // it was either written in a different key (corrupt WAL), or deliberately
+            // injected as plaintext by someone with filesystem access. In strict mode
+            // (STORAGE_STRICT_DECRYPT=true — default ON when encryption is configured,
+            // opt-out with explicit "false") we refuse to accept the fallback and the
+            // caller skips the line as corrupt rather than replaying it verbatim.
+            if (strictDecrypt) throw e
+            line // legacy plaintext line — only in permissive mode
         }
+    }
+
+    companion object {
+        // Default to STRICT whenever encryption is configured. Operators with a
+        // mixed plaintext/encrypted legacy WAL can set STORAGE_STRICT_DECRYPT=false
+        // during a one-off migration window.
+        private val strictDecrypt: Boolean =
+            System.getenv("STORAGE_STRICT_DECRYPT")?.toBoolean() ?: true
     }
 }

@@ -18,6 +18,7 @@ import com.nocturnusai.server.ErrorResponse
 import com.nocturnusai.server.ServerConfig
 import com.nocturnusai.server.ValidationException
 import com.nocturnusai.server.auth.*
+import com.nocturnusai.server.auth.ClientIp
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -51,8 +52,9 @@ fun Route.authRoutes(keyManager: ApiKeyManager?) {
             return@post
         }
 
-        // Rate-limit by client IP to prevent credential brute-force
-        val clientIp = call.request.local.remoteHost
+        // Rate-limit by client IP to prevent credential brute-force.
+        // Uses trusted-proxy-aware extraction — see ClientIp for rationale.
+        val clientIp = ClientIp.of(call)
         when (val rate = bootstrapRateLimiter.check(clientIp)) {
             is RateLimiter.Result.LockedOut -> {
                 log.warn("Bootstrap rate limit exceeded from $clientIp — locked out for ${rate.retryAfterSeconds}s")
