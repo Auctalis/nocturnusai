@@ -993,7 +993,7 @@ class Setup(
         } else {
             println("  ${DIM}Config overrides: create ${envFile.path} only if you want to change the defaults.$RESET")
         }
-        println("  ${DIM}Docs:   https://auctalis.github.io/nocturnusai/$RESET")
+        println("  ${DIM}Docs:   https://nocturnus.ai/$RESET")
         println()
     }
 

@@ -231,8 +231,8 @@ curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.s
 
 | What | Where |
 |------|-------|
-| Docs site | [auctalis.github.io/nocturnusai](https://auctalis.github.io/nocturnusai) |
-| Context workflow | [site docs](https://auctalis.github.io/nocturnusai/docs/context) |
+| Docs site | [nocturnus.ai](https://nocturnus.ai) |
+| Context workflow | [site docs](https://nocturnus.ai/docs/context) |
 | Full API reference | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) |
 | Deep user guide | [USERGUIDE.md](USERGUIDE.md) |
 | MCP configs | [mcp-configs/README.md](mcp-configs/README.md) |

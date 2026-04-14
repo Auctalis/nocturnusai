@@ -145,7 +145,7 @@ Args: `--server`, `--db`, `--api-key`, `--tenant`/`-t`, `--exec`/`-e`.
 - Zero runtime dependencies (uses built-in fetch)
 
 ### site/ — Documentation Site (Astro + GitHub Pages)
-- Static site built with **Astro**, deployed to GitHub Pages at `https://auctalis.github.io/nocturnusai/`
+- Static site built with **Astro**, deployed to GitHub Pages at `https://nocturnus.ai/`
 - Source: `site/src/pages/` (`.astro` files), `site/src/layouts/DocsLayout.astro` (shared sidebar + nav), `site/src/components/Navbar.astro`
 - All doc pages use `DocsLayout` with `const base = import.meta.env.BASE_URL.replace(/\/$/, '')` for correct path resolution on GitHub Pages
 - Convention: sidebar section titles match page `<h1>` and `<DocsLayout title="">` prop (e.g., "CLI Reference", "API Reference", "MCP Integration")

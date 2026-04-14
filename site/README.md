@@ -2,7 +2,7 @@
 
 This directory contains the public documentation site for NocturnusAI.
 
-The site is built with Astro and deployed to GitHub Pages at [https://auctalis.github.io/nocturnusai/](https://auctalis.github.io/nocturnusai/).
+The site is built with Astro and deployed to GitHub Pages at [https://nocturnus.ai/](https://nocturnus.ai/).
 
 ## What This Site Is For
 

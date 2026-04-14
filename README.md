@@ -295,18 +295,18 @@ For goal-driven context windows and diffs, use the REST API or SDKs alongside th
 
 ## Documentation
 
-Full docs: **[auctalis.github.io/nocturnusai](https://auctalis.github.io/nocturnusai)**
+Full docs: **[nocturnus.ai](https://nocturnus.ai)**
 
 | | |
 |---|---|
-| [Start Here](https://auctalis.github.io/nocturnusai/docs) | Begin with the turn-reduction workflow |
-| [Context Workflow](https://auctalis.github.io/nocturnusai/docs/context) | Raw turns -> optimize -> diff -> clear |
-| [API Reference](https://auctalis.github.io/nocturnusai/docs/api) | REST endpoints and response shapes |
-| [SDKs](https://auctalis.github.io/nocturnusai/docs/sdks) | Python and TypeScript client methods |
-| [Integrations](https://auctalis.github.io/nocturnusai/integrations) | LangChain, CrewAI, AutoGen, LangGraph, OpenAI Agents, Anthropic, MCP |
-| [MCP Integration](https://auctalis.github.io/nocturnusai/docs/mcp) | MCP config plus companion context API usage |
-| [How It Works on the Backend](https://auctalis.github.io/nocturnusai/docs/concepts) | Facts, rules, inference, salience, scopes |
-| [Security & Auth](https://auctalis.github.io/nocturnusai/docs/security) | API keys, RBAC, TLS, encryption at rest |
+| [Start Here](https://nocturnus.ai/docs) | Begin with the turn-reduction workflow |
+| [Context Workflow](https://nocturnus.ai/docs/context) | Raw turns -> optimize -> diff -> clear |
+| [API Reference](https://nocturnus.ai/docs/api) | REST endpoints and response shapes |
+| [SDKs](https://nocturnus.ai/docs/sdks) | Python and TypeScript client methods |
+| [Integrations](https://nocturnus.ai/integrations) | LangChain, CrewAI, AutoGen, LangGraph, OpenAI Agents, Anthropic, MCP |
+| [MCP Integration](https://nocturnus.ai/docs/mcp) | MCP config plus companion context API usage |
+| [How It Works on the Backend](https://nocturnus.ai/docs/concepts) | Facts, rules, inference, salience, scopes |
+| [Security & Auth](https://nocturnus.ai/docs/security) | API keys, RBAC, TLS, encryption at rest |
 
 ---
 

@@ -177,7 +177,7 @@ async with NocturnusAIMCPClient("http://localhost:9300") as mcp:
 
 ## Docs
 
-- [Docs site](https://auctalis.github.io/nocturnusai/docs)
-- [SDK docs](https://auctalis.github.io/nocturnusai/docs/sdks)
+- [Docs site](https://nocturnus.ai/docs)
+- [SDK docs](https://nocturnus.ai/docs/sdks)
 - [MCP configs](https://github.com/Auctalis/nocturnusai/tree/main/mcp-configs)
 - [Demos](https://github.com/Auctalis/nocturnusai/tree/main/demos)

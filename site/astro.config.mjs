@@ -2,14 +2,12 @@
 import { defineConfig } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
 
-// When deploying to GitHub Pages without a custom domain, the site lives at
-// https://auctalis.github.io/nocturnusai — set GITHUB_PAGES=true in CI to
-// enable the base path. Local dev works at http://localhost:4321 without it.
-const isGitHubPages = process.env.GITHUB_PAGES === 'true';
-
+// Deployed to GitHub Pages with a custom apex domain (nocturnus.ai),
+// so the site lives at the root path. public/CNAME tells Pages which
+// domain to serve the build from.
 export default defineConfig({
-  site: 'https://auctalis.github.io',
-  base: isGitHubPages ? '/nocturnusai' : '/',
+  site: 'https://nocturnus.ai',
+  base: '/',
   vite: {
     plugins: [tailwindcss()]
   }
