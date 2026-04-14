@@ -12,7 +12,7 @@
 
 **Please do not open a public GitHub issue for security vulnerabilities.**
 
-Report vulnerabilities via [GitHub Security Advisories](https://github.com/Auctalis/nocturnusai/security/advisories/new) (private, directly to maintainers).
+Report vulnerabilities via [GitHub Security Advisories](https://github.com/Auctalis/nocturnusai/security/advisories/new) (private, directly to maintainers), or email [dev@nocturnus.ai](mailto:dev@nocturnus.ai).
 
 Include:
 - Description of the vulnerability and its potential impact
