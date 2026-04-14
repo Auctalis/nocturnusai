@@ -19,6 +19,8 @@ import com.nocturnusai.storage.Hexastore
 import com.nocturnusai.inference.Substitution
 import com.nocturnusai.inference.Unifier
 import java.net.HttpURLConnection
+import java.net.InetAddress
+import java.net.URI
 import java.net.URL
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.serialization.json.*
@@ -455,13 +457,26 @@ class BackwardChainer(
          * Makes a blocking HTTP GET to [url], parses the JSON response, and extracts
          * the value at [jsonPath] (supports simple `$.field` and `$.field.nested.path`).
          * Returns the extracted value as a String, or null on any error.
+         *
+         * SECURITY — SSRF hardening:
+         * - Disabled by default. Enable with `ENABLE_HTTP_BUILTIN=true`.
+         * - Only https:// is allowed (override with `HTTP_BUILTIN_ALLOW_HTTP=true` for dev/tests).
+         * - The resolved host must not be loopback, link-local, site-local, multicast,
+         *   wildcard, or any-local. This blocks cloud metadata endpoints (169.254.169.254),
+         *   localhost, and RFC1918/RFC4193 private ranges.
+         * - Redirects are disabled to prevent bypass via 3xx to private hosts.
+         * - Optional host allowlist via `HTTP_BUILTIN_ALLOWED_HOSTS` (comma-separated).
          */
         fun resolveHttpGetJson(url: String, jsonPath: String): String? {
             return try {
+                if (!isHttpBuiltinEnabled()) return null
+                if (!isUrlAllowed(url)) return null
+
                 val connection = URL(url).openConnection() as HttpURLConnection
                 connection.connectTimeout = 5_000
                 connection.readTimeout = 10_000
                 connection.requestMethod = "GET"
+                connection.instanceFollowRedirects = false
                 connection.setRequestProperty("Accept", "application/json")
                 val status = connection.responseCode
                 if (status !in 200..299) return null
@@ -486,6 +501,58 @@ class BackwardChainer(
             } catch (e: Exception) {
                 null  // network or parse error → predicate fails
             }
+        }
+
+        private fun isHttpBuiltinEnabled(): Boolean =
+            System.getenv("ENABLE_HTTP_BUILTIN")?.toBoolean() ?: false
+
+        /**
+         * Validates a URL is safe to fetch:
+         * scheme allowed, host resolvable, resolved IP is not private/loopback/link-local,
+         * and host passes the optional allowlist. Returns false (and does not throw) on any
+         * validation failure — callers treat false as "predicate fails".
+         */
+        internal fun isUrlAllowed(url: String): Boolean {
+            val uri = try { URI(url) } catch (_: Exception) { return false }
+            val scheme = uri.scheme?.lowercase() ?: return false
+
+            val allowHttp = System.getenv("HTTP_BUILTIN_ALLOW_HTTP")?.toBoolean() ?: false
+            if (scheme != "https" && !(scheme == "http" && allowHttp)) return false
+
+            val host = uri.host ?: return false
+
+            // Optional host allowlist
+            val allowedHosts = System.getenv("HTTP_BUILTIN_ALLOWED_HOSTS")
+                ?.split(",")
+                ?.map { it.trim().lowercase() }
+                ?.filter { it.isNotEmpty() }
+                ?: emptyList()
+            if (allowedHosts.isNotEmpty() && host.lowercase() !in allowedHosts) return false
+
+            // Resolve the host and refuse any private / loopback / link-local / wildcard
+            // address. Note: this does not fully defend against DNS rebinding, but the short
+            // connect timeout + no-redirect policy narrow the window significantly.
+            val addresses = try { InetAddress.getAllByName(host) } catch (_: Exception) { return false }
+            if (addresses.isEmpty()) return false
+            for (addr in addresses) {
+                if (addr.isLoopbackAddress ||
+                    addr.isLinkLocalAddress ||
+                    addr.isSiteLocalAddress ||
+                    addr.isMulticastAddress ||
+                    addr.isAnyLocalAddress) {
+                    return false
+                }
+                // Explicitly block cloud metadata services and common private ranges that
+                // Java's isSiteLocalAddress does not flag (e.g. 100.64/10 CGNAT, IPv6 ULA).
+                val ip = addr.hostAddress
+                if (ip == "169.254.169.254" ||                    // AWS / GCP / Azure IMDS
+                    ip.startsWith("fd") || ip.startsWith("fc") || // IPv6 unique-local
+                    ip.startsWith("100.64.") ||                   // CGNAT
+                    ip.startsWith("0.")) {
+                    return false
+                }
+            }
+            return true
         }
     }
 

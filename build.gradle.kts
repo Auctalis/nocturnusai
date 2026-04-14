@@ -8,7 +8,7 @@ plugins {
 
 allprojects {
     group = "com.nocturnusai"
-    version = "0.3.5"
+    version = "0.3.7"
 
     repositories {
         mavenCentral()

@@ -94,7 +94,8 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation:2.3.13")
     implementation("io.ktor:ktor-server-call-logging:2.3.13")
     implementation("io.ktor:ktor-server-websockets:2.3.13")
-    implementation("ch.qos.logback:logback-classic:1.4.14")
+    // 1.5.13+ fixes CVE-2023-6378 (SerializationVulnerability) and CVE-2024-12798
+    implementation("ch.qos.logback:logback-classic:1.5.13")
     implementation("net.logstash.logback:logstash-logback-encoder:7.4")
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-server-tests-jvm:2.3.13")

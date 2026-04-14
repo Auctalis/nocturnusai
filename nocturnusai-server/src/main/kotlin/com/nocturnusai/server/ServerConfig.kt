@@ -42,6 +42,13 @@ object ServerConfig {
     val usingDefaultAdminCredentials: Boolean
         get() = System.getenv("NOCTURNUSAI_ADMIN_USER") == null || System.getenv("NOCTURNUSAI_ADMIN_PASS") == null
 
+    // True when the admin password is still the well-known default value. Startup
+    // refuses to enable RBAC in this state — the default must be changed via
+    // NOCTURNUSAI_ADMIN_PASS before the server will boot with AUTH_ENABLED=true.
+    // Tests and CI may override this gate with NOCTURNUSAI_ALLOW_DEFAULT_ADMIN_PASS=true.
+    val adminPassIsDefault: Boolean
+        get() = adminPass == "nocturnusai"
+
     // Default expiry for newly-created API keys (days). null = no expiry.
     // Applies to /auth/bootstrap and /auth/keys unless the caller provides expiresInDays.
     // Recommended: 365 for production.

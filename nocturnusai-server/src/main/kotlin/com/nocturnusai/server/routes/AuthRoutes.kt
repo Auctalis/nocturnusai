@@ -25,6 +25,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
+import java.security.MessageDigest
 
 private val log = LoggerFactory.getLogger("com.nocturnusai.server.routes.AuthRoutes")
 
@@ -67,8 +68,18 @@ fun Route.authRoutes(keyManager: ApiKeyManager?) {
 
         val req = call.receive<BootstrapRequest>()
 
-        // Verify admin credentials from environment
-        if (req.username != ServerConfig.adminUser || req.password != ServerConfig.adminPass) {
+        // Verify admin credentials from environment.
+        // Use MessageDigest.isEqual for a constant-time comparison on the password so
+        // the length and prefix of the expected secret cannot be inferred from timing.
+        val userMatches = MessageDigest.isEqual(
+            req.username.toByteArray(Charsets.UTF_8),
+            ServerConfig.adminUser.toByteArray(Charsets.UTF_8)
+        )
+        val passMatches = MessageDigest.isEqual(
+            req.password.toByteArray(Charsets.UTF_8),
+            ServerConfig.adminPass.toByteArray(Charsets.UTF_8)
+        )
+        if (!userMatches || !passMatches) {
             log.warn("Bootstrap auth failed (bad credentials) from $clientIp")
             call.respond(
                 HttpStatusCode.Unauthorized,

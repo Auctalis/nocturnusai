@@ -51,6 +51,24 @@ fun main() {
     // Configure logging first — before any logger is used
     LoggingConfig.configure()
 
+    // Refuse to boot with default admin credentials in RBAC mode.
+    // The default password ("nocturnusai") is publicly documented and would make
+    // /auth/bootstrap trivially exploitable. Operators must set
+    // NOCTURNUSAI_ADMIN_PASS to a secret value. CI may override with
+    // NOCTURNUSAI_ALLOW_DEFAULT_ADMIN_PASS=true for testing.
+    if (ServerConfig.authMode == AuthMode.RBAC && ServerConfig.adminPassIsDefault) {
+        val allow = System.getenv("NOCTURNUSAI_ALLOW_DEFAULT_ADMIN_PASS")?.toBoolean() ?: false
+        if (!allow) {
+            System.err.println(
+                "FATAL: NOCTURNUSAI_ADMIN_PASS is unset or uses the documented default. " +
+                "Refusing to start with AUTH_ENABLED=true. " +
+                "Set NOCTURNUSAI_ADMIN_PASS to a strong secret, or export " +
+                "NOCTURNUSAI_ALLOW_DEFAULT_ADMIN_PASS=true to bypass (test/CI only)."
+            )
+            kotlin.system.exitProcess(78) // EX_CONFIG
+        }
+    }
+
     val env = applicationEngineEnvironment {
         connector {
             host = ServerConfig.host

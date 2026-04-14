@@ -1231,10 +1231,12 @@ class McpRoutesTest {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `missing X-Tenant-ID defaults to tenant default and succeeds`() = testApplication {
+    fun `missing X-Tenant-ID returns VALIDATION_ERROR (security fix)`() = testApplication {
         application { module() }
 
-        // MCP routes fall back to "default" tenant when header is absent
+        // SECURITY: X-Tenant-ID is required on every MCP call. Previously it silently
+        // defaulted to "default", which caused cross-tenant data collision when callers
+        // forgot the header.
         val rawResponse = client.post("/mcp") {
             contentType(ContentType.Application.Json)
             setBody("""{"jsonrpc":"2.0","id":1,"method":"ping"}""")
@@ -1242,8 +1244,11 @@ class McpRoutesTest {
 
         assertEquals(HttpStatusCode.OK, rawResponse.status)
         val obj = Json.parseToJsonElement(rawResponse.bodyAsText()).jsonObject
-        // Ping should succeed regardless of tenant — it doesn't touch the DB
-        assertTrue(obj["error"].isJsonNull(), "ping should succeed without X-Tenant-ID: $obj")
+        val error = assertJsonRpcError(obj, expectedCode = -32002)
+        assertTrue(
+            error["message"]!!.jsonPrimitive.content.contains("X-Tenant-ID"),
+            "Error message should name the missing header: ${error["message"]}"
+        )
     }
 
     @Test

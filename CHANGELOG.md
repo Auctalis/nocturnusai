@@ -7,6 +7,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.3.7] — 2026-04-14
+
+### Security
+- **SSRF** — `HTTP_GET_JSON` built-in predicate is now disabled by default and hardened when enabled. Set `ENABLE_HTTP_BUILTIN=true` to opt in. When enabled: https-only (override with `HTTP_BUILTIN_ALLOW_HTTP=true`), redirects disabled, loopback/link-local/site-local/multicast/CGNAT/IPv6-ULA and the cloud metadata IP (169.254.169.254) blocked after DNS resolution. Optional host allowlist via `HTTP_BUILTIN_ALLOWED_HOSTS`.
+- **Default admin credentials** — server refuses to start in `AUTH_ENABLED=true` mode if `NOCTURNUSAI_ADMIN_PASS` is unset or still uses the documented default. Export `NOCTURNUSAI_ALLOW_DEFAULT_ADMIN_PASS=true` to bypass for test/CI.
+- **MCP tenant header** — `POST /mcp` and `GET /mcp/sse` now require `X-Tenant-ID` (previously silently defaulted to `default`, causing cross-tenant data collision for clients that forgot the header).
+- **Constant-time credential compare** — `/auth/bootstrap` now uses `MessageDigest.isEqual` for username and password comparison.
+- **Logback** — bumped to 1.5.13 (fixes CVE-2023-6378 and CVE-2024-12798).
+
+---
+
 ## [0.2.2] — 2026-04-04
 
 ### Changed

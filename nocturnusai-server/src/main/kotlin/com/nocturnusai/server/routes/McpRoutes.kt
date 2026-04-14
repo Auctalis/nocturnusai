@@ -111,7 +111,17 @@ fun Route.mcpRoutes(dbManager: DatabaseManager) {
             val request = json.decodeFromString<JsonRpcRequest>(body)
 
             val dbName = call.request.header("X-Database") ?: "default"
-            val tenantId = call.request.header("X-Tenant-ID") ?: "default"
+            // SECURITY: X-Tenant-ID is required for tenant isolation. MCP previously
+            // defaulted to "default", which silently routed every caller into the
+            // same shared tenant when the header was omitted.
+            val tenantId = call.request.header("X-Tenant-ID")
+                ?: return@post call.respond(
+                    jsonRpcError(
+                        request.id,
+                        McpErrorCodes.VALIDATION_ERROR,
+                        "Missing required header: X-Tenant-ID"
+                    )
+                )
             val db = dbManager.getDatabase(dbName)
                 ?: return@post call.respond(
                     jsonRpcError(request.id, McpErrorCodes.DATABASE_NOT_FOUND, "Database '$dbName' not found")
@@ -149,7 +159,12 @@ fun Route.mcpRoutes(dbManager: DatabaseManager) {
     // SSE endpoint for MCP streaming (server-to-client notifications)
     get("/mcp/sse") {
         val dbName = call.request.header("X-Database") ?: "default"
-        val tenantId = call.request.header("X-Tenant-ID") ?: "default"
+        // SECURITY: X-Tenant-ID is required — see /mcp handler above for rationale.
+        val tenantId = call.request.header("X-Tenant-ID")
+            ?: return@get call.respond(
+                HttpStatusCode.BadRequest,
+                ErrorResponse("VALIDATION_ERROR", "Missing required header: X-Tenant-ID")
+            )
         val db = dbManager.getDatabase(dbName)
 
         Metrics.mcpSseConnected()
