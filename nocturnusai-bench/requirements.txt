@@ -1,0 +1,14 @@
+# NocturnusAI Benchmark Requirements
+# Install with: pip install -r requirements.txt
+
+# Core
+nocturnusai>=0.3.10
+anthropic>=0.25.0
+google-generativeai>=0.5.0
+
+# Notebook + visualization
+jupyter>=1.0.0
+notebook>=7.0.0
+matplotlib>=3.8.0
+pandas>=2.0.0
+numpy>=1.26.0

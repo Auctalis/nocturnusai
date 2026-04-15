@@ -211,6 +211,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" sdks/python/pyproject.toml
+          sed -i "s/^__version__ = \".*\"/__version__ = \"${VERSION}\"/" sdks/python/nocturnusai/__init__.py
           echo "Set Python SDK version to ${VERSION}"
 
       - name: Set up Python 3.12
@@ -238,7 +239,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write   # required for npm provenance
     steps:
       - uses: actions/checkout@v4
 
@@ -262,15 +262,14 @@ jobs:
       - name: Publish
         working-directory: sdks/typescript
         run: |
-          output=$(npm publish --access public --provenance 2>&1) && echo "$output" || {
+          output=$(npm publish --access public 2>&1) && echo "$output" || {
             echo "$output"
             if echo "$output" | grep -q "previously published versions"; then
               echo "Already published — skipping."
               exit 0
             fi
             if echo "$output" | grep -q "E404"; then
-              echo "::error::npm returned 404. The NPM_TOKEN likely lacks permission to create new packages."
-              echo "::error::Use a Classic 'Automation' token, or a Granular token with 'Read and write' on 'All packages'."
+              echo "::error::npm returned 404. Check that NPM_TOKEN has 'Read and write' on 'All packages'."
             fi
             exit 1
           }
