@@ -130,13 +130,13 @@ const calcsJsonLd = {
           </div>
           <p>
             A mathematical model with editable parameters. Uses GPT-4 pricing ($30/1M),
-            50,000 turns/month, and a 100-turn conversation where naive context grows to
-            36,000 tokens. Produces the old headline claim of "$54,000 → $240 (225×)".
+            50,000 turns/month, and configurable conversation length. Useful for
+            exploring how costs scale under different workload assumptions.
           </p>
           <p style="font-size: 0.85rem; color: var(--site-muted-soft);">
-            No live API calls. All arithmetic. The 225× ratio is a consequence of the
-            parametric assumptions — specifically 36,000 token naive average vs 160 token
-            NocturnusAI retrieval. Change the parameters in the notebook and the ratio changes.
+            No live API calls — all arithmetic. The ratio depends entirely on the
+            parameters you set. Change them in the notebook and the output changes.
+            We ship this notebook for workload modeling, not for headline numbers.
           </p>
         </div>
 
@@ -404,17 +404,15 @@ const calcsJsonLd = {
         <li>GPT-4 noct: 50,000 × 960 × $30 / 1,000,000 = <strong>$1,440/mo</strong></li>
       </ul>
       <p>
-        The "$54,000 → $240" figure in the old README used a larger scenario
-        (100-turn conversations, 36,000-token naive context, 160-token NocturnusAI retrieval)
-        rather than the 20-turn default. That specific scenario is documented in the README's
-        "The math" section and is reproducible by changing <code>AVG_TURNS_PER_CONV</code>
-        to 100 and adjusting <code>NOCTURNUS_AVG_CONTEXT</code> to 960.
+        The notebook is a workload-modeling tool: change the parameters, see how cost
+        scales. It does not produce site claims. Every number on this site comes from
+        Scenario B — the live benchmark.
       </p>
 
       <div class="calcs-note">
-        The parametric model's headline claim has been superseded by the live benchmark numbers.
-        The live benchmark is a harder test: real API calls, a real conversation, real token
-        counting. We continue to ship the parametric notebook for workload exploration.
+        The live benchmark is a harder test than any parametric model: real API calls,
+        a real conversation, real token counting. We ship the notebook for workload
+        exploration — not for marketing numbers.
       </div>
     </section>
 
@@ -497,12 +495,6 @@ const calcsJsonLd = {
               <td><code>benchmark.astro</code></td>
               <td><code>results/benchmark_results.json</code></td>
               <td>{gSumN.toLocaleString()} ÷ {gSumNN.toLocaleString()} (sum/sum, this ref run)</td>
-            </tr>
-            <tr>
-              <td><strong>$54,000 → $240 (225×)</strong></td>
-              <td><code>01_cost_model.ipynb</code> (notebook only)</td>
-              <td>Parametric model, notebook cell <code>cost-table</code></td>
-              <td>GPT-4, 50k turns/mo, 36,000-tok naive avg, 160-tok noct avg</td>
             </tr>
             <tr>
               <td><strong>82–90%</strong> reduction range</td>
