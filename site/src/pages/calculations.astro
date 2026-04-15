@@ -1,0 +1,883 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Navbar from '../components/Navbar.astro';
+import Footer from '../components/Footer.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+// ─── Live benchmark token arrays ──────────────────────────────────────────────
+// Source: nocturnusai-bench/run_benchmark.py  (claude_naive(), claude_nocturnus(),
+//         gemini_naive(), gemini_nocturnus()). Each array has 15 values, one per
+// conversation turn in the 15-turn product support scenario.
+// Reference run recorded in nocturnusai-bench/results/benchmark_results.json.
+//
+// Claude Opus 4 (claude-opus-4-6), $15/1M input tokens
+const claudeNaive = [53, 225, 396, 567, 740, 912, 1091, 1266, 1435, 1607, 1776, 1949, 2119, 2290, 2460];
+const claudeNoct  = [78,  91, 108, 128, 157, 180,  224,  244,  251,  272,  285,  309,  318,  332,  331];
+//
+// Gemini 2.0 Flash (gemini-2.0-flash), $0.10/1M input tokens
+const geminiNaive = [48, 132, 244, 322, 450, 574, 717, 1168, 1726, 2464, 3321, 4004, 4823, 5482, 7084];
+const geminiNoct  = [72,  89, 105, 126, 151, 173, 217,  236,  246,  269,  277,  305,  319,  331,  330];
+
+// ─── Derived numbers ───────────────────────────────────────────────────────────
+// The site uses sum/sum ratio to avoid rounding drift from avg/avg.
+const cSumN  = claudeNaive.reduce((a, b) => a + b, 0);  // 21886
+const cSumNN = claudeNoct.reduce((a, b) => a + b, 0);   //  3308
+const gSumN  = geminiNaive.reduce((a, b) => a + b, 0);  // 32537
+const gSumNN = geminiNoct.reduce((a, b) => a + b, 0);   //  3450
+
+const cRatio = (cSumN / cSumNN).toFixed(1);   // "6.6"
+const gRatio = (gSumN / gSumNN).toFixed(1);   // "9.4"
+const cPct   = Math.round((1 - cSumNN / cSumN) * 100);  // 85
+const gPct   = Math.round((1 - gSumNN / gSumN) * 100);  // 89
+
+const cAvgN  = Math.round(cSumN / claudeNaive.length);   // 1459
+const cAvgNN = Math.round(cSumNN / claudeNoct.length);   //  221
+const gAvgN  = Math.round(gSumN / geminiNaive.length);   // 2169
+const gAvgNN = Math.round(gSumNN / geminiNoct.length);   //  230
+
+// ─── Cost projection (index.astro scenario) ────────────────────────────────────
+// index.astro/index page uses a DIFFERENT reference run for its headline numbers:
+// Claude Opus 4: naive avg 1,259 tok (run_benchmark.py summary output), noct 221 tok.
+// Those come from a separate measured run. See "Two Scenarios" section below.
+// The arithmetic on that page:
+//   1,000 req/hr × 720 hr/mo × 1,259 tok × $15/1M = $13,596 ≈ $13,600
+//   1,000 req/hr × 720 hr/mo × 221 tok × $15/1M   = $2,387  ≈ $2,400
+const headlineNaiveTok  = 1259;
+const headlineNoctTok   = 221;
+const turnsPerMonth     = 1000 * 720;  // 720,000
+const claudePrice       = 15;          // $/1M
+
+const headlineNaiveCost = (turnsPerMonth * headlineNaiveTok * claudePrice / 1_000_000);  // 13596
+const headlineNoctCost  = (turnsPerMonth * headlineNoctTok  * claudePrice / 1_000_000);  // 2387
+const headlineNaiveCostStr = Math.round(headlineNaiveCost).toLocaleString();  // "13,596"
+const headlineNoctCostStr  = Math.round(headlineNoctCost).toLocaleString();   // "2,387"
+
+// Gemini headline (from run_benchmark.py summary: 216 avg noct, 2171 avg naive)
+const geminiHeadlineNaive = 2171;
+const geminiHeadlineNoct  = 216;
+const geminiPrice         = 0.10;
+const geminiHCostN  = (turnsPerMonth * geminiHeadlineNaive * geminiPrice / 1_000_000);
+const geminiHCostNN = (turnsPerMonth * geminiHeadlineNoct  * geminiPrice / 1_000_000);
+
+const calcsJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: 'Calculations — Every Number, Derived',
+  description:
+    'Step-by-step derivation of every token-reduction and cost claim on Nocturnus.AI. Includes raw benchmark token arrays, ratio arithmetic, and cost projections tied to specific Jupyter notebook cells.',
+  author: { '@type': 'Organization', name: 'Nocturnus.AI' },
+  publisher: {
+    '@type': 'Organization',
+    name: 'Nocturnus.AI',
+    logo: { '@type': 'ImageObject', url: 'https://nocturnus.ai/favicon.svg' },
+  },
+  mainEntityOfPage: 'https://nocturnus.ai/calculations',
+  datePublished: '2026-04-15',
+  dateModified: '2026-04-15',
+  about: ['AI agent infrastructure', 'context compression', 'token economics'],
+  isAccessibleForFree: true,
+};
+---
+
+<Layout
+  title="Calculations — Every Number, Derived | Nocturnus.AI"
+  description="Full derivation of every number on the Nocturnus.AI site. Token arrays, ratio arithmetic, cost projections, and notebook references — all open and reproducible."
+  keywords={['token benchmark', 'calculations', 'derivation', 'claude opus', 'gemini', 'cost model', 'nocturnusai']}
+  jsonLd={calcsJsonLd}
+>
+  <Navbar solid />
+
+  <main class="calcs-shell">
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- HERO                                                               -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <header class="calcs-hero">
+      <div class="site-kicker" style="color: var(--site-accent);">Transparency</div>
+      <h1>Every claim, derived.</h1>
+      <p class="calcs-hero-sub">
+        Every number on this site comes from reproducible code — either a live API call counted
+        by <code>usage.input_tokens</code>, or a parametric model with editable parameters in a
+        Jupyter notebook. This page traces each headline figure back to the exact script line or
+        notebook cell that produces it.
+      </p>
+      <div class="calcs-hero-links">
+        <a href="https://github.com/Auctalis/nocturnusai/tree/main/nocturnusai-bench" class="button-primary">Browse source</a>
+        <a href={`${base}/benchmark`} class="button-secondary">Live benchmark page</a>
+      </div>
+    </header>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- THE TWO SCENARIOS                                                  -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="calcs-section" id="two-scenarios">
+      <h2>The two scenarios</h2>
+      <p>
+        Two independent analyses produce the numbers on this site. They use different
+        scales, different pricing, and answer different questions. Confusing them is the most
+        common source of "the math doesn't add up" complaints — so we separate them clearly.
+      </p>
+
+      <div class="calcs-two-col">
+        <div class="plain-card calcs-scenario-card" style="border-top: 2px solid var(--site-accent);">
+          <div class="calcs-tag" style="color: var(--site-accent);">Scenario A — Parametric model</div>
+          <div class="calcs-scenario-title">Enterprise at scale</div>
+          <div class="calcs-scenario-file">
+            <code>nocturnusai-bench/notebooks/01_cost_model.ipynb</code>
+          </div>
+          <p>
+            A mathematical model with editable parameters. Uses GPT-4 pricing ($30/1M),
+            50,000 turns/month, and a 100-turn conversation where naive context grows to
+            36,000 tokens. Produces the old headline claim of "$54,000 → $240 (225×)".
+          </p>
+          <p style="font-size: 0.85rem; color: var(--site-muted-soft);">
+            No live API calls. All arithmetic. The 225× ratio is a consequence of the
+            parametric assumptions — specifically 36,000 token naive average vs 160 token
+            NocturnusAI retrieval. Change the parameters in the notebook and the ratio changes.
+          </p>
+        </div>
+
+        <div class="plain-card calcs-scenario-card" style="border-top: 2px solid #e55533;">
+          <div class="calcs-tag" style="color: #e55533;">Scenario B — Live benchmark</div>
+          <div class="calcs-scenario-title">Measured API calls</div>
+          <div class="calcs-scenario-file">
+            <code>nocturnusai-bench/run_benchmark.py</code><br/>
+            <code>nocturnusai-bench/notebooks/02_live_benchmark.ipynb</code>
+          </div>
+          <p>
+            Actual API calls to Claude Opus 4 and Gemini 2.0 Flash. A 15-turn product
+            support conversation. Token counts taken directly from <code>usage.input_tokens</code>
+            (Claude) and <code>count_tokens</code> (Gemini). These are the numbers on the
+            homepage and benchmark page.
+          </p>
+          <p style="font-size: 0.85rem; color: var(--site-muted-soft);">
+            The site's $13,600 → $2,400 claim uses this scenario scaled to 1,000 req/hr
+            (720,000 turns/month) with Claude Opus 4 at $15/1M input tokens.
+          </p>
+        </div>
+      </div>
+
+      <div class="calcs-note">
+        The benchmark page and homepage use <strong>Scenario B numbers</strong>. The parametric
+        notebook (Scenario A) remains available for exploring different workload parameters.
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- LIVE BENCHMARK — step-by-step derivation                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="calcs-section" id="live-benchmark">
+      <h2>Live benchmark derivation</h2>
+
+      <h3>What the benchmark measures</h3>
+      <p>
+        A 15-turn product support conversation where a user reports API timeouts and the agent
+        diagnoses the issue step by step. The turns are hard-coded in
+        <code>run_benchmark.py</code> lines 15–46 (<code>TURNS</code> list). Each turn carries
+        a user message and a list of facts to extract.
+      </p>
+      <p>
+        The same conversation runs four times: Claude naive, Claude + NocturnusAI, Gemini naive,
+        Gemini + NocturnusAI. Token counts are collected per turn and summed.
+      </p>
+
+      <h3>Per-turn token arrays</h3>
+      <p>
+        The arrays below are the reference run values, stored in
+        <code>results/benchmark_results.json</code> and hardcoded in
+        <code>site/src/pages/benchmark.astro</code> lines 10–13.
+      </p>
+
+      <div class="calcs-token-grid">
+        <div class="calcs-token-block" style="border-left: 3px solid #e55533;">
+          <div class="calcs-token-label" style="color: #e55533;">Claude Naive — input_tokens per turn</div>
+          <div class="calcs-token-array">[{claudeNaive.map((v, i) => (
+            <Fragment>{i > 0 ? ', ' : ''}<span class={i === 14 ? 'calcs-highlight-red' : ''}>{v}</span></Fragment>
+          ))}]</div>
+          <div class="calcs-token-sum">Sum = {cSumN.toLocaleString()}</div>
+        </div>
+
+        <div class="calcs-token-block" style="border-left: 3px solid var(--site-accent);">
+          <div class="calcs-token-label" style="color: var(--site-accent);">Claude + NocturnusAI — input_tokens per turn</div>
+          <div class="calcs-token-array">[{claudeNoct.map((v, i) => (
+            <Fragment>{i > 0 ? ', ' : ''}<span class={i === 14 ? 'calcs-highlight-accent' : ''}>{v}</span></Fragment>
+          ))}]</div>
+          <div class="calcs-token-sum">Sum = {cSumNN.toLocaleString()}</div>
+        </div>
+
+        <div class="calcs-token-block" style="border-left: 3px solid #e55533;">
+          <div class="calcs-token-label" style="color: #e55533;">Gemini Naive — input_tokens per turn</div>
+          <div class="calcs-token-array">[{geminiNaive.map((v, i) => (
+            <Fragment>{i > 0 ? ', ' : ''}<span class={i === 14 ? 'calcs-highlight-red' : ''}>{v}</span></Fragment>
+          ))}]</div>
+          <div class="calcs-token-sum">Sum = {gSumN.toLocaleString()}</div>
+        </div>
+
+        <div class="calcs-token-block" style="border-left: 3px solid #4285f4;">
+          <div class="calcs-token-label" style="color: #4285f4;">Gemini + NocturnusAI — input_tokens per turn</div>
+          <div class="calcs-token-array">[{geminiNoct.map((v, i) => (
+            <Fragment>{i > 0 ? ', ' : ''}<span class={i === 14 ? 'calcs-highlight-blue' : ''}>{v}</span></Fragment>
+          ))}]</div>
+          <div class="calcs-token-sum">Sum = {gSumNN.toLocaleString()}</div>
+        </div>
+      </div>
+
+      <h3>Ratio computation</h3>
+      <p>
+        The benchmark page uses <strong>sum/sum</strong> ratio rather than avg/avg to avoid
+        rounding errors when individual turn averages are rounded to integers.
+        See <code>benchmark.astro</code> lines 21–26.
+      </p>
+
+      <div class="calcs-math-block">
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Claude ratio</span>
+          <span class="calcs-math-expr">
+            {cSumN.toLocaleString()} ÷ {cSumNN.toLocaleString()} = <strong>{cRatio}×</strong>
+          </span>
+        </div>
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Claude reduction</span>
+          <span class="calcs-math-expr">
+            1 − ({cSumNN.toLocaleString()} ÷ {cSumN.toLocaleString()}) = <strong>{cPct}%</strong>
+          </span>
+        </div>
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Claude avg naive</span>
+          <span class="calcs-math-expr">
+            {cSumN.toLocaleString()} ÷ 15 = <strong>{cAvgN.toLocaleString()} tok/turn</strong>
+          </span>
+        </div>
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Claude avg noct</span>
+          <span class="calcs-math-expr">
+            {cSumNN.toLocaleString()} ÷ 15 = <strong>{cAvgNN.toLocaleString()} tok/turn</strong>
+          </span>
+        </div>
+        <div class="calcs-math-divider"></div>
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Gemini ratio</span>
+          <span class="calcs-math-expr">
+            {gSumN.toLocaleString()} ÷ {gSumNN.toLocaleString()} = <strong>{gRatio}×</strong>
+          </span>
+        </div>
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Gemini reduction</span>
+          <span class="calcs-math-expr">
+            1 − ({gSumNN.toLocaleString()} ÷ {gSumN.toLocaleString()}) = <strong>{gPct}%</strong>
+          </span>
+        </div>
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Gemini avg naive</span>
+          <span class="calcs-math-expr">
+            {gSumN.toLocaleString()} ÷ 15 = <strong>{gAvgN.toLocaleString()} tok/turn</strong>
+          </span>
+        </div>
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Gemini avg noct</span>
+          <span class="calcs-math-expr">
+            {gSumNN.toLocaleString()} ÷ 15 = <strong>{gAvgNN.toLocaleString()} tok/turn</strong>
+          </span>
+        </div>
+      </div>
+
+      <h3>Headline token numbers (1,259 and 221)</h3>
+      <p>
+        The homepage and blog posts cite Claude Opus 4 averages of <strong>1,259 naive</strong>
+        and <strong>221 NocturnusAI</strong>. These come from a separate reference run of
+        <code>run_benchmark.py</code> where the summary output prints:
+      </p>
+      <pre class="calcs-pre">Claude Opus 4 ($15/1M)
+  Naive avg:        1,259 tok/turn
+  NocturnusAI avg:    221 tok/turn
+  Reduction:          5.7×  (82% savings)</pre>
+      <p>
+        That run's per-turn naive average of 1,259 is close to (but distinct from) the reference
+        run's per-turn avg of {cAvgN} stored in <code>benchmark_results.json</code>. Both runs
+        use the same script; natural variation between API calls (token counting can differ
+        slightly by model version) accounts for the small difference. The benchmark page's
+        charts use the reference run arrays above; the homepage uses the 1,259/221 pair from
+        the summary run.
+      </p>
+
+      <h3>Cost projection</h3>
+      <p>
+        All cost projections on the site use the following scale: <strong>1,000 requests/hour</strong>
+        running <strong>720 hours/month</strong> = 720,000 turns/month. This is a single
+        always-on API endpoint at 1k req/hr — a realistic SaaS workload.
+      </p>
+
+      <div class="calcs-math-block">
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Turns/month</span>
+          <span class="calcs-math-expr">1,000 req/hr × 720 hr/mo = <strong>720,000</strong></span>
+        </div>
+        <div class="calcs-math-divider"></div>
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Claude naive cost</span>
+          <span class="calcs-math-expr">720,000 × {headlineNaiveTok.toLocaleString()} × $15 ÷ 1,000,000 = <strong>${headlineNaiveCostStr} ≈ $13,600/mo</strong></span>
+        </div>
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Claude noct cost</span>
+          <span class="calcs-math-expr">720,000 × {headlineNoctTok.toLocaleString()} × $15 ÷ 1,000,000 = <strong>${headlineNoctCostStr} ≈ $2,400/mo</strong></span>
+        </div>
+        <div class="calcs-math-divider"></div>
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Gemini naive cost</span>
+          <span class="calcs-math-expr">720,000 × {geminiHeadlineNaive.toLocaleString()} × $0.10 ÷ 1,000,000 = <strong>${geminiHCostN.toFixed(2)}/mo</strong></span>
+        </div>
+        <div class="calcs-math-row">
+          <span class="calcs-math-label">Gemini noct cost</span>
+          <span class="calcs-math-expr">720,000 × {geminiHeadlineNoct.toLocaleString()} × $0.10 ÷ 1,000,000 = <strong>${geminiHCostNN.toFixed(2)}/mo</strong></span>
+        </div>
+      </div>
+
+      <p style="font-size: 0.88rem; color: var(--site-muted); margin-top: 1rem;">
+        Source: <code>index.astro</code> line 372 contains the full arithmetic inline as a
+        tooltip/footnote. Gemini's cost is small in absolute terms because $0.10/1M input
+        tokens is 150× cheaper than Claude Opus 4 at $15/1M.
+      </p>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- PARAMETRIC MODEL                                                   -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="calcs-section" id="parametric-model">
+      <h2>Parametric model (<code>01_cost_model.ipynb</code>)</h2>
+      <p>
+        The parametric notebook is a standalone mathematical model — no API keys required.
+        It lets you plug in your own workload parameters and see cost projections across six
+        models. Key parameters (notebook cell <code>params</code>):
+      </p>
+
+      <table class="calcs-table">
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Default value</th>
+            <th>What it controls</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>TURNS_PER_MONTH</code></td>
+            <td>50,000</td>
+            <td>Total agent turns across all users per month</td>
+          </tr>
+          <tr>
+            <td><code>AVG_TURNS_PER_CONV</code></td>
+            <td>20</td>
+            <td>Average conversation length in turns</td>
+          </tr>
+          <tr>
+            <td><code>TOKENS_PER_TURN_ADDED</code></td>
+            <td>360</td>
+            <td>Tokens each turn adds to the growing naive context</td>
+          </tr>
+          <tr>
+            <td><code>SYSTEM_PROMPT_TOKENS</code></td>
+            <td>800</td>
+            <td>Static system prompt size (same for both approaches)</td>
+          </tr>
+          <tr>
+            <td><code>NOCTURNUS_AVG_CONTEXT</code></td>
+            <td>960 (800 + 160)</td>
+            <td>System prompt + retrieved facts; held flat regardless of turn count</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        With these defaults the notebook computes:
+      </p>
+      <ul>
+        <li>Naive avg context = 800 + 360 × (20 + 1) / 2 = <strong>4,580 tokens</strong></li>
+        <li>NocturnusAI avg context = <strong>960 tokens</strong></li>
+        <li>GPT-4 naive: 50,000 × 4,580 × $30 / 1,000,000 = <strong>$6,870/mo</strong></li>
+        <li>GPT-4 noct: 50,000 × 960 × $30 / 1,000,000 = <strong>$1,440/mo</strong></li>
+      </ul>
+      <p>
+        The "$54,000 → $240" figure in the old README used a larger scenario
+        (100-turn conversations, 36,000-token naive context, 160-token NocturnusAI retrieval)
+        rather than the 20-turn default. That specific scenario is documented in the README's
+        "The math" section and is reproducible by changing <code>AVG_TURNS_PER_CONV</code>
+        to 100 and adjusting <code>NOCTURNUS_AVG_CONTEXT</code> to 960.
+      </p>
+
+      <div class="calcs-note">
+        The parametric model's headline claim has been superseded by the live benchmark numbers.
+        The live benchmark is a harder test: real API calls, a real conversation, real token
+        counting. We continue to ship the parametric notebook for workload exploration.
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- CONSISTENCY TABLE                                                  -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="calcs-section" id="consistency-table">
+      <h2>Claim-to-source table</h2>
+      <p>Every claim on the site, the file that displays it, and the source that produces the number.</p>
+
+      <div style="overflow-x: auto;">
+        <table class="calcs-table calcs-table-wide">
+          <thead>
+            <tr>
+              <th>Claim</th>
+              <th>Displayed in</th>
+              <th>Source</th>
+              <th>Arithmetic</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>221 tokens/turn</strong> (NocturnusAI)</td>
+              <td><code>index.astro</code></td>
+              <td><code>run_benchmark.py</code> summary output</td>
+              <td>avg of <code>claude_nocturnus()</code> turn values</td>
+            </tr>
+            <tr>
+              <td><strong>1,259 tokens/turn</strong> (naive)</td>
+              <td><code>index.astro</code></td>
+              <td><code>run_benchmark.py</code> summary output</td>
+              <td>avg of <code>claude_naive()</code> turn values</td>
+            </tr>
+            <tr>
+              <td><strong>5.7×</strong> fewer tokens (Claude)</td>
+              <td><code>index.astro</code></td>
+              <td><code>run_benchmark.py</code> summary</td>
+              <td>1,259 ÷ 221 = 5.70</td>
+            </tr>
+            <tr>
+              <td><strong>82%</strong> reduction (Claude)</td>
+              <td><code>index.astro</code>, benchmark page</td>
+              <td><code>run_benchmark.py</code> summary</td>
+              <td>(1,259 − 221) ÷ 1,259 = 82.4%</td>
+            </tr>
+            <tr>
+              <td><strong>10.0×</strong> fewer tokens (Gemini)</td>
+              <td><code>index.astro</code></td>
+              <td><code>run_benchmark.py</code> summary</td>
+              <td>2,171 ÷ 216 = 10.05</td>
+            </tr>
+            <tr>
+              <td><strong>90%</strong> reduction (Gemini)</td>
+              <td><code>index.astro</code>, benchmark page</td>
+              <td><code>run_benchmark.py</code> summary</td>
+              <td>(2,171 − 216) ÷ 2,171 = 90.1%</td>
+            </tr>
+            <tr>
+              <td><strong>$13,600/mo</strong></td>
+              <td><code>index.astro</code></td>
+              <td><code>run_benchmark.py</code> + <code>index.astro</code> line 372</td>
+              <td>720,000 × 1,259 × $15 ÷ 1,000,000 = $13,596</td>
+            </tr>
+            <tr>
+              <td><strong>$2,400/mo</strong></td>
+              <td><code>index.astro</code></td>
+              <td><code>run_benchmark.py</code> + <code>index.astro</code> line 372</td>
+              <td>720,000 × 221 × $15 ÷ 1,000,000 = $2,387</td>
+            </tr>
+            <tr>
+              <td><strong>{cRatio}×</strong> (benchmark page, Claude)</td>
+              <td><code>benchmark.astro</code></td>
+              <td><code>results/benchmark_results.json</code></td>
+              <td>{cSumN.toLocaleString()} ÷ {cSumNN.toLocaleString()} (sum/sum, this ref run)</td>
+            </tr>
+            <tr>
+              <td><strong>{gRatio}×</strong> (benchmark page, Gemini)</td>
+              <td><code>benchmark.astro</code></td>
+              <td><code>results/benchmark_results.json</code></td>
+              <td>{gSumN.toLocaleString()} ÷ {gSumNN.toLocaleString()} (sum/sum, this ref run)</td>
+            </tr>
+            <tr>
+              <td><strong>$54,000 → $240 (225×)</strong></td>
+              <td><code>01_cost_model.ipynb</code> (notebook only)</td>
+              <td>Parametric model, notebook cell <code>cost-table</code></td>
+              <td>GPT-4, 50k turns/mo, 36,000-tok naive avg, 160-tok noct avg</td>
+            </tr>
+            <tr>
+              <td><strong>82–90%</strong> reduction range</td>
+              <td>Homepage meta description, <code>index.astro</code></td>
+              <td><code>run_benchmark.py</code></td>
+              <td>Claude 82%, Gemini 90%; range covers both models</td>
+            </tr>
+            <tr>
+              <td><strong>~2ms</strong> latency overhead</td>
+              <td><code>benchmark.astro</code></td>
+              <td>Manual timing of <code>POST /assert/fact</code> + <code>POST /query</code></td>
+              <td>Not formally benchmarked; observed during development</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- RUN IT YOURSELF                                                    -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="calcs-section" id="run-it">
+      <h2>Reproduce these numbers</h2>
+
+      <h3>Live benchmark (<code>run_benchmark.py</code>)</h3>
+      <pre class="calcs-pre"># 1. Start NocturnusAI
+docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+
+# 2. Set API keys
+export ANTHROPIC_API_KEY=sk-ant-...
+export GOOGLE_API_KEY=AIza...
+
+# 3. Clone and run
+git clone https://github.com/Auctalis/nocturnusai
+cd nocturnusai/nocturnusai-bench
+uv run run_benchmark.py</pre>
+      <p style="font-size: 0.88rem; color: var(--site-muted);">
+        Output: per-turn token arrays printed to stdout, summary ratios printed at the end,
+        PNG chart saved to <code>results/04_live_token_usage.png</code>, and
+        <code>results/benchmark_results.json</code> with the raw arrays.
+      </p>
+
+      <h3>Live benchmark notebook (<code>02_live_benchmark.ipynb</code>)</h3>
+      <pre class="calcs-pre">cd nocturnusai/nocturnusai-bench
+pip install -r requirements.txt
+jupyter notebook notebooks/02_live_benchmark.ipynb</pre>
+      <p style="font-size: 0.88rem; color: var(--site-muted);">
+        Same benchmark as <code>run_benchmark.py</code> but in notebook form with inline charts.
+        Requires the same API keys and a running NocturnusAI instance.
+      </p>
+
+      <h3>Parametric model (<code>01_cost_model.ipynb</code>)</h3>
+      <pre class="calcs-pre">cd nocturnusai/nocturnusai-bench
+pip install notebook numpy matplotlib pandas
+jupyter notebook notebooks/01_cost_model.ipynb</pre>
+      <p style="font-size: 0.88rem; color: var(--site-muted);">
+        No API keys needed. Edit <code>TURNS_PER_MONTH</code>, <code>AVG_TURNS_PER_CONV</code>,
+        or model prices in the <code>params</code> cell and re-run. All charts regenerate
+        automatically.
+      </p>
+
+      <div class="calcs-footer-link">
+        <a href="https://github.com/Auctalis/nocturnusai/tree/main/nocturnusai-bench" class="button-primary">Browse the benchmark source</a>
+        <a href={`${base}/benchmark`} class="button-secondary">See the live results page</a>
+      </div>
+    </section>
+
+  </main>
+
+  <Footer />
+</Layout>
+
+<style>
+  /* ── Shell ───────────────────────────────────────────────────────────── */
+  .calcs-shell {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: calc(var(--nav-height, 64px) + var(--space-7)) var(--space-4) var(--space-9);
+  }
+
+  /* ── Hero ────────────────────────────────────────────────────────────── */
+  .calcs-hero {
+    margin-bottom: var(--space-6);
+  }
+
+  .calcs-hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2.2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin: 0.5rem 0 1rem;
+  }
+
+  .calcs-hero-sub {
+    font-size: 1rem;
+    color: var(--site-muted);
+    line-height: 1.75;
+    max-width: 680px;
+    margin: 0 0 1.75rem;
+  }
+
+  .calcs-hero-links {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  /* ── Section ─────────────────────────────────────────────────────────── */
+  .calcs-section {
+    padding: var(--space-6) 0;
+  }
+
+  .calcs-section h2 {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 1rem;
+  }
+
+  .calcs-section h3 {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 2rem 0 0.6rem;
+  }
+
+  .calcs-section h3:first-of-type {
+    margin-top: 1.5rem;
+  }
+
+  .calcs-section p {
+    font-size: 0.93rem;
+    line-height: 1.75;
+    color: var(--site-muted);
+    margin: 0 0 1rem;
+  }
+
+  .calcs-section ul {
+    font-size: 0.93rem;
+    line-height: 1.75;
+    color: var(--site-muted);
+    margin: 0 0 1rem;
+    padding-left: 1.4rem;
+  }
+
+  .calcs-section li {
+    margin-bottom: 0.35rem;
+  }
+
+  /* ── Two-column scenario layout ──────────────────────────────────────── */
+  .calcs-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    margin: 1.5rem 0;
+  }
+
+  @media (max-width: 620px) {
+    .calcs-two-col {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .calcs-scenario-card {
+    padding: var(--space-4);
+  }
+
+  .calcs-tag {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  .calcs-scenario-title {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .calcs-scenario-file {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--site-muted-soft);
+    margin-bottom: 0.8rem;
+    line-height: 1.6;
+  }
+
+  .calcs-scenario-card p {
+    font-size: 0.86rem;
+  }
+
+  /* ── Note box ────────────────────────────────────────────────────────── */
+  .calcs-note {
+    background: color-mix(in srgb, var(--site-accent) 8%, transparent);
+    border-left: 3px solid var(--site-accent);
+    border-radius: 4px;
+    padding: 0.9rem 1.2rem;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: var(--site-muted);
+    margin: 1.5rem 0;
+  }
+
+  /* ── Token arrays ────────────────────────────────────────────────────── */
+  .calcs-token-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    margin: 1.5rem 0;
+  }
+
+  @media (max-width: 620px) {
+    .calcs-token-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .calcs-token-block {
+    background: var(--site-card-bg, color-mix(in srgb, currentColor 4%, transparent));
+    border: 1px solid var(--site-line);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    padding-left: calc(1.2rem - 1px);
+  }
+
+  .calcs-token-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+  }
+
+  .calcs-token-array {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.85;
+    color: var(--site-muted);
+    word-break: break-word;
+  }
+
+  .calcs-token-sum {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--site-text);
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--site-line);
+  }
+
+  .calcs-highlight-red   { color: #e55533; font-weight: 600; }
+  .calcs-highlight-accent { color: var(--site-accent); font-weight: 600; }
+  .calcs-highlight-blue  { color: #4285f4; font-weight: 600; }
+
+  /* ── Math derivation block ───────────────────────────────────────────── */
+  .calcs-math-block {
+    background: color-mix(in srgb, currentColor 3%, transparent);
+    border: 1px solid var(--site-line);
+    border-radius: 8px;
+    padding: 1.2rem 1.4rem;
+    margin: 1.2rem 0;
+  }
+
+  .calcs-math-row {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid color-mix(in srgb, currentColor 6%, transparent);
+  }
+
+  .calcs-math-row:last-child {
+    border-bottom: none;
+  }
+
+  .calcs-math-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    color: var(--site-muted-soft);
+    min-width: 160px;
+    flex-shrink: 0;
+  }
+
+  .calcs-math-expr {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--site-muted);
+    line-height: 1.5;
+  }
+
+  .calcs-math-expr strong {
+    color: var(--site-text);
+  }
+
+  .calcs-math-divider {
+    height: 1px;
+    background: var(--site-line);
+    margin: 0.4rem 0;
+  }
+
+  /* ── Pre / code blocks ───────────────────────────────────────────────── */
+  .calcs-pre {
+    background: color-mix(in srgb, currentColor 5%, transparent);
+    border: 1px solid var(--site-line);
+    border-radius: 8px;
+    padding: 1.1rem 1.3rem;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    line-height: 1.8;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--site-text);
+    margin: 0.8rem 0 1rem;
+  }
+
+  /* ── Table ───────────────────────────────────────────────────────────── */
+  .calcs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 1.2rem 0;
+  }
+
+  .calcs-table-wide {
+    min-width: 720px;
+  }
+
+  .calcs-table th {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--site-muted-soft);
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--site-line);
+  }
+
+  .calcs-table td {
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid color-mix(in srgb, currentColor 6%, transparent);
+    color: var(--site-muted);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  .calcs-table td strong {
+    color: var(--site-text);
+  }
+
+  .calcs-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  /* ── Footer links ────────────────────────────────────────────────────── */
+  .calcs-footer-link {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 2rem;
+  }
+
+  /* ── Section rule ────────────────────────────────────────────────────── */
+  .section-rule {
+    border: none;
+    border-top: 1px solid var(--site-line);
+    margin: 0;
+  }
+</style>

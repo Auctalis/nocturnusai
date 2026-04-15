@@ -1,10 +1,14 @@
 # NocturnusAI Benchmark
 
-Reproducible benchmarks for the $54,000 → $240 context cost claim.
+Reproducible benchmarks for the measured token reduction claim.
 
-> **Claim**: An AI agent serving 50,000 turns/month on GPT-4 costs **$54,000/month** in input
-> tokens using naive context replay. The same workload costs **$240/month** with NocturnusAI
-> selective fact retrieval — a **225× reduction**.
+> **Measured**: A 15-turn product support conversation costs **$13,600/month** in Claude Opus 4
+> input tokens (1,000 req/hr) using naive context replay. The same workload costs **$2,400/month**
+> with NocturnusAI selective fact retrieval — a **5.7× reduction (82% savings)**. Gemini 2.0 Flash
+> shows **10.0× (90% savings)**.
+
+These numbers come from live API calls — not estimates. See `run_benchmark.py` and
+`notebooks/02_live_benchmark.ipynb` for the full measurement script.
 
 Every number is derived from a documented model. Every API measurement is live. Every skeptic is welcome.
 
@@ -69,16 +73,31 @@ Average context: **960 tokens** (flat, not growing).
 But the headline scenario uses **larger conversations** (enterprise agents with 36,000-token
 context by the time the conversation matures, not 20-turn chats):
 
-| Scenario | Naive avg context | NocturnusAI context | GPT-4 monthly |
-|----------|-------------------|---------------------|---------------|
-| Short chats (20 turns) | 3,800 tok | 960 tok | $5,700 → $1,440 |
-| Long sessions (100 turns, mature) | 36,000 tok | 960 tok | $54,000 → $1,440 |
-| Very long (100+ turns, no cap) | 36,000 tok | 160 tok | $54,000 → $240 |
+### Live benchmark results (measured on real APIs)
 
-The **$54,000 → $240** figure represents an enterprise agent where:
+| Model | Naive avg tokens/turn | NocturnusAI avg tokens/turn | Ratio | Savings |
+|-------|----------------------|----------------------------|-------|---------|
+| Claude Opus 4 ($15/1M) | 1,259 | 221 | **5.7×** | 82% |
+| Gemini 2.0 Flash ($0.10/1M) | 2,171 | 216 | **10.0×** | 90% |
+
+Cost at 1,000 req/hr × 720 hr/mo = 720,000 turns/month:
+
+| Model | Naive cost/mo | NocturnusAI cost/mo | Savings |
+|-------|--------------|---------------------|---------|
+| Claude Opus 4 | **$13,600** | **$2,400** | $11,200 |
+| Gemini 2.0 Flash | **$15.63** | **$1.56** | $14.07 |
+
+Source: `run_benchmark.py` and `notebooks/02_live_benchmark.ipynb`.
+
+### Parametric model scenarios
+
+The parametric notebook (`01_cost_model.ipynb`) lets you explore different workload
+assumptions. The **$54,000 → $240 (225×)** claim from the old README represents an
+enterprise-scale scenario where:
 - Conversations reach 100+ turns before being closed
 - The naive implementation has no context pruning (common in early-stage agents)
 - NocturnusAI retrieves only the ~10 most relevant facts per turn (160 tokens)
+- Pricing: GPT-4 at $30/1M input tokens, 50,000 turns/month
 
 Run notebook `01_cost_model.ipynb` to change any of these parameters interactively.
 

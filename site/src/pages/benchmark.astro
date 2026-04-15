@@ -26,12 +26,32 @@ const claudeRatio = (claudeSumNaive / claudeSumNoct).toFixed(1);  // "5.7"
 const geminiRatio = (geminiSumNaive / geminiSumNoct).toFixed(1);  // "10.0"
 const claudePct   = Math.round((1 - claudeSumNoct / claudeSumNaive) * 100);  // 82
 const geminiPct   = Math.round((1 - geminiSumNoct / geminiSumNaive) * 100);  // 90
+
+const benchJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: 'Benchmark — NocturnusAI Token Reduction',
+  description:
+    'Measured token reduction across 15-turn product support conversations on Claude Opus 4 and Gemini 2.0 Flash, using real usage.input_tokens counts.',
+  author: { '@type': 'Organization', name: 'Nocturnus.AI' },
+  publisher: {
+    '@type': 'Organization',
+    name: 'Nocturnus.AI',
+    logo: { '@type': 'ImageObject', url: 'https://nocturnus.ai/favicon.svg' },
+  },
+  mainEntityOfPage: 'https://nocturnus.ai/benchmark',
+  datePublished: '2026-04-14',
+  dateModified: '2026-04-15',
+  about: ['AI benchmark', 'token reduction', 'context compression', 'LLM economics'],
+  isAccessibleForFree: true,
+};
 ---
 
 <Layout
   title="Benchmark — NocturnusAI Token Reduction"
   description="Measured token reduction on live Claude Opus 4 and Gemini 2.0 Flash APIs. 15-turn support conversation, real usage.input_tokens counts. Run it yourself."
   keywords={['benchmark', 'token reduction', 'claude', 'gemini', 'context window', 'ai agents', 'nocturnusai']}
+  jsonLd={benchJsonLd}
 >
   <Navbar solid />
 
@@ -371,6 +391,10 @@ const geminiPct   = Math.round((1 - geminiSumNoct / geminiSumNaive) * 100);  // 
               </ul>
             </div>
           </div>
+        </div>
+
+        <div class="reveal reveal-delay-3" style="margin-top: var(--space-4); text-align: center; font-size: 0.9rem; color: var(--site-muted);">
+          See the full derivation on our <a href={`${base}/calculations`} style="color: var(--site-accent); font-weight: 500;">Calculations</a> page — every headline number traced back to the exact script line or notebook cell that produces it.
         </div>
 
         <div class="reveal reveal-delay-3" style="margin-top: var(--space-4); text-align: center;">
