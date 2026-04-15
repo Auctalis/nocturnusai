@@ -5,31 +5,131 @@ import Analytics from '../components/Analytics.astro';
 interface Props {
   title: string;
   description?: string;
+  /** Override the og:image. Accepts absolute URL or site-relative path. */
+  image?: string;
+  /** og:type — defaults to 'website'. Use 'article' for blog posts. */
+  ogType?: 'website' | 'article';
+  /** Optional JSON-LD object (or array of objects) injected into <head>. */
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+  /** Publication date for articles (ISO string). */
+  publishedTime?: string;
+  /** Last-modified date for articles (ISO string). */
+  modifiedTime?: string;
+  /** Extra keywords for this page. */
+  keywords?: string[];
+  /** Extra meta tags to inject (e.g. RSS alternate link). */
+  feedUrl?: string;
+  /** Extra classes appended to the <body>. */
+  bodyClass?: string;
 }
 
 const {
   title,
   description = 'Nocturnus.AI cuts prompt replay from long-running agent workflows so teams spend less without replacing their stack.',
+  image = '/og-default.png',
+  ogType = 'website',
+  jsonLd,
+  publishedTime,
+  modifiedTime,
+  keywords,
+  feedUrl,
+  bodyClass,
 } = Astro.props;
+
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const ogImage = image.startsWith('http')
+  ? image
+  : new URL(image, Astro.site).href;
+
+const jsonLdArray = jsonLd
+  ? Array.isArray(jsonLd)
+    ? jsonLd
+    : [jsonLd]
+  : [];
+
+// Site-wide Organization + WebSite blocks go on every page.
+const orgLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Nocturnus.AI',
+  url: 'https://nocturnus.ai/',
+  logo: 'https://nocturnus.ai/favicon.svg',
+  description:
+    'Nocturnus.AI is a logic engine and context server for AI agents, providing deterministic reasoning, truth maintenance, and salience-ranked memory.',
+};
+
+const siteLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Nocturnus.AI',
+  url: 'https://nocturnus.ai/',
+  description,
+};
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    {keywords && keywords.length > 0 && (
+      <meta name="keywords" content={keywords.join(', ')} />
+    )}
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="color-scheme" content="dark light" />
+
+    <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
     <link rel="alternate icon" href={`${base}/favicon.ico`} />
+
+    {feedUrl && (
+      <link
+        rel="alternate"
+        type="application/rss+xml"
+        title="Nocturnus.AI Blog"
+        href={feedUrl}
+      />
+    )}
+
+    {/* Open Graph */}
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content="Nocturnus.AI" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1600" />
+    <meta property="og:image:height" content="840" />
+    <meta property="og:locale" content="en_US" />
+    {publishedTime && <meta property="article:published_time" content={publishedTime} />}
+    {modifiedTime && <meta property="article:modified_time" content={modifiedTime} />}
+
+    {/* Twitter */}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    {/* Fonts */}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Commit+Mono&display=swap" rel="stylesheet" />
-    <meta name="generator" content={Astro.generator} />
+
     <title>{title}</title>
+
+    {/* JSON-LD — site-wide + page-specific */}
+    <script type="application/ld+json" set:html={JSON.stringify(orgLd)} />
+    <script type="application/ld+json" set:html={JSON.stringify(siteLd)} />
+    {jsonLdArray.map((ld) => (
+      <script type="application/ld+json" set:html={JSON.stringify(ld)} />
+    ))}
+
     <Analytics />
   </head>
-  <body class="site-body">
+  <body class:list={['site-body', bodyClass]}>
     <slot />
 
     <script is:inline>

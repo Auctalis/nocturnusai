@@ -14,11 +14,43 @@ const fmt = new Intl.DateTimeFormat('en-US', {
   month: 'long',
   day: 'numeric',
 });
+
+// Thumbnail variant of the cover (smaller + cropped).
+function thumb(src: string) {
+  // Strip existing size params, slap on a small crop.
+  const clean = src.split('?')[0];
+  return `${clean}?w=800&h=420&fit=crop&crop=entropy&q=75`;
+}
+
+// Blog JSON-LD lists all posts as blogPosts; helps Google treat this as
+// a proper blog index rather than a generic page.
+const blogLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Blog',
+  name: 'Nocturnus.AI Blog',
+  url: 'https://nocturnus.ai/blog/',
+  description:
+    'Essays, announcements, and benchmarks from the team building Nocturnus, the context server for AI agents.',
+  blogPost: posts.map((post) => ({
+    '@type': 'BlogPosting',
+    headline: post.data.title,
+    url: `https://nocturnus.ai/blog/${post.id}/`,
+    datePublished: post.data.date.toISOString(),
+    author: {
+      '@type': 'Organization',
+      name: post.data.author,
+    },
+    ...(post.data.cover && { image: post.data.cover.src }),
+  })),
+};
 ---
 
 <Layout
   title="Blog | Nocturnus.AI"
   description="Essays and announcements from the team building Nocturnus, the context server for AI agents."
+  jsonLd={blogLd}
+  feedUrl="https://nocturnus.ai/rss.xml"
+  keywords={['ai agents', 'context compression', 'logic engine', 'token cost', 'agent memory']}
 >
   <Navbar solid />
 
@@ -29,27 +61,45 @@ const fmt = new Intl.DateTimeFormat('en-US', {
       <p class="lead">
         Essays, announcements, and benchmarks from the team building Nocturnus.
       </p>
+      <a class="blog-rss" href={`${base}/rss.xml`} aria-label="Subscribe via RSS">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.2"/></svg>
+        RSS
+      </a>
     </header>
 
     <ul class="blog-list">
       {posts.map((post) => (
         <li class="blog-list-item">
           <a href={`${base}/blog/${post.id}/`} class="blog-list-link">
-            <div class="blog-list-meta">
-              <time datetime={post.data.date.toISOString()}>{fmt.format(post.data.date)}</time>
-              {post.data.tags.length > 0 && (
-                <span class="blog-list-tags">
-                  {post.data.tags.slice(0, 3).map((tag) => (
-                    <span class="blog-list-tag">{tag}</span>
-                  ))}
-                </span>
-              )}
-            </div>
-            <h2 class="blog-list-title">{post.data.title}</h2>
-            {post.data.subtitle && (
-              <p class="blog-list-subtitle">{post.data.subtitle}</p>
+            {post.data.cover && (
+              <div class="blog-list-thumb">
+                <img
+                  src={thumb(post.data.cover.src)}
+                  alt={post.data.cover.alt}
+                  loading="lazy"
+                  decoding="async"
+                  width="800"
+                  height="420"
+                />
+              </div>
             )}
-            <span class="blog-list-readmore">Read post →</span>
+            <div class="blog-list-body">
+              <div class="blog-list-meta">
+                <time datetime={post.data.date.toISOString()}>{fmt.format(post.data.date)}</time>
+                {post.data.tags.length > 0 && (
+                  <span class="blog-list-tags">
+                    {post.data.tags.slice(0, 3).map((tag) => (
+                      <span class="blog-list-tag">{tag}</span>
+                    ))}
+                  </span>
+                )}
+              </div>
+              <h2 class="blog-list-title">{post.data.title}</h2>
+              {post.data.subtitle && (
+                <p class="blog-list-subtitle">{post.data.subtitle}</p>
+              )}
+              <span class="blog-list-readmore">Read post →</span>
+            </div>
           </a>
         </li>
       ))}
@@ -72,6 +122,7 @@ const fmt = new Intl.DateTimeFormat('en-US', {
   .blog-index-header {
     margin-bottom: clamp(3rem, 6vw, 4.5rem);
     max-width: 720px;
+    position: relative;
   }
 
   .docs-kicker {
@@ -99,6 +150,27 @@ const fmt = new Intl.DateTimeFormat('en-US', {
     margin: 0;
   }
 
+  .blog-rss {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 1rem;
+    font-family: 'Commit Mono', ui-monospace, monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    color: color-mix(in srgb, currentColor 60%, transparent);
+    text-decoration: none;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+    border-radius: 999px;
+    transition: color 180ms ease, border-color 180ms ease;
+  }
+
+  .blog-rss:hover {
+    color: var(--accent, #e6a03c);
+    border-color: color-mix(in srgb, var(--accent, #e6a03c) 40%, transparent);
+  }
+
   .blog-list {
     list-style: none;
     margin: 0;
@@ -113,11 +185,20 @@ const fmt = new Intl.DateTimeFormat('en-US', {
   }
 
   .blog-list-link {
-    display: block;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.6rem;
     padding: 2rem 0;
     text-decoration: none;
     color: inherit;
     transition: transform 180ms ease, opacity 180ms ease;
+  }
+
+  @media (min-width: 720px) {
+    .blog-list-link {
+      grid-template-columns: 280px minmax(0, 1fr);
+      align-items: start;
+    }
   }
 
   .blog-list-link:hover {
@@ -126,6 +207,29 @@ const fmt = new Intl.DateTimeFormat('en-US', {
 
   .blog-list-link:hover .blog-list-readmore {
     color: var(--accent, #e6a03c);
+  }
+
+  .blog-list-thumb {
+    aspect-ratio: 40 / 21;
+    overflow: hidden;
+    border-radius: 10px;
+    background: color-mix(in srgb, currentColor 8%, transparent);
+  }
+
+  .blog-list-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 400ms ease;
+  }
+
+  .blog-list-link:hover .blog-list-thumb img {
+    transform: scale(1.03);
+  }
+
+  .blog-list-body {
+    min-width: 0;
   }
 
   .blog-list-meta {

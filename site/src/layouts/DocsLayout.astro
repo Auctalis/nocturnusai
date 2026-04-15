@@ -1,15 +1,42 @@
 ---
-import '../styles/global.css';
+import Layout from './Layout.astro';
 import Navbar from '../components/Navbar.astro';
 import Footer from '../components/Footer.astro';
-import Analytics from '../components/Analytics.astro';
 
 interface Props {
   title: string;
+  description?: string;
 }
 
-const { title } = Astro.props;
+const {
+  title,
+  description = 'Nocturnus.AI documentation — build, integrate, and operate the context server for AI agents.',
+} = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+// TechArticle schema helps these pages land as rich results for
+// developer-intent queries ("nocturnusai mcp", "context window api", etc.).
+const techArticleLd = {
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: title,
+  description,
+  author: {
+    '@type': 'Organization',
+    name: 'Nocturnus.AI',
+    url: 'https://nocturnus.ai/',
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: 'Nocturnus.AI',
+    url: 'https://nocturnus.ai/',
+    logo: {
+      '@type': 'ImageObject',
+      url: 'https://nocturnus.ai/favicon.svg',
+    },
+  },
+  mainEntityOfPage: new URL(Astro.url.pathname, Astro.site).href,
+};
 
 const navItems = [
   {
@@ -49,114 +76,82 @@ const navItems = [
 ];
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="description" content="Nocturnus.AI documentation for reducing large turn arrays into smaller model-ready context windows." />
-    <meta name="viewport" content="width=device-width" />
-    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
-    <link rel="alternate icon" href={`${base}/favicon.ico`} />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Commit+Mono&display=swap" rel="stylesheet" />
-    <meta name="generator" content={Astro.generator} />
-    <title>{title} | Nocturnus.AI Docs</title>
-    <Analytics />
-  </head>
-  <body class="site-body docs-page">
-    <Navbar solid />
+<Layout
+  title={`${title} | Nocturnus.AI Docs`}
+  description={description}
+  jsonLd={techArticleLd}
+  bodyClass="docs-page"
+>
+  <Navbar solid />
 
-    <div class="site-container docs-shell">
-      <aside class="docs-sidebar">
-        {navItems.map((group) => (
-          <div class="docs-nav-group">
-            <div class="docs-nav-title">{group.title}</div>
-            <ul class="docs-nav-list">
-              {group.links.map((link) => (
-                <li><a href={link.href} class="docs-nav-link">{link.text}</a></li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </aside>
-
-      <main class="docs-main">
-        <details class="docs-mobile-nav">
-          <summary>Docs Navigation</summary>
-          <div class="docs-mobile-nav-panel">
-            {navItems.map((group) => (
-              <div class="docs-nav-group">
-                <div class="docs-nav-title">{group.title}</div>
-                <ul class="docs-nav-list">
-                  {group.links.map((link) => (
-                    <li><a href={link.href} class="docs-nav-link">{link.text}</a></li>
-                  ))}
-                </ul>
-              </div>
+  <div class="site-container docs-shell">
+    <aside class="docs-sidebar">
+      {navItems.map((group) => (
+        <div class="docs-nav-group">
+          <div class="docs-nav-title">{group.title}</div>
+          <ul class="docs-nav-list">
+            {group.links.map((link) => (
+              <li><a href={link.href} class="docs-nav-link">{link.text}</a></li>
             ))}
-          </div>
-        </details>
+          </ul>
+        </div>
+      ))}
+    </aside>
 
-        <article class="docs-content">
-          <slot />
-        </article>
-      </main>
-    </div>
+    <main class="docs-main">
+      <details class="docs-mobile-nav">
+        <summary>Docs Navigation</summary>
+        <div class="docs-mobile-nav-panel">
+          {navItems.map((group) => (
+            <div class="docs-nav-group">
+              <div class="docs-nav-title">{group.title}</div>
+              <ul class="docs-nav-list">
+                {group.links.map((link) => (
+                  <li><a href={link.href} class="docs-nav-link">{link.text}</a></li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </details>
 
-    <Footer />
+      <article class="docs-content">
+        <slot />
+      </article>
+    </main>
+  </div>
 
-    <script is:inline>
-      (() => {
-        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-          document.documentElement.classList.add('motion-ok');
-          const nodes = document.querySelectorAll('.reveal');
-          if ('IntersectionObserver' in window) {
-            const observer = new IntersectionObserver(
-              (entries) => {
-                entries.forEach((entry) => {
-                  if (entry.isIntersecting) {
-                    entry.target.classList.add('is-visible');
-                    observer.unobserve(entry.target);
-                  }
-                });
-              },
-              { threshold: 0.16 },
-            );
-            nodes.forEach((node) => observer.observe(node));
-          } else {
-            nodes.forEach((node) => node.classList.add('is-visible'));
+  <Footer />
+
+  <script is:inline>
+    (() => {
+      document.querySelectorAll('.docs-content pre').forEach((pre) => {
+        if (pre.querySelector('.copy-btn')) return;
+        const button = document.createElement('button');
+        button.className = 'copy-btn';
+        button.textContent = 'copy';
+        button.addEventListener('click', async () => {
+          const code = pre.querySelector('code');
+          const text = (code ?? pre).innerText;
+          try {
+            await navigator.clipboard.writeText(text);
+          } catch {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            ta.remove();
           }
-        }
-
-        document.querySelectorAll('.docs-content pre').forEach((pre) => {
-          if (pre.querySelector('.copy-btn')) return;
-          const button = document.createElement('button');
-          button.className = 'copy-btn';
-          button.textContent = 'copy';
-          button.addEventListener('click', async () => {
-            const code = pre.querySelector('code');
-            const text = (code ?? pre).innerText;
-            try {
-              await navigator.clipboard.writeText(text);
-            } catch {
-              const ta = document.createElement('textarea');
-              ta.value = text;
-              document.body.appendChild(ta);
-              ta.select();
-              document.execCommand('copy');
-              ta.remove();
-            }
-            button.textContent = 'copied';
-            button.classList.add('copied');
-            setTimeout(() => {
-              button.textContent = 'copy';
-              button.classList.remove('copied');
-            }, 1600);
-          });
-          pre.appendChild(button);
+          button.textContent = 'copied';
+          button.classList.add('copied');
+          setTimeout(() => {
+            button.textContent = 'copy';
+            button.classList.remove('copied');
+          }, 1600);
         });
-      })();
-    </script>
-  </body>
-</html>
+        pre.appendChild(button);
+      });
+    })();
+  </script>
+</Layout>
