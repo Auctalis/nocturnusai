@@ -1,0 +1,659 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Navbar from '../components/Navbar.astro';
+import Footer from '../components/Footer.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+// Measured token counts from run_benchmark.py — 15-turn product support conversation
+// API: claude-opus-4-6 and gemini-2.0-flash, live calls, usage.input_tokens
+const claudeNaive   = [53, 225, 396, 567, 740, 912, 1091, 1266, 1435, 1607, 1776, 1949, 2119, 2290, 2460];
+const claudeNoct    = [78, 91, 108, 128, 157, 180, 224, 244, 251, 272, 285, 309, 318, 332, 331];
+const geminiNaive   = [48, 132, 244, 322, 450, 574, 717, 1168, 1726, 2464, 3321, 4004, 4823, 5482, 7084];
+const geminiNoct    = [72, 89, 105, 126, 151, 173, 217, 236, 246, 269, 277, 305, 319, 331, 330];
+
+const claudeAvgNaive = Math.round(claudeNaive.reduce((a, b) => a + b, 0) / claudeNaive.length);
+const claudeAvgNoct  = Math.round(claudeNoct.reduce((a, b) => a + b, 0) / claudeNoct.length);
+const geminiAvgNaive = Math.round(geminiNaive.reduce((a, b) => a + b, 0) / geminiNaive.length);
+const geminiAvgNoct  = Math.round(geminiNoct.reduce((a, b) => a + b, 0) / geminiNoct.length);
+
+// Use sum/sum ratios (matching run_benchmark.py) to avoid rounding drift in avg/avg
+const claudeSumNaive = claudeNaive.reduce((a, b) => a + b, 0);
+const claudeSumNoct  = claudeNoct.reduce((a, b) => a + b, 0);
+const geminiSumNaive = geminiNaive.reduce((a, b) => a + b, 0);
+const geminiSumNoct  = geminiNoct.reduce((a, b) => a + b, 0);
+const claudeRatio = (claudeSumNaive / claudeSumNoct).toFixed(1);  // "5.7"
+const geminiRatio = (geminiSumNaive / geminiSumNoct).toFixed(1);  // "10.0"
+const claudePct   = Math.round((1 - claudeSumNoct / claudeSumNaive) * 100);  // 82
+const geminiPct   = Math.round((1 - geminiSumNoct / geminiSumNaive) * 100);  // 90
+---
+
+<Layout
+  title="Benchmark — NocturnusAI Token Reduction"
+  description="Measured token reduction on live Claude Opus 4 and Gemini 2.0 Flash APIs. 15-turn support conversation, real usage.input_tokens counts. Run it yourself."
+  keywords={['benchmark', 'token reduction', 'claude', 'gemini', 'context window', 'ai agents', 'nocturnusai']}
+>
+  <Navbar solid />
+
+  <main>
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- HERO                                                               -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="bench-hero">
+      <div class="site-container">
+        <div class="bench-hero-inner">
+          <div class="site-kicker" style="color: var(--site-accent);">Live Benchmark</div>
+          <h1 style="font-family: var(--font-display); font-size: clamp(2.2rem, 5vw, 3.8rem); font-weight: 700; line-height: 1.1; letter-spacing: -0.03em; margin: 0.6rem 0 1rem;">
+            Measured on real APIs.<br/>Every number is live.
+          </h1>
+          <p style="font-size: 1.05rem; color: var(--site-muted); max-width: 580px; line-height: 1.7; margin: 0 0 2rem;">
+            A 15-turn product-support conversation. Token counts taken directly from <code>usage.input_tokens</code> — not estimated, not modeled. Open source, reproducible, and auditable.
+          </p>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <a href="https://github.com/Auctalis/nocturnusai/tree/main/nocturnusai-bench" class="button-primary">Run it yourself</a>
+            <a href={`${base}/docs`} class="button-secondary">Read the docs</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- SUMMARY STATS                                                      -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="results">
+      <div class="site-container">
+        <div class="bench-stat-grid reveal">
+          <div class="plain-card bench-stat-card">
+            <div class="bench-model-tag">Claude Opus 4</div>
+            <div class="bench-ratio">{claudeRatio}×</div>
+            <div class="bench-stat-label">fewer input tokens per turn</div>
+            <div class="bench-stat-detail">
+              <span>{claudeAvgNoct.toLocaleString()} avg with NocturnusAI</span>
+              <span class="bench-vs">vs</span>
+              <span>{claudeAvgNaive.toLocaleString()} naive</span>
+            </div>
+            <div class="bench-savings-pct">{claudePct}% reduction</div>
+          </div>
+
+          <div class="plain-card bench-stat-card">
+            <div class="bench-model-tag" style="color: #4285f4;">Gemini 2.0 Flash</div>
+            <div class="bench-ratio">{geminiRatio}×</div>
+            <div class="bench-stat-label">fewer input tokens per turn</div>
+            <div class="bench-stat-detail">
+              <span>{geminiAvgNoct.toLocaleString()} avg with NocturnusAI</span>
+              <span class="bench-vs">vs</span>
+              <span>{geminiAvgNaive.toLocaleString()} naive</span>
+            </div>
+            <div class="bench-savings-pct">{geminiPct}% reduction</div>
+          </div>
+
+          <div class="plain-card bench-stat-card bench-stat-meta">
+            <div class="bench-model-tag" style="color: var(--site-muted);">Scenario</div>
+            <div style="font-size: 0.9rem; line-height: 1.7; color: var(--site-muted); margin-top: 0.8rem;">
+              <strong style="color: var(--site-text); display: block; margin-bottom: 0.4rem;">Product support, 15 turns</strong>
+              API timeout → connection pool exhaustion → root cause diagnosis. Facts extracted per turn, queried individually via <code>POST /query</code>.
+            </div>
+            <div style="margin-top: 1rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted-soft);">
+              v0.3.10 &middot; localhost:9300 &middot; April 2026
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- CHARTS                                                             -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="charts">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Token Usage Per Turn</div>
+          <h2 class="site-title" style="font-size: clamp(1.8rem, 3.5vw, 2.6rem);">Context grows linearly. NocturnusAI stays flat.</h2>
+          <p class="site-subtitle">Each naive turn replays the full conversation. NocturnusAI retrieves only stored facts — so cost stays constant regardless of conversation length.</p>
+        </div>
+
+        <!-- Claude chart -->
+        <div class="bench-chart-section reveal reveal-delay-1">
+          <div class="bench-chart-header">
+            <div>
+              <div class="bench-chart-title">Claude Opus 4 (claude-opus-4-6)</div>
+              <div class="bench-chart-sub">$15/1M input tokens &middot; live API &middot; usage.input_tokens</div>
+            </div>
+            <div class="bench-chart-badge">{claudeRatio}× fewer tokens</div>
+          </div>
+
+          <svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg" class="bench-svg" aria-label="Claude Opus 4 token usage comparison">
+            <!-- Grid -->
+            <line x1="80" y1="24" x2="80" y2="240" stroke="currentColor" stroke-opacity="0.12" stroke-width="1"/>
+            <line x1="80" y1="240" x2="855" y2="240" stroke="currentColor" stroke-opacity="0.12" stroke-width="1"/>
+            <line x1="80" y1="186" x2="855" y2="186" stroke="currentColor" stroke-opacity="0.06" stroke-width="1" stroke-dasharray="3 5"/>
+            <line x1="80" y1="132" x2="855" y2="132" stroke="currentColor" stroke-opacity="0.06" stroke-width="1" stroke-dasharray="3 5"/>
+            <line x1="80" y1="78" x2="855" y2="78" stroke="currentColor" stroke-opacity="0.06" stroke-width="1" stroke-dasharray="3 5"/>
+
+            <!-- Y labels -->
+            <text x="72" y="244" text-anchor="end" fill="currentColor" fill-opacity="0.4" font-size="19" font-family="monospace">0</text>
+            <text x="72" y="190" text-anchor="end" fill="currentColor" fill-opacity="0.4" font-size="19" font-family="monospace">625</text>
+            <text x="72" y="136" text-anchor="end" fill="currentColor" fill-opacity="0.4" font-size="19" font-family="monospace">1,250</text>
+            <text x="72" y="82" text-anchor="end" fill="currentColor" fill-opacity="0.4" font-size="19" font-family="monospace">1,875</text>
+            <text x="72" y="28" text-anchor="end" fill="currentColor" fill-opacity="0.4" font-size="19" font-family="monospace">2,500</text>
+
+            <!-- X turn labels -->
+            <text x="80" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T1</text>
+            <text x="190" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T4</text>
+            <text x="300" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T7</text>
+            <text x="410" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T9</text>
+            <text x="520" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T11</text>
+            <text x="685" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T13</text>
+            <text x="850" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T15</text>
+
+            <!-- Fill between curves -->
+            <polygon
+              points="80,235 135,221 190,206 245,191 300,176 355,161 410,146 465,131 520,116 575,101 630,87 685,72 740,57 795,42 850,28 850,211 795,211 740,213 685,213 630,215 575,217 520,218 465,219 410,221 355,224 300,226 245,229 190,231 135,232 80,233"
+              fill="#e55533" fill-opacity="0.07"
+            />
+
+            <!-- Naive line -->
+            <polyline
+              points="80,235 135,221 190,206 245,191 300,176 355,161 410,146 465,131 520,116 575,101 630,87 685,72 740,57 795,42 850,28"
+              fill="none" stroke="#e55533" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+            />
+
+            <!-- NocturnusAI line -->
+            <polyline
+              points="80,233 135,232 190,231 245,229 300,226 355,224 410,221 465,219 520,218 575,217 630,215 685,213 740,213 795,211 850,211"
+              fill="none" stroke="#D4883A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+            />
+
+            <!-- Endpoint labels -->
+            <text x="858" y="24" fill="#e55533" fill-opacity="0.85" font-size="18" font-family="monospace">2,460</text>
+            <text x="858" y="207" fill="#D4883A" fill-opacity="0.85" font-size="18" font-family="monospace">331</text>
+
+            <!-- Legend -->
+            <line x1="80" y1="270" x2="104" y2="270" stroke="#e55533" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="92" cy="270" r="3" fill="#e55533"/>
+            <text x="110" y="274" fill="currentColor" fill-opacity="0.55" font-size="18" font-family="monospace">Naive (full history)</text>
+            <line x1="305" y1="270" x2="329" y2="270" stroke="#D4883A" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="317" cy="270" r="3" fill="#D4883A"/>
+            <text x="335" y="274" fill="currentColor" fill-opacity="0.55" font-size="18" font-family="monospace">NocturnusAI (retrieved facts)</text>
+          </svg>
+        </div>
+
+        <!-- Gemini chart -->
+        <div class="bench-chart-section reveal reveal-delay-2" style="margin-top: var(--space-6);">
+          <div class="bench-chart-header">
+            <div>
+              <div class="bench-chart-title">Gemini 2.0 Flash (gemini-2.0-flash)</div>
+              <div class="bench-chart-sub">$0.10/1M input tokens &middot; live API &middot; count_tokens API</div>
+            </div>
+            <div class="bench-chart-badge" style="color: #4285f4; border-color: color-mix(in srgb, #4285f4 30%, transparent);">{geminiRatio}× fewer tokens</div>
+          </div>
+
+          <svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg" class="bench-svg" aria-label="Gemini 2.0 Flash token usage comparison">
+            <!-- Grid -->
+            <line x1="80" y1="24" x2="80" y2="240" stroke="currentColor" stroke-opacity="0.12" stroke-width="1"/>
+            <line x1="80" y1="240" x2="855" y2="240" stroke="currentColor" stroke-opacity="0.12" stroke-width="1"/>
+            <line x1="80" y1="186" x2="855" y2="186" stroke="currentColor" stroke-opacity="0.06" stroke-width="1" stroke-dasharray="3 5"/>
+            <line x1="80" y1="132" x2="855" y2="132" stroke="currentColor" stroke-opacity="0.06" stroke-width="1" stroke-dasharray="3 5"/>
+            <line x1="80" y1="78" x2="855" y2="78" stroke="currentColor" stroke-opacity="0.06" stroke-width="1" stroke-dasharray="3 5"/>
+
+            <!-- Y labels -->
+            <text x="72" y="244" text-anchor="end" fill="currentColor" fill-opacity="0.4" font-size="19" font-family="monospace">0</text>
+            <text x="72" y="190" text-anchor="end" fill="currentColor" fill-opacity="0.4" font-size="19" font-family="monospace">1,875</text>
+            <text x="72" y="136" text-anchor="end" fill="currentColor" fill-opacity="0.4" font-size="19" font-family="monospace">3,750</text>
+            <text x="72" y="82" text-anchor="end" fill="currentColor" fill-opacity="0.4" font-size="19" font-family="monospace">5,625</text>
+            <text x="72" y="28" text-anchor="end" fill="currentColor" fill-opacity="0.4" font-size="19" font-family="monospace">7,500</text>
+
+            <!-- X turn labels -->
+            <text x="80" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T1</text>
+            <text x="190" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T4</text>
+            <text x="300" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T7</text>
+            <text x="410" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T9</text>
+            <text x="520" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T11</text>
+            <text x="685" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T13</text>
+            <text x="850" y="260" text-anchor="middle" fill="currentColor" fill-opacity="0.35" font-size="17" font-family="monospace">T15</text>
+
+            <!-- Fill between curves -->
+            <polygon
+              points="80,239 135,236 190,233 245,231 300,227 355,224 410,219 465,206 520,190 575,169 630,144 685,125 740,101 795,82 850,36 850,231 795,231 740,231 685,231 630,232 575,232 520,233 465,233 410,234 355,235 300,236 245,236 190,237 135,237 80,238"
+              fill="#e55533" fill-opacity="0.07"
+            />
+
+            <!-- Naive line -->
+            <polyline
+              points="80,239 135,236 190,233 245,231 300,227 355,224 410,219 465,206 520,190 575,169 630,144 685,125 740,101 795,82 850,36"
+              fill="none" stroke="#e55533" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+            />
+
+            <!-- NocturnusAI line -->
+            <polyline
+              points="80,238 135,237 190,237 245,236 300,236 355,235 410,234 465,233 520,233 575,232 630,232 685,231 740,231 795,231 850,231"
+              fill="none" stroke="#4285f4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+            />
+
+            <!-- Endpoint labels -->
+            <text x="858" y="32" fill="#e55533" fill-opacity="0.85" font-size="18" font-family="monospace">7,084</text>
+            <text x="858" y="227" fill="#4285f4" fill-opacity="0.85" font-size="18" font-family="monospace">330</text>
+
+            <!-- Legend -->
+            <line x1="80" y1="270" x2="104" y2="270" stroke="#e55533" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="92" cy="270" r="3" fill="#e55533"/>
+            <text x="110" y="274" fill="currentColor" fill-opacity="0.55" font-size="18" font-family="monospace">Naive (full history)</text>
+            <line x1="305" y1="270" x2="329" y2="270" stroke="#4285f4" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="317" cy="270" r="3" fill="#4285f4"/>
+            <text x="335" y="274" fill="currentColor" fill-opacity="0.55" font-size="18" font-family="monospace">NocturnusAI (retrieved facts)</text>
+          </svg>
+        </div>
+
+        <p class="reveal reveal-delay-3" style="text-align: center; margin-top: var(--space-4); font-size: 0.82rem; color: var(--site-muted-soft);">
+          Gemini growth is steeper because the naive approach concatenates the full conversation string. Compression ratio improves with conversation length.
+        </p>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- PER-TURN DATA TABLE                                                -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="data">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Raw Numbers</div>
+          <h2 class="site-title" style="font-size: clamp(1.6rem, 3vw, 2.2rem);">Input tokens per turn — all 15 turns.</h2>
+        </div>
+
+        <div class="reveal reveal-delay-1" style="overflow-x: auto;">
+          <table class="bench-table">
+            <thead>
+              <tr>
+                <th>Turn</th>
+                <th style="color: #e55533;">Claude Naive</th>
+                <th style="color: var(--site-accent);">Claude Nocturnus</th>
+                <th>Ratio</th>
+                <th style="color: #e55533;">Gemini Naive</th>
+                <th style="color: #4285f4;">Gemini Nocturnus</th>
+                <th>Ratio</th>
+              </tr>
+            </thead>
+            <tbody>
+              {claudeNaive.map((cn, i) => {
+                const cnn = claudeNoct[i];
+                const gn = geminiNaive[i];
+                const gnn = geminiNoct[i];
+                const cr = (cn / cnn).toFixed(1);
+                const gr = (gn / gnn).toFixed(1);
+                return (
+                  <tr>
+                    <td style="font-family: var(--font-mono); color: var(--site-muted);">T{i + 1}</td>
+                    <td style="color: #e55533; opacity: 0.8;">{cn.toLocaleString()}</td>
+                    <td style="color: var(--site-accent); font-weight: 500;">{cnn.toLocaleString()}</td>
+                    <td style="font-family: var(--font-mono); font-size: 0.82rem;">{cr}×</td>
+                    <td style="color: #e55533; opacity: 0.8;">{gn.toLocaleString()}</td>
+                    <td style="color: #4285f4; font-weight: 500;">{gnn.toLocaleString()}</td>
+                    <td style="font-family: var(--font-mono); font-size: 0.82rem;">{gr}×</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td style="font-family: var(--font-mono); font-weight: 600; color: var(--site-text);">Avg</td>
+                <td style="color: #e55533; font-weight: 600;">{claudeAvgNaive.toLocaleString()}</td>
+                <td style="color: var(--site-accent); font-weight: 600;">{claudeAvgNoct.toLocaleString()}</td>
+                <td style="font-family: var(--font-mono); font-weight: 600; color: var(--site-accent);">{claudeRatio}×</td>
+                <td style="color: #e55533; font-weight: 600;">{geminiAvgNaive.toLocaleString()}</td>
+                <td style="color: #4285f4; font-weight: 600;">{geminiAvgNoct.toLocaleString()}</td>
+                <td style="font-family: var(--font-mono); font-weight: 600; color: #4285f4;">{geminiRatio}×</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <p class="reveal reveal-delay-2" style="margin-top: var(--space-3); font-size: 0.82rem; color: var(--site-muted-soft); text-align: center;">
+          Claude Naive T1 is low (53 tokens) because turn 1 has no history yet. The ratio compounds from T2 onwards.
+        </p>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- METHODOLOGY                                                        -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="methodology">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Methodology</div>
+          <h2 class="site-title" style="font-size: clamp(1.6rem, 3vw, 2.2rem);">Reproducible. Open. Skeptics welcome.</h2>
+        </div>
+
+        <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
+          <div class="plain-card" style="border-top: 2px solid #e55533;">
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: #e55533; margin-bottom: 0.6rem;">Naive Approach</div>
+            <ul style="font-size: 0.88rem; color: var(--site-muted); line-height: 1.75; margin: 0; padding-left: 1.2rem;">
+              <li>Conversation history accumulated as a message list</li>
+              <li>Every turn sends the <strong style="color: var(--site-text);">complete history</strong> to the model</li>
+              <li>Token count from API <code>usage.input_tokens</code></li>
+              <li>0.35s sleep between calls to respect rate limits</li>
+            </ul>
+          </div>
+
+          <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.6rem;">NocturnusAI Approach</div>
+            <ul style="font-size: 0.88rem; color: var(--site-muted); line-height: 1.75; margin: 0; padding-left: 1.2rem;">
+              <li>Key facts extracted per turn (predicate + value pairs)</li>
+              <li>Stored via <code>POST /assert/fact</code> with tenant isolation</li>
+              <li>Each turn retrieves facts via <code>POST /query</code> per predicate</li>
+              <li>Only retrieved facts sent as context — <strong style="color: var(--site-text);">no history replay</strong></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="reveal reveal-delay-2 plain-card" style="border-left: 3px solid var(--site-accent); padding: var(--space-4);">
+          <h3 style="font-size: 1rem; font-weight: 600; margin: 0 0 0.8rem;">What we measured (and what we didn't)</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); font-size: 0.88rem; color: var(--site-muted); line-height: 1.7;">
+            <div>
+              <strong style="color: var(--site-text); display: block; margin-bottom: 0.4rem;">Measured</strong>
+              <ul style="margin: 0; padding-left: 1.2rem;">
+                <li>Input tokens only (from API response)</li>
+                <li>15 turns × 4 passes (Claude naive, Claude NocturnusAI, Gemini naive, Gemini NocturnusAI)</li>
+                <li>Fresh tenant per run (timestamp-suffixed)</li>
+              </ul>
+            </div>
+            <div>
+              <strong style="color: var(--site-text); display: block; margin-bottom: 0.4rem;">Not measured here</strong>
+              <ul style="margin: 0; padding-left: 1.2rem;">
+                <li>Output tokens (identical for both approaches)</li>
+                <li>Response quality or accuracy</li>
+                <li>NocturnusAI latency overhead (~2ms per turn)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="reveal reveal-delay-3" style="margin-top: var(--space-4); text-align: center;">
+          <a href="https://github.com/Auctalis/nocturnusai/tree/main/nocturnusai-bench" class="button-primary" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+            View source on GitHub
+          </a>
+          <p style="margin-top: 1rem; font-size: 0.82rem; color: var(--site-muted-soft);">
+            <code>nocturnusai-bench/run_benchmark.py</code> — single file, stdlib + anthropic + google-genai
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- COST PROJECTION                                                    -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="cost">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Cost Projection</div>
+          <h2 class="site-title" style="font-size: clamp(1.6rem, 3vw, 2.2rem);">50,000 turns/month. Real prices.</h2>
+        </div>
+
+        <div class="reveal reveal-delay-1" style="overflow-x: auto;">
+          <table class="bench-table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Price</th>
+                <th>Naive avg</th>
+                <th>Naive cost/mo</th>
+                <th>Nocturnus avg</th>
+                <th>Nocturnus cost/mo</th>
+                <th>Savings</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Claude Opus 4</td>
+                <td style="font-family: var(--font-mono);">$15/1M</td>
+                <td style="color: #e55533;">{claudeAvgNaive.toLocaleString()} tok</td>
+                <td style="color: #e55533; font-weight: 500;">${(50000 * claudeAvgNaive * 15 / 1_000_000).toFixed(0)}</td>
+                <td style="color: var(--site-accent);">{claudeAvgNoct.toLocaleString()} tok</td>
+                <td style="color: var(--site-accent); font-weight: 500;">${(50000 * claudeAvgNoct * 15 / 1_000_000).toFixed(0)}</td>
+                <td style="font-family: var(--font-mono); font-weight: 600; color: var(--site-accent);">
+                  {(100 - claudeAvgNoct / claudeAvgNaive * 100).toFixed(0)}% off
+                </td>
+              </tr>
+              <tr>
+                <td>Gemini 2.0 Flash</td>
+                <td style="font-family: var(--font-mono);">$0.10/1M</td>
+                <td style="color: #e55533;">{geminiAvgNaive.toLocaleString()} tok</td>
+                <td style="color: #e55533; font-weight: 500;">${(50000 * geminiAvgNaive * 0.10 / 1_000_000).toFixed(2)}</td>
+                <td style="color: #4285f4;">{geminiAvgNoct.toLocaleString()} tok</td>
+                <td style="color: #4285f4; font-weight: 500;">${(50000 * geminiAvgNoct * 0.10 / 1_000_000).toFixed(2)}</td>
+                <td style="font-family: var(--font-mono); font-weight: 600; color: #4285f4;">
+                  {(100 - geminiAvgNoct / geminiAvgNaive * 100).toFixed(0)}% off
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="reveal reveal-delay-2" style="margin-top: var(--space-3); font-size: 0.82rem; color: var(--site-muted-soft); text-align: center;">
+          At 50,000 turns/month. The compression ratio ({claudeRatio}× Claude, {geminiRatio}× Gemini) is constant regardless of volume.
+        </p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- CTA                                                                -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section cta-band" id="run-it">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <h2 class="site-title" style="font-size: clamp(1.8rem, 3.5vw, 2.8rem); color: var(--site-dark-text);">Run it yourself.</h2>
+          <p style="font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.06em; color: rgba(255,255,255,0.45); margin-top: 0.5rem;">OPEN SOURCE &middot; SINGLE SCRIPT &middot; BRING YOUR OWN API KEYS</p>
+        </div>
+
+        <div class="reveal reveal-delay-1 plain-card" style="background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); box-shadow: none; max-width: 680px; margin: 0 auto;">
+          <div class="panel-label">3 steps</div>
+          <pre style="margin: 0; font-size: 0.88rem; line-height: 1.9; white-space: pre-wrap; color: rgba(255,255,255,0.85);"># 1. Start NocturnusAI
+docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+
+# 2. Set API keys
+export ANTHROPIC_API_KEY=sk-ant-...
+export GOOGLE_API_KEY=AIza...
+
+# 3. Run
+git clone https://github.com/Auctalis/nocturnusai
+cd nocturnusai/nocturnusai-bench
+uv run run_benchmark.py</pre>
+        </div>
+
+        <div class="reveal reveal-delay-2" style="text-align: center; margin-top: var(--space-4);">
+          <a href="https://github.com/Auctalis/nocturnusai/tree/main/nocturnusai-bench" class="button-primary">View benchmark source</a>
+          <span style="display: inline-block; margin: 0 1rem; color: rgba(255,255,255,0.25);">&middot;</span>
+          <a href={`${base}/docs`} class="button-secondary">Read the docs</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</Layout>
+
+<style>
+  /* ── Hero ─────────────────────────────────────────────────────────────── */
+  .bench-hero {
+    padding: calc(var(--nav-height, 64px) + var(--space-7)) 0 var(--space-7);
+    background: var(--site-bg);
+    border-bottom: 1px solid var(--site-line);
+  }
+
+  .bench-hero-inner {
+    max-width: 680px;
+  }
+
+  /* ── Stat cards ───────────────────────────────────────────────────────── */
+  .bench-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+
+  @media (max-width: 860px) {
+    .bench-stat-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .bench-stat-meta {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .bench-stat-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .bench-stat-card {
+    text-align: center;
+    padding: var(--space-5) var(--space-3);
+    border-top: 2px solid var(--site-accent);
+  }
+
+  .bench-model-tag {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--site-accent);
+    margin-bottom: 0.8rem;
+  }
+
+  .bench-ratio {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 6vw, 4.5rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: var(--site-accent);
+  }
+
+  .bench-stat-label {
+    font-size: 0.88rem;
+    color: var(--site-muted);
+    margin-top: 0.5rem;
+  }
+
+  .bench-stat-detail {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+    font-size: 0.8rem;
+    color: var(--site-muted-soft);
+    font-family: var(--font-mono);
+    flex-wrap: wrap;
+  }
+
+  .bench-vs {
+    opacity: 0.4;
+    font-size: 0.7rem;
+  }
+
+  .bench-savings-pct {
+    margin-top: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--site-accent);
+    font-family: var(--font-mono);
+  }
+
+  /* ── Charts ───────────────────────────────────────────────────────────── */
+  .bench-chart-section {
+    background: var(--site-surface);
+    border: 1px solid var(--site-line);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+  }
+
+  .bench-chart-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .bench-chart-title {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  .bench-chart-sub {
+    font-size: 0.78rem;
+    color: var(--site-muted);
+    margin-top: 0.2rem;
+    font-family: var(--font-mono);
+  }
+
+  .bench-chart-badge {
+    flex-shrink: 0;
+    padding: 0.3rem 0.8rem;
+    background: color-mix(in srgb, var(--site-accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--site-accent) 30%, transparent);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--site-accent);
+    white-space: nowrap;
+  }
+
+  .bench-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  /* ── Table ────────────────────────────────────────────────────────────── */
+  .bench-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+    min-width: 600px;
+  }
+
+  .bench-table thead tr {
+    border-bottom: 2px solid var(--site-line);
+  }
+
+  .bench-table th {
+    text-align: left;
+    padding: 0.65rem 0.9rem;
+    font-weight: 600;
+    font-size: 0.8rem;
+  }
+
+  .bench-table td {
+    padding: 0.5rem 0.9rem;
+    border-bottom: 1px solid var(--site-line);
+    font-family: var(--font-mono);
+  }
+
+  .bench-table tbody tr:hover {
+    background: var(--site-surface);
+  }
+
+  .bench-table tfoot tr {
+    border-top: 2px solid var(--site-line);
+    background: color-mix(in srgb, var(--site-accent) 5%, transparent);
+  }
+
+  .bench-table tfoot td {
+    border-bottom: none;
+  }
+</style>
