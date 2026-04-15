@@ -166,6 +166,125 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
     </script>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- BENCHMARK — live measured results (mini homepage section)          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="benchmark">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">Benchmark</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Measured on live APIs. Every number is real.</h2>
+          <p class="site-subtitle">15-turn product support conversation. Token counts from <code>usage.input_tokens</code>. Not a model. Not an estimate.</p>
+        </div>
+
+        <!-- Two inline SVG charts side by side -->
+        <div class="bench-home-charts reveal reveal-delay-1">
+          <!-- Claude chart -->
+          <div>
+            <div style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.5rem; text-align: center;">Claude Opus 4 &mdash; 5.7&times; fewer tokens</div>
+            <svg viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto; display: block;" aria-label="Claude Opus 4 token usage">
+              <line x1="10" y1="10" x2="10" y2="195" stroke="currentColor" stroke-opacity="0.1" stroke-width="1"/>
+              <line x1="10" y1="195" x2="790" y2="195" stroke="currentColor" stroke-opacity="0.1" stroke-width="1"/>
+              <line x1="10" y1="105" x2="790" y2="105" stroke="currentColor" stroke-opacity="0.05" stroke-width="1" stroke-dasharray="4 5"/>
+              <!-- Fill area between curves -->
+              <polygon points="60,191 110,175 160,160 210,144 260,129 310,113 360,98 410,82 460,67 510,52 560,37 610,22 660,10 710,10 760,10 760,172 710,171 660,170 610,170 560,169 510,168 460,168 410,167 360,165 310,163 260,161 210,160 160,158 110,157 60,156" fill="#e55533" fill-opacity="0.08"/>
+              <!-- Naive line -->
+              <polyline points="60,191 110,175 160,160 210,144 260,129 310,113 360,98 410,82 460,67 510,52 560,37 610,22 660,10 710,10 760,10" fill="none" stroke="#e55533" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <!-- NocturnusAI line -->
+              <polyline points="60,188 110,187 160,186 210,184 260,182 310,180 360,176 410,175 460,174 510,172 560,171 610,169 660,168 710,167 760,167" fill="none" stroke="#D4883A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <!-- Labels at T15 -->
+              <text x="768" y="8" fill="#e55533" fill-opacity="0.75" font-size="18" font-family="monospace">2,460</text>
+              <text x="768" y="163" fill="#D4883A" fill-opacity="0.75" font-size="18" font-family="monospace">331</text>
+              <!-- Legend -->
+              <line x1="60" y1="210" x2="78" y2="210" stroke="#e55533" stroke-width="2" stroke-linecap="round"/>
+              <text x="82" y="214" fill="currentColor" fill-opacity="0.5" font-size="17" font-family="monospace">Naive</text>
+              <line x1="160" y1="210" x2="178" y2="210" stroke="#D4883A" stroke-width="2" stroke-linecap="round"/>
+              <text x="182" y="214" fill="currentColor" fill-opacity="0.5" font-size="17" font-family="monospace">NocturnusAI</text>
+            </svg>
+          </div>
+
+          <!-- Gemini chart -->
+          <div>
+            <div style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.5rem; text-align: center;">Gemini 2.0 Flash &mdash; 10.0&times; fewer tokens</div>
+            <svg viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto; display: block;" aria-label="Gemini 2.0 Flash token usage">
+              <line x1="10" y1="10" x2="10" y2="195" stroke="currentColor" stroke-opacity="0.1" stroke-width="1"/>
+              <line x1="10" y1="195" x2="790" y2="195" stroke="currentColor" stroke-opacity="0.1" stroke-width="1"/>
+              <line x1="10" y1="105" x2="790" y2="105" stroke="currentColor" stroke-opacity="0.05" stroke-width="1" stroke-dasharray="4 5"/>
+              <!-- Fill area between curves -->
+              <polygon points="60,194 110,191 160,188 210,186 260,183 310,180 360,176 410,162 460,146 510,124 560,99 610,79 660,54 710,35 760,10 760,191 710,191 660,191 610,191 560,192 510,192 460,192 410,193 360,193 310,193 260,194 210,194 160,194 110,194 60,194" fill="#e55533" fill-opacity="0.08"/>
+              <!-- Naive line -->
+              <polyline points="60,194 110,191 160,188 210,186 260,183 310,180 360,176 410,162 460,146 510,124 560,99 610,79 660,54 710,35 760,10" fill="none" stroke="#e55533" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <!-- NocturnusAI line -->
+              <polyline points="60,193 110,193 160,193 210,193 260,193 310,193 360,192 410,192 460,192 510,192 560,192 610,191 660,191 710,191 760,191" fill="none" stroke="#4285f4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <!-- Labels at T15 -->
+              <text x="768" y="9" fill="#e55533" fill-opacity="0.75" font-size="18" font-family="monospace">7,084</text>
+              <text x="768" y="188" fill="#4285f4" fill-opacity="0.75" font-size="18" font-family="monospace">330</text>
+              <!-- Legend -->
+              <line x1="60" y1="210" x2="78" y2="210" stroke="#e55533" stroke-width="2" stroke-linecap="round"/>
+              <text x="82" y="214" fill="currentColor" fill-opacity="0.5" font-size="17" font-family="monospace">Naive</text>
+              <line x1="160" y1="210" x2="178" y2="210" stroke="#4285f4" stroke-width="2" stroke-linecap="round"/>
+              <text x="182" y="214" fill="currentColor" fill-opacity="0.5" font-size="17" font-family="monospace">NocturnusAI</text>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Stat cards row -->
+        <div class="bench-home-stats reveal reveal-delay-2">
+          <div class="plain-card" style="text-align: center; padding: var(--space-4) var(--space-3); border-top: 2px solid var(--site-accent);">
+            <div style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">5.7×</div>
+            <div style="font-size: 0.82rem; color: var(--site-muted); margin-top: 0.4rem;">Claude Opus 4 &middot; 82% reduction</div>
+          </div>
+          <div class="plain-card" style="text-align: center; padding: var(--space-4) var(--space-3); border-top: 2px solid #4285f4;">
+            <div style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; font-family: var(--font-mono); color: #4285f4; line-height: 1;">10.0×</div>
+            <div style="font-size: 0.82rem; color: var(--site-muted); margin-top: 0.4rem;">Gemini 2.0 Flash &middot; 90% reduction</div>
+          </div>
+          <div class="plain-card" style="text-align: center; padding: var(--space-4) var(--space-3);">
+            <div style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-text); line-height: 1;">15</div>
+            <div style="font-size: 0.82rem; color: var(--site-muted); margin-top: 0.4rem;">turns &middot; live API &middot; open source</div>
+          </div>
+        </div>
+
+        <p class="reveal reveal-delay-3" style="text-align: center; margin-top: var(--space-4); font-size: 0.88rem; color: var(--site-muted);">
+          Counts from <code>usage.input_tokens</code> &mdash; not a model, not an estimate.
+          <a href={`${base}/benchmark`} style="color: var(--site-accent); font-weight: 500; margin-left: 0.5rem;">Full methodology + run it yourself &rarr;</a>
+        </p>
+      </div>
+    </section>
+
+    <style>
+      .bench-home-charts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-5);
+        margin-bottom: var(--space-4);
+      }
+
+      .bench-home-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-3);
+        margin-bottom: var(--space-3);
+      }
+
+      @media (max-width: 780px) {
+        .bench-home-charts {
+          grid-template-columns: 1fr;
+        }
+        .bench-home-stats {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .bench-home-stats {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- WHY NOW — the urgency and the inflection                           -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section class="site-section-tight" id="why-now">
@@ -553,122 +672,6 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
     </script>
 
     <hr class="section-rule" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- BENCHMARK — live measured results (mini homepage section)          -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <section class="site-section-tight" id="benchmark">
-      <div class="site-container">
-        <div class="section-head reveal">
-          <div class="site-kicker">Benchmark</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Measured on live APIs. Every number is real.</h2>
-          <p class="site-subtitle">15-turn product support conversation. Token counts from <code>usage.input_tokens</code>. Not a model. Not an estimate.</p>
-        </div>
-
-        <!-- Two inline SVG charts side by side -->
-        <div class="bench-home-charts reveal reveal-delay-1">
-          <!-- Claude chart -->
-          <div>
-            <div style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.5rem; text-align: center;">Claude Opus 4 &mdash; 5.7&times; fewer tokens</div>
-            <svg viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto; display: block;" aria-label="Claude Opus 4 token usage">
-              <line x1="10" y1="10" x2="10" y2="195" stroke="currentColor" stroke-opacity="0.1" stroke-width="1"/>
-              <line x1="10" y1="195" x2="790" y2="195" stroke="currentColor" stroke-opacity="0.1" stroke-width="1"/>
-              <line x1="10" y1="105" x2="790" y2="105" stroke="currentColor" stroke-opacity="0.05" stroke-width="1" stroke-dasharray="4 5"/>
-              <!-- Fill area between curves -->
-              <polygon points="60,191 110,175 160,160 210,144 260,129 310,113 360,98 410,82 460,67 510,52 560,37 610,22 660,10 710,10 760,10 760,172 710,171 660,170 610,170 560,169 510,168 460,168 410,167 360,165 310,163 260,161 210,160 160,158 110,157 60,156" fill="#e55533" fill-opacity="0.08"/>
-              <!-- Naive line -->
-              <polyline points="60,191 110,175 160,160 210,144 260,129 310,113 360,98 410,82 460,67 510,52 560,37 610,22 660,10 710,10 760,10" fill="none" stroke="#e55533" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <!-- NocturnusAI line -->
-              <polyline points="60,188 110,187 160,186 210,184 260,182 310,180 360,176 410,175 460,174 510,172 560,171 610,169 660,168 710,167 760,167" fill="none" stroke="#D4883A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <!-- Labels at T15 -->
-              <text x="768" y="8" fill="#e55533" fill-opacity="0.75" font-size="18" font-family="monospace">2,460</text>
-              <text x="768" y="163" fill="#D4883A" fill-opacity="0.75" font-size="18" font-family="monospace">331</text>
-              <!-- Legend -->
-              <line x1="60" y1="210" x2="78" y2="210" stroke="#e55533" stroke-width="2" stroke-linecap="round"/>
-              <text x="82" y="214" fill="currentColor" fill-opacity="0.5" font-size="17" font-family="monospace">Naive</text>
-              <line x1="160" y1="210" x2="178" y2="210" stroke="#D4883A" stroke-width="2" stroke-linecap="round"/>
-              <text x="182" y="214" fill="currentColor" fill-opacity="0.5" font-size="17" font-family="monospace">NocturnusAI</text>
-            </svg>
-          </div>
-
-          <!-- Gemini chart -->
-          <div>
-            <div style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.5rem; text-align: center;">Gemini 2.0 Flash &mdash; 10.0&times; fewer tokens</div>
-            <svg viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto; display: block;" aria-label="Gemini 2.0 Flash token usage">
-              <line x1="10" y1="10" x2="10" y2="195" stroke="currentColor" stroke-opacity="0.1" stroke-width="1"/>
-              <line x1="10" y1="195" x2="790" y2="195" stroke="currentColor" stroke-opacity="0.1" stroke-width="1"/>
-              <line x1="10" y1="105" x2="790" y2="105" stroke="currentColor" stroke-opacity="0.05" stroke-width="1" stroke-dasharray="4 5"/>
-              <!-- Fill area between curves -->
-              <polygon points="60,194 110,191 160,188 210,186 260,183 310,180 360,176 410,162 460,146 510,124 560,99 610,79 660,54 710,35 760,10 760,191 710,191 660,191 610,191 560,192 510,192 460,192 410,193 360,193 310,193 260,194 210,194 160,194 110,194 60,194" fill="#e55533" fill-opacity="0.08"/>
-              <!-- Naive line -->
-              <polyline points="60,194 110,191 160,188 210,186 260,183 310,180 360,176 410,162 460,146 510,124 560,99 610,79 660,54 710,35 760,10" fill="none" stroke="#e55533" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <!-- NocturnusAI line -->
-              <polyline points="60,193 110,193 160,193 210,193 260,193 310,193 360,192 410,192 460,192 510,192 560,192 610,191 660,191 710,191 760,191" fill="none" stroke="#4285f4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <!-- Labels at T15 -->
-              <text x="768" y="9" fill="#e55533" fill-opacity="0.75" font-size="18" font-family="monospace">7,084</text>
-              <text x="768" y="188" fill="#4285f4" fill-opacity="0.75" font-size="18" font-family="monospace">330</text>
-              <!-- Legend -->
-              <line x1="60" y1="210" x2="78" y2="210" stroke="#e55533" stroke-width="2" stroke-linecap="round"/>
-              <text x="82" y="214" fill="currentColor" fill-opacity="0.5" font-size="17" font-family="monospace">Naive</text>
-              <line x1="160" y1="210" x2="178" y2="210" stroke="#4285f4" stroke-width="2" stroke-linecap="round"/>
-              <text x="182" y="214" fill="currentColor" fill-opacity="0.5" font-size="17" font-family="monospace">NocturnusAI</text>
-            </svg>
-          </div>
-        </div>
-
-        <!-- Stat cards row -->
-        <div class="bench-home-stats reveal reveal-delay-2">
-          <div class="plain-card" style="text-align: center; padding: var(--space-4) var(--space-3); border-top: 2px solid var(--site-accent);">
-            <div style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">5.7×</div>
-            <div style="font-size: 0.82rem; color: var(--site-muted); margin-top: 0.4rem;">Claude Opus 4 &middot; 82% reduction</div>
-          </div>
-          <div class="plain-card" style="text-align: center; padding: var(--space-4) var(--space-3); border-top: 2px solid #4285f4;">
-            <div style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; font-family: var(--font-mono); color: #4285f4; line-height: 1;">10.0×</div>
-            <div style="font-size: 0.82rem; color: var(--site-muted); margin-top: 0.4rem;">Gemini 2.0 Flash &middot; 90% reduction</div>
-          </div>
-          <div class="plain-card" style="text-align: center; padding: var(--space-4) var(--space-3);">
-            <div style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-text); line-height: 1;">15</div>
-            <div style="font-size: 0.82rem; color: var(--site-muted); margin-top: 0.4rem;">turns &middot; live API &middot; open source</div>
-          </div>
-        </div>
-
-        <p class="reveal reveal-delay-3" style="text-align: center; margin-top: var(--space-4); font-size: 0.88rem; color: var(--site-muted);">
-          Counts from <code>usage.input_tokens</code> &mdash; not a model, not an estimate.
-          <a href={`${base}/benchmark`} style="color: var(--site-accent); font-weight: 500; margin-left: 0.5rem;">Full methodology + run it yourself &rarr;</a>
-        </p>
-      </div>
-    </section>
-
-    <style>
-      .bench-home-charts {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: var(--space-5);
-        margin-bottom: var(--space-4);
-      }
-
-      .bench-home-stats {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: var(--space-3);
-        margin-bottom: var(--space-3);
-      }
-
-      @media (max-width: 780px) {
-        .bench-home-charts {
-          grid-template-columns: 1fr;
-        }
-        .bench-home-stats {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-
-      @media (max-width: 480px) {
-        .bench-home-stats {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- TRY IT — zero-friction first value                                -->
