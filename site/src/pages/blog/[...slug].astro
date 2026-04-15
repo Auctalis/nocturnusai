@@ -21,11 +21,59 @@ const fmt = new Intl.DateTimeFormat('en-US', {
   month: 'long',
   day: 'numeric',
 });
+
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const ogImage = post.data.cover?.src;
+
+// Build the BlogPosting schema — helps land as a rich result, and
+// lets Google Discover surface it with the cover image.
+const blogPostingLd: Record<string, unknown> = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: post.data.title,
+  description: post.data.subtitle ?? post.data.title,
+  datePublished: post.data.date.toISOString(),
+  dateModified: (post.data.updated ?? post.data.date).toISOString(),
+  author: {
+    '@type': 'Organization',
+    name: post.data.author,
+    url: 'https://nocturnus.ai/',
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: 'Nocturnus.AI',
+    url: 'https://nocturnus.ai/',
+    logo: {
+      '@type': 'ImageObject',
+      url: 'https://nocturnus.ai/favicon.svg',
+    },
+  },
+  mainEntityOfPage: {
+    '@type': 'WebPage',
+    '@id': canonical,
+  },
+  keywords: post.data.tags,
+};
+
+if (post.data.cover) {
+  blogPostingLd.image = {
+    '@type': 'ImageObject',
+    url: post.data.cover.src,
+    caption: post.data.cover.alt,
+  };
+}
 ---
 
 <Layout
   title={`${post.data.title} | Nocturnus.AI`}
   description={post.data.subtitle ?? post.data.title}
+  image={ogImage}
+  ogType="article"
+  publishedTime={post.data.date.toISOString()}
+  modifiedTime={(post.data.updated ?? post.data.date).toISOString()}
+  jsonLd={blogPostingLd}
+  keywords={post.data.tags}
+  feedUrl="https://nocturnus.ai/rss.xml"
 >
   <Navbar solid />
 
@@ -50,9 +98,41 @@ const fmt = new Intl.DateTimeFormat('en-US', {
         )}
       </header>
 
+      {post.data.cover && (
+        <figure class="blog-post-cover">
+          <img
+            src={post.data.cover.src}
+            alt={post.data.cover.alt}
+            width="1600"
+            height="840"
+            loading="eager"
+            fetchpriority="high"
+            decoding="async"
+          />
+        </figure>
+      )}
+
       <div class="blog-post-body">
         <Content />
       </div>
+
+      {post.data.cover && (
+        <p class="blog-post-credit">
+          Cover by{' '}
+          <a href={post.data.cover.photographerUrl} rel="nofollow noopener" target="_blank">
+            {post.data.cover.photographer}
+          </a>{' '}
+          on{' '}
+          <a
+            href={`${post.data.cover.unsplashUrl}?utm_source=nocturnus&utm_medium=referral`}
+            rel="nofollow noopener"
+            target="_blank"
+          >
+            Unsplash
+          </a>
+          .
+        </p>
+      )}
     </article>
 
     <footer class="blog-post-footer">
@@ -117,9 +197,24 @@ const fmt = new Intl.DateTimeFormat('en-US', {
   }
 
   .blog-post-header {
-    margin-bottom: clamp(2.5rem, 5vw, 3.5rem);
+    margin-bottom: clamp(2rem, 4vw, 2.5rem);
     padding-bottom: clamp(1.5rem, 3vw, 2rem);
     border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  }
+
+  .blog-post-cover {
+    margin: 0 0 clamp(2rem, 4vw, 3rem);
+    border-radius: 12px;
+    overflow: hidden;
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    aspect-ratio: 40 / 21;
+  }
+
+  .blog-post-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
 
   .blog-post-meta {
@@ -170,6 +265,27 @@ const fmt = new Intl.DateTimeFormat('en-US', {
     font-size: 0.72rem;
     letter-spacing: 0.04em;
     color: color-mix(in srgb, currentColor 60%, transparent);
+  }
+
+  .blog-post-credit {
+    margin-top: clamp(2rem, 4vw, 3rem);
+    font-family: 'Commit Mono', ui-monospace, monospace;
+    font-size: 0.76rem;
+    letter-spacing: 0.04em;
+    color: color-mix(in srgb, currentColor 50%, transparent);
+    text-align: center;
+  }
+
+  .blog-post-credit a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
+    text-underline-offset: 3px;
+    transition: color 180ms ease;
+  }
+
+  .blog-post-credit a:hover {
+    color: var(--accent, #e6a03c);
   }
 
   .blog-post-footer {
