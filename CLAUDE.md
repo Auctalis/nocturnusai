@@ -212,6 +212,10 @@ Args: `--server`, `--db`, `--api-key`, `--tenant`/`-t`, `--exec`/`-e`.
 - Release workflow: `.github/workflows/release.yml` (triggers on version tags `v*`)
 - Docs workflow: `.github/workflows/docs.yml` (triggers on `site/**` changes)
 
+## Versioning
+
+**Stay on the `0.3.x` series.** The patch number (`x`) can — and should — grow past a single digit (`v0.3.11`, `v0.3.23`, `v0.3.127`). Do NOT bump the minor version to `0.4` without explicit maintainer instruction. The 0.3 series signals a specific era of the product; rolling the minor mid-stream is reserved for deliberate milestones the maintainer will call. When in doubt, increment patch and keep moving.
+
 ## Environment Variables (Server)
 
 | Variable | Default | Purpose |
