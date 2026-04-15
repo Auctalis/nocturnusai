@@ -539,10 +539,10 @@ curl -X POST "http://localhost:9300/tx/commit/$TX_ID" \
     <hr />
 
     <h2 id="context-management">Context Management Engine</h2>
-    <p>The context optimization API — the core of NocturnusAI's cost reduction story. These endpoints deliver goal-driven, salience-ranked, contradiction-checked context windows that cut token costs by 97%.</p>
+    <p>The context optimization API — the core of NocturnusAI's cost reduction story. These endpoints deliver goal-driven, salience-ranked, contradiction-checked context windows that cut token costs by 82–90% (measured on live Claude Opus 4 and Gemini 2.0 Flash).</p>
 
     <div class="not-prose my-6 p-4 bg-slate-900 border-l-4 border-emerald-500 text-slate-300">
-        <strong>This is the money saver.</strong> Instead of stuffing 150K tokens into every LLM prompt ($2.25/request at GPT-4o rates), these endpoints deliver ~820 tokens of goal-relevant facts ($0.01/request). Same correct answer, 97% lower bill.
+        <strong>This is the money saver.</strong> Instead of replaying the full conversation every turn (~1,259 tokens/turn on Claude Opus 4), these endpoints return only the ~221-token delta of goal-relevant facts. Same correct answer, 82% lower bill. <a href="/benchmark" style="color: #34d399;">See the benchmark →</a>
     </div>
 
     <div class="callout callout-tip">

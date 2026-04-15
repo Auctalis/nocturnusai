@@ -14,7 +14,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <h3 id="vs-rag">How is NocturnusAI different from RAG / vector search?</h3>
     <p>
-        RAG retrieves text that <em>looks</em> related based on embedding similarity — and sends all of it to the LLM, burning tokens on irrelevant context. NocturnusAI <em>derives</em> what must be true using logical inference and delivers only goal-relevant facts — cutting token costs by 97%. They're complementary: use RAG for unstructured retrieval, NocturnusAI for verified reasoning with optimized context. The difference isn't just accuracy — it's your token bill.
+        RAG retrieves text that <em>looks</em> related based on embedding similarity — and sends all of it to the LLM, burning tokens on irrelevant context. NocturnusAI <em>derives</em> what must be true using logical inference and delivers only goal-relevant facts — cutting token costs by 82–90% (measured on Claude Opus 4 and Gemini 2.0 Flash). They're complementary: use RAG for unstructured retrieval, NocturnusAI for verified reasoning with optimized context. The difference isn't just accuracy — it's your token bill.
     </p>
     <p><a href={`${base}/docs/concepts#inference`}>Learn about inference &rarr;</a></p>
 
@@ -46,7 +46,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <h3 id="cost">How much does NocturnusAI save on LLM costs?</h3>
     <p>
-        In a typical setup, agents stuff 150K+ tokens of context into every LLM request at $15/M tokens (GPT-4o, Claude Sonnet). That's $2.25 per request. NocturnusAI's Context Management Engine uses goal-driven backward chaining to deliver only relevant facts — typically 820 tokens for the same query. That's <strong>$0.01 per request</strong>, a 97% reduction. At 1,000 requests/hour, that's the difference between $54,000/month and $240/month.
+        In a live 15-turn product-support benchmark on Claude Opus 4, naive full-history replay averages 1,259 input tokens per turn. NocturnusAI's Context Management Engine uses goal-driven backward chaining to return only relevant facts — averaging 221 tokens per turn. That's an <strong>82% reduction</strong> (5.7× fewer tokens); Gemini 2.0 Flash shows 10.0×. At 1,000 requests/hour (720,000 turns/month) at $15/1M input tokens, that's the difference between <strong>$13,600/month</strong> and <strong>$2,400/month</strong>. <a href={`${base}/benchmark`}>See the full benchmark →</a>
     </p>
     <p><a href={`${base}/docs/concepts#context-optimization`}>Learn about context optimization →</a></p>
 

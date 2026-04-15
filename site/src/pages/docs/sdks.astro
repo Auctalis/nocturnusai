@@ -7,7 +7,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <DocsLayout title="SDKs">
     <h1>SDKs & Agents</h1>
     <p class="lead text-xl text-slate-400">
-        Official client libraries for Python and TypeScript — with context optimization that cuts token costs by 97%. Plus native integrations for LangChain, CrewAI, AutoGen, LangGraph, OpenAI Agents SDK, and Anthropic SDK.
+        Official client libraries for Python and TypeScript — with context optimization that cuts token costs by 82–90% (measured on live APIs). Plus native integrations for LangChain, CrewAI, AutoGen, LangGraph, OpenAI Agents SDK, and Anthropic SDK.
     </p>
 
     <div class="callout callout-info">
@@ -88,7 +88,7 @@ with SyncNocturnusAIClient("http://localhost:9300", database="mydb", tenant_id="
     </div>
 
     <h3>Context Optimization</h3>
-    <p>The Python SDK includes full support for the Context Management Engine — the feature that cuts token costs by 97%. Use the unified <code>client.context()</code> method for both simple and goal-driven windows:</p>
+    <p>The Python SDK includes full support for the Context Management Engine — the feature that cuts token costs by 82–90% (measured on live APIs). Use the unified <code>client.context()</code> method for both simple and goal-driven windows:</p>
     <pre><code class="language-python">from nocturnusai import SyncNocturnusAIClient
 
 with SyncNocturnusAIClient("http://localhost:9300") as client:

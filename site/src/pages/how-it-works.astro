@@ -8,7 +8,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 <Layout
   title="How It Works - NocturnusAI Context Compression"
-  description="How NocturnusAI compresses agent context by 97% using logical inference instead of similarity search. Deep dive into the extraction, reasoning, and delta pipeline."
+  description="How NocturnusAI compresses agent context by 82–90% using logical inference instead of similarity search. Measured on live Claude Opus 4 and Gemini 2.0 Flash. Deep dive into the extraction, reasoning, and delta pipeline."
 >
   <Navbar solid />
 
@@ -20,7 +20,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       <div class="site-container">
         <div class="section-head reveal">
           <div class="site-kicker">How It Works</div>
-          <h1 class="site-title">How NocturnusAI compresses context by 97%.</h1>
+          <h1 class="site-title">How NocturnusAI compresses context by 82–90%.</h1>
           <p class="site-subtitle" style="max-width: 52rem;">
             Most agent memory systems store embeddings and retrieve by similarity &mdash; so your context window fills with everything that <em>looks</em> related.
             NocturnusAI takes a different approach: it extracts structured facts, reasons about what's actually relevant to the current goal, and returns only what changed.
@@ -64,7 +64,7 @@ Turn 8: Tool ran query
 Turn 9: Agent summarized
 <span style="color: var(--site-accent);">Turn 10: New question &mdash; but model re-reads ALL of this</span>
 
-<span style="color: rgba(255,255,255,0.35);">~2,400 tokens &middot; $2.25/request &middot; ~$54,000/month</span></pre>
+<span style="color: rgba(255,255,255,0.35);">~1,607 tokens on turn 10 &middot; ~$13,600/month at 1,000 req/hr</span></pre>
           </div>
         </div>
       </div>
@@ -131,7 +131,7 @@ customer_tier(acme, enterprise)</pre>
 <span style="color: var(--site-accent);">Context window:</span> 3 facts, not 47</pre>
             </div>
             <p style="font-size: 0.88rem; line-height: 1.72; color: var(--site-muted);">
-              Similarity search would return every fact that <em>mentions</em> login, Okta, or Acme. Backward chaining returns only facts in the logical chain from the goal. That's why the compression is 97%, not 30%.
+              Similarity search would return every fact that <em>mentions</em> login, Okta, or Acme. Backward chaining returns only facts in the logical chain from the goal. That's why the compression is 82%, not 30%.
             </p>
           </div>
         </div>
@@ -149,14 +149,14 @@ customer_tier(acme, enterprise)</pre>
                 <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.5rem;">What your model sees (turn 2+)</div>
                 <pre style="margin: 0; font-size: 0.95rem; line-height: 1.75; white-space: pre-wrap; color: var(--site-text); font-family: var(--font-display);">14 failed SAML assertions at 09:12 UTC.
 Issuer mismatch after IdP migration.</pre>
-                <p style="margin-top: 0.8rem; font-weight: 600; font-size: 0.88rem;">~30 tokens &middot; $0.01/request</p>
+                <p style="margin-top: 0.8rem; font-weight: 600; font-size: 0.88rem;">~221 tokens avg &middot; 5.7× fewer (Claude Opus 4)</p>
               </div>
               <div class="plain-card" style="padding: var(--space-3); opacity: 0.45;">
                 <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--site-muted-soft); margin-bottom: 0.5rem;">Without NocturnusAI</div>
                 <pre style="margin: 0; font-size: 0.78rem; line-height: 1.6; white-space: pre-wrap; color: var(--site-muted);">Full thread replay:
 all turns, tool calls,
 system events, retries...</pre>
-                <p style="margin-top: 0.8rem; color: var(--site-muted); font-size: 0.88rem;">~2,400 tokens &middot; $2.25/request</p>
+                <p style="margin-top: 0.8rem; color: var(--site-muted); font-size: 0.88rem;">~1,259 tokens avg &middot; full-history replay</p>
               </div>
             </div>
           </div>
@@ -184,7 +184,7 @@ system events, retries...</pre>
           </div>
           <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
             <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Backward Chainer</h3>
-            <p style="font-size: 0.88rem; color: var(--site-muted);">Goal-driven SLD resolution with unification. Given a goal, it finds all facts and rules that can prove it &mdash; and nothing else. This is how context windows shrink by 97%.</p>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Goal-driven SLD resolution with unification. Given a goal, it finds all facts and rules that can prove it &mdash; and nothing else. This is how context windows shrink by 82–90%.</p>
           </div>
           <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
             <h3 style="font-size: 1rem; margin-bottom: 0.6rem;">Rete Engine</h3>
@@ -285,7 +285,7 @@ system events, retries...</pre>
     assertions since 09:12. Acme is enterprise tier.",
   "factsExtracted": 4,
   "factsInScope": 4,
-  "contextWindowTokens": 28,
+  "contextWindowTokens": 221,
   "sessionId": "ticket-4821"
 &#125;</pre>
           </div>
@@ -297,7 +297,7 @@ system events, retries...</pre>
             <pre style="margin: 0; font-size: 0.82rem; line-height: 1.7; white-space: pre-wrap; color: var(--site-muted); font-family: var(--font-mono);"><span style="color: var(--site-text);">r = POST /context(turns, scope, sessionId)</span>
 
 messages = [
-  system(r.briefingDelta),  <span style="color: var(--site-accent);"># ~30 tokens</span>
+  system(r.briefingDelta),  <span style="color: var(--site-accent);"># ~221 tokens avg</span>
   user(next_question),
 ]
 
