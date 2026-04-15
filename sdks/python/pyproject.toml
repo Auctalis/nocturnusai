@@ -1,5 +1,6 @@
 [build-system]
-requires = ["hatchling"]
+# PEP 639 SPDX license expressions require hatchling >= 1.26.
+requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
@@ -7,7 +8,9 @@ name = "nocturnusai"
 version = "0.3.5"
 description = "Python SDK for NocturnusAI — a logic-based inference engine and knowledge database"
 readme = "README.md"
-license = {text = "Business Source License 1.1"}
+# PEP 639 SPDX identifier — machine-readable for pip-audit, Snyk, FOSSA, etc.
+license = "BUSL-1.1"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [
     { name = "NocturnusAI Team" },
@@ -28,7 +31,7 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: Other/Proprietary License",
+    # License classifier removed per PEP 639 — use the `license` SPDX string above.
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",

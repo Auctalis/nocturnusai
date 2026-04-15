@@ -21,10 +21,20 @@ RUN ./gradlew :nocturnusai-server:installDist --no-daemon
 # ── Runtime Stage ────────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
 
+# OCI image metadata — used by ghcr.io, Dependabot, Trivy/Grype, and all major
+# container scanners. `licenses` is the key one: without it, scanners flag the
+# image as NOASSERTION and enterprise policy gates block the pull.
 LABEL org.opencontainers.image.title="NocturnusAI"
 LABEL org.opencontainers.image.description="Logic server for Agentic AI — deterministic reasoning, truth maintenance, and agent memory"
-LABEL org.opencontainers.image.url="https://github.com/Auctalis/nocturnusai"
-LABEL org.opencontainers.image.vendor="Auctalis"
+LABEL org.opencontainers.image.url="https://nocturnus.ai"
+LABEL org.opencontainers.image.source="https://github.com/Auctalis/nocturnusai"
+LABEL org.opencontainers.image.documentation="https://nocturnus.ai/docs"
+LABEL org.opencontainers.image.vendor="Auctalis LLC"
+LABEL org.opencontainers.image.licenses="BUSL-1.1"
+# Build-arg — injected by the release workflow via --build-arg VERSION=${GITHUB_REF_NAME#v}.
+# Falls back to `dev` for local builds so the LABEL is always present.
+ARG VERSION=dev
+LABEL org.opencontainers.image.version="${VERSION}"
 
 # ── Defaults (overridden by .env / docker-compose environment) ───────────────
 ENV PORT=9300 \
