@@ -122,6 +122,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Compute the version string once, via env, so the Dockerfile's
+      # ARG VERSION picks up the clean semver (no leading "v") and the
+      # OCI image.version label matches the git tag.
+      - name: Compute image version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          echo "IMAGE_VERSION=${REF_NAME#v}" >> "$GITHUB_ENV"
+
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v5
@@ -132,6 +141,8 @@ jobs:
           outputs: type=image,name=ghcr.io/auctalis/nocturnusai,push-by-digest=true,name-canonical=true
           cache-from: type=gha,scope=${{ matrix.slug }}
           cache-to: type=gha,mode=max,scope=${{ matrix.slug }}
+          build-args: |
+            VERSION=${{ env.IMAGE_VERSION }}
 
       - name: Export digest
         run: |
