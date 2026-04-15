@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+// SPDX-License-Identifier: BUSL-1.1
+// See LICENSE at the repository root for the full Business Source License 1.1.
 /**
  * @module nocturnusai-sdk
  *

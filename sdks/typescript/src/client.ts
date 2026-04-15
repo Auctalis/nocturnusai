@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Auctalis LLC. All rights reserved.
+// SPDX-License-Identifier: BUSL-1.1
 /**
  * @module client
  * Main NocturnusAI client for interacting with the HTTP API.

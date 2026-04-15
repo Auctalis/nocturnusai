@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Auctalis LLC. All rights reserved.
+# SPDX-License-Identifier: BUSL-1.1
 """Async and sync HTTP clients for the NocturnusAI server API.
 
 Usage::
