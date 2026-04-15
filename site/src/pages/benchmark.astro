@@ -58,52 +58,6 @@ const geminiPct   = Math.round((1 - geminiSumNoct / geminiSumNaive) * 100);  // 
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- SUMMARY STATS                                                      -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <section class="site-section-tight" id="results">
-      <div class="site-container">
-        <div class="bench-stat-grid reveal">
-          <div class="plain-card bench-stat-card">
-            <div class="bench-model-tag">Claude Opus 4</div>
-            <div class="bench-ratio">{claudeRatio}×</div>
-            <div class="bench-stat-label">fewer input tokens per turn</div>
-            <div class="bench-stat-detail">
-              <span>{claudeAvgNoct.toLocaleString()} avg with NocturnusAI</span>
-              <span class="bench-vs">vs</span>
-              <span>{claudeAvgNaive.toLocaleString()} naive</span>
-            </div>
-            <div class="bench-savings-pct">{claudePct}% reduction</div>
-          </div>
-
-          <div class="plain-card bench-stat-card">
-            <div class="bench-model-tag" style="color: #4285f4;">Gemini 2.0 Flash</div>
-            <div class="bench-ratio">{geminiRatio}×</div>
-            <div class="bench-stat-label">fewer input tokens per turn</div>
-            <div class="bench-stat-detail">
-              <span>{geminiAvgNoct.toLocaleString()} avg with NocturnusAI</span>
-              <span class="bench-vs">vs</span>
-              <span>{geminiAvgNaive.toLocaleString()} naive</span>
-            </div>
-            <div class="bench-savings-pct">{geminiPct}% reduction</div>
-          </div>
-
-          <div class="plain-card bench-stat-card bench-stat-meta">
-            <div class="bench-model-tag" style="color: var(--site-muted);">Scenario</div>
-            <div style="font-size: 0.9rem; line-height: 1.7; color: var(--site-muted); margin-top: 0.8rem;">
-              <strong style="color: var(--site-text); display: block; margin-bottom: 0.4rem;">Product support, 15 turns</strong>
-              API timeout → connection pool exhaustion → root cause diagnosis. Facts extracted per turn, queried individually via <code>POST /query</code>.
-            </div>
-            <div style="margin-top: 1rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted-soft);">
-              v0.3.10 &middot; localhost:9300 &middot; April 2026
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <hr class="section-rule" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- CHARTS                                                             -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section class="site-section-tight" id="charts">
@@ -249,6 +203,52 @@ const geminiPct   = Math.round((1 - geminiSumNoct / geminiSumNaive) * 100);  // 
         <p class="reveal reveal-delay-3" style="text-align: center; margin-top: var(--space-4); font-size: 0.82rem; color: var(--site-muted-soft);">
           Gemini growth is steeper because the naive approach concatenates the full conversation string. Compression ratio improves with conversation length.
         </p>
+      </div>
+    </section>
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- SUMMARY STATS                                                      -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="results">
+      <div class="site-container">
+        <div class="bench-stat-grid reveal">
+          <div class="plain-card bench-stat-card">
+            <div class="bench-model-tag">Claude Opus 4</div>
+            <div class="bench-ratio">{claudeRatio}×</div>
+            <div class="bench-stat-label">fewer input tokens per turn</div>
+            <div class="bench-stat-detail">
+              <span>{claudeAvgNoct.toLocaleString()} avg with NocturnusAI</span>
+              <span class="bench-vs">vs</span>
+              <span>{claudeAvgNaive.toLocaleString()} naive</span>
+            </div>
+            <div class="bench-savings-pct">{claudePct}% reduction</div>
+          </div>
+
+          <div class="plain-card bench-stat-card">
+            <div class="bench-model-tag" style="color: #4285f4;">Gemini 2.0 Flash</div>
+            <div class="bench-ratio">{geminiRatio}×</div>
+            <div class="bench-stat-label">fewer input tokens per turn</div>
+            <div class="bench-stat-detail">
+              <span>{geminiAvgNoct.toLocaleString()} avg with NocturnusAI</span>
+              <span class="bench-vs">vs</span>
+              <span>{geminiAvgNaive.toLocaleString()} naive</span>
+            </div>
+            <div class="bench-savings-pct">{geminiPct}% reduction</div>
+          </div>
+
+          <div class="plain-card bench-stat-card bench-stat-meta">
+            <div class="bench-model-tag" style="color: var(--site-muted);">Scenario</div>
+            <div style="font-size: 0.9rem; line-height: 1.7; color: var(--site-muted); margin-top: 0.8rem;">
+              <strong style="color: var(--site-text); display: block; margin-bottom: 0.4rem;">Product support, 15 turns</strong>
+              API timeout → connection pool exhaustion → root cause diagnosis. Facts extracted per turn, queried individually via <code>POST /query</code>.
+            </div>
+            <div style="margin-top: 1rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted-soft);">
+              v0.3.10 &middot; localhost:9300 &middot; April 2026
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 

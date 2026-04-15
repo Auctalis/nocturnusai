@@ -26,7 +26,7 @@ const softwareAppLd = {
   applicationCategory: 'DeveloperApplication',
   operatingSystem: 'Cross-platform',
   description:
-    'Open-source logic engine and context server for AI agents. Deterministic inference, truth maintenance, and salience-ranked memory — cutting prompt tokens by up to 98%.',
+    'Open-source logic engine and context server for AI agents. Deterministic inference, truth maintenance, and salience-ranked memory — cutting prompt tokens by 82–90%, measured on live Claude Opus 4 and Gemini 2.0 Flash APIs.',
   url: 'https://nocturnus.ai/',
   offers: {
     '@type': 'Offer',
@@ -46,7 +46,7 @@ const softwareAppLd = {
 
 <Layout
   title="Nocturnus.AI - Reasoning Engine for AI Agents"
-  description="Open-source logic engine for AI agents. Deterministic inference, truth maintenance, and salience-ranked context — cutting prompt tokens by 98%."
+  description="Open-source logic engine for AI agents. Deterministic inference, truth maintenance, and salience-ranked context — cutting prompt tokens by 82–90%, measured on live APIs."
   keywords={['ai agents', 'context window', 'logic engine', 'token cost', 'agent memory', 'mcp server', 'langchain', 'langgraph']}
   jsonLd={softwareAppLd}
   feedUrl="https://nocturnus.ai/rss.xml"
@@ -63,23 +63,23 @@ const softwareAppLd = {
           <div class="hero-dark-kicker">CONTEXT SERVER FOR AI AGENTS</div>
           <h1 class="hero-dark-headline">
             Send <span class="hero-accent">
-              <span class="hero-num" data-count-to="30" data-count-decimals="0" data-count-locale="en-US">0</span> tokens</span>
-            instead of <span class="hero-num" data-count-to="2400" data-count-decimals="0" data-count-locale="en-US">0</span>.
+              <span class="hero-num" data-count-to="221" data-count-decimals="0" data-count-locale="en-US">0</span> tokens</span>
+            instead of <span class="hero-num" data-count-to="1259" data-count-decimals="0" data-count-locale="en-US">0</span>.
           </h1>
           <p class="hero-dark-sub">
             NocturnusAI sits between your agent and the LLM. It extracts facts, reasons about what's relevant, and returns only what changed.
           </p>
           <div class="hero-cost-line">
-            <span class="hero-cost-new">$240<span style="font-weight: 400; font-size: 0.6em; opacity: 0.6;">/mo</span></span>
+            <span class="hero-cost-new">$2,400<span style="font-weight: 400; font-size: 0.6em; opacity: 0.6;">/mo</span></span>
             <span class="hero-cost-vs">instead of</span>
-            <span class="hero-cost-old">$54,000<span style="font-weight: 400; font-size: 0.6em; opacity: 0.5;">/mo</span></span>
+            <span class="hero-cost-old">$13,600<span style="font-weight: 400; font-size: 0.6em; opacity: 0.5;">/mo</span></span>
           </div>
           <div class="hero-dark-ctas">
             <a href="#try-it" class="hero-btn-primary">Try it now</a>
             <a href={`${base}/docs`} class="hero-btn-secondary">Read the docs</a>
           </div>
           <div class="hero-dark-stats">
-            <span>98% fewer tokens</span>
+            <span>82–90% fewer tokens</span>
             <span class="hero-stat-dot">&middot;</span>
             <span>open source</span>
             <span class="hero-stat-dot">&middot;</span>
@@ -109,7 +109,7 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
 <span class="htl-ok">&#10003;</span> <span class="htl-key">briefingDelta</span>: <span class="htl-str">"Login failing post-Okta
   cutover. Acme is enterprise tier."</span>
 
-  <span class="htl-accent">~30 tokens</span> <span class="htl-muted">instead of ~2,400</span></pre>
+  <span class="htl-accent">~221 tokens</span> <span class="htl-muted">instead of ~1,259</span></pre>
           </div>
         </div>
       </div>
@@ -215,8 +215,8 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
       <div class="site-container">
         <div class="section-head reveal">
           <div class="site-kicker">How It Compresses</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Reasoning is how you get 98% compression.</h2>
-          <p class="site-subtitle">Vector stores retrieve everything that looks vaguely related &mdash; so your context window fills with noise. NocturnusAI uses logical inference to keep only what must be true. That's the difference between ~2,400 tokens and ~30.</p>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Reasoning is how you get 82–90% fewer tokens.</h2>
+          <p class="site-subtitle">Vector stores retrieve everything that looks vaguely related &mdash; so your context window fills with noise. NocturnusAI uses logical inference to keep only what must be true. That's the difference between ~1,259 tokens and ~221 (measured on Claude Opus 4).</p>
         </div>
 
         <!-- 3-card mechanism: how reasoning → compression → savings -->
@@ -229,12 +229,12 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
           <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
             <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.6rem;">Step 2</div>
             <h3 style="font-size: 1.05rem; margin-bottom: 0.6rem;">Infers what's relevant</h3>
-            <p style="font-size: 0.88rem; color: var(--site-muted);">Backward chaining finds only facts reachable from your agent's current goals. Everything else stays out of the context window. This is why it's 98%, not 30%.</p>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Backward chaining finds only facts reachable from your agent's current goals. Everything else stays out of the context window. This is why compression reaches 82%, not 30%.</p>
           </div>
           <div class="plain-card" style="border-top: 2px solid var(--site-accent);">
             <div style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--site-accent); margin-bottom: 0.6rem;">Step 3</div>
             <h3 style="font-size: 1.05rem; margin-bottom: 0.6rem;">Returns only the delta</h3>
-            <p style="font-size: 0.88rem; color: var(--site-muted);">Each turn returns a <code>briefingDelta</code> &mdash; what changed since last time. On turn 10, your model sees 30 tokens instead of the full 2,400-token thread replay.</p>
+            <p style="font-size: 0.88rem; color: var(--site-muted);">Each turn retrieves only stored facts. By turn 10, your model sees 272 tokens instead of the full 1,607-token thread replay. By turn 15: 331 vs 2,460.</p>
           </div>
         </div>
 
@@ -332,25 +332,25 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
       <div class="site-container">
         <div class="section-head reveal">
           <div class="site-kicker">The Cost</div>
-          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">$240/month instead of $54,000.</h2>
-          <p class="site-subtitle">At 1,000 requests/hour on GPT-4o. The ratio holds across providers.</p>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3.1rem);">$2,400/month instead of $13,600.</h2>
+          <p class="site-subtitle">At 1,000 requests/hour. Claude Opus 4, $15/1M input tokens. Measured, not estimated.</p>
         </div>
 
         <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin-bottom: var(--space-5);">
           <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3);">
-            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">~30</div>
+            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">221</div>
             <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">tokens per turn</div>
             <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">with NocturnusAI</div>
           </div>
           <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3); opacity: 0.35;">
-            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); line-height: 1;">~2,400</div>
+            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); line-height: 1;">1,259</div>
             <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">tokens per turn</div>
-            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">full replay</div>
+            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">naive avg</div>
           </div>
           <div class="plain-card" style="text-align: center; padding: var(--space-5) var(--space-3);">
-            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">98%</div>
+            <div style="font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 700; font-family: var(--font-mono); color: var(--site-accent); line-height: 1;">82%</div>
             <div style="font-size: 0.85rem; color: var(--site-muted); margin-top: 0.5rem;">reduction</div>
-            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">per request</div>
+            <div style="font-size: 0.75rem; color: var(--site-muted-soft); margin-top: 0.25rem;">Claude Opus 4 avg</div>
           </div>
         </div>
 
@@ -361,15 +361,15 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); font-size: 0.85rem; line-height: 1.72; color: var(--site-muted);">
               <div>
                 <strong style="color: var(--site-text); display: block; margin-bottom: 0.3rem;">Without NocturnusAI</strong>
-                A 10-turn support conversation averages ~2,400 input tokens per LLM call when replaying the full thread (user messages, tool outputs, system events). At 1,000 requests/hour on GPT-4o ($15/1M input tokens), that's <strong style="color: var(--site-text);">$54,000/month</strong>.
+                A 15-turn product support conversation averages ~1,259 input tokens per LLM call when replaying the full thread (user messages, tool outputs, system events). At 1,000 requests/hour with Claude Opus 4 ($15/1M input tokens), that's <strong style="color: var(--site-text);">$13,600/month</strong>.
               </div>
               <div>
                 <strong style="color: var(--site-text); display: block; margin-bottom: 0.3rem;">With NocturnusAI</strong>
-                The <code>briefingDelta</code> returns only new facts since the last turn &mdash; typically 20&ndash;40 tokens. Same scenario: <strong style="color: var(--site-text);">$240/month</strong>. The logic engine runs locally with zero token cost. Only the initial LLM extraction step uses tokens.
+                NocturnusAI retrieves only stored facts per turn — averaging ~221 tokens. Same scenario: <strong style="color: var(--site-text);">$2,400/month</strong>. The logic engine runs locally with zero token cost. Only the initial LLM extraction step uses tokens.
               </div>
             </div>
             <p style="margin-top: var(--space-2); font-size: 0.78rem; color: var(--site-muted-soft);">
-              Calculation: 1,000 req/hr &times; 720 hr/mo &times; token cost. Claude, Gemini, and local Ollama cost less per token but the compression ratio (30 vs 2,400) is the same regardless of provider. The 98% figure is (2,400 &minus; 30) / 2,400 = 98.75%.
+              Calculation: 1,000 req/hr &times; 720 hr/mo &times; 1,259 tokens &times; $15/1M = $13,596. With NocturnusAI: same &times; 221 tokens = $2,387. Measured on Claude Opus 4 over a 15-turn benchmark. The 82% reduction is (1,259 &minus; 221) / 1,259 = 82.4%. Gemini 2.0 Flash shows 90%.
             </p>
           </div>
         </div>
@@ -384,7 +384,7 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
     <section class="site-section-tight token-ticker" id="token-math" aria-label="Tokens per turn comparison">
       <div class="section-head reveal site-container">
         <div class="site-kicker">The Token Math</div>
-        <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">30 tokens, not 2,400.</h2>
+        <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">221 tokens, not 1,259.</h2>
         <p class="site-subtitle">Per turn. Every turn. The dollars take care of themselves.</p>
       </div>
 
@@ -394,7 +394,7 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
           <div class="ticker-card ticker-naive">
             <div class="ticker-label">Naive agent</div>
             <div class="ticker-value">
-              <span class="ticker-num" data-count-to="2400" data-count-decimals="0">0</span>
+              <span class="ticker-num" data-count-to="1259" data-count-decimals="0">0</span>
             </div>
             <div class="ticker-sub">tokens per turn</div>
           </div>
@@ -402,7 +402,7 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
           <div class="ticker-card ticker-us">
             <div class="ticker-label">Nocturnus</div>
             <div class="ticker-value ticker-value-accent">
-              <span class="ticker-num" data-count-to="30" data-count-decimals="0">0</span>
+              <span class="ticker-num" data-count-to="221" data-count-decimals="0">0</span>
             </div>
             <div class="ticker-sub">tokens per turn</div>
           </div>
@@ -410,9 +410,9 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
           <div class="ticker-card ticker-savings">
             <div class="ticker-label">You save</div>
             <div class="ticker-value ticker-value-big">
-              <span class="ticker-num" data-count-to="2370" data-count-decimals="0">0</span>
+              <span class="ticker-num" data-count-to="1038" data-count-decimals="0">0</span>
             </div>
-            <div class="ticker-sub">tokens per turn &mdash; 98% reduction</div>
+            <div class="ticker-sub">tokens per turn &mdash; 82% reduction</div>
           </div>
         </div>
 
@@ -805,7 +805,7 @@ Acme is on the enterprise tier.</pre>
                 <pre style="margin: 0; font-size: 1rem; line-height: 1.8; white-space: pre-wrap; font-family: var(--font-display); color: rgba(255,255,255,0.9);">14 failed SAML assertions at 09:12 UTC.
 Issuer mismatch after IdP migration.</pre>
               </div>
-              <p style="margin-top: 0.8rem; font-weight: 600;">~30 tokens &middot; $0.01/request</p>
+              <p style="margin-top: 0.8rem; font-weight: 600;">~221 tokens avg &middot; 5.7&times; fewer</p>
             </div>
             <div class="payoff-right">
               <h3>Without NocturnusAI</h3>
@@ -816,7 +816,7 @@ Tool auth_audit: 14 failed SAML assertions...
 Tool auth_audit: issuer mismatch after IdP...
 + internal notes, retries, system events...</pre>
               </div>
-              <p style="margin-top: 0.8rem; color: var(--site-muted);">~2,400 tokens &middot; $2.25/request <span style="font-size: 0.8rem;">(per-turn average; <a href={`${base}/docs/faq#cost`} style="color: inherit; text-decoration: underline;">full conversation window is 150K+</a>)</span></p>
+              <p style="margin-top: 0.8rem; color: var(--site-muted);">~1,259 tokens avg &middot; naive full-history replay <span style="font-size: 0.8rem;">(<a href={`${base}/benchmark`} style="color: inherit; text-decoration: underline;">see benchmark</a>)</span></p>
             </div>
           </div>
         </div>

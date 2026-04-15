@@ -38,7 +38,7 @@ Nocturnus is a context server.
 
 It sits between your agent and your LLM. On every turn, it takes the agent's current goal and works backward — through facts, through state, through history — to identify the minimum set of context required to support the next decision. It returns those facts. It returns nothing else.
 
-Average context per turn drops from roughly 2,400 tokens to 30. Not through compression. Not through summarization. Through **derivation** — sending only what is logically necessary, because we know what is logically necessary.
+Average context per turn drops from roughly 1,259 tokens to 221 on Claude Opus 4 — a 5.7× reduction measured on live API calls. Not through compression. Not through summarization. Through **derivation** — sending only what is logically necessary, because we know what is logically necessary.
 
 This is not vector search. It is not a smarter chunker. It is not a longer cache. It is a different kind of computation: backward-chaining logical inference operating on a structured representation of agent state. The medieval Schoolmen had a word for the difference between recognition and reasoning. We do not need their word. We just need the architecture to work.
 
@@ -48,12 +48,12 @@ This is not vector search. It is not a smarter chunker. It is not a longer cache
 
 | | Naive agent | RAG-optimized | **Nocturnus** |
 |---|---|---|---|
-| Tokens per turn | ~2,400 | ~800 | **~30** |
-| Cost per 1M turns (Sonnet) | $7,200 | $2,400 | **$90** |
+| Tokens per turn | ~1,259 | ~800 | **~221** |
+| Cost per 1M turns (Opus 4, $15/1M) | $18,885 | $12,000 | **$3,315** |
 | Latency | high | medium | **low** |
 | Truth-preserving | no | no | **yes** |
 
-A SaaS workload that costs **$54,000 a month** on a naive architecture costs around **$240 a month** on Nocturnus. Same model. Same outputs. **225× lower bill.**
+A SaaS workload that costs **$13,600 a month** on a naive architecture costs around **$2,400 a month** on Nocturnus (Claude Opus 4, 1,000 req/hr). Same model. Same outputs. **5.7× lower bill.** Gemini 2.0 Flash shows 10.0×.
 
 That is not an optimization. That is a different category of product economics.
 
@@ -90,7 +90,7 @@ The integration takes minutes. We are not asking you to rebuild your agent. We a
 
 If you are building an agent today, your three biggest hidden enemies are:
 
-**Token cost** — which we have already addressed. 50× to 200× reduction in inference spend, depending on workload.
+**Token cost** — which we have already addressed. 5.7× to 10.0× reduction in inference spend, measured on Claude Opus 4 and Gemini 2.0 Flash.
 
 **Hallucination on operational state** — which vector retrieval cannot fix, because *similarity is not truth.* When your agent has to make a decision based on the current state of a customer record, a contract clause, or an inventory level, "the most semantically similar document" is the wrong abstraction. We return the actual fact.
 
