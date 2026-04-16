@@ -9,6 +9,8 @@
 
 > **License in one line.** [Business Source License 1.1](LICENSE) (SPDX: `BUSL-1.1`). Free for internal use — including internal production — inside your own organization. Offering NocturnusAI or substantial functionality as a product/hosted service to third parties requires a commercial license ([licensing@nocturnus.ai](mailto:licensing@nocturnus.ai)). Converts to Apache 2.0 on 2030-02-19.
 
+![NocturnusAI — Context Server for AI Agents](README-hero.png)
+
 **Large turn arrays in. Lean context windows out.**
 
 If your agent keeps replaying chat history, tool output, CRM notes, retries, and stale summaries into every model call, NocturnusAI cuts that down first.

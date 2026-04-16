@@ -27,6 +27,17 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
             That's logical compression, not summarization.
           </p>
         </div>
+
+        <div class="reveal reveal-delay-1" style="margin-top: var(--space-4);">
+          <img
+            src="/architecture-pipeline.png"
+            alt="Architecture diagram: Agent sends current goal to Nocturnus Context Server which checks Facts, State, and History via backward-chaining logical inference, then returns only what is logically necessary to the LLM."
+            width="1200"
+            height="252"
+            loading="eager"
+            style="width: 100%; height: auto; border-radius: var(--radius-md); border: 1px solid var(--site-line);"
+          />
+        </div>
       </div>
     </section>
 
