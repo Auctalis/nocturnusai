@@ -5,6 +5,7 @@
 [![npm](https://img.shields.io/npm/v/nocturnusai-sdk?logo=npm&logoColor=white)](https://www.npmjs.com/package/nocturnusai-sdk)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2FAuctalis%2Fnocturnusai-blue?logo=docker)](https://github.com/Auctalis/nocturnusai/pkgs/container/nocturnusai)
 [![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-orange.svg?logo=spdx&logoColor=white)](LICENSE)
+[![MCP](https://glama.ai/mcp/servers/Auctalis/nocturnusai/badge?score=true)](https://glama.ai/mcp/servers/Auctalis/nocturnusai)
 
 > **License in one line.** [Business Source License 1.1](LICENSE) (SPDX: `BUSL-1.1`). Free for internal use — including internal production — inside your own organization. Offering NocturnusAI or substantial functionality as a product/hosted service to third parties requires a commercial license ([licensing@nocturnus.ai](mailto:licensing@nocturnus.ai)). Converts to Apache 2.0 on 2030-02-19.
 

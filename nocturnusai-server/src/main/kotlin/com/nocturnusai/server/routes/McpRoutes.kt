@@ -230,7 +230,7 @@ private fun handleInitialize(request: JsonRpcRequest): JsonRpcResponse {
         )),
         "serverInfo" to JsonObject(mapOf(
             "name" to JsonPrimitive("nocturnusai"),
-            "version" to JsonPrimitive("0.3.5")
+            "version" to JsonPrimitive("0.3.12")
         ))
     ))
     return JsonRpcResponse(id = request.id, result = result)
@@ -240,22 +240,22 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
     val tools = buildJsonArray {
         add(toolSchema(
             name = "tell",
-            description = "Tell NocturnusAI something it should know. Stores a fact (knowledge) that can be queried and used in reasoning. Supports auto-expiration via ttl (milliseconds) or validUntil (epoch ms).",
+            description = "Assert a fact into the knowledge base. Stores knowledge that can be queried and used in logical reasoning. Supports auto-expiration via ttl (milliseconds) or validUntil (epoch ms), confidence scoring, and configurable conflict resolution.",
             properties = mapOf(
                 "predicate" to propString("The relationship or property name (e.g., 'parent', 'likes', 'located_in')"),
                 "args" to propArray("The entities involved (e.g., ['alice', 'bob'] for 'alice is parent of bob')"),
-                "scope" to propString("Optional isolation scope (e.g., 'session_123', 'hypothesis_a')"),
-                "negated" to propBool("Set true to store the negation of this fact"),
+                "scope" to propString("Optional isolation scope for partitioned reasoning (e.g., 'session_123', 'hypothesis_a')"),
+                "negated" to propBool("Set true to store the explicit negation of this fact (distinct from NAF)"),
                 "ttl" to propNumber("Auto-expire after this many milliseconds"),
                 "validUntil" to propNumber("Epoch ms when this fact stops being valid"),
-                "confidence" to propNumber("Optional confidence score 0.0–1.0 (e.g., 0.9 = high confidence from LLM extraction)"),
-                "conflictStrategy" to propString("How to handle contradictions: REJECT (default), NEWEST_WINS, CONFIDENCE, KEEP_BOTH")
+                "confidence" to propNumber("Confidence score 0.0–1.0 (e.g., 0.9 = high confidence from LLM extraction)"),
+                "conflictStrategy" to propString("How to handle contradictions: REJECT (default — error on duplicate), NEWEST_WINS, CONFIDENCE (highest wins), KEEP_BOTH")
             ),
             required = listOf("predicate", "args")
         ))
         add(toolSchema(
             name = "teach",
-            description = "Teach NocturnusAI a rule for automatic reasoning. When conditions (body) are all true, the conclusion (head) is automatically derivable. Use ?prefix for variables (e.g., ?x, ?who). Example: 'If ?x is parent of ?y AND ?y is parent of ?z, THEN ?x is grandparent of ?z'.",
+            description = "Define a logical rule for automatic reasoning. When all conditions (body) are true, the conclusion (head) is automatically derivable via backward chaining. Use ?-prefixed variables (e.g., ?x, ?who). Supports Negation-as-Failure in body atoms. Example: 'If ?x is human AND NOT god(?x), THEN ?x is mortal'.",
             properties = mapOf(
                 "head" to propObject("The conclusion (what becomes true)", mapOf(
                     "predicate" to propString("Conclusion relationship name"),
@@ -268,7 +268,7 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "ask",
-            description = "Ask NocturnusAI a question. Finds all answers by applying rules and matching facts through multi-step logical reasoning. Use ?prefix for unknowns you want to discover. Returns all provable answers, optionally with full proof chains showing how each answer was derived.",
+            description = "Query the knowledge base using multi-step logical reasoning (backward chaining with unification). Finds all provable answers by applying rules and matching facts. Use ?-prefixed variables for unknowns you want to discover. Optionally returns full proof chains showing the reasoning steps.",
             properties = mapOf(
                 "predicate" to propString("What you're asking about (e.g., 'grandparent')"),
                 "args" to propArray("Use ?x, ?who etc. for unknowns, concrete values to constrain (e.g., ['?who', 'charlie'])"),
@@ -280,7 +280,7 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "forget",
-            description = "Make NocturnusAI forget a fact. Any knowledge that was derived from this fact is also automatically forgotten (cascading retraction).",
+            description = "Retract a fact from the knowledge base. Any knowledge that was derived from this fact is also automatically forgotten via the Truth Maintenance System (cascading retraction). This is the inverse of 'tell'.",
             properties = mapOf(
                 "predicate" to propString("The relationship to forget"),
                 "args" to propArray("The specific entities to forget about"),
@@ -290,7 +290,7 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "recall",
-            description = "Recall what was known at a specific point in time. Useful for time-travel queries like 'What was true an hour ago?' Respects temporal bounds (validFrom/validUntil/ttl).",
+            description = "Time-travel query: recall what was known at a specific point in time. Returns facts that were valid at the given timestamp, respecting temporal bounds (validFrom, validUntil, ttl). Useful for debugging agent behavior or reconstructing past state.",
             properties = mapOf(
                 "predicate" to propString("What to recall"),
                 "args" to propArray("Arguments (use ?prefix for unknowns)"),
@@ -301,7 +301,7 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "context",
-            description = "Get the most relevant knowledge for your current reasoning step. Returns facts ranked by relevance (composite of recency, access frequency, and priority). Use this to efficiently populate your context window with the most important knowledge. Optionally pass goals for goal-driven selection, sessionId for incremental diffing, or maxFactsPerPredicate for diversity control.",
+            description = "Get the most relevant knowledge for your current reasoning step, ranked by composite salience (recency × frequency × priority). Returns a token-optimized context window. Supports three output formats: 'predicate' (machine-readable), 'natural' (LLM-optimized prose), 'structured' (grouped with metadata). Pass goals for goal-driven selection, sessionId for incremental diffing across turns.",
             properties = mapOf(
                 "maxFacts" to propNumber("Maximum facts to return (default: 100)"),
                 "minSalience" to propNumber("Minimum salience score 0.0-1.0 (default: 0.0)"),
@@ -319,13 +319,13 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "compress",
-            description = "Compress repeated patterns into summary knowledge. Detects episodic patterns (e.g., 'user asked about X five times') and creates semantic summaries. Helps manage memory growth in long-running sessions.",
+            description = "Run memory consolidation: detects repeated episodic patterns (e.g., 'user asked about X five times') and creates semantic summaries. Reduces memory footprint in long-running agent sessions while preserving essential knowledge.",
             properties = emptyMap(),
             required = emptyList()
         ))
         add(toolSchema(
             name = "cleanup",
-            description = "Clean up stale knowledge. Expires facts past their TTL and evicts low-relevance facts when memory is over capacity. Run periodically in long-running agent sessions.",
+            description = "Run memory decay and eviction. Expires facts past their TTL and evicts low-salience facts when memory exceeds capacity. Call periodically in long-running agent sessions to prevent unbounded memory growth.",
             properties = mapOf(
                 "threshold" to propNumber("Relevance threshold below which facts are evicted (default: 0.05)")
             ),
@@ -333,7 +333,7 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "predicates",
-            description = "Discover the knowledge base schema. Lists all predicates (relationship types) currently stored, with argument counts and fact counts. Useful for understanding what knowledge is available before querying.",
+            description = "Discover the knowledge base schema. Lists all predicates (relationship types) currently stored, with their arity (argument count), fact count, and whether they have associated rules. Use this to understand what knowledge is available before querying.",
             properties = mapOf(
                 "scope" to propString("Optional scope filter")
             ),
@@ -341,7 +341,7 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "aggregate",
-            description = "Compute COUNT, SUM, MIN, MAX, or AVG over facts matching a pattern. Use COUNT to count matches, or SUM/MIN/MAX/AVG to aggregate a numeric argument at a specific position. Example: COUNT all score(player, ?) facts, or SUM the scores at argIndex=1.",
+            description = "Compute aggregations over matching facts. Supports COUNT (number of matches), SUM, MIN, MAX, and AVG over a numeric argument at a specified position. Example: COUNT all score(player, ?) facts, or AVG scores at argIndex=1.",
             properties = mapOf(
                 "predicate" to propString("The predicate to aggregate over"),
                 "args" to propArray("Pattern arguments. Use ?x, ?who etc. for wildcards, concrete values to constrain"),
@@ -353,7 +353,7 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "bulk_assert",
-            description = "Assert multiple facts in a single call. Non-transactional: each fact is attempted independently — contradictions are reported as errors rather than aborting the batch. Returns counts of successful and failed assertions.",
+            description = "Assert multiple facts in a single call for efficiency. Non-transactional: each fact is attempted independently — contradictions are reported as errors without aborting the batch. Returns counts of successful and failed assertions.",
             properties = mapOf(
                 "facts" to propFactArray("Array of fact objects, each with 'predicate', 'args', optional 'negated', 'scope', 'ttl', 'validUntil'")
             ),
@@ -361,7 +361,7 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "retract_pattern",
-            description = "Retract all facts matching a pattern in a single call. Use ?x, ?y etc. as wildcards to retract multiple facts at once. Returns the count and list of retracted facts.",
+            description = "Retract all facts matching a pattern in a single call. Use ?-prefixed variables as wildcards to retract multiple facts at once. Returns the count and list of retracted facts. Cascading retraction applies to each removed fact.",
             properties = mapOf(
                 "predicate" to propString("The predicate pattern to match for retraction"),
                 "args" to propArray("Arguments. Use ?x, ?who etc. as wildcards to match multiple facts"),
@@ -371,7 +371,7 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "fork_scope",
-            description = "Fork a knowledge base scope. Creates an independent copy of all facts in sourceScope under targetScope. Use this to safely explore hypothetical scenarios ('What if Alice moves to London?') without modifying the main knowledge base. sourceScope=null forks from the global (unscoped) partition.",
+            description = "Fork a knowledge base scope — creates an independent copy of all facts in the source scope under a new target scope name. Use this for hypothetical reasoning ('What if Alice moves to London?') without modifying the main knowledge base. Similar to git branch for knowledge.",
             properties = mapOf(
                 "sourceScope" to propString("Scope to copy from. Omit or pass null for the global partition."),
                 "targetScope" to propString("New scope name to copy all facts into.")
@@ -380,7 +380,7 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "merge_scope",
-            description = "Merge facts from sourceScope back into targetScope (default: global). Useful for committing hypothetical reasoning back into the main knowledge base. Choose a conflict strategy: SOURCE_WINS overwrites, TARGET_WINS keeps existing, KEEP_BOTH retains both, REJECT aborts if conflicts found.",
+            description = "Merge facts from one scope back into another (default: global). Use this to commit hypothetical reasoning results back into the main knowledge base. Choose a conflict strategy: SOURCE_WINS overwrites, TARGET_WINS keeps existing, KEEP_BOTH retains both versions, REJECT aborts if any conflicts.",
             properties = mapOf(
                 "sourceScope" to propString("Scope to merge facts from."),
                 "targetScope" to propString("Destination scope. Omit or pass null for the global partition."),
@@ -390,13 +390,13 @@ private fun handleToolsList(request: JsonRpcRequest): JsonRpcResponse {
         ))
         add(toolSchema(
             name = "list_scopes",
-            description = "List all named scopes currently in the knowledge base. Useful for discovering what hypothetical contexts or reasoning branches exist.",
+            description = "List all named scopes in the knowledge base. Shows what hypothetical contexts or reasoning branches currently exist. The global (unscoped) partition is always present but not listed.",
             properties = emptyMap(),
             required = emptyList()
         ))
         add(toolSchema(
             name = "delete_scope",
-            description = "Delete a knowledge base scope and all facts within it. Use this to clean up completed or abandoned hypothetical reasoning branches.",
+            description = "Delete a knowledge base scope and all facts within it. Use this to clean up completed or abandoned hypothetical reasoning branches. This is irreversible.",
             properties = mapOf(
                 "scope" to propString("The scope name to delete.")
             ),

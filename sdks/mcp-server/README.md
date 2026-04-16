@@ -1,5 +1,7 @@
 # nocturnusai-mcp
 
+<a href="https://glama.ai/mcp/servers/Auctalis/nocturnusai"><img width="380" height="200" src="https://glama.ai/mcp/servers/Auctalis/nocturnusai/badge" alt="NocturnusAI MCP server" /></a>
+
 MCP stdio server for [NocturnusAI](https://nocturnus.ai/) — agent reasoning, memory, and token-optimized context for AI applications. Point any MCP-compatible client (Claude Desktop, Cursor, Windsurf, etc.) at a running NocturnusAI instance and get:
 
 - **Deterministic reasoning** — multi-step inference with proof chains, not LLM guessing
