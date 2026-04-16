@@ -1,6 +1,6 @@
 # nocturnusai-mcp
 
-<a href="https://glama.ai/mcp/servers/Auctalis/nocturnusai"><img width="380" height="200" src="https://glama.ai/mcp/servers/Auctalis/nocturnusai/badge" alt="NocturnusAI MCP server" /></a>
+[![nocturnusai MCP server](https://glama.ai/mcp/servers/Auctalis/nocturnusai/badges/score.svg)](https://glama.ai/mcp/servers/Auctalis/nocturnusai)
 
 MCP stdio server for [NocturnusAI](https://nocturnus.ai/) — agent reasoning, memory, and token-optimized context for AI applications. Point any MCP-compatible client (Claude Desktop, Cursor, Windsurf, etc.) at a running NocturnusAI instance and get:
 
