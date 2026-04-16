@@ -276,6 +276,50 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  # ── MCP stdio server → npm ─────────────────────────────────────────────────
+  mcp-server-npm:
+    name: MCP stdio server → npm
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inject version from git tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd sdks/mcp-server
+          npm version "${VERSION}" --no-git-tag-version --allow-same-version
+          echo "Set MCP server version to ${VERSION}"
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install and build
+        working-directory: sdks/mcp-server
+        run: npm install && npm run build
+
+      - name: Publish
+        working-directory: sdks/mcp-server
+        run: |
+          output=$(npm publish --access public 2>&1) && echo "$output" || {
+            echo "$output"
+            if echo "$output" | grep -q "previously published versions"; then
+              echo "Already published — skipping."
+              exit 0
+            fi
+            if echo "$output" | grep -q "E404"; then
+              echo "::error::npm returned 404. Check that NPM_TOKEN has 'Read and write' on 'All packages'."
+            fi
+            exit 1
+          }
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   # Note: Docs → GitHub Pages is handled by docs.yml on every push to main.
   # GitHub Pages environment protection rules prevent tag-triggered deployments,
   # so docs are NOT deployed here in the release workflow.
@@ -283,14 +327,15 @@ jobs:
   # ── GitHub Release with CLI binaries + auto-generated notes ─────────────────
   github-release:
     name: GitHub Release
-    needs: [cli-native, docker, python-sdk, typescript-sdk]
+    needs: [cli-native, docker, python-sdk, typescript-sdk, mcp-server-npm]
     # Proceed as long as Docker and SDK publishes succeeded.
     # CLI binaries are downloaded best-effort — missing platforms are OK.
     if: |
       always() &&
       needs.docker.result == 'success' &&
       needs.python-sdk.result == 'success' &&
-      needs.typescript-sdk.result == 'success'
+      needs.typescript-sdk.result == 'success' &&
+      needs.mcp-server-npm.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
