@@ -37,11 +37,8 @@ export default defineConfig({
     }),
   ],
   image: {
-    // Sharp fails to build from source in some environments, so we stay on
-    // `noop`. Blog cover images come from Unsplash which already serves
-    // optimized WebP via their CDN — we pass `?w=…&q=…` params.
-    // Swap to the default service + `npm i sharp` once we host our own images.
-    service: { entrypoint: 'astro/assets/services/noop' },
+    // sharp@0.33.5 installed — Astro's default image service now handles
+    // local images (resize, WebP/AVIF conversion) and remote Unsplash images.
     domains: ['images.unsplash.com'],
   },
   vite: {

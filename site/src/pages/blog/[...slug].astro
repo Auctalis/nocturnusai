@@ -116,20 +116,24 @@ if (post.data.cover) {
         <Content />
       </div>
 
-      {post.data.cover && (
+      {post.data.cover?.photographer && (
         <p class="blog-post-credit">
           Cover by{' '}
           <a href={post.data.cover.photographerUrl} rel="nofollow noopener" target="_blank">
             {post.data.cover.photographer}
           </a>{' '}
-          on{' '}
-          <a
-            href={`${post.data.cover.unsplashUrl}?utm_source=nocturnus&utm_medium=referral`}
-            rel="nofollow noopener"
-            target="_blank"
-          >
-            Unsplash
-          </a>
+          {post.data.cover.unsplashUrl && (
+            <>
+              on{' '}
+              <a
+                href={`${post.data.cover.unsplashUrl}?utm_source=nocturnus&utm_medium=referral`}
+                rel="nofollow noopener"
+                target="_blank"
+              >
+                Unsplash
+              </a>
+            </>
+          )}
           .
         </p>
       )}

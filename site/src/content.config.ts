@@ -13,26 +13,26 @@ const blog = defineCollection({
     tags: z.array(z.string()).default([]),
     draft: z.boolean().default(false),
     /**
-     * Unsplash cover image. Used in four places automatically:
+     * Cover image. Used in four places automatically:
      *   1. Blog post hero
      *   2. Blog index card thumbnail
      *   3. og:image for social shares
      *   4. JSON-LD BlogPosting.image
      *
-     * `src` should include Unsplash sizing params, e.g.
+     * `src` can be an Unsplash URL with sizing params, e.g.
      *   https://images.unsplash.com/photo-...?w=1600&h=840&fit=crop&q=80
+     * or a local path in /public, e.g. "/blog-600b-cover.jpg".
      *
-     * Photographer attribution is required by the Unsplash license —
-     * we render it in the post footer automatically.
+     * Photographer attribution is optional — rendered in the post
+     * footer when present (required for Unsplash licence).
      */
     cover: z
       .object({
-        src: z.string().url(),
+        src: z.string(),
         alt: z.string(),
-        photographer: z.string(),
-        photographerUrl: z.string().url(),
-        // Link to the Unsplash photo page (not the raw image).
-        unsplashUrl: z.string().url(),
+        photographer: z.string().optional(),
+        photographerUrl: z.string().url().optional(),
+        unsplashUrl: z.string().url().optional(),
       })
       .optional(),
   }),
