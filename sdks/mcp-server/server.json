@@ -6,12 +6,12 @@
     "url": "https://github.com/Auctalis/nocturnusai",
     "source": "github"
   },
-  "version": "0.3.0",
+  "version": "0.3.11",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "nocturnusai-mcp",
-      "version": "0.3.0",
+      "version": "0.3.11",
       "transport": {
         "type": "stdio"
       },
