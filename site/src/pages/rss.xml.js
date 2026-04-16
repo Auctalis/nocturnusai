@@ -8,7 +8,7 @@ export async function GET(context) {
   return rss({
     title: 'Nocturnus.AI — Blog',
     description:
-      'Essays, announcements, and benchmarks from the team building Nocturnus, the context server for AI agents.',
+      'Essays, announcements, and benchmarks from the team building Nocturnus — the context engineering engine for AI agents.',
     site: context.site,
     items: posts.map((post) => ({
       title: post.data.title,

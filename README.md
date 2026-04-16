@@ -7,22 +7,92 @@
 [![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-orange.svg?logo=spdx&logoColor=white)](LICENSE)
 [![MCP](https://glama.ai/mcp/servers/Auctalis/nocturnusai/badge?score=true)](https://glama.ai/mcp/servers/Auctalis/nocturnusai)
 
-> **License in one line.** [Business Source License 1.1](LICENSE) (SPDX: `BUSL-1.1`). Free for internal use — including internal production — inside your own organization. Offering NocturnusAI or substantial functionality as a product/hosted service to third parties requires a commercial license ([licensing@nocturnus.ai](mailto:licensing@nocturnus.ai)). Converts to Apache 2.0 on 2030-02-19.
+> **The context engineering engine for AI agents: send only what changed.**
 
-![NocturnusAI — Context Server for AI Agents](README-hero.png)
+![NocturnusAI — Context Engineering Engine for AI Agents](README-hero.png)
 
-**Large turn arrays in. Lean context windows out.**
+---
 
-If your agent keeps replaying chat history, tool output, CRM notes, retries, and stale summaries into every model call, NocturnusAI cuts that down first.
+## Before / After
 
-The primary workflow is not "learn predicates." It is:
+```python
+# ❌ Without NocturnusAI — replay everything, every turn
+messages = system_prompt + full_history + tool_outputs   # ~1,259 tokens/turn
+response = llm(messages)                                 # $13,600/mo at scale
 
-1. Send the raw turns you already have.
-2. Get back a smaller working set.
-3. Narrow that set for the next question.
-4. Reuse diffs so later turns only send what changed.
+# ✅ With NocturnusAI — send only what changed
+ctx = nocturnus.process_turns(raw_turns)                 # extract → infer → delta
+messages = system_prompt + ctx.briefing_delta             # ~221 tokens/turn
+response = llm(messages)                                 # $2,400/mo. Same accuracy.
+```
 
-Predicates, rules, inference, truth maintenance, scopes, and temporal logic are still there. They matter. They just belong behind the main story, not in front of it.
+---
+
+## The Numbers
+
+Measured on live APIs. 15-turn product support conversation. Real `usage.input_tokens` counts. [Run it yourself.](https://nocturnus.ai/benchmark)
+
+| | Naive replay | RAG-optimized | **NocturnusAI** |
+|---|---|---|---|
+| Tokens per turn | ~1,259 | ~800 | **~221** |
+| Cost per month (1K req/hr, Opus 4, $15/1M) | $13,600 | $12,000 | **$2,400** |
+| Latency | high | medium | **low** |
+| Truth-preserving | no | no | **yes** |
+
+Claude Opus 4: **5.7×** reduction. Gemini 2.0 Flash: **10.0×**. [Full calculations.](https://nocturnus.ai/calculations)
+
+---
+
+## Install
+
+```bash
+pip install nocturnusai          # Python
+npm install nocturnusai-sdk      # TypeScript
+docker run -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest  # Docker
+```
+
+Or use the setup wizard:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
+```
+
+---
+
+## Why Developers Star This Repo
+
+- **Reproducible token reduction** — benchmark in the repo, methodology published, run it against your own workload
+- **Deterministic inference** — same query, same result, every time. No embedding drift, no cosine similarity lottery
+- **Truth maintenance** — retract a fact, all derived conclusions auto-retract. No stale context, no hallucination on operational state
+- **Plugs into existing stacks** — LangChain, LlamaIndex, CrewAI, AutoGen, MCP, Vercel AI SDK, OpenAI Agents SDK, Mastra
+- **Benchmarkable against naive replay** — numbers derived, not invented. Every claim traces to a notebook cell
+
+---
+
+## Framework Quickstarts
+
+| Framework | Integration | Link |
+|---|---|---|
+| **LangChain / LangGraph** | Drop-in `NocturnusContextProvider`, LangSmith trace pass-through | [Docs](https://nocturnus.ai/docs/integrations) |
+| **CrewAI** | Task-scoped context per agent role | [Docs](https://nocturnus.ai/docs/integrations) |
+| **AutoGen** | Context server callable by any agent | [Docs](https://nocturnus.ai/docs/integrations) |
+| **MCP** | Spec-compliant server for Claude Desktop, Cursor, Continue | [Config](https://nocturnus.ai/docs/mcp) |
+| **OpenAI Agents SDK** | Context middleware, no tool modifications | [Docs](https://nocturnus.ai/docs/integrations) |
+| **Vercel AI SDK** | Edge-compatible adapter for Next.js, Nuxt, SvelteKit | [Docs](https://nocturnus.ai/docs/integrations) |
+| **Python SDK** | `pip install nocturnusai` | [Docs](https://nocturnus.ai/docs/sdks) |
+| **TypeScript SDK** | `npm install nocturnusai-sdk` | [Docs](https://nocturnus.ai/docs/sdks) |
+
+---
+
+## How It Works
+
+Three steps. Every turn.
+
+1. **Extract** — raw conversation turns → structured facts via LLM extraction
+2. **Infer** — backward-chaining logical inference finds only the facts reachable from the agent's current goal
+3. **Return the delta** — a `briefingDelta` containing only what changed since the last turn
+
+This is not vector search. It is not summarization. It is deterministic inference on a logic engine — [Hexastore](https://nocturnus.ai/docs/concepts) indexing, [backward chaining](https://nocturnus.ai/how-it-works), and [truth maintenance](https://nocturnus.ai/docs/concepts#truth-maintenance).
 
 ---
 
@@ -47,22 +117,6 @@ curl -X POST http://localhost:9300/context \
   }'
 ```
 
-Response shape (facts and salience values depend on LLM extraction):
-
-```json
-{
-  "facts": [
-    {"predicate":"customer_tier","args":["acme_corp","enterprise"],"salience":0.65},
-    {"predicate":"contract_value","args":["acme_corp","2000000"],"salience":0.65},
-    {"predicate":"issue","args":["acme_corp","sla_credits"],"salience":0.64}
-  ],
-  "totalFactsInKB": 7,
-  "factsReturned": 3,
-  "contradictions": 0,
-  "newFactsExtracted": 3
-}
-```
-
 ### 2. Goal-driven pass: `POST /memory/context`
 
 ```bash
@@ -70,15 +124,11 @@ curl -X POST http://localhost:9300/memory/context \
   -H 'Content-Type: application/json' \
   -H 'X-Tenant-ID: default' \
   -d '{
-    "goals": [
-      {"predicate":"eligible_for_sla","args":["acme_corp"]}
-    ],
+    "goals": [{"predicate":"eligible_for_sla","args":["acme_corp"]}],
     "maxFacts": 12,
     "sessionId": "ticket-42"
   }'
 ```
-
-Use this when you know what the next model call is trying to answer.
 
 ### 3. Later turns: `POST /context/diff`
 
@@ -86,13 +136,10 @@ Use this when you know what the next model call is trying to answer.
 curl -X POST http://localhost:9300/context/diff \
   -H 'Content-Type: application/json' \
   -H 'X-Tenant-ID: default' \
-  -d '{
-    "sessionId": "ticket-42",
-    "maxFacts": 12
-  }'
+  -d '{"sessionId": "ticket-42", "maxFacts": 12}'
 ```
 
-This returns only `added` and `removed` entries between snapshots.
+Returns only `added` and `removed` entries between snapshots.
 
 ### 4. End of thread: `POST /context/session/clear`
 
@@ -107,7 +154,8 @@ curl -X POST http://localhost:9300/context/session/clear \
 
 ## Choose Your Surface
 
-### Python SDK
+<details>
+<summary><b>Python SDK</b></summary>
 
 ```python
 from nocturnusai import SyncNocturnusAIClient
@@ -128,7 +176,10 @@ with SyncNocturnusAIClient("http://localhost:9300") as client:
     print(ctx.briefing_delta)
 ```
 
-### TypeScript SDK
+</details>
+
+<details>
+<summary><b>TypeScript SDK</b></summary>
 
 ```ts
 import { NocturnusAIClient } from 'nocturnusai-sdk';
@@ -147,18 +198,15 @@ const ctx = await client.processTurns({
   sessionId: 'ticket-42',
 });
 
-const diff = await client.diffContext({
-  sessionId: 'ticket-42',
-  maxFacts: 12,
-});
-
+const diff = await client.diffContext({ sessionId: 'ticket-42', maxFacts: 12 });
 await client.clearContextSession('ticket-42');
 console.log(ctx.briefingDelta);
 ```
 
-### MCP
+</details>
 
-Add Nocturnus as an MCP server:
+<details>
+<summary><b>MCP</b></summary>
 
 ```json
 {
@@ -173,6 +221,8 @@ Add Nocturnus as an MCP server:
 
 Use the `context` tool each turn for a salience-ranked working set. Pair MCP with the HTTP context endpoints when you need goal-driven assembly and diffs.
 
+</details>
+
 ---
 
 ## What Lives Behind The Workflow
@@ -185,8 +235,6 @@ When you do need backend mechanics, NocturnusAI provides them:
 - Temporal facts with `ttl`, `validFrom`, and `validUntil`
 - Multi-tenancy via `X-Database` and `X-Tenant-ID`
 - MCP, REST, Python SDK, TypeScript SDK, and CLI surfaces over the same engine
-
-That is the backend. The front-of-product story is still turn reduction.
 
 ---
 
@@ -201,36 +249,11 @@ docker run -d --name nocturnusai -p 9300:9300 \
   ghcr.io/auctalis/nocturnusai:latest
 ```
 
-Verify it's running:
-
 ```bash
-curl http://localhost:9300/health
+curl http://localhost:9300/health   # Verify it's running
 ```
-
-Try the logic engine (works immediately, no LLM needed):
-
-```bash
-curl -X POST http://localhost:9300/tell \
-  -H 'Content-Type: application/json' \
-  -H 'X-Tenant-ID: default' \
-  -d '{"predicate":"customer_tier","args":["acme_corp","enterprise"]}'
-
-curl -X POST http://localhost:9300/tell \
-  -H 'Content-Type: application/json' \
-  -H 'X-Tenant-ID: default' \
-  -d '{"predicate":"contract_value","args":["acme_corp","2000000"]}'
-
-curl -X POST http://localhost:9300/ask \
-  -H 'Content-Type: application/json' \
-  -H 'X-Tenant-ID: default' \
-  -d '{"predicate":"customer_tier","args":["acme_corp","?tier"]}'
-```
-
-That's it. Server is running, persists data to a named Docker volume, and restarts automatically. For natural-language turn extraction (the Working Loop above), add an LLM provider -- see the next section.
 
 ### Docker with Ollama (enables natural-language extraction)
-
-If you have [Ollama](https://ollama.com) running locally:
 
 ```bash
 docker run -d --name nocturnusai -p 9300:9300 \
@@ -242,59 +265,22 @@ docker run -d --name nocturnusai -p 9300:9300 \
   ghcr.io/auctalis/nocturnusai:latest
 ```
 
-### Install script (CLI + setup wizard)
+### From this repo
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Auctalis/nocturnusai/main/install.sh | bash
-```
-
-Downloads the CLI binary and launches an interactive setup wizard where you choose your LLM provider (Ollama, Anthropic, OpenAI, Google, or skip). Creates a persistent Docker Compose install.
-
-Shortcuts if you already know what you want:
-
-```bash
-curl -fsSL ... | bash -s -- --host-ollama    # Reuse local Ollama
-curl -fsSL ... | bash -s -- --ollama         # Bundle Ollama in Docker
-curl -fsSL ... | bash -s -- --key sk-ant-... # Use Anthropic
-```
-
-### Python SDK
-
-```bash
-pip install nocturnusai
-```
-
-### TypeScript SDK
-
-```bash
-npm install nocturnusai-sdk
-```
-
-### MCP client
-
-Copy one of the configs from [`mcp-configs/`](./mcp-configs).
-
-### From this repo (contributors)
-
-```bash
-make up-ollama
-make smoke
+make up-ollama && make smoke
 ```
 
 ---
 
 ## CLI
 
-The CLI is useful for interactive inspection and salience-window retrieval:
-
 ```bash
 nocturnusai                                # Interactive REPL
 nocturnusai -e "context 10"               # Salience-ranked working set
-nocturnusai -e "compress"                 # Simplified alias: POST /memory/compress
-nocturnusai -e "cleanup 0.05"             # Simplified alias: POST /memory/cleanup
+nocturnusai -e "compress"                 # POST /memory/compress
+nocturnusai -e "cleanup 0.05"             # POST /memory/cleanup
 ```
-
-For goal-driven context windows and diffs, use the REST API or SDKs alongside the CLI.
 
 ---
 
@@ -304,20 +290,18 @@ Full docs: **[nocturnus.ai](https://nocturnus.ai)**
 
 | | |
 |---|---|
-| [Start Here](https://nocturnus.ai/docs) | Begin with the turn-reduction workflow |
-| [Context Workflow](https://nocturnus.ai/docs/context) | Raw turns -> optimize -> diff -> clear |
+| [Start Here](https://nocturnus.ai/docs) | The turn-reduction workflow |
+| [Context Workflow](https://nocturnus.ai/docs/context) | Raw turns → optimize → diff → clear |
 | [API Reference](https://nocturnus.ai/docs/api) | REST endpoints and response shapes |
 | [SDKs](https://nocturnus.ai/docs/sdks) | Python and TypeScript client methods |
-| [Integrations](https://nocturnus.ai/integrations) | LangChain, CrewAI, AutoGen, LangGraph, OpenAI Agents, Anthropic, MCP |
-| [MCP Integration](https://nocturnus.ai/docs/mcp) | MCP config plus companion context API usage |
-| [How It Works on the Backend](https://nocturnus.ai/docs/concepts) | Facts, rules, inference, salience, scopes |
-| [Security & Auth](https://nocturnus.ai/docs/security) | API keys, RBAC, TLS, encryption at rest |
+| [Integrations](https://nocturnus.ai/integrations) | LangChain, CrewAI, AutoGen, MCP, and more |
+| [Benchmark](https://nocturnus.ai/benchmark) | Measured token reduction on live APIs |
+| [Calculations](https://nocturnus.ai/calculations) | Every number, derived |
+| [How It Works](https://nocturnus.ai/how-it-works) | The extraction → inference → delta pipeline |
 
 ---
 
 ## Docker Compose (advanced)
-
-For persistent config, monitoring, or Ollama bundling:
 
 ```bash
 git clone https://github.com/Auctalis/nocturnusai.git && cd nocturnusai
@@ -327,8 +311,6 @@ make up-ollama                                 # + Ollama (reuses host or starts
 make up-monitoring                             # + Prometheus + Grafana
 make smoke                                     # Verify health + context endpoint
 ```
-
----
 
 ## Build from Source
 
@@ -353,7 +335,7 @@ Report vulnerabilities privately via [GitHub Security Advisories](https://github
 
 ## License
 
-Business Source License 1.1 - free for non-production use and internal production use within your organization. Offering NocturnusAI to third parties as a product or service requires a commercial license from [licensing@nocturnus.ai](mailto:licensing@nocturnus.ai). Converts to Apache 2.0 on 2030-02-19. See [LICENSE](LICENSE) and [DISCLAIMER.md](DISCLAIMER.md).
+[Business Source License 1.1](LICENSE) (SPDX: `BUSL-1.1`). Free for internal use — including internal production — inside your own organization. Offering NocturnusAI or substantial functionality as a product/hosted service to third parties requires a commercial license ([licensing@nocturnus.ai](mailto:licensing@nocturnus.ai)). Converts to Apache 2.0 on 2030-02-19. See [LICENSE](LICENSE) and [DISCLAIMER.md](DISCLAIMER.md).
 
 ---
 
