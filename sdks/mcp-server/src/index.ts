@@ -78,7 +78,7 @@ const STATIC_TOOLS = [
   {
     name: "tell",
     description:
-      "Assert a fact into the knowledge base. Stores knowledge that can be queried and used in logical reasoning. Supports auto-expiration via ttl (milliseconds) or validUntil (epoch ms), confidence scoring, and configurable conflict resolution.",
+      "Assert a fact into the knowledge base. Stores knowledge queryable via logical reasoning. Supports TTL expiration, confidence scoring, and configurable conflict resolution. Side effects: mutates state (additive) — stored facts persist until retracted or expired. Auth: requires X-Tenant-ID header for tenant isolation; FACT_WRITE permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR on bad args, CONFLICT_ERROR on contradictions when conflictStrategy=REJECT.",
     inputSchema: {
       type: "object",
       properties: {
@@ -97,7 +97,7 @@ const STATIC_TOOLS = [
   {
     name: "teach",
     description:
-      "Define a logical rule for automatic reasoning. When all conditions (body) are true, the conclusion (head) is automatically derivable via backward chaining. Use ?-prefixed variables (e.g., ?x, ?who). Supports Negation-as-Failure in body atoms. Example: 'If ?x is human AND NOT god(?x), THEN ?x is mortal'.",
+      "Define a logical rule for automatic reasoning. When body conditions hold, head becomes derivable via backward chaining. Use ?-prefixed variables; supports Negation-as-Failure. Example: 'If ?x is human AND NOT god(?x), THEN ?x is mortal'. Side effects: mutates state (additive) — rules remain active until explicitly removed. Auth: requires X-Tenant-ID header; RULE_WRITE permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR on malformed rules.",
     inputSchema: {
       type: "object",
       properties: {
@@ -130,7 +130,7 @@ const STATIC_TOOLS = [
   {
     name: "ask",
     description:
-      "Query the knowledge base using multi-step logical reasoning (backward chaining with unification). Finds all provable answers by applying rules and matching facts. Use ?-prefixed variables for unknowns you want to discover. Optionally returns full proof chains showing the reasoning steps.",
+      "Query the knowledge base using multi-step logical reasoning (backward chaining with unification). Finds all provable answers by applying rules and matching facts. Use ?-prefixed variables for unknowns; optionally returns full proof chains. Side effects: none (read-only). Auth: requires X-Tenant-ID header; FACT_READ permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR on bad args; result set bounded by INFERENCE_MAX_RESULTS (default 10,000) to prevent OOM.",
     inputSchema: {
       type: "object",
       properties: {
@@ -146,7 +146,7 @@ const STATIC_TOOLS = [
   {
     name: "forget",
     description:
-      "Retract a fact from the knowledge base. Any knowledge that was derived from this fact is also automatically forgotten via the Truth Maintenance System (cascading retraction). This is the inverse of 'tell'.",
+      "Retract a fact from the knowledge base. Inverse of 'tell'. Side effects: DESTRUCTIVE — triggers cascading retraction of any knowledge derived from this fact via the Truth Maintenance System (irreversible). Auth: requires X-Tenant-ID header; FACT_WRITE permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR on bad args (no error if the fact was not present).",
     inputSchema: {
       type: "object",
       properties: {
@@ -160,7 +160,7 @@ const STATIC_TOOLS = [
   {
     name: "recall",
     description:
-      "Time-travel query: recall what was known at a specific point in time. Returns facts that were valid at the given timestamp, respecting temporal bounds (validFrom, validUntil, ttl). Useful for debugging agent behavior or reconstructing past state.",
+      "Time-travel query: recall what was known at a specific point in time. Returns facts valid at the given timestamp, respecting temporal bounds (validFrom, validUntil, ttl). Useful for debugging agent behavior or reconstructing past state. Side effects: none (read-only). Auth: requires X-Tenant-ID header; FACT_READ permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR on bad args or missing timestamp.",
     inputSchema: {
       type: "object",
       properties: {
@@ -175,7 +175,7 @@ const STATIC_TOOLS = [
   {
     name: "context",
     description:
-      "Get the most relevant knowledge for your current reasoning step, ranked by composite salience (recency × frequency × priority). Returns a token-optimized context window. Supports three output formats: 'predicate' (machine-readable), 'natural' (LLM-optimized prose), 'structured' (grouped with metadata). Pass goals for goal-driven selection, sessionId for incremental diffing across turns.",
+      "Get the most relevant knowledge for the current reasoning step, ranked by composite salience (recency × frequency × priority). Returns a token-optimized context window in 'predicate', 'natural', or 'structured' format. Pass goals for goal-driven selection, sessionId for incremental diffs across turns. Side effects: read-only for stored facts (salience access counters may update internally). Auth: requires X-Tenant-ID header; FACT_READ permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR on bad args.",
     inputSchema: {
       type: "object",
       properties: {
@@ -207,13 +207,13 @@ const STATIC_TOOLS = [
   {
     name: "compress",
     description:
-      "Run memory consolidation: detects repeated episodic patterns (e.g., 'user asked about X five times') and creates semantic summaries. Reduces memory footprint in long-running agent sessions while preserving essential knowledge.",
+      "Run memory consolidation: detects repeated episodic patterns (e.g., 'user asked about X five times') and creates semantic summaries. Reduces memory footprint in long-running sessions while preserving essential knowledge. Side effects: mutates state (additive) — creates new summary facts; original facts remain intact. Auth: requires X-Tenant-ID header; FACT_WRITE permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR on bad args.",
     inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "cleanup",
     description:
-      "Run memory decay and eviction. Expires facts past their TTL and evicts low-salience facts when memory exceeds capacity. Call periodically in long-running agent sessions to prevent unbounded memory growth.",
+      "Run memory decay and eviction. Expires facts past their TTL and evicts low-salience facts when memory exceeds capacity. Call periodically in long-running agent sessions to prevent unbounded growth. Side effects: DESTRUCTIVE — permanently removes evicted and expired facts (irreversible). Auth: requires X-Tenant-ID header; FACT_WRITE permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR on bad threshold.",
     inputSchema: {
       type: "object",
       properties: {
@@ -225,7 +225,7 @@ const STATIC_TOOLS = [
   {
     name: "predicates",
     description:
-      "Discover the knowledge base schema. Lists all predicates (relationship types) currently stored, with their arity (argument count), fact count, and whether they have associated rules. Use this to understand what knowledge is available before querying.",
+      "Discover the knowledge base schema. Lists all predicates currently stored with arity (argument count), fact count, and whether they have associated rules. Use this before querying to understand what knowledge is available. Side effects: none (read-only). Auth: requires X-Tenant-ID header; FACT_READ permission when auth is enabled. Rate-limited per principal. Errors: none under normal operation.",
     inputSchema: {
       type: "object",
       properties: {
@@ -237,7 +237,7 @@ const STATIC_TOOLS = [
   {
     name: "aggregate",
     description:
-      "Compute aggregations over matching facts. Supports COUNT (number of matches), SUM, MIN, MAX, and AVG over a numeric argument at a specified position. Example: COUNT all score(player, ?) facts, or AVG scores at argIndex=1.",
+      "Compute aggregations over matching facts. Supports COUNT, SUM, MIN, MAX, and AVG over a numeric argument at a specified position. Example: COUNT all score(player, ?) facts, or AVG scores at argIndex=1. Side effects: none (read-only). Auth: requires X-Tenant-ID header; FACT_READ permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR on unknown operation or missing argIndex for numeric ops.",
     inputSchema: {
       type: "object",
       properties: {
@@ -253,7 +253,7 @@ const STATIC_TOOLS = [
   {
     name: "bulk_assert",
     description:
-      "Assert multiple facts in a single call for efficiency. Non-transactional: each fact is attempted independently — contradictions are reported as errors without aborting the batch. Returns counts of successful and failed assertions.",
+      "Assert multiple facts in a single call for efficiency. Non-transactional: each fact is attempted independently — contradictions are reported without aborting the batch. Returns counts of successful and failed assertions. Side effects: mutates state (additive) — partial successes persist even if other facts in the batch fail. Auth: requires X-Tenant-ID header; FACT_WRITE permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR on malformed input; per-fact failures returned in the response's errors array.",
     inputSchema: {
       type: "object",
       properties: {
@@ -280,7 +280,7 @@ const STATIC_TOOLS = [
   {
     name: "retract_pattern",
     description:
-      "Retract all facts matching a pattern in a single call. Use ?-prefixed variables as wildcards to retract multiple facts at once. Returns the count and list of retracted facts. Cascading retraction applies to each removed fact.",
+      "Retract all facts matching a pattern in a single call. Use ?-prefixed variables as wildcards to retract multiple facts at once. Returns the count and list of retracted facts. Side effects: DESTRUCTIVE — removes multiple facts and cascades TMS retraction for each removed fact (irreversible). Auth: requires X-Tenant-ID header; FACT_WRITE permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR on bad args.",
     inputSchema: {
       type: "object",
       properties: {
@@ -294,7 +294,7 @@ const STATIC_TOOLS = [
   {
     name: "fork_scope",
     description:
-      "Fork a knowledge base scope — creates an independent copy of all facts in the source scope under a new target scope name. Use this for hypothetical reasoning ('What if Alice moves to London?') without modifying the main knowledge base. Similar to git branch for knowledge.",
+      "Fork a knowledge base scope — creates an independent copy of all facts in the source scope under a new target scope name. Use for hypothetical reasoning ('What if Alice moves to London?') without modifying the main knowledge base. Similar to git branch for knowledge. Side effects: mutates state (additive) — creates a new scope with copied facts; source scope is unchanged. Auth: requires X-Tenant-ID header; FACT_WRITE permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR if targetScope is blank or already exists.",
     inputSchema: {
       type: "object",
       properties: {
@@ -307,7 +307,7 @@ const STATIC_TOOLS = [
   {
     name: "merge_scope",
     description:
-      "Merge facts from one scope back into another (default: global). Use this to commit hypothetical reasoning results back into the main knowledge base. Choose a conflict strategy: SOURCE_WINS overwrites, TARGET_WINS keeps existing, KEEP_BOTH retains both versions, REJECT aborts if any conflicts.",
+      "Merge facts from one scope into another (default: global). Use to commit hypothetical reasoning back into the main knowledge base. Strategy controls conflict handling: SOURCE_WINS overwrites, TARGET_WINS keeps existing, KEEP_BOTH retains both, REJECT aborts on conflict. Side effects: mutates the target scope; may overwrite existing facts depending on strategy (potentially destructive under SOURCE_WINS). Auth: requires X-Tenant-ID header; FACT_WRITE permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR on unknown strategy; CONFLICT_ERROR when strategy=REJECT and conflicts are found.",
     inputSchema: {
       type: "object",
       properties: {
@@ -321,13 +321,13 @@ const STATIC_TOOLS = [
   {
     name: "list_scopes",
     description:
-      "List all named scopes in the knowledge base. Shows what hypothetical contexts or reasoning branches currently exist. The global (unscoped) partition is always present but not listed.",
+      "List all named scopes in the knowledge base. Shows what hypothetical contexts or reasoning branches exist. The global (unscoped) partition is always present but not listed. Side effects: none (read-only). Auth: requires X-Tenant-ID header; FACT_READ permission when auth is enabled. Rate-limited per principal. Errors: none under normal operation.",
     inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "delete_scope",
     description:
-      "Delete a knowledge base scope and all facts within it. Use this to clean up completed or abandoned hypothetical reasoning branches. This is irreversible.",
+      "Delete a named scope and all facts within it. Use to clean up completed or abandoned hypothetical reasoning branches. Side effects: DESTRUCTIVE and IRREVERSIBLE — permanently removes all facts in the scope; cascades TMS retraction for any derived facts. Auth: requires X-Tenant-ID header; FACT_WRITE permission when auth is enabled. Rate-limited per principal. Errors: VALIDATION_ERROR if scope name is blank.",
     inputSchema: {
       type: "object",
       properties: {
@@ -341,7 +341,7 @@ const STATIC_TOOLS = [
 const server = new Server(
   {
     name: "nocturnusai-mcp",
-    version: "0.3.11",
+    version: "0.3.13",
   },
   {
     capabilities: {

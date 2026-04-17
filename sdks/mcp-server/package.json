@@ -1,6 +1,6 @@
 {
   "name": "nocturnusai-mcp",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "description": "MCP stdio server for NocturnusAI — agent reasoning, memory lifecycle, and token-optimized context windows for AI applications.",
   "type": "module",
   "main": "dist/index.js",
