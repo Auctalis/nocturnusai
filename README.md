@@ -5,7 +5,7 @@
 [![npm](https://img.shields.io/npm/v/nocturnusai-sdk?logo=npm&logoColor=white)](https://www.npmjs.com/package/nocturnusai-sdk)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2FAuctalis%2Fnocturnusai-blue?logo=docker)](https://github.com/Auctalis/nocturnusai/pkgs/container/nocturnusai)
 [![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-orange.svg?logo=spdx&logoColor=white)](LICENSE)
-[![MCP](https://glama.ai/mcp/servers/Auctalis/nocturnusai/badge?score=true)](https://glama.ai/mcp/servers/Auctalis/nocturnusai)
+[![MCP](https://img.shields.io/badge/MCP-compatible-8A2BE2?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIi8+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMyIvPjwvc3ZnPg==)](https://nocturnus.ai/docs/mcp)
 
 > **The context engineering engine for AI agents: send only what changed.**
 

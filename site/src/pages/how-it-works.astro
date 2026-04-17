@@ -28,15 +28,30 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           </p>
         </div>
 
-        <div class="reveal reveal-delay-1" style="margin-top: var(--space-4);">
-          <img
-            src="/architecture-pipeline.png"
-            alt="Architecture diagram: Agent sends current goal to Nocturnus Context Server which checks Facts, State, and History via backward-chaining logical inference, then returns only what is logically necessary to the LLM."
-            width="1200"
-            height="252"
-            loading="eager"
-            style="width: 100%; height: auto; border-radius: var(--radius-md); border: 1px solid var(--site-line);"
-          />
+        <div class="reveal reveal-delay-1 hiw-pipeline" style="margin-top: var(--space-5);">
+          <div class="hiw-pipe-step">
+            <div class="hiw-pipe-icon" style="background: var(--site-accent);">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <div class="hiw-pipe-label">Agent</div>
+            <div class="hiw-pipe-desc">Raw turns, tool outputs, conversation history</div>
+          </div>
+          <div class="hiw-pipe-arrow">&rarr;</div>
+          <div class="hiw-pipe-step hiw-pipe-step-accent">
+            <div class="hiw-pipe-icon" style="background: var(--site-dark);">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4.5 6.5 1.5"/><path d="M16 4.5 17.5 1.5"/><circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="11" r="3"/><circle cx="15.5" cy="11" r="3"/><path d="M10.5 15 12 17l1.5-2"/></svg>
+            </div>
+            <div class="hiw-pipe-label">Nocturnus</div>
+            <div class="hiw-pipe-desc">Extract facts &rarr; backward-chain inference &rarr; compute delta</div>
+          </div>
+          <div class="hiw-pipe-arrow">&rarr;</div>
+          <div class="hiw-pipe-step">
+            <div class="hiw-pipe-icon" style="background: var(--site-accent);">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93"/><path d="M8 6a4 4 0 0 1 8 0"/><path d="M12 18v4"/><path d="M8 22h8"/><rect x="3" y="10" width="18" height="8" rx="2"/></svg>
+            </div>
+            <div class="hiw-pipe-label">LLM</div>
+            <div class="hiw-pipe-desc">Receives only what changed &mdash; ~221 tokens instead of ~1,259</div>
+          </div>
         </div>
       </div>
     </section>
@@ -366,3 +381,62 @@ llm_response = call_llm(messages)
 
   <Footer />
 </Layout>
+
+<style>
+  .hiw-pipeline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+  }
+  .hiw-pipe-step {
+    flex: 1;
+    max-width: 280px;
+    text-align: center;
+    padding: var(--space-4) var(--space-3);
+    border: 1px solid var(--site-line);
+    border-radius: var(--radius-md);
+    background: var(--site-surface);
+  }
+  .hiw-pipe-step-accent {
+    border-color: var(--site-accent);
+    box-shadow: 0 0 0 1px var(--site-accent), 0 8px 24px -8px rgba(0,0,0,0.08);
+  }
+  .hiw-pipe-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: inline-grid;
+    place-items: center;
+    margin-bottom: 0.7rem;
+    color: var(--site-accent);
+  }
+  .hiw-pipe-label {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin-bottom: 0.35rem;
+  }
+  .hiw-pipe-desc {
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--site-muted);
+  }
+  .hiw-pipe-arrow {
+    font-size: 1.6rem;
+    color: var(--site-accent);
+    font-weight: 300;
+    flex-shrink: 0;
+  }
+  @media (max-width: 720px) {
+    .hiw-pipeline {
+      flex-direction: column;
+    }
+    .hiw-pipe-arrow {
+      transform: rotate(90deg);
+    }
+    .hiw-pipe-step {
+      max-width: 100%;
+    }
+  }
+</style>
