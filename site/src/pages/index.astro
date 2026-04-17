@@ -41,14 +41,38 @@ const softwareAppLd = {
   },
 };
 
+// Pull published examples for the homepage grid and the ItemList JSON-LD.
+// Keeping this in one place means the grid + structured data never drift.
+const exampleEntries = (await getCollection('examples', ({ data }) => !data.draft))
+  .sort((a, b) => a.data.order - b.data.order);
+
+// ItemList schema — tells Google this page links to a canonical set of
+// framework-specific example pages and orders them. Helps sitelinks /
+// example carousels in SERPs.
+const examplesItemListLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'NocturnusAI framework examples',
+  description:
+    '5-minute wow examples for LangChain, OpenAI Agents SDK, CrewAI, MCP, and Vercel AI SDK — problem, exact before/after token counts, install, runnable code.',
+  numberOfItems: exampleEntries.length,
+  itemListElement: exampleEntries.map((e, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    url: `https://nocturnus.ai/examples/${e.id}/`,
+    name: e.data.title,
+    description: e.data.problem,
+  })),
+};
+
 // FAQ schema stub — populate if we add an FAQ section; harmless to omit.
 ---
 
 <Layout
   title="Nocturnus.AI — The Context Engineering Engine for AI Agents"
   description="The context engineering engine for AI agents. Send only what changed — 82–90% fewer tokens, measured on live Claude Opus 4 and Gemini 2.0 Flash APIs."
-  keywords={['ai agents', 'context window', 'logic engine', 'token cost', 'agent memory', 'mcp server', 'langchain', 'langgraph']}
-  jsonLd={softwareAppLd}
+  keywords={['ai agents', 'context window', 'logic engine', 'token cost', 'agent memory', 'mcp server', 'langchain', 'crewai', 'openai agents sdk', 'vercel ai sdk']}
+  jsonLd={[softwareAppLd, examplesItemListLd]}
   feedUrl="https://nocturnus.ai/rss.xml"
 >
   <Navbar />
@@ -281,6 +305,171 @@ $ curl localhost:<span class="htl-num">9300</span>/context \
       }
     </style>
 
+
+    <hr class="section-rule" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- EXAMPLES — 5-minute wow, direct links to runnable code              -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="site-section-tight" id="examples">
+      <div class="site-container">
+        <div class="section-head reveal">
+          <div class="site-kicker">5-Minute Wow</div>
+          <h2 class="site-title" style="font-size: clamp(2rem, 4vw, 3rem);">Start in your stack.</h2>
+          <p class="site-subtitle">
+            Pick your framework. Copy the install. Run <code style="background: var(--site-surface); padding: 0.1em 0.35em; border-radius: 3px;">bench.py</code> against your own workload. Each example ships with the problem, exact before/after token counts, a copy-paste install, and runnable code.
+          </p>
+        </div>
+
+        <div class="reveal reveal-delay-1 home-examples-grid">
+          <a href={`${base}/examples/langchain`} class="home-example-card">
+            <div class="home-example-kicker">LANGCHAIN</div>
+            <div class="home-example-title">Support agent</div>
+            <div class="home-example-problem">ConversationBufferMemory replays every turn.</div>
+            <div class="home-example-stats">
+              <span class="home-example-before">1,259</span>
+              <span class="home-example-arrow">→</span>
+              <span class="home-example-after">221</span>
+              <span class="home-example-sub">tokens/turn · 5.7×</span>
+            </div>
+          </a>
+
+          <a href={`${base}/examples/openai-agents`} class="home-example-card">
+            <div class="home-example-kicker">OPENAI AGENTS SDK</div>
+            <div class="home-example-title">SLA-credit resolver</div>
+            <div class="home-example-problem">Every tool call re-sends the prior conversation.</div>
+            <div class="home-example-stats">
+              <span class="home-example-before">1,259</span>
+              <span class="home-example-arrow">→</span>
+              <span class="home-example-after">221</span>
+              <span class="home-example-sub">tokens/turn · 5.7×</span>
+            </div>
+          </a>
+
+          <a href={`${base}/examples/crewai`} class="home-example-card">
+            <div class="home-example-kicker">CREWAI</div>
+            <div class="home-example-title">3-agent research crew</div>
+            <div class="home-example-problem">Each crew member sees all prior crew outputs.</div>
+            <div class="home-example-stats">
+              <span class="home-example-before">1,259</span>
+              <span class="home-example-arrow">→</span>
+              <span class="home-example-after">221</span>
+              <span class="home-example-sub">tokens/turn · 5.7×</span>
+            </div>
+          </a>
+
+          <a href={`${base}/examples/mcp`} class="home-example-card">
+            <div class="home-example-kicker">MCP</div>
+            <div class="home-example-title">Claude Desktop / Cursor</div>
+            <div class="home-example-problem">Tool outputs accumulate across the session.</div>
+            <div class="home-example-stats">
+              <span class="home-example-before">1,259</span>
+              <span class="home-example-arrow">→</span>
+              <span class="home-example-after">221</span>
+              <span class="home-example-sub">tokens/turn · 5.7×</span>
+            </div>
+          </a>
+
+          <a href={`${base}/examples/vercel-ai-sdk`} class="home-example-card">
+            <div class="home-example-kicker">VERCEL AI SDK</div>
+            <div class="home-example-title">Next.js chat app</div>
+            <div class="home-example-problem">streamText gets the full history every request.</div>
+            <div class="home-example-stats">
+              <span class="home-example-before">1,259</span>
+              <span class="home-example-arrow">→</span>
+              <span class="home-example-after">221</span>
+              <span class="home-example-sub">tokens/turn · 5.7×</span>
+            </div>
+          </a>
+
+          <a href={`${base}/examples/`} class="home-example-card home-example-all">
+            <div class="home-example-kicker">ALL EXAMPLES</div>
+            <div class="home-example-title">See all five &rarr;</div>
+            <div class="home-example-problem">One page. Every framework. Every number, derived.</div>
+            <div class="home-example-stats" style="border-top-color: transparent;">
+              <span style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--site-accent);">nocturnus.ai/examples</span>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <style>
+      .home-examples-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: var(--space-3);
+      }
+      .home-example-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: var(--space-4);
+        background: #fff;
+        border: 1px solid var(--site-line);
+        border-radius: var(--radius-md);
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+      }
+      .home-example-card:hover {
+        border-color: var(--site-accent);
+        transform: translateY(-2px);
+        box-shadow: 0 12px 28px -12px rgba(0,0,0,0.14);
+      }
+      .home-example-kicker {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.12em;
+        color: var(--site-accent);
+      }
+      .home-example-title {
+        font-family: var(--font-display);
+        font-size: 1.15rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      .home-example-problem {
+        font-size: 0.88rem;
+        line-height: 1.55;
+        color: var(--site-muted);
+        flex: 1;
+      }
+      .home-example-stats {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.4rem;
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        padding-top: 0.8rem;
+        margin-top: 0.3rem;
+        border-top: 1px solid var(--site-line);
+      }
+      .home-example-before {
+        color: var(--site-muted-soft);
+        text-decoration: line-through;
+        text-decoration-color: rgba(33,28,23,0.28);
+      }
+      .home-example-arrow { color: var(--site-accent); }
+      .home-example-after {
+        color: var(--site-accent);
+        font-weight: 700;
+      }
+      .home-example-sub {
+        color: var(--site-muted);
+        font-size: 0.78rem;
+        margin-left: auto;
+      }
+      .home-example-all {
+        background: var(--site-dark);
+        color: var(--site-dark-text);
+        border-color: var(--site-dark);
+      }
+      .home-example-all .home-example-kicker { color: var(--site-accent); }
+      .home-example-all .home-example-title { color: var(--site-dark-text); }
+      .home-example-all .home-example-problem { color: rgba(240,235,225,0.65); }
+    </style>
 
     <hr class="section-rule" />
 
@@ -932,35 +1121,41 @@ DELETE /scope/ticket-4821</pre>
         </div>
 
         <div class="reveal reveal-delay-1" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4);">
-          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
+          <a href={`${base}/examples/langchain`} class="plain-card" style="text-align: center; padding: var(--space-3); text-decoration: none; color: inherit; display: block; transition: border-color 180ms ease;">
             <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">LangChain</h3>
             <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">7 tools + agent example</p>
             <code style="font-size: 0.72rem; color: var(--site-accent);">pip install nocturnusai[langchain]</code>
-          </div>
-          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
+            <div style="margin-top: 0.6rem; font-size: 0.74rem; color: var(--site-accent); font-weight: 500;">Example &rarr;</div>
+          </a>
+          <a href={`${base}/examples/crewai`} class="plain-card" style="text-align: center; padding: var(--space-3); text-decoration: none; color: inherit; display: block;">
             <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">CrewAI</h3>
             <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">5 tools + Storage backend</p>
             <code style="font-size: 0.72rem; color: var(--site-accent);">pip install nocturnusai[crewai]</code>
-          </div>
-          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
-            <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">AutoGen</h3>
-            <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">5 tools + Memory protocol</p>
-            <code style="font-size: 0.72rem; color: var(--site-accent);">pip install nocturnusai[autogen]</code>
-          </div>
-          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
-            <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">LangGraph</h3>
-            <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">Checkpoint saver</p>
-            <code style="font-size: 0.72rem; color: var(--site-accent);">pip install nocturnusai[langgraph]</code>
-          </div>
-          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
+            <div style="margin-top: 0.6rem; font-size: 0.74rem; color: var(--site-accent); font-weight: 500;">Example &rarr;</div>
+          </a>
+          <a href={`${base}/examples/openai-agents`} class="plain-card" style="text-align: center; padding: var(--space-3); text-decoration: none; color: inherit; display: block;">
             <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">OpenAI Agents</h3>
             <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">5 function tools</p>
             <code style="font-size: 0.72rem; color: var(--site-accent);">pip install nocturnusai[openai-agents]</code>
-          </div>
-          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
+            <div style="margin-top: 0.6rem; font-size: 0.74rem; color: var(--site-accent); font-weight: 500;">Example &rarr;</div>
+          </a>
+          <a href={`${base}/examples/mcp`} class="plain-card" style="text-align: center; padding: var(--space-3); text-decoration: none; color: inherit; display: block;">
             <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">MCP</h3>
             <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">16 tools, 5 IDE configs</p>
             <code style="font-size: 0.72rem; color: var(--site-accent);">Claude, Cursor, Windsurf, VS Code</code>
+            <div style="margin-top: 0.6rem; font-size: 0.74rem; color: var(--site-accent); font-weight: 500;">Example &rarr;</div>
+          </a>
+          <a href={`${base}/examples/vercel-ai-sdk`} class="plain-card" style="text-align: center; padding: var(--space-3); text-decoration: none; color: inherit; display: block;">
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">Vercel AI SDK</h3>
+            <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">Next.js streamText wrapper</p>
+            <code style="font-size: 0.72rem; color: var(--site-accent);">npm install nocturnusai-sdk</code>
+            <div style="margin-top: 0.6rem; font-size: 0.74rem; color: var(--site-accent); font-weight: 500;">Example &rarr;</div>
+          </a>
+          <div class="plain-card" style="text-align: center; padding: var(--space-3);">
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.4rem;">AutoGen &middot; LangGraph</h3>
+            <p style="font-size: 0.78rem; color: var(--site-muted); margin-bottom: 0.5rem;">Tools + Memory + Checkpointer</p>
+            <code style="font-size: 0.72rem; color: var(--site-accent);">pip install nocturnusai[autogen]</code>
+            <div style="margin-top: 0.6rem; font-size: 0.74rem; color: var(--site-muted-soft);">Docs &rarr;</div>
           </div>
         </div>
 

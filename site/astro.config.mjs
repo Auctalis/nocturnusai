@@ -21,9 +21,25 @@ export default defineConfig({
       changefreq: 'weekly',
       priority: 0.7,
       serialize(item) {
-        // Homepage gets top priority; blog and docs get slightly less.
+        // Homepage is the entry point; examples are the highest-converting
+        // pages for developers and deserve top priority below the home.
         if (item.url === 'https://nocturnus.ai/') {
           item.priority = 1.0;
+          item.changefreq = 'weekly';
+        } else if (item.url === 'https://nocturnus.ai/examples/') {
+          item.priority = 0.95;
+          item.changefreq = 'weekly';
+        } else if (item.url.includes('/examples/')) {
+          item.priority = 0.9;
+          item.changefreq = 'weekly';
+        } else if (item.url === 'https://nocturnus.ai/benchmark/') {
+          item.priority = 0.9;
+          item.changefreq = 'weekly';
+        } else if (item.url === 'https://nocturnus.ai/how-it-works/') {
+          item.priority = 0.85;
+          item.changefreq = 'weekly';
+        } else if (item.url === 'https://nocturnus.ai/integrations/') {
+          item.priority = 0.85;
           item.changefreq = 'weekly';
         } else if (item.url.includes('/blog/')) {
           item.priority = 0.8;

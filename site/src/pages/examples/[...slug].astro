@@ -39,6 +39,34 @@ const techArticleLd = {
   mainEntityOfPage: canonical,
   about: ['AI agent infrastructure', example.data.framework, 'context compression'],
   isAccessibleForFree: true,
+  image: `https://nocturnus.ai${example.data.demoGif}`,
+  keywords: [example.data.framework, 'nocturnusai', 'example', 'context compression', '5-minute wow'],
+};
+
+const breadcrumbLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://nocturnus.ai/' },
+    { '@type': 'ListItem', position: 2, name: 'Examples', item: 'https://nocturnus.ai/examples/' },
+    { '@type': 'ListItem', position: 3, name: example.data.framework, item: canonical },
+  ],
+};
+
+// HowTo schema — each example IS a how-to (install, run, measure).
+// Rich result eligibility for "how to cut agent token costs with <framework>".
+const howToLd = {
+  '@context': 'https://schema.org',
+  '@type': 'HowTo',
+  name: `${example.data.title} — cut context tokens by ${Math.round((1 - example.data.tokensAfter / example.data.tokensBefore) * 100)}%`,
+  description: example.data.problem,
+  totalTime: 'PT5M',
+  tool: [{ '@type': 'HowToTool', name: example.data.framework }, { '@type': 'HowToTool', name: 'NocturnusAI' }],
+  step: [
+    { '@type': 'HowToStep', name: 'Install', text: example.data.install },
+    { '@type': 'HowToStep', name: 'Run the example', text: `Clone https://github.com/Auctalis/nocturnusai and run the code in ${example.data.githubPath}/.` },
+    { '@type': 'HowToStep', name: 'Measure your own workload', text: `Run bench.py (or bench.mjs) inside ${example.data.githubPath}/ to measure before/after token counts on your own conversation.` },
+  ],
 };
 
 // Ordered list of OTHER examples for the "next step" nav at the bottom
@@ -53,7 +81,7 @@ const nextExample =
   title={`${example.data.title} — 5-minute wow | Nocturnus.AI`}
   description={example.data.problem}
   image={example.data.demoGif}
-  jsonLd={techArticleLd}
+  jsonLd={[techArticleLd, howToLd, breadcrumbLd]}
   keywords={[example.data.framework.toLowerCase(), 'ai agents', 'context compression', 'nocturnusai', 'example']}
 >
   <Navbar solid />
