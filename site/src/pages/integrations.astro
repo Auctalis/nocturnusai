@@ -91,6 +91,7 @@ pip install nocturnusai[all]               <span style="color: rgba(255,255,255,
             <p style="font-size: 0.92rem; line-height: 1.72; color: var(--site-muted); margin-bottom: var(--space-3);">
               Assert facts, teach rules, query with inference, get salience-ranked context, run goal-driven optimization, and extract structured facts from raw text. All as native <code>BaseTool</code> subclasses with Pydantic schemas.
             </p>
+            <p style="margin-bottom: var(--space-3);"><a href={`${base}/examples/langchain`} style="color: var(--site-accent); font-weight: 500;">See the 5-minute example →</a></p>
             <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: var(--space-2);">
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">assert</span>
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">query</span>
@@ -170,6 +171,7 @@ result = crew.kickoff()</pre>
             <p style="font-size: 0.92rem; line-height: 1.72; color: var(--site-muted); margin-bottom: var(--space-3);">
               Five <code>BaseTool</code> subclasses for tell/ask/teach/forget/context, plus a <code>Storage</code> backend that persists crew memory as logical facts instead of embeddings. Your crew remembers through reasoning, not similarity search.
             </p>
+            <p style="margin-bottom: var(--space-3);"><a href={`${base}/examples/crewai`} style="color: var(--site-accent); font-weight: 500;">See the 5-minute example →</a></p>
             <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">tell</span>
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">ask</span>
@@ -301,6 +303,7 @@ agent = Agent(
     tools=tools,
 )</pre>
             </div>
+            <p style="margin-top: var(--space-2); font-size: 0.88rem;"><a href={`${base}/examples/openai-agents`} style="color: var(--site-accent); font-weight: 500;">See the 5-minute example →</a></p>
           </div>
           <div>
             <h3 style="font-family: var(--font-display); font-size: 1.1rem; font-weight: 600; margin: 0 0 var(--space-2);">Anthropic SDK</h3>
@@ -343,6 +346,7 @@ result = handle_tool_call(
             <p style="font-size: 0.92rem; line-height: 1.72; color: var(--site-muted); margin-bottom: var(--space-3);">
               NocturnusAI speaks the Model Context Protocol natively. Point your IDE or Claude Desktop at the server and your AI assistant gains deterministic reasoning, fact storage, and context compression &mdash; no code changes.
             </p>
+            <p style="margin-bottom: var(--space-3);"><a href={`${base}/examples/mcp`} style="color: var(--site-accent); font-weight: 500;">See the 5-minute example →</a></p>
             <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.68rem; color: var(--site-muted);">tell</span>
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.68rem; color: var(--site-muted);">ask</span>
@@ -424,11 +428,12 @@ const ctx = await client.context(&#123;
 <span style="color: rgba(255,255,255,0.45);">// ctx.briefingDelta → only what's relevant</span></pre>
           </div>
           <div>
-            <div class="site-kicker">TypeScript</div>
+            <div class="site-kicker">TypeScript · Vercel AI SDK</div>
             <h2 style="font-family: var(--font-display); font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 600; margin: 0.5rem 0 0.8rem; letter-spacing: -0.02em;">Full API coverage. Zero dependencies.</h2>
             <p style="font-size: 0.92rem; line-height: 1.72; color: var(--site-muted); margin-bottom: var(--space-3);">
-              46 typed methods covering the full NocturnusAI API. Uses built-in <code>fetch</code> &mdash; no runtime dependencies. SSE event subscription for real-time knowledge change notifications.
+              46 typed methods covering the full NocturnusAI API. Uses built-in <code>fetch</code> &mdash; no runtime dependencies. SSE event subscription for real-time knowledge change notifications. Drop into any Vercel AI SDK route handler to compress context before <code>streamText</code>.
             </p>
+            <p style="margin-bottom: var(--space-3);"><a href={`${base}/examples/vercel-ai-sdk`} style="color: var(--site-accent); font-weight: 500;">See the 5-minute Vercel AI SDK example →</a></p>
             <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">46 methods</span>
               <span style="padding: 0.25rem 0.6rem; background: var(--site-surface-soft); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.72rem; color: var(--site-muted);">typed returns</span>

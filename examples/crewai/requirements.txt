@@ -1,0 +1,2 @@
+nocturnusai>=0.3.0
+crewai>=0.70.0

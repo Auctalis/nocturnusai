@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "nocturnus": {
+      "url": "http://localhost:9300/mcp/sse",
+      "transport": "sse",
+      "description": "NocturnusAI context server — salience-ranked memory for AI agents",
+      "env": {
+        "NOCTURNUS_TENANT_ID": "default",
+        "NOCTURNUS_DATABASE": "default"
+      }
+    }
+  }
+}

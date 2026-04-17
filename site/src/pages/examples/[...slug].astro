@@ -1,0 +1,352 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Navbar from '../../components/Navbar.astro';
+import Footer from '../../components/Footer.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const examples = await getCollection('examples', ({ data }) => !data.draft);
+  return examples.map((example) => ({
+    params: { slug: example.id },
+    props: { example },
+  }));
+}
+
+const { example } = Astro.props;
+const { Content } = await render(example);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const reductionPct = Math.round(
+  (1 - example.data.tokensAfter / example.data.tokensBefore) * 100,
+);
+const reductionFactor = (
+  example.data.tokensBefore / example.data.tokensAfter
+).toFixed(1);
+
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+
+const techArticleLd = {
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: example.data.title,
+  description: example.data.problem,
+  author: { '@type': 'Organization', name: 'Nocturnus.AI' },
+  publisher: {
+    '@type': 'Organization',
+    name: 'Nocturnus.AI',
+    logo: { '@type': 'ImageObject', url: 'https://nocturnus.ai/favicon.svg' },
+  },
+  mainEntityOfPage: canonical,
+  about: ['AI agent infrastructure', example.data.framework, 'context compression'],
+  isAccessibleForFree: true,
+};
+
+// Ordered list of OTHER examples for the "next step" nav at the bottom
+const allExamples = (await getCollection('examples', ({ data }) => !data.draft))
+  .sort((a, b) => a.data.order - b.data.order);
+const currentIdx = allExamples.findIndex((e) => e.id === example.id);
+const nextExample =
+  allExamples[(currentIdx + 1) % allExamples.length];
+---
+
+<Layout
+  title={`${example.data.title} — 5-minute wow | Nocturnus.AI`}
+  description={example.data.problem}
+  image={example.data.demoGif}
+  jsonLd={techArticleLd}
+  keywords={[example.data.framework.toLowerCase(), 'ai agents', 'context compression', 'nocturnusai', 'example']}
+>
+  <Navbar solid />
+
+  <main class="ex-shell">
+    <div class="site-container" style="max-width: 920px;">
+      <a href={`${base}/examples/`} class="ex-back">← All examples</a>
+
+      <!-- HERO -->
+      <header class="ex-hero">
+        <div class="site-kicker" style="color: var(--site-accent);">5-MINUTE WOW · {example.data.framework.toUpperCase()}</div>
+        <h1 class="ex-h1">{example.data.title}</h1>
+        <p class="ex-problem">
+          <strong>The problem:</strong> {example.data.problem}
+        </p>
+      </header>
+
+      <!-- BEFORE / AFTER -->
+      <section class="ex-stats reveal">
+        <div class="ex-stat">
+          <div class="ex-stat-label">Without NocturnusAI</div>
+          <div class="ex-stat-num">{example.data.tokensBefore.toLocaleString()}</div>
+          <div class="ex-stat-sub">tokens / turn</div>
+        </div>
+        <div class="ex-stat-arrow">→</div>
+        <div class="ex-stat ex-stat-accent">
+          <div class="ex-stat-label">With NocturnusAI</div>
+          <div class="ex-stat-num">{example.data.tokensAfter.toLocaleString()}</div>
+          <div class="ex-stat-sub">tokens / turn</div>
+        </div>
+        <div class="ex-stat">
+          <div class="ex-stat-label">Reduction</div>
+          <div class="ex-stat-num">{reductionFactor}×</div>
+          <div class="ex-stat-sub">{reductionPct}% fewer tokens</div>
+        </div>
+      </section>
+      <p class="ex-stats-footnote">
+        Measured on our{' '}
+        <a href={`${base}/benchmark`}>15-turn product-support benchmark</a> against Claude Opus 4.
+        The compression happens at the Nocturnus layer — it's framework-agnostic.{' '}
+        <a href={`https://github.com/Auctalis/nocturnusai/tree/main/${example.data.githubPath}`} target="_blank" rel="noopener">
+          Run <code>bench.py</code>
+        </a>{' '}
+        against your own workload.
+      </p>
+
+      <!-- INSTALL -->
+      <section class="ex-section reveal">
+        <h2 class="ex-h2">Copy-paste install</h2>
+        <pre class="ex-install"><code>{example.data.install}</code></pre>
+      </section>
+
+      <!-- DEMO GIF -->
+      <section class="ex-section reveal">
+        <h2 class="ex-h2">2-minute demo</h2>
+        <p class="ex-demo-desc">{example.data.demoDescription}.</p>
+        <figure class="ex-demo">
+          {/* TODO: replace with real .gif when recorded — drop file at same path */}
+          <img
+            src={example.data.demoGif}
+            alt={`${example.data.framework} demo — ${example.data.demoDescription}`}
+            width="800"
+            height="450"
+            loading="lazy"
+            decoding="async"
+          />
+        </figure>
+      </section>
+
+      <!-- CODE + COMMENTARY (from MDX) -->
+      <section class="ex-section ex-mdx docs-content reveal">
+        <Content />
+      </section>
+
+      <!-- RUN IT YOURSELF -->
+      <section class="ex-section ex-cta reveal">
+        <h2 class="ex-h2">Run it yourself</h2>
+        <div class="ex-cta-grid">
+          <a class="plain-card ex-cta-card" href={`https://github.com/Auctalis/nocturnusai/tree/main/${example.data.githubPath}`} target="_blank" rel="noopener">
+            <div class="ex-cta-kicker">GITHUB</div>
+            <div class="ex-cta-title">Full example directory</div>
+            <div class="ex-cta-desc"><code>{example.data.githubPath}/</code></div>
+          </a>
+          <a class="plain-card ex-cta-card" href={`${base}/benchmark`}>
+            <div class="ex-cta-kicker">METHODOLOGY</div>
+            <div class="ex-cta-title">Benchmark details</div>
+            <div class="ex-cta-desc">How the numbers were measured, and how to reproduce them.</div>
+          </a>
+          <a class="plain-card ex-cta-card" href={`${base}/examples/${nextExample.id}`}>
+            <div class="ex-cta-kicker">NEXT EXAMPLE</div>
+            <div class="ex-cta-title">{nextExample.data.framework}</div>
+            <div class="ex-cta-desc">{nextExample.data.problem}</div>
+          </a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <Footer />
+</Layout>
+
+<style>
+  .ex-shell { padding: 6.5rem 0 4rem; background: var(--site-bg); }
+  .ex-back {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--site-muted);
+    text-decoration: none;
+    margin-bottom: var(--space-4);
+  }
+  .ex-back:hover { color: var(--site-accent); }
+
+  .ex-hero { margin-bottom: var(--space-5); }
+  .ex-h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0.5rem 0 1rem;
+  }
+  .ex-problem {
+    font-size: 1.05rem;
+    line-height: 1.7;
+    color: var(--site-muted);
+    max-width: 720px;
+    margin: 0;
+  }
+  .ex-problem strong { color: var(--site-text); }
+
+  .ex-stats {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr 1fr;
+    gap: var(--space-3);
+    align-items: center;
+    margin: var(--space-5) 0 0.6rem;
+  }
+  .ex-stat {
+    text-align: center;
+    padding: 1.3rem 1rem;
+    background: var(--site-surface);
+    border: 1px solid var(--site-line);
+    border-radius: var(--radius-md);
+  }
+  .ex-stat-accent {
+    border-color: var(--site-accent);
+    box-shadow: 0 0 0 1px var(--site-accent);
+  }
+  .ex-stat-label {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--site-muted-soft);
+    margin-bottom: 0.5rem;
+  }
+  .ex-stat-num {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--site-text);
+  }
+  .ex-stat-accent .ex-stat-num { color: var(--site-accent); }
+  .ex-stat-sub {
+    font-size: 0.82rem;
+    color: var(--site-muted);
+    margin-top: 0.4rem;
+  }
+  .ex-stat-arrow {
+    font-size: 1.4rem;
+    color: var(--site-accent);
+    text-align: center;
+  }
+  .ex-stats-footnote {
+    font-size: 0.85rem;
+    color: var(--site-muted);
+    line-height: 1.6;
+    margin: 0.6rem 0 var(--space-5);
+  }
+  .ex-stats-footnote a { color: var(--site-accent); }
+  .ex-stats-footnote code {
+    background: var(--site-surface);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+
+  .ex-section { margin: var(--space-5) 0; }
+  .ex-h2 {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+
+  .ex-install {
+    background: var(--site-dark);
+    color: var(--site-dark-text);
+    padding: 1.2rem 1.4rem;
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre;
+    margin: 0;
+  }
+
+  .ex-demo-desc {
+    font-size: 0.95rem;
+    color: var(--site-muted);
+    margin: 0 0 1rem;
+  }
+  .ex-demo {
+    margin: 0;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--site-line);
+  }
+  .ex-demo img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .ex-mdx :global(h2) {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 2.2rem 0 0.9rem;
+    letter-spacing: -0.01em;
+  }
+  .ex-mdx :global(pre) {
+    margin: 1rem 0;
+  }
+  .ex-mdx :global(ul) {
+    line-height: 1.72;
+  }
+  .ex-mdx :global(p) {
+    line-height: 1.7;
+    margin: 0 0 1rem;
+  }
+
+  .ex-cta { margin-top: var(--space-6); }
+  .ex-cta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-3);
+  }
+  .ex-cta-card {
+    text-decoration: none;
+    color: inherit;
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    transition: border-color 180ms ease, transform 180ms ease;
+  }
+  .ex-cta-card:hover {
+    border-color: var(--site-accent);
+    transform: translateY(-2px);
+  }
+  .ex-cta-kicker {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    color: var(--site-accent);
+  }
+  .ex-cta-title {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+  .ex-cta-desc {
+    font-size: 0.88rem;
+    color: var(--site-muted);
+    line-height: 1.5;
+  }
+  .ex-cta-desc code {
+    background: var(--site-surface);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+    font-size: 0.88em;
+  }
+
+  @media (max-width: 720px) {
+    .ex-stats {
+      grid-template-columns: 1fr;
+    }
+    .ex-stat-arrow { display: none; }
+  }
+</style>

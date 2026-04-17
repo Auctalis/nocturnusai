@@ -1,0 +1,58 @@
+---
+title: "MCP + NocturnusAI"
+framework: "MCP"
+problem: "Claude Desktop, Cursor, and Continue accumulate tool outputs across the session — context window fills with repetition."
+tokensBefore: 1259
+tokensAfter: 221
+install: |
+  docker run -d -p 9300:9300 -e EXTRACTION_ENABLED=true ghcr.io/auctalis/nocturnusai:latest
+  cp config.json ~/Library/Application\ Support/Claude/mcp_servers/nocturnus.json
+githubPath: "examples/mcp"
+demoGif: "/examples/mcp-demo.png"
+demoDescription: "Claude Desktop session, 10 tool calls, flat token cost per turn"
+order: 4
+---
+
+## What changes in your MCP client
+
+Drop this config into your MCP client's server directory. On next restart, the Nocturnus tools — `tell`, `ask`, `teach`, `forget`, `context`, `predicates`, `bulk_assert`, `fork_scope` — appear in your tool list.
+
+```json
+{
+  "mcpServers": {
+    "nocturnus": {
+      "url": "http://localhost:9300/mcp/sse",
+      "transport": "sse",
+      "env": {
+        "NOCTURNUS_TENANT_ID": "default",
+        "NOCTURNUS_DATABASE": "default"
+      }
+    }
+  }
+}
+```
+
+## How to use it in a session
+
+When your assistant needs working memory — at the start of a task, before a tool call, or when the thread grows long — it calls `nocturnus:context`. Nocturnus returns a salience-ranked working set instead of the full transcript.
+
+```
+You:  Remember customer_tier(acme, enterprise) and contract_value(acme, 2000000).
+      Then call context to see what you know.
+
+Claude (tool call → nocturnus:tell):  customer_tier(acme, enterprise)
+Claude (tool call → nocturnus:tell):  contract_value(acme, 2000000)
+Claude (tool call → nocturnus:context):  { "goals": [...], "maxFacts": 8 }
+
+Claude (response):  "I know Acme is enterprise tier with a $2M contract.
+                    Salience 0.65 on both. Ready for the next step."
+```
+
+## Why it works
+
+On a naive MCP client, every turn sends the full prior conversation to the model. Prompt size grows linearly. With Nocturnus as an MCP server, the assistant calls `nocturnus:context` when it wants working memory — and receives a short goal-filtered briefing. The per-turn cost stays flat regardless of how long the session runs.
+
+## What's in the repo
+
+- `config.json` — drop-in for Claude Desktop, Cursor, Continue, Windsurf
+- `example-session.md` — 10-turn walkthrough with before/after token counts per turn

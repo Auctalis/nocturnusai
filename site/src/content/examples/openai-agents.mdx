@@ -1,0 +1,58 @@
+---
+title: "OpenAI Agents SDK + NocturnusAI"
+framework: "OpenAI Agents SDK"
+problem: "Every tool call re-sends the prior conversation into the agent's context."
+tokensBefore: 1259
+tokensAfter: 221
+install: |
+  pip install nocturnusai openai-agents
+  docker run -d -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+  export OPENAI_API_KEY=sk-...
+githubPath: "examples/openai-agents"
+demoGif: "/examples/openai-agents-demo.png"
+demoDescription: "CRM-lookup agent resolving an SLA-credit ticket"
+order: 2
+---
+
+## What changes in your code
+
+`get_nocturnusai_tools()` returns a list of Agents-SDK-compatible tools. Pair them with `process_turns()` before each agent run and the agent sees only what changed.
+
+```python
+from nocturnusai import SyncNocturnusAIClient
+from nocturnusai.openai_agents import get_nocturnusai_tools
+from agents import Agent, Runner
+
+with SyncNocturnusAIClient("http://localhost:9300") as client:
+    # Compress the ticket thread once
+    client.process_turns(
+        turns=[
+            "User: Globex asking for SLA credits, claims 14h downtime.",
+            "Tool sla_calculator: breach=true, credit_owed=$77500.",
+            "Tool contract_check: auto_approval_limit=$100k.",
+        ],
+        scope="sla-ticket-8812",
+        session_id="sla-ticket-8812",
+    )
+
+    # Hand the knowledge-query tools to the agent
+    agent = Agent(
+        name="sla-resolver",
+        instructions="Resolve SLA credit tickets. Query the KB (scope='sla-ticket-8812').",
+        tools=get_nocturnusai_tools(client),
+    )
+
+    result = Runner.run_sync(agent, "Is this ticket eligible for auto-approval?")
+    print(result.final_output)
+    # → "Yes — $77,500 is under the $100,000 auto-approval threshold."
+```
+
+## Why it works
+
+The agent never sees the raw ticket thread. It sees facts like `credit_owed(globex, 77500)` and `auto_approval_limit(100000)` — and backward-chains from `eligible_for_auto_approval(globex)` to the answer. The context stays flat turn-over-turn.
+
+## What's in the repo
+
+- `knowledge_agent.py` — full agent wiring against a 5-turn SLA ticket
+- `bench.py` — run a 15-turn conversation with and without NocturnusAI against your own OpenAI key
+- `requirements.txt`

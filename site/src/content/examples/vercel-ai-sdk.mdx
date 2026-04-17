@@ -1,0 +1,83 @@
+---
+title: "Vercel AI SDK + NocturnusAI"
+framework: "Vercel AI SDK"
+problem: "streamText() receives the full message history on every request — token cost climbs with every turn."
+tokensBefore: 1259
+tokensAfter: 221
+install: |
+  npm install nocturnusai-sdk ai @ai-sdk/openai
+  docker run -d -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+githubPath: "examples/vercel-ai-sdk"
+demoGif: "/examples/vercel-ai-sdk-demo.png"
+demoDescription: "Next.js chat app, 15 turns, flat latency and token cost"
+order: 5
+---
+
+## What changes in your API route
+
+Call `noct.processTurns()` before `streamText`. Pass the `briefingDelta` as the `system` message. `streamText` receives only the new user message — never the full thread.
+
+```ts
+// app/api/chat/route.ts
+import { streamText, type Message } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { NocturnusAIClient } from 'nocturnusai-sdk';
+
+const noct = new NocturnusAIClient({
+  baseUrl: process.env.NOCTURNUS_URL ?? 'http://localhost:9300',
+  tenantId: 'default',
+});
+
+export async function POST(req: Request) {
+  const { messages, sessionId } =
+    (await req.json()) as { messages: Message[]; sessionId: string };
+  const lastUserMessage = messages[messages.length - 1]?.content ?? '';
+
+  // Compress prior context into a short briefing
+  const ctx = await noct.processTurns({
+    turns: [lastUserMessage],
+    sessionId,
+    scope: sessionId,
+  });
+
+  // streamText sees a short system prompt + the new user message only
+  const result = streamText({
+    model: openai('gpt-4o-mini'),
+    system: ctx.briefingDelta ?? 'Start of conversation.',
+    messages: [{ role: 'user', content: lastUserMessage }],
+  });
+
+  return result.toDataStreamResponse();
+}
+```
+
+## What changes in your page
+
+Nothing. Standard `useChat` UI with a persistent `sessionId` body param.
+
+```tsx
+// app/page.tsx
+'use client';
+import { useChat } from 'ai/react';
+import { useMemo } from 'react';
+
+export default function Chat() {
+  const sessionId = useMemo(() => `session-${crypto.randomUUID()}`, []);
+  const { messages, input, handleInputChange, handleSubmit } = useChat({
+    api: '/api/chat',
+    body: { sessionId },
+  });
+  // ...standard chat UI
+}
+```
+
+## Why it works
+
+On a default Vercel AI SDK chat, `streamText` receives the full `messages` array every turn. By turn 10 the prompt is thousands of tokens of repeated history. With NocturnusAI, the prompt stays flat — the model sees only the `briefingDelta` for this turn.
+
+## What's in the repo
+
+- `app/api/chat/route.ts` — the compression handler
+- `app/page.tsx` — standard `useChat` UI
+- `bench.mjs` — measure your own tokens with `node bench.mjs`
+- `package.json` — Next.js + `ai` + `@ai-sdk/openai` + `nocturnusai-sdk`

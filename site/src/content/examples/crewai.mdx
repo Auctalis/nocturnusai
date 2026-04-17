@@ -1,0 +1,62 @@
+---
+title: "CrewAI + NocturnusAI"
+framework: "CrewAI"
+problem: "Each crew member receives all prior crew outputs as context — token cost scales with crew size."
+tokensBefore: 1259
+tokensAfter: 221
+install: |
+  pip install nocturnusai crewai
+  docker run -d -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+  export OPENAI_API_KEY=sk-...
+githubPath: "examples/crewai"
+demoGif: "/examples/crewai-demo.png"
+demoDescription: "3-agent research crew writing an investment brief"
+order: 3
+---
+
+## What changes in your code
+
+Every crew member gets `get_nocturnusai_tools(client, scope=TOPIC)`. They all read/write the same scoped knowledge base — but each only retrieves the facts relevant to its role.
+
+```python
+from nocturnusai import SyncNocturnusAIClient
+from nocturnusai.crewai import get_nocturnusai_tools
+from crewai import Agent, Task, Crew, Process
+
+with SyncNocturnusAIClient("http://localhost:9300") as client:
+    TOPIC = "ai-agent-infrastructure-2026"
+    tools = get_nocturnusai_tools(client, scope=TOPIC)
+
+    researcher = Agent(
+        role="Market Researcher",
+        goal="Identify market size and key players.",
+        tools=tools,
+    )
+    analyst = Agent(
+        role="Strategy Analyst",
+        goal="Identify risks and tailwinds for the context layer.",
+        tools=tools,
+    )
+    writer = Agent(
+        role="Brief Writer",
+        goal="Produce a 3-sentence investment brief.",
+        tools=tools,
+    )
+
+    crew = Crew(
+        agents=[researcher, analyst, writer],
+        tasks=[...],
+        process=Process.sequential,
+    )
+    brief = crew.kickoff()
+```
+
+## Why it works
+
+Without Nocturnus: the Writer receives the full transcript of the Researcher's and Analyst's runs. With Nocturnus: each agent queries the shared knowledge base for the facts its role needs — `market_size(*)`, `key_player(*)`, `incumbent_risk(*)` — and the Writer only pulls what it's writing about.
+
+## What's in the repo
+
+- `research_crew.py` — 3-agent crew seeded with 10 facts, produces an investment brief
+- `bench.py` — measure token counts across the crew with and without compression
+- `requirements.txt`

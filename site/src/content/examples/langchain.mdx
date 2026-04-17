@@ -1,0 +1,55 @@
+---
+title: "LangChain + NocturnusAI"
+framework: "LangChain"
+problem: "ConversationBufferMemory replays every turn — cost explodes after 10 turns."
+tokensBefore: 1259
+tokensAfter: 221
+install: |
+  pip install nocturnusai langchain langchain-openai
+  docker run -d -p 9300:9300 ghcr.io/auctalis/nocturnusai:latest
+githubPath: "examples/langchain"
+demoGif: "/examples/langchain-demo.png"
+demoDescription: "15-turn support ticket with live token counts per turn"
+order: 1
+---
+
+## What changes in your code
+
+Swap `ConversationBufferMemory` for a call to `process_turns()`. Your LangChain agent now sees a compact `briefingDelta` instead of the full chat history.
+
+```python
+from nocturnusai import SyncNocturnusAIClient
+from nocturnusai.langchain import get_nocturnusai_tools
+
+with SyncNocturnusAIClient("http://localhost:9300") as client:
+    # Compress noisy turns (user msg + tool output) into structured facts
+    ctx = client.process_turns(
+        turns=[
+            "User: Dashboard login failures since 8am PST, 40 users affected.",
+            "Tool crm_lookup: acme-corp, enterprise tier, $2.4M ARR.",
+            "Tool auth_audit: 287 SAML_ASSERTION_INVALID since 07:52 UTC.",
+        ],
+        scope="ticket-7734",
+        session_id="ticket-7734",
+    )
+
+    print(ctx.briefing_delta)
+    # → "Acme Corp (enterprise, $2.4M ARR): 40-user login outage since
+    #    07:52 UTC. Root signal: 287 SAML_ASSERTION_INVALID errors."
+
+    # Give the agent Nocturnus query tools
+    tools = get_nocturnusai_tools(client)
+    # ... wire into AgentExecutor / create_tool_calling_agent as usual
+```
+
+## Why it works
+
+NocturnusAI extracts structured predicates (`customer_tier(acme, enterprise)`, `auth_error(acme, saml_invalid, 287)`, ...) and returns only the facts reachable from your agent's current goal via backward-chaining inference. Similarity search returns noise. This returns only what the agent needs.
+
+## What's in the repo
+
+- `support_agent.py` — 3-batch support-ticket compression demo + full LangChain agent wiring
+- `bench.py` — measure your own before/after tokens
+- `requirements.txt` — minimal deps
+
+Run `python bench.py` after setting `OPENAI_API_KEY` to see per-turn `usage.prompt_tokens` for your workload.

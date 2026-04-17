@@ -1,0 +1,238 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Navbar from '../../components/Navbar.astro';
+import Footer from '../../components/Footer.astro';
+import { getCollection } from 'astro:content';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const examples = (await getCollection('examples', ({ data }) => !data.draft))
+  .sort((a, b) => a.data.order - b.data.order);
+
+const collectionLd = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: 'Nocturnus.AI Examples',
+  description:
+    '5-minute wow examples for LangChain, OpenAI Agents SDK, CrewAI, MCP, and Vercel AI SDK. Each shows the problem, exact before/after token counts, copy-paste install, and a runnable repo.',
+  url: 'https://nocturnus.ai/examples/',
+  isPartOf: {
+    '@type': 'WebSite',
+    name: 'Nocturnus.AI',
+    url: 'https://nocturnus.ai/',
+  },
+  hasPart: examples.map((e) => ({
+    '@type': 'TechArticle',
+    headline: e.data.title,
+    url: `https://nocturnus.ai/examples/${e.id}/`,
+    description: e.data.problem,
+  })),
+};
+---
+
+<Layout
+  title="Examples — 5-minute wow for every framework | Nocturnus.AI"
+  description="Production-grade examples for LangChain, OpenAI Agents SDK, CrewAI, MCP, and Vercel AI SDK. Each includes before/after token counts, install commands, and a runnable repo."
+  keywords={['examples', 'langchain', 'openai agents', 'crewai', 'mcp', 'vercel ai sdk', 'nocturnusai']}
+  jsonLd={collectionLd}
+>
+  <Navbar solid />
+
+  <main class="ex-index-shell">
+    <div class="site-container" style="max-width: 1100px;">
+
+      <header class="ex-index-hero">
+        <div class="site-kicker" style="color: var(--site-accent);">EXAMPLES</div>
+        <h1 class="ex-index-h1">5-minute wow, once per framework.</h1>
+        <p class="ex-index-lede">
+          Each example ships with the same four things: the problem it solves, exact before/after token counts,
+          a copy-paste install, and a 2-minute demo. Runnable code lives in the repo. Numbers come from our{' '}
+          <a href={`${base}/benchmark`}>15-turn product-support benchmark</a>.
+        </p>
+      </header>
+
+      <div class="ex-grid">
+        {examples.map((e) => {
+          const reduction = Math.round(
+            (1 - e.data.tokensAfter / e.data.tokensBefore) * 100,
+          );
+          return (
+            <a href={`${base}/examples/${e.id}/`} class="ex-card">
+              <div class="ex-card-thumb">
+                <img
+                  src={e.data.demoGif}
+                  alt={`${e.data.framework} demo`}
+                  width="800"
+                  height="450"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+              <div class="ex-card-body">
+                <div class="ex-card-kicker">{e.data.framework.toUpperCase()}</div>
+                <h2 class="ex-card-title">{e.data.title.replace(` + NocturnusAI`, '')}</h2>
+                <p class="ex-card-problem">{e.data.problem}</p>
+                <div class="ex-card-stats">
+                  <span class="ex-card-stat-before">{e.data.tokensBefore.toLocaleString()}</span>
+                  <span class="ex-card-stat-arrow">→</span>
+                  <span class="ex-card-stat-after">{e.data.tokensAfter.toLocaleString()}</span>
+                  <span class="ex-card-stat-label">tokens/turn · {reduction}% reduction</span>
+                </div>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+
+      <section class="ex-index-cta">
+        <h2 class="ex-index-cta-title">Your framework isn't here yet?</h2>
+        <p>
+          The Nocturnus compression layer is framework-agnostic — you can call{' '}
+          <code>POST /context</code> from any language. We're adding integrations based on what developers ask for. Open a{' '}
+          <a href="https://github.com/Auctalis/nocturnusai/issues/new" target="_blank" rel="noopener">request issue</a>{' '}
+          or send a pull request with your own example.
+        </p>
+      </section>
+    </div>
+  </main>
+
+  <Footer />
+</Layout>
+
+<style>
+  .ex-index-shell { padding: 6.5rem 0 4rem; background: var(--site-bg); }
+
+  .ex-index-hero {
+    max-width: 760px;
+    margin: 0 0 var(--space-5);
+  }
+  .ex-index-h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2.2rem, 4.5vw, 3.4rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0.6rem 0 1.2rem;
+  }
+  .ex-index-lede {
+    font-size: 1.05rem;
+    line-height: 1.72;
+    color: var(--site-muted);
+    margin: 0;
+  }
+  .ex-index-lede a { color: var(--site-accent); }
+
+  .ex-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--space-4);
+    margin-top: var(--space-5);
+  }
+
+  .ex-card {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+    background: #fff;
+    border: 1px solid var(--site-line);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+  }
+  .ex-card:hover {
+    border-color: var(--site-accent);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px -12px rgba(0,0,0,0.14);
+  }
+  .ex-card-thumb {
+    aspect-ratio: 16 / 9;
+    background: var(--site-dark);
+  }
+  .ex-card-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .ex-card-body {
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+  }
+  .ex-card-kicker {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    color: var(--site-accent);
+  }
+  .ex-card-title {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .ex-card-problem {
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: var(--site-muted);
+    margin: 0 0 auto;
+  }
+  .ex-card-stats {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    margin-top: 0.6rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--site-line);
+  }
+  .ex-card-stat-before {
+    color: var(--site-muted-soft);
+    text-decoration: line-through;
+    text-decoration-color: rgba(33,28,23,0.28);
+  }
+  .ex-card-stat-arrow {
+    color: var(--site-accent);
+  }
+  .ex-card-stat-after {
+    color: var(--site-accent);
+    font-weight: 700;
+  }
+  .ex-card-stat-label {
+    color: var(--site-muted);
+    font-size: 0.78rem;
+    margin-left: auto;
+  }
+
+  .ex-index-cta {
+    margin-top: var(--space-6);
+    padding: var(--space-5);
+    background: var(--site-surface);
+    border: 1px solid var(--site-line);
+    border-radius: var(--radius-md);
+  }
+  .ex-index-cta-title {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0 0 0.8rem;
+  }
+  .ex-index-cta p {
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--site-muted);
+    margin: 0;
+  }
+  .ex-index-cta a { color: var(--site-accent); }
+  .ex-index-cta code {
+    background: #fff;
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+</style>
